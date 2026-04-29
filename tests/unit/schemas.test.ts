@@ -46,7 +46,7 @@ describe('SentryResponseSchema', () => {
   it('parses valid Sentry response', () => {
     const input = {
       count: '2',
-      data: [{ des: '99942', fullname: 'Apophis', ps_cum: '-3.42', ip: '0.0001', n_imp: '1' }],
+      data: [{ des: '99942', fullname: 'Apophis', ps_cum: '-3.42', ip: '0.0001', n_imp: 1 }],
     }
     const result = SentryResponseSchema.safeParse(input)
     expect(result.success).toBe(true)
