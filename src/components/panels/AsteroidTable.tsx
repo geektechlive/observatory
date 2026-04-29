@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { useNeo } from '@/hooks/useNeo'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { formatKm, formatLunarDistance, formatVelocity, formatDiameter } from '@/lib/format'
 import type { NeoObject } from '@/schemas/neo'
 import styles from './asteroid-table.module.css'
+
+type SortKey = 'missKm' | 'velocity' | 'diameter' | 'hazardous'
+type SortDir = 'asc' | 'desc'
 
 interface FlatNeo {
   id: string
@@ -35,11 +39,78 @@ function flattenNeos(record: Record<string, NeoObject[]>): FlatNeo[] {
       })
     }
   }
-  return all.sort((a, b) => a.missKm - b.missKm).slice(0, 12)
+  return all
+}
+
+function sortNeos(neos: FlatNeo[], key: SortKey, dir: SortDir): FlatNeo[] {
+  return [...neos].sort((a, b) => {
+    let diff = 0
+    if (key === 'missKm') diff = a.missKm - b.missKm
+    else if (key === 'velocity') diff = a.velocityKps - b.velocityKps
+    else if (key === 'diameter')
+      diff = (a.diameterMin + a.diameterMax) / 2 - (b.diameterMin + b.diameterMax) / 2
+    else if (key === 'hazardous') diff = (b.isHazardous ? 1 : 0) - (a.isHazardous ? 1 : 0)
+    return dir === 'asc' ? diff : -diff
+  })
+}
+
+interface SortableThProps {
+  label: string
+  sortKey: SortKey
+  current: SortKey
+  dir: SortDir
+  align?: 'left' | 'right' | 'center'
+  onSort: (key: SortKey) => void
+}
+
+function SortableTh({ label, sortKey, current, dir, align = 'left', onSort }: SortableThProps) {
+  const active = current === sortKey
+  const ariaSort = active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'
+  const thClass = [
+    styles.th ?? '',
+    align === 'right' ? (styles.thRight ?? '') : '',
+    align === 'center' ? (styles.thCenter ?? '') : '',
+    styles.thSortable ?? '',
+    active ? (styles.thActive ?? '') : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <th
+      scope="col"
+      className={thClass}
+      aria-sort={ariaSort}
+      onClick={() => onSort(sortKey)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSort(sortKey)
+        }
+      }}
+      tabIndex={0}
+    >
+      {label}
+      <span className={styles.sortIcon ?? ''} aria-hidden="true">
+        {active ? (dir === 'asc' ? ' ↑' : ' ↓') : ' ↕'}
+      </span>
+    </th>
+  )
 }
 
 export function AsteroidTable() {
   const { data, isLoading, error } = useNeo()
+  const [sortKey, setSortKey] = useState<SortKey>('missKm')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'hazardous' ? 'desc' : 'asc')
+    }
+  }
 
   const renderContent = () => {
     if (isLoading && !data) {
@@ -50,7 +121,8 @@ export function AsteroidTable() {
       return <div className={styles.unavailable ?? ''}>Data unavailable</div>
     }
 
-    const neos = flattenNeos(data.near_earth_objects)
+    const raw = flattenNeos(data.near_earth_objects)
+    const neos = sortNeos(raw, sortKey, sortDir).slice(0, 12)
 
     if (neos.length === 0) {
       return <div className={styles.empty ?? ''}>No close approaches in the next 7 days</div>
@@ -58,9 +130,7 @@ export function AsteroidTable() {
 
     return (
       <table className={styles.table ?? ''}>
-        <caption className={styles.caption ?? ''}>
-          Near-Earth Objects · Next 7 days · Closest first
-        </caption>
+        <caption className={styles.caption ?? ''}>Near-Earth Objects · Next 7 days</caption>
         <thead>
           <tr>
             <th scope="col" className={styles.th ?? ''}>
@@ -69,18 +139,38 @@ export function AsteroidTable() {
             <th scope="col" className={styles.th ?? ''}>
               Date
             </th>
-            <th scope="col" className={`${styles.th ?? ''} ${styles.thRight ?? ''}`}>
-              Miss Distance
-            </th>
-            <th scope="col" className={`${styles.th ?? ''} ${styles.thRight ?? ''}`}>
-              Velocity
-            </th>
-            <th scope="col" className={`${styles.th ?? ''} ${styles.thRight ?? ''}`}>
-              Diameter
-            </th>
-            <th scope="col" className={`${styles.th ?? ''} ${styles.thCenter ?? ''}`}>
-              ⚠
-            </th>
+            <SortableTh
+              label="Miss Distance"
+              sortKey="missKm"
+              current={sortKey}
+              dir={sortDir}
+              align="right"
+              onSort={handleSort}
+            />
+            <SortableTh
+              label="Velocity"
+              sortKey="velocity"
+              current={sortKey}
+              dir={sortDir}
+              align="right"
+              onSort={handleSort}
+            />
+            <SortableTh
+              label="Diameter"
+              sortKey="diameter"
+              current={sortKey}
+              dir={sortDir}
+              align="right"
+              onSort={handleSort}
+            />
+            <SortableTh
+              label="⚠"
+              sortKey="hazardous"
+              current={sortKey}
+              dir={sortDir}
+              align="center"
+              onSort={handleSort}
+            />
           </tr>
         </thead>
         <tbody>

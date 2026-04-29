@@ -31,6 +31,29 @@
   white-space: nowrap;
 }
 
+.thSortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--duration-fast);
+}
+
+.thSortable:hover {
+  color: var(--ink-dim);
+}
+
+.thActive {
+  color: var(--cyan);
+}
+
+.thActive:hover {
+  color: var(--cyan);
+}
+
+.sortIcon {
+  font-size: 0.7em;
+  opacity: 0.6;
+}
+
 .thRight {
   text-align: right;
 }
