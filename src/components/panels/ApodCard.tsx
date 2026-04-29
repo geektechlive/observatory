@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useApod } from '@/hooks/useApod'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { ApodLightbox } from './ApodLightbox'
 import styles from './apod-card.module.css'
 
 export function ApodCard() {
   const { data, isLoading, error } = useApod()
   const [expanded, setExpanded] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   if (isLoading && !data) {
     return (
@@ -23,6 +25,9 @@ export function ApodCard() {
     )
   }
 
+  const lightboxSrc = data.hdurl ?? data.url
+  const canLightbox = data.media_type === 'image'
+
   return (
     <GlassPanel variant="hero" label="APOD">
       <div className={styles.apodCard ?? ''}>
@@ -31,10 +36,24 @@ export function ApodCard() {
             <img
               src={data.url}
               alt={data.title}
-              className={styles.image ?? ''}
+              className={`${styles.image ?? ''}${canLightbox ? ` ${styles.imageClickable ?? ''}` : ''}`}
               loading="lazy"
               width={1200}
               height={220}
+              onClick={canLightbox ? () => setLightboxOpen(true) : undefined}
+              role={canLightbox ? 'button' : undefined}
+              tabIndex={canLightbox ? 0 : undefined}
+              onKeyDown={
+                canLightbox
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setLightboxOpen(true)
+                      }
+                    }
+                  : undefined
+              }
+              aria-label={canLightbox ? `View full-size: ${data.title}` : undefined}
             />
           </div>
         ) : (
@@ -73,6 +92,10 @@ export function ApodCard() {
           {data.copyright && <span>© {data.copyright.trim()}</span>}
         </div>
       </div>
+
+      {lightboxOpen && canLightbox && (
+        <ApodLightbox src={lightboxSrc} alt={data.title} onClose={() => setLightboxOpen(false)} />
+      )}
     </GlassPanel>
   )
 }

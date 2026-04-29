@@ -20,6 +20,15 @@
   display: block;
 }
 
+.imageClickable {
+  cursor: zoom-in;
+  transition: opacity var(--duration-fast);
+}
+
+.imageClickable:hover {
+  opacity: 0.9;
+}
+
 .videoPlaceholder {
   width: 100%;
   height: 220px;
