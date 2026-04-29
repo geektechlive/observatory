@@ -5,13 +5,28 @@ import styles from './ticker.module.css'
 interface TickerItemProps {
   item: TickerItemData
   'aria-hidden'?: true
+  onClick?: (() => void) | undefined
 }
 
-export function TickerItem({ item, 'aria-hidden': ariaHidden }: TickerItemProps) {
+export function TickerItem({ item, 'aria-hidden': ariaHidden, onClick }: TickerItemProps) {
   const timeStr = item.time.getTime() > 0 ? formatRelativeTime(item.time.toISOString()) : ''
 
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault()
+      onClick()
+    }
+  }
+
   return (
-    <span className={styles.itemWrap ?? ''} aria-hidden={ariaHidden}>
+    <span
+      className={`${styles.itemWrap ?? ''}${onClick ? ` ${styles.itemClickable ?? ''}` : ''}`}
+      aria-hidden={ariaHidden}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? handleKey : undefined}
+    >
       <span className={styles.dot ?? ''} aria-hidden="true" style={{ background: item.color }} />
       <span className={styles.label ?? ''} style={{ color: item.color }}>
         {item.label}

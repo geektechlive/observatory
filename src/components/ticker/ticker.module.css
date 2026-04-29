@@ -26,6 +26,15 @@
   flex-shrink: 0;
   border-right: 1px solid var(--glass-border);
   height: 100%;
+  background: none;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  cursor: pointer;
+}
+
+.liveChip:hover {
+  color: var(--ink);
 }
 
 .liveDot {
@@ -107,6 +116,16 @@
   gap: 6px;
   padding: 0 8px;
   cursor: default;
+}
+
+.itemClickable {
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity var(--duration-fast);
+}
+
+.itemClickable:hover {
+  opacity: 0.8;
 }
 
 .dot {

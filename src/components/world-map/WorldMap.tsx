@@ -6,6 +6,7 @@ import { useEvents } from '@/hooks/useEvents'
 import { useIss } from '@/hooks/useIss'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
+import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
 
@@ -276,6 +277,18 @@ export function WorldMap() {
         : [],
     })
   }, [mapLoaded, position])
+
+  const selectedEventId = useUiStore((s) => s.selectedEventId)
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || !selectedEventId) return
+    if (!selectedEventId.startsWith('eonet-')) return
+    const rawId = selectedEventId.slice('eonet-'.length)
+    const event = events?.events.find((e) => e.id === rawId)
+    if (!event) return
+    const geom = event.geometry.find(isPointGeometry)
+    if (!geom) return
+    mapRef.current.flyTo({ center: geom.coordinates as [number, number], zoom: 3, duration: 1000 })
+  }, [mapLoaded, selectedEventId, events])
 
   return (
     <div className={styles.mapWrap ?? ''}>
