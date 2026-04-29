@@ -20,10 +20,21 @@ function categoryColor(categoryId: string): string {
   return '#cbd5e1'
 }
 
+function categoryLabel(categoryId: string): string {
+  if (categoryId === 'wildfires') return 'Wildfire'
+  if (categoryId === 'severeStorms') return 'Severe Storm'
+  if (categoryId === 'earthquakes') return 'Earthquake'
+  if (categoryId === 'volcanoes') return 'Volcano'
+  if (categoryId === 'floods') return 'Flood'
+  if (categoryId === 'landslides') return 'Landslide'
+  return 'Event'
+}
+
 interface EventFeatureProperties {
   color: string
   title: string
   id: string
+  categoryId: string
 }
 
 function eventsToGeoJson(
@@ -42,6 +53,7 @@ function eventsToGeoJson(
           color: categoryColor(categoryId),
           title: event.title,
           id: event.id,
+          categoryId,
         },
       })
     }
@@ -53,6 +65,7 @@ function eventsToGeoJson(
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const popupRef = useRef<maplibregl.Popup | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
   const { data: events } = useEvents()
@@ -159,10 +172,61 @@ export function WorldMap() {
         },
       )
 
+      // Hover popup
+      map.on(
+        'mouseenter',
+        'eonet-dots',
+        (e: MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+          map.getCanvas().style.cursor = 'pointer'
+          const feature = e.features?.[0]
+          if (!feature) return
+          const geom = feature.geometry as GeoJSON.Point
+          const coords = geom.coordinates as [number, number]
+          const title = (feature.properties['title'] as string | undefined) ?? ''
+          const catId = (feature.properties['categoryId'] as string | undefined) ?? ''
+          const color = (feature.properties['color'] as string | undefined) ?? '#cbd5e1'
+
+          const inner = document.createElement('div')
+          inner.className = 'eonet-popup-inner'
+
+          const labelEl = document.createElement('div')
+          labelEl.className = 'eonet-popup-label'
+          labelEl.style.color = color
+          labelEl.textContent = categoryLabel(catId)
+          inner.appendChild(labelEl)
+
+          const titleEl = document.createElement('div')
+          titleEl.className = 'eonet-popup-title'
+          titleEl.textContent = title
+          inner.appendChild(titleEl)
+
+          if (popupRef.current) popupRef.current.remove()
+
+          popupRef.current = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 10,
+            className: 'eonet-popup',
+          })
+            .setLngLat(coords)
+            .setDOMContent(inner)
+            .addTo(map)
+        },
+      )
+
+      map.on('mouseleave', 'eonet-dots', () => {
+        map.getCanvas().style.cursor = ''
+        if (popupRef.current) {
+          popupRef.current.remove()
+          popupRef.current = null
+        }
+      })
+
       setMapLoaded(true)
     })
 
     return () => {
+      popupRef.current?.remove()
       map.remove()
       mapRef.current = null
       setMapLoaded(false)
@@ -207,7 +271,8 @@ export function WorldMap() {
   }, [mapLoaded, position])
 
   return (
-    <div ref={containerRef} className={styles.container ?? ''}>
+    <div className={styles.mapWrap ?? ''}>
+      <div ref={containerRef} className={styles.container ?? ''} />
       <MapLegend events={events?.events ?? []} issVisible={position !== null} />
     </div>
   )

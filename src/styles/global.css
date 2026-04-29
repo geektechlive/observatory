@@ -43,3 +43,35 @@ body {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
+
+/* MapLibre event popup */
+.eonet-popup .maplibregl-popup-content {
+  background: rgba(4, 6, 15, 0.88);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  max-width: 220px;
+}
+
+.eonet-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.eonet-popup-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.eonet-popup-title {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.45;
+}
