@@ -28,7 +28,9 @@ export function Ticker() {
             ))}
             {/* Duplicate for seamless loop — hidden from screen readers */}
             {!reducedMotion &&
-              displayItems.map((item) => <TickerItem key={`${item.id}-dup`} item={item} />)}
+              displayItems.map((item) => (
+                <TickerItem key={`${item.id}-dup`} item={item} aria-hidden={true} />
+              ))}
           </div>
         )}
       </div>

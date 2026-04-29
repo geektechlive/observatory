@@ -213,6 +213,11 @@ export function WorldMap() {
             .setLngLat(coords)
             .setDOMContent(inner)
             .addTo(map)
+
+          // Move popup element to mapWrap so it isn't clipped by the container's overflow:hidden
+          const popupEl = popupRef.current.getElement()
+          const mapWrap = containerRef.current?.parentElement
+          if (popupEl && mapWrap) mapWrap.appendChild(popupEl)
         },
       )
 

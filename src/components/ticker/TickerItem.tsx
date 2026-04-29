@@ -4,13 +4,14 @@ import styles from './ticker.module.css'
 
 interface TickerItemProps {
   item: TickerItemData
+  'aria-hidden'?: true
 }
 
-export function TickerItem({ item }: TickerItemProps) {
+export function TickerItem({ item, 'aria-hidden': ariaHidden }: TickerItemProps) {
   const timeStr = item.time.getTime() > 0 ? formatRelativeTime(item.time.toISOString()) : ''
 
   return (
-    <span className={styles.itemWrap ?? ''}>
+    <span className={styles.itemWrap ?? ''} aria-hidden={ariaHidden}>
       <span className={styles.dot ?? ''} aria-hidden="true" style={{ background: item.color }} />
       <span className={styles.label ?? ''} style={{ color: item.color }}>
         {item.label}
