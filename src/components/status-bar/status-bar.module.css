@@ -21,14 +21,12 @@
   font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.01em;
-  display: flex;
-  align-items: center;
-  gap: 6px;
   flex-shrink: 0;
 }
 
 .brandDot {
   color: var(--cyan);
+  margin: 0 0.5px;
 }
 
 .divider {

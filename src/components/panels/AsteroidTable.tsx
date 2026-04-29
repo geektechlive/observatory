@@ -52,6 +52,10 @@ export function AsteroidTable() {
 
     const neos = flattenNeos(data.near_earth_objects)
 
+    if (neos.length === 0) {
+      return <div className={styles.empty ?? ''}>No close approaches in the next 7 days</div>
+    }
+
     return (
       <table className={styles.table ?? ''}>
         <caption className={styles.caption ?? ''}>

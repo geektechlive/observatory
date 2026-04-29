@@ -10,7 +10,7 @@
   /* Ink */
   --ink: #f3f6fb;
   --ink-dim: rgba(243, 246, 251, 0.55);
-  --ink-faint: rgba(243, 246, 251, 0.3);
+  --ink-faint: rgba(243, 246, 251, 0.5);
 
   /* Semantic accents */
   --cyan: #7dd3fc; /* telemetry, ISS */

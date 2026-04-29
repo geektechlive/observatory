@@ -33,6 +33,37 @@ export function AboutPopover({ onClose }: AboutPopoverProps) {
     }
   }, [onClose])
 
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null
+    const focusable = ref.current?.querySelectorAll<HTMLElement>(
+      'a[href], button, [tabindex]:not([tabindex="-1"])',
+    )
+    focusable?.[0]?.focus()
+
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault()
+          last?.focus()
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault()
+          first?.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', trap)
+    return () => {
+      document.removeEventListener('keydown', trap)
+      prev?.focus()
+    }
+  }, [])
+
   return (
     <div
       ref={ref}

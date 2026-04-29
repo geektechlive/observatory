@@ -24,6 +24,10 @@ export function SentryPanel() {
       return <div className={styles.unavailable ?? ''}>Data unavailable</div>
     }
 
+    if (sorted.length === 0) {
+      return <div className={styles.empty ?? ''}>No objects in catalog</div>
+    }
+
     return (
       <table className={styles.table ?? ''}>
         <caption className={styles.caption ?? ''}>

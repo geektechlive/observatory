@@ -28,7 +28,14 @@ export function ApodCard() {
       <div className={styles.apodCard ?? ''}>
         {data.media_type === 'image' ? (
           <div className={styles.imageWrap ?? ''}>
-            <img src={data.url} alt={data.title} className={styles.image ?? ''} loading="lazy" />
+            <img
+              src={data.url}
+              alt={data.title}
+              className={styles.image ?? ''}
+              loading="lazy"
+              width={1200}
+              height={220}
+            />
           </div>
         ) : (
           <div className={styles.videoPlaceholder ?? ''}>
@@ -41,7 +48,7 @@ export function ApodCard() {
               rel="noopener noreferrer"
               className={styles.videoLink ?? ''}
             >
-              Video · Open on NASA
+              {data.media_type === 'video' ? 'Video · Open on NASA' : 'Interactive · Open on NASA'}
             </a>
           </div>
         )}

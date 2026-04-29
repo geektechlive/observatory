@@ -12,7 +12,23 @@ function accentClass(remaining: number): string {
 export function ApiQuotaMeter() {
   const quotaRemaining = useUiStore((s) => s.quotaRemaining)
 
-  if (quotaRemaining === null) return null
+  if (quotaRemaining === null) {
+    return (
+      <div
+        className={styles.meter}
+        style={{ opacity: 0.3 }}
+        aria-hidden="true"
+        title="Awaiting quota data"
+      >
+        <span className={`${styles.label ?? ''} ${styles.good ?? ''}`}>
+          —<span className={styles.unit ?? ''}>/hr</span>
+        </span>
+        <div className={styles.track ?? ''}>
+          <div className={`${styles.fill ?? ''} ${styles.good ?? ''}`} style={{ width: '100%' }} />
+        </div>
+      </div>
+    )
+  }
 
   const ratio = Math.max(0, Math.min(1, quotaRemaining / NASA_QUOTA_LIMIT))
 

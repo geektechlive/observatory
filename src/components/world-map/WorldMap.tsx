@@ -6,7 +6,6 @@ import { useEvents } from '@/hooks/useEvents'
 import { useIss } from '@/hooks/useIss'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
-import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
 
@@ -35,6 +34,7 @@ interface EventFeatureProperties {
   title: string
   id: string
   categoryId: string
+  link: string
 }
 
 function eventsToGeoJson(
@@ -54,6 +54,7 @@ function eventsToGeoJson(
           title: event.title,
           id: event.id,
           categoryId,
+          link: event.link,
         },
       })
     }
@@ -79,9 +80,10 @@ export function WorldMap() {
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json',
       center: [0, 20],
       zoom: 1.5,
-      attributionControl: false,
       interactive: true,
     })
+
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
     mapRef.current = map
 
@@ -167,8 +169,8 @@ export function WorldMap() {
         (e: MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0]
           if (!feature) return
-          const id = feature.properties['id'] as string | undefined
-          if (id != null) useUiStore.getState().setSelectedEventId(id)
+          const link = (feature.properties['link'] as string | undefined) ?? ''
+          if (link) window.open(link, '_blank', 'noopener,noreferrer')
         },
       )
 

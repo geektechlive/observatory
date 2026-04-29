@@ -4,6 +4,7 @@ import { fetchIssTle } from '@/lib/api/iss'
 import { propagateIss, computeTrail } from '@/lib/orbit/propagate'
 import type { IssPosition } from '@/lib/orbit/propagate'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { useUiStore } from '@/store/ui'
 
 export interface IssState {
   position: IssPosition | null
@@ -58,6 +59,10 @@ export function useIss(): IssState {
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
   }, [tle, reducedMotion])
+
+  useEffect(() => {
+    useUiStore.getState().setIsLive(error == null)
+  }, [error])
 
   return {
     position,

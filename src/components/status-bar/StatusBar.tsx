@@ -3,10 +3,12 @@ import { DualClock } from './DualClock'
 import { LiveIndicator } from './LiveIndicator'
 import { ApiQuotaMeter } from './ApiQuotaMeter'
 import { AboutPopover } from './AboutPopover'
+import { useUiStore } from '@/store/ui'
 import styles from './status-bar.module.css'
 
 export function StatusBar() {
   const [aboutOpen, setAboutOpen] = useState(false)
+  const isLive = useUiStore((s) => s.isLive)
 
   return (
     <header role="banner">
@@ -17,7 +19,7 @@ export function StatusBar() {
 
         <span className={styles.divider} aria-hidden="true" />
 
-        <LiveIndicator live={true} />
+        <LiveIndicator live={isLive} />
 
         <span className={styles.spacer} />
 

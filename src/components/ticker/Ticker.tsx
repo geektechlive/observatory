@@ -19,14 +19,18 @@ export function Ticker() {
       </div>
 
       <div className={styles.track ?? ''}>
-        <div className={styles.inner ?? ''}>
-          {displayItems.map((item) => (
-            <TickerItem key={item.id} item={item} />
-          ))}
-          {/* Duplicate for seamless loop — hidden from screen readers */}
-          {!reducedMotion &&
-            displayItems.map((item) => <TickerItem key={`${item.id}-dup`} item={item} />)}
-        </div>
+        {displayItems.length === 0 ? (
+          <span className={styles.empty ?? ''}>Awaiting telemetry…</span>
+        ) : (
+          <div className={styles.inner ?? ''}>
+            {displayItems.map((item) => (
+              <TickerItem key={item.id} item={item} />
+            ))}
+            {/* Duplicate for seamless loop — hidden from screen readers */}
+            {!reducedMotion &&
+              displayItems.map((item) => <TickerItem key={`${item.id}-dup`} item={item} />)}
+          </div>
+        )}
       </div>
     </div>
   )

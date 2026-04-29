@@ -6,7 +6,7 @@ export const ApodSchema = z.object({
   explanation: z.string(),
   url: z.string().url(),
   hdurl: z.string().url().optional(),
-  media_type: z.enum(['image', 'video']),
+  media_type: z.enum(['image', 'video', 'other']),
   service_version: z.string(),
   copyright: z.string().optional(),
 })

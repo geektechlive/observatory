@@ -34,8 +34,9 @@ export function StatNumber({ value, unit, label, accent }: StatNumberProps) {
       <div
         data-mono
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--font-mono)',
           fontWeight: 700,
+          fontFeatureSettings: '"tnum" 1',
           fontSize: 'clamp(1.25rem, 1rem + 1vw, 1.75rem)',
           color,
           lineHeight: 1,

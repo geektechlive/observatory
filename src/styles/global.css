@@ -75,3 +75,18 @@ body {
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.45;
 }
+
+/* MapLibre attribution — glass style */
+.maplibregl-ctrl-attrib {
+  background: rgba(4, 6, 15, 0.7) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 4px !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  color: var(--ink-faint) !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--ink-dim) !important;
+}

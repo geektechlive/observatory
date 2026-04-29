@@ -24,6 +24,14 @@ export function FireballList() {
 
   const recent = data.data.slice(0, 8)
 
+  if (recent.length === 0) {
+    return (
+      <GlassPanel variant="tile" label="Fireballs">
+        <div className={styles.empty ?? ''}>No recent fireballs</div>
+      </GlassPanel>
+    )
+  }
+
   return (
     <GlassPanel variant="tile" label="Fireballs">
       <div className={styles.fireballList ?? ''}>

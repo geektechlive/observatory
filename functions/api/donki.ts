@@ -28,16 +28,19 @@ async function fetchDonkiEndpoint<T>(
   apiKey: string,
   startDate: string,
   endDate: string,
-): Promise<T[]> {
+): Promise<{ data: T[]; ok: boolean }> {
   const url = `${NASA_API_BASE}/DONKI/${endpoint}?startDate=${startDate}&endDate=${endDate}&api_key=${apiKey}`
   const res = await fetch(url)
-  if (!res.ok) return []
+  if (!res.ok) return { data: [], ok: false }
   const raw: unknown = await res.json()
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((item) => schema.safeParse(item))
-    .filter((r): r is z.SafeParseSuccess<T> => r.success)
-    .map((r) => r.data)
+  if (!Array.isArray(raw)) return { data: [], ok: false }
+  return {
+    data: raw
+      .map((item) => schema.safeParse(item))
+      .filter((r): r is z.SafeParseSuccess<T> => r.success)
+      .map((r) => r.data),
+    ok: true,
+  }
 }
 
 export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
@@ -61,14 +64,27 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
 
   const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
 
-  const [flares, cmes, geomagneticStorms, seps] = await Promise.all([
+  const [flaresResult, cmesResult, stormsResult, sepsResult] = await Promise.all([
     fetchDonkiEndpoint('FLR', SolarFlareSchema, apiKey, startDate, endDate),
     fetchDonkiEndpoint('CME', CmeSchema, apiKey, startDate, endDate),
     fetchDonkiEndpoint('GST', GeomagneticStormSchema, apiKey, startDate, endDate),
     fetchDonkiEndpoint('SEP', SepSchema, apiKey, startDate, endDate),
   ])
 
-  const data: DonkiResponse = { flares, cmes, geomagneticStorms, seps }
+  const allFailed = !flaresResult.ok && !cmesResult.ok && !stormsResult.ok && !sepsResult.ok
+  if (allFailed) {
+    return new Response(JSON.stringify({ error: 'All DONKI endpoints unavailable' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const data: DonkiResponse = {
+    flares: flaresResult.data,
+    cmes: cmesResult.data,
+    geomagneticStorms: stormsResult.data,
+    seps: sepsResult.data,
+  }
   const body = JSON.stringify(data)
   await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
 
