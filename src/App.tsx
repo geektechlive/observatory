@@ -1,5 +1,6 @@
 import { StatusBar } from '@/components/status-bar/StatusBar'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { WorldMap } from '@/components/world-map/WorldMap'
 import appStyles from './App.module.css'
 
 export function App() {
@@ -11,11 +12,9 @@ export function App() {
 
       <main id="main-content" className={appStyles.main}>
         <div className={appStyles.grid}>
-          <GlassPanel variant="panel" label="World Map" className={appStyles.mapPlaceholder}>
-            <div className={appStyles.placeholder}>
-              <span>MapLibre GL — Phase 2</span>
-            </div>
-          </GlassPanel>
+          <div className={appStyles.mapPlaceholder}>
+            <WorldMap />
+          </div>
 
           <GlassPanel variant="tile" label="ISS" className={appStyles.tile}>
             <div className={appStyles.placeholder}>
