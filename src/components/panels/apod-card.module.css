@@ -72,19 +72,17 @@
   margin: 0;
 }
 
-.explanation {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  color: var(--ink-dim);
-  line-height: 1.6;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
+.explanationWrap {
   overflow: hidden;
+  max-height: 6.5em;
+  transition: max-height 0.35s ease;
 }
 
-.explanationExpanded {
+.explanationWrapOpen {
+  max-height: 60em;
+}
+
+.explanation {
   font-family: var(--font-body);
   font-size: var(--text-sm);
   color: var(--ink-dim);

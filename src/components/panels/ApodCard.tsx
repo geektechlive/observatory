@@ -74,9 +74,11 @@ export function ApodCard() {
 
         <h2 className={styles.title ?? ''}>{data.title}</h2>
 
-        <p className={expanded ? (styles.explanationExpanded ?? '') : (styles.explanation ?? '')}>
-          {data.explanation}
-        </p>
+        <div
+          className={`${styles.explanationWrap ?? ''} ${expanded ? (styles.explanationWrapOpen ?? '') : ''}`}
+        >
+          <p className={styles.explanation ?? ''}>{data.explanation}</p>
+        </div>
 
         <button
           type="button"
