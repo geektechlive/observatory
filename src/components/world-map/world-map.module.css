@@ -12,3 +12,19 @@
   border-radius: var(--radius-panel);
   overflow: hidden;
 }
+
+.eonetBadge {
+  position: absolute;
+  bottom: 36px;
+  left: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(4, 6, 15, 0.75);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--amber);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}

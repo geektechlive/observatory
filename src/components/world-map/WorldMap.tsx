@@ -72,6 +72,7 @@ export function WorldMap() {
 
   const { data: events } = useEvents()
   const { position, trail } = useIss()
+  const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -294,6 +295,11 @@ export function WorldMap() {
     <div className={styles.mapWrap ?? ''}>
       <div ref={containerRef} className={styles.container ?? ''} />
       <MapLegend events={events?.events ?? []} issVisible={position !== null} />
+      {eonetFailed && (
+        <div className={styles.eonetBadge ?? ''} role="status" aria-live="polite">
+          EONET unavailable
+        </div>
+      )}
     </div>
   )
 }
