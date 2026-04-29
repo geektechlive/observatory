@@ -1,6 +1,11 @@
+import { lazy, Suspense } from 'react'
 import { StatusBar } from '@/components/status-bar/StatusBar'
-import { WorldMap } from '@/components/world-map/WorldMap'
 import { IssPanel } from '@/components/panels/IssPanel'
+
+const WorldMap = lazy(() =>
+  import('@/components/world-map/WorldMap').then((m) => ({ default: m.WorldMap })),
+)
+
 import { SentryPanel } from '@/components/panels/SentryPanel'
 import { AsteroidTable } from '@/components/panels/AsteroidTable'
 import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
@@ -20,7 +25,9 @@ export function App() {
       <main id="main-content" className={appStyles.main ?? ''}>
         <div className={appStyles.grid ?? ''}>
           <div className={appStyles.mapArea ?? ''}>
-            <WorldMap />
+            <Suspense fallback={null}>
+              <WorldMap />
+            </Suspense>
           </div>
 
           <div className={appStyles.issArea ?? ''}>
