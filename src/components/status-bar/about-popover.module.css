@@ -1,0 +1,89 @@
+.popover {
+  position: fixed;
+  top: calc(var(--status-bar-h) + 8px);
+  right: 16px;
+  z-index: 200;
+  width: 280px;
+  padding: 16px;
+  background: rgba(10, 14, 30, 0.92);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-panel);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.dot {
+  color: var(--cyan);
+}
+
+.description {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--ink-dim);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.rule {
+  border: none;
+  border-top: 1px solid var(--glass-border);
+  margin: 12px 0;
+}
+
+.credit {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--ink-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sectionLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+
+.sourceList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sourceList li {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+}
+
+.link {
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.footer {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--ink-dim);
+  margin: 0;
+}

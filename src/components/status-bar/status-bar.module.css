@@ -64,3 +64,8 @@
   border-color: var(--cyan);
   color: var(--cyan);
 }
+
+.aboutWrap {
+  position: relative;
+  flex-shrink: 0;
+}

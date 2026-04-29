@@ -1,0 +1,53 @@
+.issPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  height: 100%;
+}
+
+.statRow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+
+.shimmer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shimmerRow {
+  height: 48px;
+  border-radius: 6px;
+  background: var(--glass-bg);
+  animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.coordRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

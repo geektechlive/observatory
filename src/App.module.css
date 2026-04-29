@@ -10,47 +10,55 @@
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-auto-rows: auto;
   gap: var(--space-gap);
   padding: var(--space-gap);
 }
 
-.mapPlaceholder {
+/* Row 1-2: Map spans col 1-2, rows 1-2 */
+.mapArea {
   grid-column: 1 / 3;
   grid-row: 1 / 3;
   min-height: 480px;
 }
 
-.tile {
-  min-height: 160px;
+/* Row 1: ISS Panel col 3 */
+.issArea {
+  grid-column: 3;
+  grid-row: 1;
 }
 
-.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 32px;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+/* Row 2: Sentry Panel col 3 */
+.sentryArea {
+  grid-column: 3;
+  grid-row: 2;
 }
 
-.ticker {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--ticker-h);
-  z-index: 90;
-  padding: 0 var(--space-gap);
+/* Row 3: Asteroid table full width */
+.asteroidArea {
+  grid-column: 1 / -1;
+  grid-row: 3;
 }
 
-.tickerInner {
-  height: 100%;
-  border-radius: var(--radius-tile) var(--radius-tile) 0 0;
-  display: flex;
-  align-items: center;
+/* Row 4: Space weather spans col 1-2, fireball col 3 */
+.weatherArea {
+  grid-column: 1 / 3;
+  grid-row: 4;
+}
+
+.fireballArea {
+  grid-column: 3;
+  grid-row: 4;
+}
+
+/* Row 5: APOD hero full width */
+.apodArea {
+  grid-column: 1 / -1;
+  grid-row: 5;
+}
+
+/* Row 6: Footer full width */
+.footerArea {
+  grid-column: 1 / -1;
+  grid-row: 6;
 }

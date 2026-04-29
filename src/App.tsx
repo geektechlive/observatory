@@ -1,6 +1,13 @@
 import { StatusBar } from '@/components/status-bar/StatusBar'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { WorldMap } from '@/components/world-map/WorldMap'
+import { IssPanel } from '@/components/panels/IssPanel'
+import { SentryPanel } from '@/components/panels/SentryPanel'
+import { AsteroidTable } from '@/components/panels/AsteroidTable'
+import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
+import { FireballList } from '@/components/panels/FireballList'
+import { ApodCard } from '@/components/panels/ApodCard'
+import { Ticker } from '@/components/ticker/Ticker'
+import { Footer } from '@/components/footer/Footer'
 import appStyles from './App.module.css'
 
 export function App() {
@@ -10,52 +17,43 @@ export function App() {
 
       <StatusBar />
 
-      <main id="main-content" className={appStyles.main}>
-        <div className={appStyles.grid}>
-          <div className={appStyles.mapPlaceholder}>
+      <main id="main-content" className={appStyles.main ?? ''}>
+        <div className={appStyles.grid ?? ''}>
+          <div className={appStyles.mapArea ?? ''}>
             <WorldMap />
           </div>
 
-          <GlassPanel variant="tile" label="ISS" className={appStyles.tile}>
-            <div className={appStyles.placeholder}>
-              <span>ISS Tracker — Phase 2</span>
-            </div>
-          </GlassPanel>
+          <div className={appStyles.issArea ?? ''}>
+            <IssPanel />
+          </div>
 
-          <GlassPanel variant="tile" label="Asteroids" className={appStyles.tile}>
-            <div className={appStyles.placeholder}>
-              <span>NeoWs — Phase 3</span>
-            </div>
-          </GlassPanel>
+          <div className={appStyles.sentryArea ?? ''}>
+            <SentryPanel />
+          </div>
 
-          <GlassPanel variant="tile" label="APOD" className={appStyles.tile}>
-            <div className={appStyles.placeholder}>
-              <span>APOD — Phase 3</span>
-            </div>
-          </GlassPanel>
+          <div className={appStyles.asteroidArea ?? ''}>
+            <AsteroidTable />
+          </div>
 
-          <GlassPanel variant="tile" label="Space Weather" className={appStyles.tile}>
-            <div className={appStyles.placeholder}>
-              <span>DONKI — Phase 3</span>
-            </div>
-          </GlassPanel>
-        </div>
+          <div className={appStyles.weatherArea ?? ''}>
+            <SpaceWeatherStrip />
+          </div>
 
-        <div className={appStyles.ticker}>
-          <GlassPanel variant="tile" className={appStyles.tickerInner}>
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 'var(--text-xs)',
-                color: 'var(--ink-dim)',
-                padding: '0 16px',
-              }}
-            >
-              ● Live Ticker — Phase 3
-            </span>
-          </GlassPanel>
+          <div className={appStyles.fireballArea ?? ''}>
+            <FireballList />
+          </div>
+
+          <div className={appStyles.apodArea ?? ''}>
+            <ApodCard />
+          </div>
+
+          <div className={appStyles.footerArea ?? ''}>
+            <Footer />
+          </div>
         </div>
       </main>
+
+      <Ticker />
     </>
   )
 }

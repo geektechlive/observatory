@@ -58,11 +58,13 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
   const body = JSON.stringify(parsed.data)
   await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
 
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
-  })
+  const missHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Cache': 'MISS',
+    'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+  }
+  const quota = upstream.headers.get('X-RateLimit-Remaining')
+  if (quota !== null) missHeaders['X-Quota-Remaining'] = quota
+
+  return new Response(body, { headers: missHeaders })
 }
