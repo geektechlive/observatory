@@ -13,6 +13,7 @@ import { FireballList } from '@/components/panels/FireballList'
 import { ApodCard } from '@/components/panels/ApodCard'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import appStyles from './App.module.css'
 
 export function App() {
@@ -31,27 +32,39 @@ export function App() {
           </div>
 
           <div className={appStyles.issArea ?? ''}>
-            <IssPanel />
+            <ErrorBoundary label="ISS">
+              <IssPanel />
+            </ErrorBoundary>
           </div>
 
           <div className={appStyles.sentryArea ?? ''}>
-            <SentryPanel />
+            <ErrorBoundary label="Sentry">
+              <SentryPanel />
+            </ErrorBoundary>
           </div>
 
           <div className={appStyles.asteroidArea ?? ''}>
-            <AsteroidTable />
+            <ErrorBoundary label="Close Approaches">
+              <AsteroidTable />
+            </ErrorBoundary>
           </div>
 
           <div className={appStyles.weatherArea ?? ''}>
-            <SpaceWeatherStrip />
+            <ErrorBoundary label="Space Weather">
+              <SpaceWeatherStrip />
+            </ErrorBoundary>
           </div>
 
           <div className={appStyles.fireballArea ?? ''}>
-            <FireballList />
+            <ErrorBoundary label="Fireballs">
+              <FireballList />
+            </ErrorBoundary>
           </div>
 
           <div className={appStyles.apodArea ?? ''}>
-            <ApodCard />
+            <ErrorBoundary label="APOD">
+              <ApodCard />
+            </ErrorBoundary>
           </div>
 
           <div className={appStyles.footerArea ?? ''}>
@@ -60,7 +73,9 @@ export function App() {
         </div>
       </main>
 
-      <Ticker />
+      <ErrorBoundary>
+        <Ticker />
+      </ErrorBoundary>
     </>
   )
 }
