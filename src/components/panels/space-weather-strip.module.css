@@ -40,21 +40,6 @@
   text-align: center;
 }
 
-.kpBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--amber);
-  letter-spacing: 0.06em;
-  align-self: flex-start;
-}
-
 .eventList {
   display: flex;
   flex-direction: column;

@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useDonki } from '@/hooks/useDonki'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { DataAge } from '@/components/ui/DataAge'
+import { KpSparkline } from './KpSparkline'
 import { formatRelativeTime } from '@/lib/format'
 import styles from './space-weather-strip.module.css'
 
@@ -32,13 +33,11 @@ export function SpaceWeatherStrip() {
     )
   }
 
-  // Max KP index across all storms
-  let maxKp: number | null = null
+  // Collect all Kp readings across all storms for sparkline
+  const kpReadings: { observedTime: string; kpIndex: number }[] = []
   for (const storm of data.geomagneticStorms) {
     for (const kp of storm.allKpIndex ?? []) {
-      if (maxKp === null || kp.kpIndex > maxKp) {
-        maxKp = kp.kpIndex
-      }
+      kpReadings.push({ observedTime: kp.observedTime, kpIndex: kp.kpIndex })
     }
   }
 
@@ -110,7 +109,7 @@ export function SpaceWeatherStrip() {
           </div>
         </div>
 
-        {maxKp !== null && <div className={styles.kpBadge ?? ''}>Max KP: {maxKp}</div>}
+        <KpSparkline readings={kpReadings} />
 
         <div className={styles.divider ?? ''} />
 
