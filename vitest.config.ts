@@ -4,6 +4,7 @@ import { resolve } from 'path'
 export default defineConfig({
   test: {
     environment: 'node',
+    include: ['tests/unit/**/*.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/lib/**', 'src/schemas/**', 'src/hooks/**'],

@@ -8,13 +8,14 @@ test.describe('Landing page', () => {
 
   test('status bar is visible', async ({ page }) => {
     await page.goto('/')
-    const statusBar = page.getByRole('banner')
+    const statusBar = page.locator('nav[aria-label="Observatory status"]')
     await expect(statusBar).toBeVisible()
   })
 
   test('brand mark is present', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByText('cosmo')).toBeVisible()
+    const nav = page.locator('nav[aria-label="Observatory status"]')
+    await expect(nav.getByText('cosmo')).toBeVisible()
   })
 
   test('main content area is present', async ({ page }) => {
@@ -33,7 +34,7 @@ test.describe('Landing page', () => {
     const aboutBtn = page.getByRole('button', { name: /about/i })
     await aboutBtn.click()
     await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByText('cosmo-tui')).toBeVisible()
+    await expect(page.getByRole('dialog').getByText('cosmo-tui')).toBeVisible()
   })
 
   test('About popover closes on Escape', async ({ page }) => {
