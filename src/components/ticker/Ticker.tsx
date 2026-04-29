@@ -1,8 +1,11 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useTicker } from '@/hooks/useTicker'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { useUiStore } from '@/store/ui'
 import { TickerItem } from './TickerItem'
 import styles from './ticker.module.css'
+
+const TICKER_SPEED_PX_PER_S = 80
 
 export function Ticker() {
   const items = useTicker()
@@ -12,6 +15,18 @@ export function Ticker() {
   const setSelectedEventId = useUiStore((s) => s.setSelectedEventId)
 
   const displayItems = reducedMotion ? items.slice(0, 8) : items
+
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [tickerDuration, setTickerDuration] = useState(60)
+
+  useLayoutEffect(() => {
+    if (!innerRef.current) return
+    const width = innerRef.current.scrollWidth
+    if (width === 0) return
+    // Animation scrolls -50% of total width; derive duration from target speed
+    const duration = (width * 0.5) / TICKER_SPEED_PX_PER_S
+    setTickerDuration(Math.max(15, duration))
+  }, [displayItems.length])
 
   return (
     <div className={styles.ticker ?? ''} role="region" aria-label="Live event feed">
@@ -35,8 +50,14 @@ export function Ticker() {
           <span className={styles.empty ?? ''}>Awaiting telemetry…</span>
         ) : (
           <div
+            ref={innerRef}
             className={styles.inner ?? ''}
-            style={{ animationPlayState: tickerPaused ? 'paused' : undefined }}
+            style={
+              {
+                '--ticker-duration': `${tickerDuration.toFixed(1)}s`,
+                animationPlayState: tickerPaused ? 'paused' : undefined,
+              } as React.CSSProperties
+            }
           >
             {displayItems.map((item) => (
               <TickerItem
