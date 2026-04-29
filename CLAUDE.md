@@ -21,7 +21,7 @@ Vite 8 + React 19 + TypeScript 6 strict · Cloudflare Pages + Pages Functions + 
 - Phase 1 (scaffold + infra): **complete**
 - Phase 2 (map + ISS): **complete** — MapLibre + EONET markers + ISS live tracker
 - Phase 3 (panels + ticker): **complete** — all 6 panels, ticker, footer, App.tsx wired
-- Phase 4 (security + polish): **in progress** — fonts, meta, OG, favicon, AboutPopover, ApiQuotaMeter done; Lighthouse + code-split pass remaining
+- Phase 4 (security + polish): **complete** — self-hosted fonts, CSP, OG/meta/favicon, AboutPopover, ApiQuotaMeter, quota tracking, code-split (WorldMap lazy), tests (unit + e2e), CI (3-job workflow)
 
 ## Gotchas
 
