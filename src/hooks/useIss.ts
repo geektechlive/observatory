@@ -61,7 +61,7 @@ export function useIss(): IssState {
   }, [tle, reducedMotion])
 
   useEffect(() => {
-    useUiStore.getState().setIsLive(error == null)
+    useUiStore.getState().setSourceError('iss', error != null)
   }, [error])
 
   return {

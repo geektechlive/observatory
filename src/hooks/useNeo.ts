@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchNeo } from '@/lib/api/neo'
 import type { NeoResponse } from '@/schemas/neo'
+import { useUiStore } from '@/store/ui'
 
 export function useNeo(): {
   data: NeoResponse | undefined
@@ -14,6 +16,10 @@ export function useNeo(): {
     refetchInterval: 15 * 60 * 1000,
     refetchOnWindowFocus: true,
   })
+
+  useEffect(() => {
+    useUiStore.getState().setSourceError('neo', error != null)
+  }, [error])
 
   return {
     data,

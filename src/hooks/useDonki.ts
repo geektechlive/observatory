@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchDonki } from '@/lib/api/donki'
 import type { DonkiResponse } from '@/schemas/donki'
+import { useUiStore } from '@/store/ui'
 
 export function useDonki(): {
   data: DonkiResponse | undefined
@@ -14,6 +16,10 @@ export function useDonki(): {
     refetchInterval: 15 * 60 * 1000,
     refetchOnWindowFocus: true,
   })
+
+  useEffect(() => {
+    useUiStore.getState().setSourceError('donki', error != null)
+  }, [error])
 
   return {
     data,

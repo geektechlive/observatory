@@ -8,7 +8,10 @@ import styles from './status-bar.module.css'
 
 export function StatusBar() {
   const [aboutOpen, setAboutOpen] = useState(false)
-  const isLive = useUiStore((s) => s.isLive)
+  const sourceErrors = useUiStore((s) => s.sourceErrors)
+  const issDown = sourceErrors['iss'] === true
+  const othersDown = Object.entries(sourceErrors).some(([k, v]) => k !== 'iss' && v)
+  const liveStatus = issDown ? 'offline' : othersDown ? 'degraded' : 'live'
 
   return (
     <header role="banner">
@@ -19,7 +22,7 @@ export function StatusBar() {
 
         <span className={styles.divider} aria-hidden="true" />
 
-        <LiveIndicator live={isLive} />
+        <LiveIndicator status={liveStatus} />
 
         <span className={styles.spacer} />
 
