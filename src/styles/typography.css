@@ -1,0 +1,53 @@
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 400;
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.15;
+}
+
+code,
+pre,
+kbd,
+[data-mono] {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+}
+
+[data-editorial] {
+  font-family: var(--font-editorial);
+  font-style: italic;
+}
+
+.text-dim {
+  color: var(--ink-dim);
+}
+
+.text-faint {
+  color: var(--ink-faint);
+}
+
+.text-cyan {
+  color: var(--cyan);
+}
+
+.text-amber {
+  color: var(--amber);
+}
+
+.text-magenta {
+  color: var(--magenta);
+}
+
+.text-green {
+  color: var(--green);
+}

@@ -1,0 +1,9 @@
+name = "observatory"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+[[kv_namespaces]]
+binding = "OBSERVATORY_CACHE"
+# Replace with real IDs after running: wrangler kv namespace create OBSERVATORY_CACHE
+id = "REPLACE_AFTER_DEPLOY"
+preview_id = "REPLACE_AFTER_DEPLOY"

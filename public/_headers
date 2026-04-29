@@ -1,0 +1,7 @@
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apod.nasa.gov https://*.basemaps.cartocdn.com https://api.maptiler.com; font-src 'self'; connect-src 'self' https://*.nasa.gov https://ssd-api.jpl.nasa.gov https://celestrak.org https://*.basemaps.cartocdn.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';

@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NASA Web Dashboard — Visual Direction Mockups</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter+Tight:wght@500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; }
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* ============ TOP NAV ============ */
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(10, 10, 10, 0.7);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .topnav strong { color: #5cd8ff; font-weight: 600; }
+    .topnav .nav-links { display: flex; gap: 18px; margin-left: auto; }
+    .topnav .nav-links a {
+      color: rgba(255, 255, 255, 0.5);
+      text-decoration: none;
+      transition: color 0.2s;
+      cursor: pointer;
+    }
+    .topnav .nav-links a:hover { color: #fff; }
+
+    .section-divider {
+      padding: 80px 24px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .section-divider .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 12px;
+    }
+    .section-divider h2 {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: clamp(32px, 4vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+    .section-divider p {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 15px;
+      max-width: 680px;
+      line-height: 1.5;
+    }
+    .section-divider .meta {
+      display: flex;
+      gap: 24px;
+      margin-top: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.5);
+      flex-wrap: wrap;
+    }
+    .section-divider .meta span strong {
+      color: #fff;
+      font-weight: 500;
+      margin-left: 6px;
+    }
+
+    /* ============ MOCKUP FRAME ============ */
+    .mockup {
+      max-width: 1400px;
+      margin: 0 auto 80px;
+      padding: 0 24px;
+    }
+    .mockup-frame {
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    /* ============================================ */
+    /*  STYLE 1 — MISSION CONTROL                   */
+    /* ============================================ */
+    .mc {
+      --bg: #05070d;
+      --bg-elev: #0a0e16;
+      --bg-elev2: #0e1320;
+      --line: rgba(92, 216, 255, 0.12);
+      --line-strong: rgba(92, 216, 255, 0.24);
+      --ink: #e6edf3;
+      --ink-dim: #9aa6b2;
+      --amber: #ffb547;
+      --cyan: #5cd8ff;
+      --magenta: #ff5cf2;
+      --green: #6ee7a7;
+      --red: #ff5470;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+      position: relative;
+    }
+    .mc::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .mc::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0,
+        transparent 2px,
+        rgba(255, 255, 255, 0.015) 2px,
+        rgba(255, 255, 255, 0.015) 3px
+      );
+      pointer-events: none;
+    }
+    .mc-statusbar {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--bg-elev);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      gap: 28px;
+    }
+    .mc-statusbar .brand {
+      color: var(--cyan);
+      font-weight: 600;
+      letter-spacing: 0.18em;
+    }
+    .mc-statusbar .brand::before {
+      content: '◉ ';
+      color: var(--amber);
+    }
+    .mc-statusbar .stat { color: var(--ink-dim); display: flex; align-items: center; gap: 8px; }
+    .mc-statusbar .stat strong { color: var(--ink); font-weight: 500; }
+    .mc-statusbar .right { margin-left: auto; display: flex; gap: 24px; }
+    .mc-statusbar .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px var(--green);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .mc-grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1px;
+      background: var(--line-strong);
+    }
+    .mc-map-panel {
+      background: var(--bg);
+      padding: 24px;
+      min-height: 520px;
+      position: relative;
+      overflow: hidden;
+    }
+    .mc-map-panel .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .mc-map-panel .panel-head .title { color: var(--cyan); }
+    .mc-map-panel .panel-head .title::before { content: '[ '; color: var(--ink-dim); }
+    .mc-map-panel .panel-head .title::after { content: ' ]'; color: var(--ink-dim); }
+    .mc-map-panel .panel-head .legend {
+      display: flex;
+      gap: 16px;
+      color: var(--ink-dim);
+    }
+    .mc-map-panel .panel-head .legend span { display: flex; align-items: center; gap: 6px; }
+    .mc-map-panel .panel-head .legend .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+
+    .world-svg {
+      width: 100%; height: 420px;
+      display: block;
+    }
+    .world-svg .land { fill: rgba(92, 216, 255, 0.08); stroke: rgba(92, 216, 255, 0.25); stroke-width: 0.4; }
+    .world-svg .grid-line { stroke: rgba(92, 216, 255, 0.08); stroke-width: 0.3; fill: none; }
+
+    .marker { fill-opacity: 0.9; }
+    .marker-fire { fill: var(--red); filter: drop-shadow(0 0 4px var(--red)); }
+    .marker-storm { fill: #4cc4ff; filter: drop-shadow(0 0 4px #4cc4ff); }
+    .marker-quake { fill: var(--amber); filter: drop-shadow(0 0 4px var(--amber)); }
+    .marker-volcano { fill: #ff8a3c; filter: drop-shadow(0 0 4px #ff8a3c); }
+    .marker-iss { fill: var(--cyan); filter: drop-shadow(0 0 8px var(--cyan)); }
+    .iss-trail { stroke: var(--cyan); stroke-width: 0.6; fill: none; stroke-dasharray: 2 2; opacity: 0.7; }
+
+    .mc-side {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+    .mc-card {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .mc-card:last-child { border-bottom: none; }
+    .mc-card .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .mc-card .card-head .name { color: var(--amber); }
+    .mc-card .card-head .id { color: var(--ink-dim); font-size: 9px; }
+    .mc-card .big-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .mc-card .big-number .unit {
+      font-size: 12px;
+      color: var(--ink-dim);
+      margin-left: 6px;
+    }
+    .mc-card .sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-dim);
+    }
+    .mc-card .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(92, 216, 255, 0.1);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+    .mc-card .row:last-child { border-bottom: none; }
+    .mc-card .row .lbl { color: var(--ink-dim); }
+    .mc-card .row .val { color: var(--ink); }
+    .mc-card .row .val.haz { color: var(--magenta); font-weight: 500; }
+
+    .mc-asteroid-table {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      width: 100%;
+    }
+    .mc-asteroid-table .th-row {
+      color: var(--ink-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 9px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line-strong);
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr 0.7fr 0.4fr;
+      gap: 8px;
+    }
+    .mc-asteroid-table .ast-row {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr 0.7fr 0.4fr;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px dashed rgba(92, 216, 255, 0.1);
+    }
+    .mc-asteroid-table .ast-row .name-c { color: var(--ink); }
+    .mc-asteroid-table .ast-row .num { color: var(--cyan); }
+    .mc-asteroid-table .ast-row .haz {
+      text-align: center;
+      color: var(--ink-dim);
+    }
+    .mc-asteroid-table .ast-row.haz-true .haz {
+      color: var(--magenta);
+      font-weight: 600;
+    }
+
+    .mc-spaceweather {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--line-strong);
+      background: var(--bg-elev);
+    }
+    .mc-sw-cell {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line-strong);
+      text-align: center;
+    }
+    .mc-sw-cell:last-child { border-right: none; }
+    .mc-sw-cell .lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      margin-bottom: 4px;
+    }
+    .mc-sw-cell .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .mc-sw-cell.alert .num { color: var(--amber); }
+
+    .mc-ticker {
+      position: relative;
+      z-index: 2;
+      background: var(--bg-elev2);
+      border-top: 1px solid var(--line-strong);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      height: 44px;
+    }
+    .mc-ticker-tag {
+      background: var(--amber);
+      color: #000;
+      padding: 6px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+      flex-shrink: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+    .mc-ticker-track {
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .mc-ticker-strip {
+      display: inline-flex;
+      animation: ticker 60s linear infinite;
+      gap: 36px;
+      padding-left: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--ink);
+    }
+    .mc-ticker-strip .item { display: inline-flex; align-items: center; gap: 8px; }
+    .mc-ticker-strip .item .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .mc-ticker-strip .item .lbl {
+      color: var(--ink-dim);
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    @keyframes ticker {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    /* ============================================ */
+    /*  STYLE 2 — GLASS / LUXURY FUTURIST           */
+    /* ============================================ */
+    .gl {
+      --bg: #04060f;
+      --ink: #f3f6fb;
+      --ink-dim: rgba(243, 246, 251, 0.55);
+      --ink-faint: rgba(243, 246, 251, 0.3);
+      --accent: #7dd3fc;
+      --accent-glow: rgba(125, 211, 252, 0.5);
+      --cyan: #7dd3fc;
+      --amber: #fbbf24;
+      --magenta: #f472b6;
+      --green: #6ee7a7;
+      --warm: #fda4af;
+      background: var(--bg);
+      color: var(--ink);
+      position: relative;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+    .gl::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(125, 211, 252, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(167, 139, 250, 0.15) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 100%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
+        var(--bg);
+      pointer-events: none;
+    }
+    .gl-stars {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(1px 1px at 12% 22%, #fff 50%, transparent 50%),
+        radial-gradient(1px 1px at 38% 14%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 56% 36%, #fff 50%, transparent 50%),
+        radial-gradient(1px 1px at 71% 9%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(1px 1px at 88% 28%, #fff 50%, transparent 50%),
+        radial-gradient(1px 1px at 23% 58%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 47% 72%, #fff 50%, transparent 50%),
+        radial-gradient(1px 1px at 64% 88%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(1px 1px at 82% 64%, rgba(255,255,255,0.5) 50%, transparent 50%),
+        radial-gradient(1px 1px at 8% 84%, #fff 50%, transparent 50%),
+        radial-gradient(1px 1px at 31% 92%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(1px 1px at 92% 92%, rgba(255,255,255,0.5) 50%, transparent 50%);
+      opacity: 0.7;
+    }
+
+    .gl-statusbar {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      padding: 16px 28px;
+      gap: 22px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: var(--ink-dim);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .gl-statusbar .brand {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      text-transform: none;
+    }
+    .gl-statusbar .brand .accent { color: var(--accent); }
+    .gl-statusbar .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(110, 231, 167, 0.08);
+      border: 1px solid rgba(110, 231, 167, 0.25);
+      color: var(--green);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .gl-statusbar .live::before {
+      content: '';
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green), 0 0 18px rgba(110, 231, 167, 0.4);
+      animation: pulse 1.5s infinite;
+    }
+    .gl-statusbar .clock {
+      display: inline-flex; align-items: baseline; gap: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .gl-statusbar .clock .lbl {
+      color: var(--ink-faint);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .gl-statusbar .clock .val {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .gl-statusbar .clock .val .accent { color: var(--cyan); }
+    .gl-statusbar .right {
+      margin-left: auto;
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+    .gl-statusbar .meter {
+      display: inline-flex; flex-direction: column; gap: 4px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .gl-statusbar .meter .lbl {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .gl-statusbar .meter .val {
+      font-size: 12px;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .gl-statusbar .meter .val.warn { color: var(--amber); }
+    .gl-statusbar .meter .bar {
+      width: 64px; height: 3px; border-radius: 2px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .gl-statusbar .meter .bar::after {
+      content: '';
+      display: block;
+      width: 84.7%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--amber));
+      border-radius: 2px;
+    }
+    .gl-statusbar strong { color: var(--ink); font-weight: 500; }
+
+    .gl-hero-grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 18px;
+      padding: 8px 28px 18px;
+    }
+    .gl-glass {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .gl-glass::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    }
+
+    .gl-map {
+      padding: 26px;
+      min-height: 480px;
+    }
+    .gl-map .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 18px;
+    }
+    .gl-map .head h3 {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .gl-map .head .sub {
+      color: var(--ink-dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+    }
+    .gl-map .legend {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .gl-map .legend .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 10px;
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .gl-map .legend .chip .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .gl-map .legend .chip .iss-glyph {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan), 0 0 16px rgba(125,211,252,0.4);
+      position: relative;
+    }
+    .gl-map .legend .chip .iss-glyph::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 1px solid rgba(125,211,252,0.4);
+    }
+    .gl-map .legend .chip .count {
+      color: var(--ink-faint);
+      font-size: 10px;
+      margin-left: 2px;
+    }
+    .gl-map .legend .divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255,255,255,0.08);
+      margin: 0 4px;
+    }
+    .gl-map .legend .label {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--ink-faint);
+      margin: 0 4px;
+    }
+
+    .gl-world-svg { width: 100%; height: 380px; display: block; }
+    .gl-world-svg .land {
+      fill: rgba(125, 211, 252, 0.09);
+      stroke: rgba(125, 211, 252, 0.35);
+      stroke-width: 0.5;
+    }
+    .gl-world-svg .grid-line { stroke: rgba(255, 255, 255, 0.04); stroke-width: 0.3; fill: none; }
+    .gl-world-svg .marker-fire { fill: #fb7185; filter: drop-shadow(0 0 8px #fb7185); }
+    .gl-world-svg .marker-storm { fill: #38bdf8; filter: drop-shadow(0 0 8px #38bdf8); }
+    .gl-world-svg .marker-quake { fill: #fbbf24; filter: drop-shadow(0 0 8px #fbbf24); }
+    .gl-world-svg .marker-volcano { fill: #fb923c; filter: drop-shadow(0 0 8px #fb923c); }
+    .gl-world-svg .marker-iss { fill: #7dd3fc; filter: drop-shadow(0 0 14px #7dd3fc); }
+    .gl-world-svg .iss-trail { stroke: rgba(125, 211, 252, 0.5); stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+
+    .gl-side { display: flex; flex-direction: column; gap: 18px; }
+    .gl-side .gl-glass { padding: 22px 24px; }
+    .gl-side .label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 10px;
+    }
+    .gl-side h4 {
+      font-family: 'Inter Tight', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.01em;
+      margin-bottom: 6px;
+    }
+    .gl-side .big {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(180deg, #fff 0%, var(--accent) 120%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      line-height: 1;
+      margin: 6px 0 8px;
+    }
+    .gl-side .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+    }
+    .gl-side .row:last-child { border-bottom: none; }
+    .gl-side .row .lbl { color: var(--ink-dim); }
+    .gl-side .row .val { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .gl-side .row .val.cyan { color: var(--cyan); }
+    .gl-side .row .val.amber { color: var(--amber); }
+    .gl-side .row .val.magenta { color: var(--magenta); }
+    .gl-side .row .val.green { color: var(--green); }
+    .gl-side .label-pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-family: 'IBM Plex Mono', monospace;
+      margin-left: 8px;
+      vertical-align: 2px;
+    }
+    .gl-side .label-pill.cyan { background: rgba(125,211,252,0.12); color: var(--cyan); border: 1px solid rgba(125,211,252,0.25); }
+    .gl-side .label-pill.magenta { background: rgba(244,114,182,0.12); color: var(--magenta); border: 1px solid rgba(244,114,182,0.25); }
+    .gl-side .label-pill.amber { background: rgba(251,191,36,0.12); color: var(--amber); border: 1px solid rgba(251,191,36,0.25); }
+    .gl-side .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .gl-side .mini-bar {
+      display: flex; gap: 3px; height: 14px; align-items: flex-end;
+      margin: 14px 0 8px;
+    }
+    .gl-side .mini-bar span {
+      flex: 1; background: rgba(125,211,252,0.4); border-radius: 1px;
+    }
+    .gl-side .mini-bar span:nth-child(1) { height: 30%; }
+    .gl-side .mini-bar span:nth-child(2) { height: 55%; }
+    .gl-side .mini-bar span:nth-child(3) { height: 40%; }
+    .gl-side .mini-bar span:nth-child(4) { height: 80%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+    .gl-side .mini-bar span:nth-child(5) { height: 65%; }
+    .gl-side .mini-bar span:nth-child(6) { height: 45%; }
+    .gl-side .mini-bar span:nth-child(7) { height: 70%; }
+    .gl-side .mini-bar span:nth-child(8) { height: 50%; }
+    .gl-side .mini-bar span:nth-child(9) { height: 90%; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .gl-side .mini-bar span:nth-child(10) { height: 60%; }
+    .gl-side .mini-bar span:nth-child(11) { height: 40%; }
+    .gl-side .mini-bar span:nth-child(12) { height: 75%; }
+    .gl-side .scale-bar {
+      position: relative;
+      height: 6px;
+      background: linear-gradient(90deg, rgba(110,231,167,0.4), rgba(251,191,36,0.5), rgba(244,114,182,0.6));
+      border-radius: 3px;
+      margin: 12px 0 6px;
+    }
+    .gl-side .scale-bar .marker {
+      position: absolute;
+      top: -3px;
+      width: 2px; height: 12px;
+      background: #fff;
+      box-shadow: 0 0 8px #fff;
+    }
+    .gl-side .scale-axis {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 9px;
+      color: var(--ink-faint);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .gl-strip {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 2fr 1.2fr;
+      gap: 18px;
+      padding: 0 28px 18px;
+    }
+    .gl-strip .gl-glass { padding: 18px 22px; }
+    .gl-sw {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      align-items: center;
+    }
+    .gl-sw .cell {
+      padding: 4px 18px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .gl-sw .cell:last-child { border-right: none; }
+    .gl-sw .cell:first-child { padding-left: 0; }
+    .gl-sw .cell .lbl {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 6px;
+    }
+    .gl-sw .cell .num {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .gl-sw .cell .num.amber { color: var(--amber); }
+    .gl-sw .cell .num.cyan { color: var(--cyan); }
+    .gl-sw .cell .delta {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      color: var(--ink-dim);
+      margin-top: 4px;
+    }
+    .gl-sw .cell .delta.up { color: var(--amber); }
+    .gl-sw .cell .delta.down { color: var(--green); }
+    .gl-fireball-list {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .gl-fireball-list .row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+    }
+    .gl-fireball-list .row:last-child { border: none; }
+    .gl-fireball-list .row .star {
+      color: #fde68a;
+      filter: drop-shadow(0 0 6px #fde68a);
+      font-size: 12px;
+    }
+    .gl-fireball-list .row .when { color: var(--ink-dim); width: 60px; }
+    .gl-fireball-list .row .where { color: var(--ink); }
+    .gl-fireball-list .row .energy { color: var(--amber); }
+
+    .gl-bottom {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 18px;
+      padding: 0 28px 22px;
+    }
+    .gl-asteroid-card { padding: 22px 26px; }
+    .gl-asteroid-card .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+    }
+    .gl-asteroid-card h3 {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    .gl-asteroid-card .head .sub {
+      color: var(--ink-dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+    }
+    .gl-asteroid-table { width: 100%; }
+    .gl-asteroid-table th {
+      text-align: left;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      padding-bottom: 8px;
+      font-weight: 400;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .gl-asteroid-table td {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+    .gl-asteroid-table td.haz {
+      color: var(--ink-faint);
+    }
+    .gl-asteroid-table tr.is-haz td.haz {
+      color: var(--warm);
+      font-weight: 600;
+    }
+    .gl-asteroid-table td.miss-near { color: var(--magenta); font-weight: 600; }
+    .gl-asteroid-table td.miss-mid { color: var(--amber); }
+    .gl-asteroid-table td.miss-far { color: var(--ink-dim); }
+    .gl-asteroid-table td .obj-name {
+      color: var(--ink);
+      font-family: 'Inter Tight', sans-serif;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+    .gl-asteroid-table td .obj-id {
+      color: var(--ink-faint);
+      font-size: 10px;
+      margin-left: 6px;
+    }
+    .gl-asteroid-table .meter-cell {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .gl-asteroid-table .meter-cell .bar {
+      flex: 1; max-width: 60px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .gl-asteroid-table .meter-cell .bar > span {
+      display: block; height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--amber));
+    }
+    .gl-apod {
+      padding: 0;
+      position: relative;
+      min-height: 240px;
+      overflow: hidden;
+    }
+    .gl-apod-img {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 40%, rgba(244, 114, 182, 0.5) 0%, transparent 40%),
+        radial-gradient(ellipse at 70% 60%, rgba(125, 211, 252, 0.4) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 30%),
+        linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #1e3a8a 100%);
+    }
+    .gl-apod-overlay {
+      position: absolute;
+      inset: 0;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 60%, transparent 100%);
+    }
+    .gl-apod-overlay .label {
+      color: var(--accent);
+      letter-spacing: 0.16em;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .gl-apod-overlay h3 {
+      font-family: 'Fraunces', serif;
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+    }
+    .gl-apod-overlay p {
+      color: var(--ink-dim);
+      font-size: 12px;
+      margin-top: 6px;
+      max-width: 90%;
+    }
+
+    .gl-ticker {
+      position: relative;
+      z-index: 2;
+      margin: 0 28px 28px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      height: 52px;
+    }
+    .gl-ticker-tag {
+      padding: 0 18px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--accent), #818cf8);
+      color: #04060f;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .gl-ticker-tag::before {
+      content: '';
+      width: 6px; height: 6px; border-radius: 50%; background: #04060f;
+      animation: pulse 1.4s infinite;
+    }
+    .gl-ticker-track {
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .gl-ticker-strip {
+      display: inline-flex;
+      gap: 38px;
+      padding-left: 24px;
+      animation: ticker 70s linear infinite;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+    .gl-ticker-strip .item { display: inline-flex; align-items: center; gap: 10px; }
+    .gl-ticker-strip .item .lbl {
+      color: var(--ink-faint);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .gl-ticker-strip .item .lbl.fire { color: var(--warm); }
+    .gl-ticker-strip .item .lbl.iss { color: var(--cyan); }
+    .gl-ticker-strip .item .lbl.quake { color: var(--amber); }
+    .gl-ticker-strip .item .lbl.volcano { color: #fb923c; }
+    .gl-ticker-strip .item .lbl.sentry { color: var(--magenta); }
+    .gl-ticker-strip .item .lbl.fireball { color: #fde68a; }
+    .gl-ticker-strip .item .lbl.solar { color: var(--amber); }
+    .gl-ticker-strip .item .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+
+    /* ============================================ */
+    /*  STYLE 3 — HYBRID                            */
+    /* ============================================ */
+    .hy {
+      --bg: #060810;
+      --bg-elev: rgba(255, 255, 255, 0.025);
+      --ink: #f3f6fb;
+      --ink-dim: rgba(243, 246, 251, 0.55);
+      --ink-faint: rgba(243, 246, 251, 0.3);
+      --line: rgba(255, 255, 255, 0.06);
+      --line-strong: rgba(255, 255, 255, 0.12);
+      --amber: #ffb547;
+      --cyan: #5cd8ff;
+      --magenta: #ff5cf2;
+      --green: #6ee7a7;
+      --red: #ff5470;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+      position: relative;
+      overflow: hidden;
+    }
+    .hy::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(92, 216, 255, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 100%, rgba(255, 181, 71, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .hy::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .hy-statusbar {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      padding: 16px 24px;
+      gap: 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(6, 8, 16, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .hy-statusbar .brand {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+    }
+    .hy-statusbar .brand .accent { color: var(--cyan); }
+    .hy-statusbar .stats { display: flex; gap: 22px; margin-left: auto; }
+    .hy-statusbar .stat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-dim);
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hy-statusbar .stat strong { color: var(--ink); font-weight: 500; }
+    .hy-statusbar .pulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.6s infinite;
+    }
+
+    .hy-hero {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+      padding: 28px 28px 18px;
+    }
+    .hy-headline {
+      padding: 14px 4px;
+    }
+    .hy-headline .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 14px;
+    }
+    .hy-headline .eyebrow::before { content: '◉ '; }
+    .hy-headline h1 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(36px, 4.6vw, 64px);
+      font-weight: 500;
+      line-height: 0.96;
+      letter-spacing: -0.02em;
+      margin-bottom: 18px;
+    }
+    .hy-headline h1 em {
+      font-style: italic;
+      color: var(--cyan);
+      font-weight: 400;
+    }
+    .hy-headline .lede {
+      color: var(--ink-dim);
+      font-size: 15px;
+      line-height: 1.5;
+      max-width: 540px;
+    }
+    .hy-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-top: 28px;
+      max-width: 540px;
+    }
+    .hy-stats .item .num {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .hy-stats .item .num .accent { color: var(--cyan); }
+    .hy-stats .item .lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-top: 4px;
+    }
+
+    .hy-bento {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 14px;
+    }
+    .hy-tile {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      position: relative;
+      overflow: hidden;
+    }
+    .hy-tile .tile-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .hy-tile .tile-head .name { color: var(--cyan); }
+    .hy-tile.iss .tile-head .name { color: var(--cyan); }
+    .hy-tile.ast .tile-head .name { color: var(--amber); }
+    .hy-tile .tile-num {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin: 8px 0;
+    }
+    .hy-tile .tile-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 4px 0;
+      color: var(--ink-dim);
+    }
+    .hy-tile .tile-row strong { color: var(--ink); font-weight: 500; }
+
+    .hy-map-wrap {
+      position: relative;
+      z-index: 2;
+      margin: 8px 28px 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(6, 8, 16, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 22px 24px;
+      overflow: hidden;
+    }
+    .hy-map-wrap .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .hy-map-wrap h3 {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    .hy-map-wrap .legend {
+      display: flex;
+      gap: 18px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--ink-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hy-map-wrap .legend span { display: flex; align-items: center; gap: 6px; }
+    .hy-map-wrap .legend .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .hy-world-svg { width: 100%; height: 360px; display: block; }
+    .hy-world-svg .land {
+      fill: rgba(255, 255, 255, 0.05);
+      stroke: rgba(92, 216, 255, 0.3);
+      stroke-width: 0.5;
+    }
+    .hy-world-svg .grid-line { stroke: rgba(255, 255, 255, 0.04); stroke-width: 0.3; fill: none; }
+    .hy-world-svg .marker-fire { fill: var(--red); filter: drop-shadow(0 0 6px var(--red)); }
+    .hy-world-svg .marker-storm { fill: #5cb8ff; filter: drop-shadow(0 0 6px #5cb8ff); }
+    .hy-world-svg .marker-quake { fill: var(--amber); filter: drop-shadow(0 0 6px var(--amber)); }
+    .hy-world-svg .marker-volcano { fill: #ff8a3c; filter: drop-shadow(0 0 6px #ff8a3c); }
+    .hy-world-svg .marker-iss { fill: var(--cyan); filter: drop-shadow(0 0 12px var(--cyan)); }
+    .hy-world-svg .iss-trail { stroke: var(--cyan); stroke-width: 0.7; fill: none; stroke-dasharray: 2 2; opacity: 0.7; }
+
+    .hy-ticker {
+      position: relative;
+      z-index: 3;
+      background: rgba(6, 8, 16, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--line-strong);
+      display: flex;
+      align-items: center;
+      height: 52px;
+      overflow: hidden;
+    }
+    .hy-ticker-tag {
+      background: linear-gradient(90deg, var(--amber), #ff8a3c);
+      color: #060810;
+      padding: 0 18px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      gap: 8px;
+    }
+    .hy-ticker-tag::before {
+      content: '';
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #060810;
+      animation: pulse 1.5s infinite;
+    }
+    .hy-ticker-track {
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .hy-ticker-strip {
+      display: inline-flex;
+      gap: 38px;
+      padding-left: 24px;
+      animation: ticker 65s linear infinite;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+    .hy-ticker-strip .item { display: inline-flex; align-items: center; gap: 10px; }
+    .hy-ticker-strip .item .lbl {
+      color: var(--ink-faint);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    /* ============ SUMMARY ============ */
+    .summary {
+      max-width: 1400px;
+      margin: 60px auto 100px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .sum-card {
+      padding: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .sum-card h4 {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .sum-card .tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 16px;
+    }
+    .sum-card ul { list-style: none; }
+    .sum-card li {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .sum-card li:last-child { border-bottom: none; }
+    .sum-card li .k {
+      color: rgba(255, 255, 255, 0.4);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <strong>NASA WEB DASHBOARD</strong>
+    <span style="color: rgba(255,255,255,0.4);">VISUAL DIRECTION COMPS</span>
+    <div class="nav-links">
+      <a href="#mc">01 Mission Control</a>
+      <a href="#gl">02 Glass / Luxury</a>
+      <a href="#hy">03 Hybrid</a>
+      <a href="#summary">Compare</a>
+    </div>
+  </nav>
+
+  <!-- =========================================== -->
+  <!-- DIRECTION 01 — MISSION CONTROL              -->
+  <!-- =========================================== -->
+  <section id="mc">
+    <div class="section-divider">
+      <div class="label">Direction 01</div>
+      <h2>Mission Control</h2>
+      <p>NORAD / JPL ops aesthetic. Phosphor-grid background, monospace-led type, dense data, broadcast ticker. Feels like you're sitting in a control room. Information-rich, technical, no-nonsense.</p>
+      <div class="meta">
+        <span>Type<strong>Inter + JetBrains Mono</strong></span>
+        <span>Bg<strong>#05070d</strong></span>
+        <span>Cyan<strong>#5cd8ff</strong></span>
+        <span>Amber<strong>#ffb547</strong></span>
+        <span>Magenta<strong>#ff5cf2</strong></span>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-frame mc">
+        <!-- Status bar -->
+        <div class="mc-statusbar">
+          <span class="brand">COSMO // OBSERVATORY</span>
+          <span class="stat"><span class="pulse"></span><strong>LIVE</strong></span>
+          <span class="stat">UTC <strong>04:28:13</strong></span>
+          <span class="stat">LOCAL <strong>21:28 PDT</strong></span>
+          <div class="right">
+            <span class="stat">REFRESH <strong>00:42</strong></span>
+            <span class="stat">QUOTA <strong>847/1000</strong></span>
+            <span class="stat">v1.0.0</span>
+          </div>
+        </div>
+
+        <!-- Main grid -->
+        <div class="mc-grid">
+          <div class="mc-map-panel">
+            <div class="panel-head">
+              <span class="title">EONET // ACTIVE EVENTS // 144</span>
+              <div class="legend">
+                <span><span class="dot" style="background:#ff5470"></span>FIRE 87</span>
+                <span><span class="dot" style="background:#4cc4ff"></span>STORM 12</span>
+                <span><span class="dot" style="background:#ffb547"></span>QUAKE 31</span>
+                <span><span class="dot" style="background:#ff8a3c"></span>VOLCANO 9</span>
+                <span><span class="dot" style="background:#5cd8ff;box-shadow:0 0 8px #5cd8ff"></span>ISS</span>
+              </div>
+            </div>
+            <svg class="world-svg" viewBox="0 0 1000 480" preserveAspectRatio="xMidYMid meet">
+              <!-- Lat/lon grid -->
+              <g class="grid-line">
+                <line x1="0" y1="120" x2="1000" y2="120" />
+                <line x1="0" y1="240" x2="1000" y2="240" />
+                <line x1="0" y1="360" x2="1000" y2="360" />
+                <line x1="167" y1="0" x2="167" y2="480" />
+                <line x1="333" y1="0" x2="333" y2="480" />
+                <line x1="500" y1="0" x2="500" y2="480" />
+                <line x1="667" y1="0" x2="667" y2="480" />
+                <line x1="833" y1="0" x2="833" y2="480" />
+              </g>
+              <!-- Stylized continents (Mercator-ish abstract) -->
+              <g>
+                <!-- North America -->
+                <path class="land" d="M120,120 Q140,100 180,105 L240,110 Q280,115 290,140 L295,180 Q280,210 250,225 L220,235 Q190,240 160,225 L130,200 Q115,170 120,120 Z" />
+                <!-- Greenland -->
+                <path class="land" d="M310,80 Q330,70 350,80 L355,110 Q345,125 325,120 L310,100 Z" />
+                <!-- South America -->
+                <path class="land" d="M280,260 Q290,250 305,255 L320,290 Q325,340 310,380 L295,400 Q280,395 270,370 L265,330 Q270,290 280,260 Z" />
+                <!-- Europe -->
+                <path class="land" d="M490,130 Q510,120 535,125 L550,140 Q555,160 540,170 L515,175 Q495,170 485,155 Z" />
+                <!-- Africa -->
+                <path class="land" d="M495,200 Q520,195 545,210 L555,260 Q550,310 535,340 L515,360 Q495,355 485,330 L480,280 Q485,235 495,200 Z" />
+                <!-- Middle East -->
+                <path class="land" d="M555,180 Q575,175 590,190 L595,215 Q585,225 565,220 L555,200 Z" />
+                <!-- Asia -->
+                <path class="land" d="M580,120 Q620,105 680,110 L740,115 Q790,125 820,150 L830,185 Q820,210 790,220 L740,225 Q690,225 640,215 L600,200 Q580,180 580,140 Z" />
+                <!-- India -->
+                <path class="land" d="M650,210 Q670,205 685,225 L690,255 Q680,275 665,270 L655,250 Q648,230 650,210 Z" />
+                <!-- SE Asia -->
+                <path class="land" d="M730,235 Q755,230 780,245 L790,265 Q775,275 750,275 L735,260 Z" />
+                <!-- Australia -->
+                <path class="land" d="M800,310 Q840,300 875,315 L880,345 Q860,360 825,358 L800,345 Q790,325 800,310 Z" />
+                <!-- Antarctica -->
+                <path class="land" d="M50,430 L950,430 L950,460 L50,460 Z" />
+                <!-- UK -->
+                <path class="land" d="M470,140 Q480,135 485,145 L482,158 Q472,160 467,150 Z" />
+                <!-- Japan -->
+                <path class="land" d="M830,170 Q840,165 845,175 L843,195 Q833,200 828,190 Z" />
+                <!-- New Zealand -->
+                <path class="land" d="M895,355 Q905,355 908,365 L905,378 Q898,378 893,370 Z" />
+                <!-- Indonesia -->
+                <path class="land" d="M755,275 Q775,272 790,278 L795,288 Q780,290 760,287 Z" />
+                <!-- Madagascar -->
+                <path class="land" d="M580,310 Q588,305 592,318 L588,335 Q582,335 578,325 Z" />
+              </g>
+              <!-- ISS trail -->
+              <path class="iss-trail" d="M50,260 Q200,180 380,260 Q560,340 760,220 Q860,170 950,260" />
+              <!-- Markers -->
+              <!-- Fires (red) -->
+              <circle class="marker marker-fire" cx="200" cy="180" r="3.5" />
+              <circle class="marker marker-fire" cx="220" cy="200" r="3.5" />
+              <circle class="marker marker-fire" cx="270" cy="195" r="3" />
+              <circle class="marker marker-fire" cx="510" cy="320" r="3.5" />
+              <circle class="marker marker-fire" cx="525" cy="335" r="3" />
+              <circle class="marker marker-fire" cx="820" cy="335" r="3.5" />
+              <circle class="marker marker-fire" cx="840" cy="325" r="3" />
+              <circle class="marker marker-fire" cx="700" cy="190" r="3" />
+              <!-- Storms (blue) -->
+              <circle class="marker marker-storm" cx="160" cy="240" r="4" />
+              <circle class="marker marker-storm" cx="640" cy="250" r="4" />
+              <circle class="marker marker-storm" cx="780" cy="270" r="4" />
+              <!-- Quakes (amber) -->
+              <circle class="marker marker-quake" cx="190" cy="270" r="3.5" />
+              <circle class="marker marker-quake" cx="760" cy="240" r="3.5" />
+              <circle class="marker marker-quake" cx="295" cy="320" r="3.5" />
+              <circle class="marker marker-quake" cx="780" cy="180" r="3.5" />
+              <circle class="marker marker-quake" cx="690" cy="270" r="3" />
+              <!-- Volcanoes -->
+              <circle class="marker marker-volcano" cx="130" cy="180" r="3.5" />
+              <circle class="marker marker-volcano" cx="800" cy="280" r="3.5" />
+              <circle class="marker marker-volcano" cx="290" cy="370" r="3.5" />
+              <!-- ISS -->
+              <g>
+                <circle class="marker marker-iss" cx="760" cy="220" r="6" />
+                <circle cx="760" cy="220" r="14" fill="none" stroke="#5cd8ff" stroke-width="0.8" opacity="0.5" />
+                <text x="775" y="218" font-family="JetBrains Mono" font-size="10" fill="#5cd8ff">ISS</text>
+                <text x="775" y="230" font-family="JetBrains Mono" font-size="8" fill="#5cd8ff" opacity="0.7">408 KM • 27580 KM/H</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="mc-side">
+            <!-- ISS card -->
+            <div class="mc-card">
+              <div class="card-head">
+                <span class="name">▸ ISS // ZARYA</span>
+                <span class="id">ID 25544</span>
+              </div>
+              <div class="big-number">408.2 <span class="unit">KM ALT</span></div>
+              <div class="row"><span class="lbl">LATITUDE</span><span class="val">+34.21°</span></div>
+              <div class="row"><span class="lbl">LONGITUDE</span><span class="val">+128.40°</span></div>
+              <div class="row"><span class="lbl">VELOCITY</span><span class="val">27,580 km/h</span></div>
+              <div class="row"><span class="lbl">PASS</span><span class="val">in 02:14:31</span></div>
+            </div>
+
+            <!-- Sentry card -->
+            <div class="mc-card">
+              <div class="card-head">
+                <span class="name">▸ SENTRY // TOP RISK</span>
+                <span class="id">29075 (1950 DA)</span>
+              </div>
+              <div class="big-number">−2.32 <span class="unit">PALERMO</span></div>
+              <div class="row"><span class="lbl">IMPACT P</span><span class="val haz">2.6 × 10⁻⁴</span></div>
+              <div class="row"><span class="lbl">DIAMETER</span><span class="val">1.3 km</span></div>
+              <div class="row"><span class="lbl">IP DATE</span><span class="val">2880-03-16</span></div>
+            </div>
+
+            <!-- Asteroid table -->
+            <div class="mc-card">
+              <div class="card-head">
+                <span class="name">▸ NEO // CLOSE APPROACHES</span>
+                <span class="id">7 days</span>
+              </div>
+              <div class="mc-asteroid-table">
+                <div class="th-row">
+                  <span>NAME</span><span>DATE</span><span>MISS (LD)</span><span>HAZ</span>
+                </div>
+                <div class="ast-row">
+                  <span class="name-c">2024 PT5</span><span>04-29</span><span class="num">3.41</span><span class="haz">−</span>
+                </div>
+                <div class="ast-row haz-true">
+                  <span class="name-c">99942 Apophis</span><span>04-30</span><span class="num">2.18</span><span class="haz">⚠</span>
+                </div>
+                <div class="ast-row">
+                  <span class="name-c">2007 FT3</span><span>05-01</span><span class="num">12.04</span><span class="haz">−</span>
+                </div>
+                <div class="ast-row haz-true">
+                  <span class="name-c">2009 JF1</span><span>05-03</span><span class="num">0.87</span><span class="haz">⚠</span>
+                </div>
+                <div class="ast-row">
+                  <span class="name-c">410777 (2009 FD)</span><span>05-04</span><span class="num">8.52</span><span class="haz">−</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Space weather strip -->
+        <div class="mc-spaceweather">
+          <div class="mc-sw-cell"><div class="lbl">Solar Flares 24h</div><div class="num">12</div></div>
+          <div class="mc-sw-cell alert"><div class="lbl">CMEs 24h</div><div class="num">3</div></div>
+          <div class="mc-sw-cell"><div class="lbl">GST 7d</div><div class="num">2</div></div>
+          <div class="mc-sw-cell"><div class="lbl">SEP 7d</div><div class="num">0</div></div>
+        </div>
+
+        <!-- Ticker -->
+        <div class="mc-ticker">
+          <span class="mc-ticker-tag">◉ LIVE</span>
+          <div class="mc-ticker-track">
+            <div class="mc-ticker-strip">
+              <span class="item"><span class="dot" style="background:#ff5470"></span><span class="lbl">FIRE</span> Wildfire detected • Sierra Nevada, CA — 38.91° / −120.4°</span>
+              <span class="item"><span class="dot" style="background:#5cd8ff"></span><span class="lbl">ISS</span> Pass over Pacific — alt 408.2 km • vel 27,580 km/h</span>
+              <span class="item"><span class="dot" style="background:#ffb547"></span><span class="lbl">QUAKE</span> M5.4 — Honshu, Japan • depth 32 km</span>
+              <span class="item"><span class="dot" style="background:#ff8a3c"></span><span class="lbl">VOLCANO</span> Sangay activity — Ecuador • plume 6.1 km</span>
+              <span class="item"><span class="dot" style="background:#ff5cf2"></span><span class="lbl">SENTRY</span> 2009 JF1 close approach — 0.87 LD • 4.2e-5 IP</span>
+              <span class="item"><span class="dot" style="background:#5cd8ff"></span><span class="lbl">FIREBALL</span> Atmospheric impact — Indian Ocean • 4.5 kt</span>
+              <span class="item"><span class="dot" style="background:#ffb547"></span><span class="lbl">SOLAR</span> M2.1 flare — AR3576 • 04:12 UT</span>
+              <!-- repeat for seamless loop -->
+              <span class="item"><span class="dot" style="background:#ff5470"></span><span class="lbl">FIRE</span> Wildfire detected • Sierra Nevada, CA — 38.91° / −120.4°</span>
+              <span class="item"><span class="dot" style="background:#5cd8ff"></span><span class="lbl">ISS</span> Pass over Pacific — alt 408.2 km • vel 27,580 km/h</span>
+              <span class="item"><span class="dot" style="background:#ffb547"></span><span class="lbl">QUAKE</span> M5.4 — Honshu, Japan • depth 32 km</span>
+              <span class="item"><span class="dot" style="background:#ff8a3c"></span><span class="lbl">VOLCANO</span> Sangay activity — Ecuador • plume 6.1 km</span>
+              <span class="item"><span class="dot" style="background:#ff5cf2"></span><span class="lbl">SENTRY</span> 2009 JF1 close approach — 0.87 LD • 4.2e-5 IP</span>
+              <span class="item"><span class="dot" style="background:#5cd8ff"></span><span class="lbl">FIREBALL</span> Atmospheric impact — Indian Ocean • 4.5 kt</span>
+              <span class="item"><span class="dot" style="background:#ffb547"></span><span class="lbl">SOLAR</span> M2.1 flare — AR3576 • 04:12 UT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- DIRECTION 02 — GLASS / LUXURY               -->
+  <!-- =========================================== -->
+  <section id="gl">
+    <div class="section-divider">
+      <div class="label">Direction 02 · Refined</div>
+      <h2>Glass / Luxury Futurist <span style="color: rgba(125, 211, 252, 0.7); font-weight: 400;">— with ops-grade density</span></h2>
+      <p>Frosted panels and deep-space bloom kept. Mission-control density layered in — pulsing live indicator, dual UTC/local clocks, multi-color data accents (cyan for telemetry, amber for warnings, magenta for risk), denser side cards, expanded asteroid table, space-weather strip, fireball events. Premium feel, ops-grade information.</p>
+      <div class="meta">
+        <span>Type<strong>Inter Tight + IBM Plex Mono + Fraunces</strong></span>
+        <span>Bg<strong>#04060f + nebula bloom</strong></span>
+        <span>Cyan<strong>#7dd3fc telemetry</strong></span>
+        <span>Amber<strong>#fbbf24 alerts</strong></span>
+        <span>Magenta<strong>#f472b6 risk</strong></span>
+        <span>Material<strong>frosted glass</strong></span>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-frame gl">
+        <div class="gl-stars"></div>
+
+        <div class="gl-statusbar">
+          <span class="brand">cosmo<span class="accent">.</span>observatory</span>
+          <span class="live">Live</span>
+          <span class="clock"><span class="lbl">UTC</span><span class="val">04:28:13</span></span>
+          <span class="clock"><span class="lbl">Local</span><span class="val">21:28<span style="color: var(--ink-faint)">:13</span> <span class="accent">PDT</span></span></span>
+          <span class="clock"><span class="lbl">Refresh in</span><span class="val">00:42</span></span>
+          <div class="right">
+            <span class="meter">
+              <span class="lbl">API quota · NASA</span>
+              <span style="display:flex; align-items:center; gap:8px;"><span class="bar"></span><span class="val">847 <span style="color: var(--ink-faint)">/ 1000</span></span></span>
+            </span>
+            <span class="meter">
+              <span class="lbl">Last sync</span>
+              <span class="val">04:27:31</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="gl-hero-grid">
+          <div class="gl-glass gl-map">
+            <div class="head">
+              <div>
+                <h3>Earth, in real time</h3>
+                <div class="sub">144 active events · ISS overhead · Updated 04:27 UTC</div>
+              </div>
+              <div class="sub">EONET · NeoWs · ISS TLE</div>
+            </div>
+            <div class="legend">
+              <span class="label">Natural events</span>
+              <span class="chip"><span class="dot" style="background:#fb7185; box-shadow:0 0 6px #fb7185;"></span>Wildfire <span class="count">87</span></span>
+              <span class="chip"><span class="dot" style="background:#38bdf8; box-shadow:0 0 6px #38bdf8;"></span>Severe storm <span class="count">12</span></span>
+              <span class="chip"><span class="dot" style="background:#fbbf24; box-shadow:0 0 6px #fbbf24;"></span>Earthquake <span class="count">31</span></span>
+              <span class="chip"><span class="dot" style="background:#fb923c; box-shadow:0 0 6px #fb923c;"></span>Volcano <span class="count">9</span></span>
+              <span class="chip"><span class="dot" style="background:#6ee7a7; box-shadow:0 0 6px #6ee7a7;"></span>Flood <span class="count">5</span></span>
+              <span class="divider"></span>
+              <span class="label">Sky</span>
+              <span class="chip"><span class="iss-glyph"></span>ISS <span class="count">live</span></span>
+              <span class="chip"><span class="dot" style="background:#fde68a; box-shadow:0 0 6px #fde68a;"></span>Fireball <span class="count">14 · 30d</span></span>
+            </div>
+            <svg class="gl-world-svg" viewBox="0 0 1000 460" preserveAspectRatio="xMidYMid meet">
+              <g class="grid-line">
+                <line x1="0" y1="115" x2="1000" y2="115" />
+                <line x1="0" y1="230" x2="1000" y2="230" />
+                <line x1="0" y1="345" x2="1000" y2="345" />
+              </g>
+              <g>
+                <path class="land" d="M120,120 Q140,100 180,105 L240,110 Q280,115 290,140 L295,180 Q280,210 250,225 L220,235 Q190,240 160,225 L130,200 Q115,170 120,120 Z" />
+                <path class="land" d="M310,80 Q330,70 350,80 L355,110 Q345,125 325,120 L310,100 Z" />
+                <path class="land" d="M280,260 Q290,250 305,255 L320,290 Q325,340 310,380 L295,400 Q280,395 270,370 L265,330 Q270,290 280,260 Z" />
+                <path class="land" d="M490,130 Q510,120 535,125 L550,140 Q555,160 540,170 L515,175 Q495,170 485,155 Z" />
+                <path class="land" d="M495,200 Q520,195 545,210 L555,260 Q550,310 535,340 L515,360 Q495,355 485,330 L480,280 Q485,235 495,200 Z" />
+                <path class="land" d="M555,180 Q575,175 590,190 L595,215 Q585,225 565,220 L555,200 Z" />
+                <path class="land" d="M580,120 Q620,105 680,110 L740,115 Q790,125 820,150 L830,185 Q820,210 790,220 L740,225 Q690,225 640,215 L600,200 Q580,180 580,140 Z" />
+                <path class="land" d="M650,210 Q670,205 685,225 L690,255 Q680,275 665,270 L655,250 Q648,230 650,210 Z" />
+                <path class="land" d="M730,235 Q755,230 780,245 L790,265 Q775,275 750,275 L735,260 Z" />
+                <path class="land" d="M800,310 Q840,300 875,315 L880,345 Q860,360 825,358 L800,345 Q790,325 800,310 Z" />
+                <path class="land" d="M50,420 L950,420 L950,445 L50,445 Z" />
+                <path class="land" d="M470,140 Q480,135 485,145 L482,158 Q472,160 467,150 Z" />
+                <path class="land" d="M830,170 Q840,165 845,175 L843,195 Q833,200 828,190 Z" />
+                <path class="land" d="M895,355 Q905,355 908,365 L905,378 Q898,378 893,370 Z" />
+                <path class="land" d="M755,275 Q775,272 790,278 L795,288 Q780,290 760,287 Z" />
+                <path class="land" d="M580,310 Q588,305 592,318 L588,335 Q582,335 578,325 Z" />
+              </g>
+              <path class="iss-trail" d="M50,260 Q200,180 380,260 Q560,340 760,220 Q860,170 950,260" />
+              <circle class="marker-fire" cx="200" cy="180" r="4" />
+              <circle class="marker-fire" cx="220" cy="200" r="4" />
+              <circle class="marker-fire" cx="510" cy="320" r="4" />
+              <circle class="marker-fire" cx="820" cy="335" r="4" />
+              <circle class="marker-storm" cx="160" cy="240" r="5" />
+              <circle class="marker-storm" cx="640" cy="250" r="5" />
+              <circle class="marker-quake" cx="760" cy="240" r="4.5" />
+              <circle class="marker-quake" cx="295" cy="320" r="4.5" />
+              <circle class="marker-volcano" cx="800" cy="280" r="4.5" />
+              <g>
+                <circle class="marker-iss" cx="760" cy="220" r="7" />
+                <circle cx="760" cy="220" r="18" fill="none" stroke="rgba(125,211,252,0.5)" stroke-width="0.8" />
+                <circle cx="760" cy="220" r="32" fill="none" stroke="rgba(125,211,252,0.2)" stroke-width="0.6" />
+                <line x1="767" y1="220" x2="800" y2="200" stroke="rgba(125,211,252,0.5)" stroke-width="0.6" />
+                <rect x="800" y="186" width="64" height="28" rx="4" fill="rgba(4,6,15,0.85)" stroke="rgba(125,211,252,0.4)" stroke-width="0.6" />
+                <text x="808" y="199" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="#7dd3fc" letter-spacing="1">ISS</text>
+                <text x="808" y="210" font-family="IBM Plex Mono, monospace" font-size="7.5" fill="rgba(243,246,251,0.7)">408 km · 27,580</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="gl-side">
+            <div class="gl-glass">
+              <div class="header-row">
+                <span class="label">ISS · Zarya<span class="label-pill cyan">Telemetry</span></span>
+                <span class="label" style="margin: 0; color: var(--cyan);">●</span>
+              </div>
+              <h4>Currently overhead</h4>
+              <div class="big">408.2 km</div>
+              <div class="row"><span class="lbl">Latitude</span><span class="val cyan">+34.21°</span></div>
+              <div class="row"><span class="lbl">Longitude</span><span class="val cyan">+128.40°</span></div>
+              <div class="row"><span class="lbl">Velocity</span><span class="val">27,580 km/h</span></div>
+              <div class="row"><span class="lbl">Orbital period</span><span class="val">92.68 min</span></div>
+              <div class="row"><span class="lbl">Inclination</span><span class="val">51.64°</span></div>
+              <div class="row"><span class="lbl">Crew aboard</span><span class="val green">7</span></div>
+              <div class="row"><span class="lbl">Next pass</span><span class="val amber">in 2 h 14 m</span></div>
+              <div class="row"><span class="lbl">Pass elevation</span><span class="val">42°</span></div>
+            </div>
+
+            <div class="gl-glass">
+              <div class="header-row">
+                <span class="label">Sentry · top risk<span class="label-pill magenta">Risk</span></span>
+                <span class="label" style="margin: 0; color: var(--magenta);">▲</span>
+              </div>
+              <h4>(29075) 1950 DA</h4>
+              <div class="big" style="background: linear-gradient(180deg, #fff 0%, var(--magenta) 120%); -webkit-background-clip: text; background-clip: text;">−2.32</div>
+              <div class="scale-bar"><span class="marker" style="left: 28%"></span></div>
+              <div class="scale-axis"><span>Safe</span><span>Watch</span><span>Hazard</span></div>
+              <div class="row" style="margin-top: 10px;"><span class="lbl">Palermo scale</span><span class="val magenta">−2.32</span></div>
+              <div class="row"><span class="lbl">Torino scale</span><span class="val">0</span></div>
+              <div class="row"><span class="lbl">Impact P</span><span class="val magenta">2.6 × 10⁻⁴</span></div>
+              <div class="row"><span class="lbl">Diameter</span><span class="val">1.3 km</span></div>
+              <div class="row"><span class="lbl">Velocity</span><span class="val">14.1 km/s</span></div>
+              <div class="row"><span class="lbl">Encounter</span><span class="val">2880-03-16</span></div>
+              <div class="row"><span class="lbl">Energy</span><span class="val amber">75 Gt TNT</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="gl-strip">
+          <div class="gl-glass">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 14px;">
+              <div>
+                <div class="label" style="font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color: rgba(243,246,251,0.3); margin-bottom: 6px;">DONKI · Space Weather · 24 hours</div>
+                <h4 style="font-family:'Inter Tight', sans-serif; font-size:18px; font-weight:600; letter-spacing:-0.01em;">Sun activity, last 24 h</h4>
+              </div>
+              <span style="font-family:'IBM Plex Mono', monospace; font-size:11px; color: var(--ink-dim);">Updated 04:27 UTC</span>
+            </div>
+            <div class="gl-sw">
+              <div class="cell">
+                <div class="lbl">Solar flares</div>
+                <div class="num">12</div>
+                <div class="delta up">▲ 4 vs prior 24 h</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">CMEs</div>
+                <div class="num amber">3</div>
+                <div class="delta up">▲ 2 · M2.1 strongest</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">Geomagnetic (7d)</div>
+                <div class="num">2</div>
+                <div class="delta">G2 storm 04-26</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">SEP events</div>
+                <div class="num cyan">0</div>
+                <div class="delta down">All clear</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="gl-glass">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 12px;">
+              <div>
+                <div class="label" style="font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color: rgba(243,246,251,0.3); margin-bottom: 6px;">Fireball events</div>
+                <h4 style="font-family:'Inter Tight', sans-serif; font-size:18px; font-weight:600; letter-spacing:-0.01em;">Recent atmospheric impacts</h4>
+              </div>
+              <span style="font-family:'IBM Plex Mono', monospace; font-size:11px; color: var(--ink-dim);">3 of 14 · 30d</span>
+            </div>
+            <div class="gl-fireball-list">
+              <div class="row">
+                <span class="star">★</span>
+                <span class="when">04-27</span>
+                <span class="where">Indian Ocean · −12.4° / 78.9°</span>
+                <span class="energy">4.5 kt</span>
+              </div>
+              <div class="row">
+                <span class="star">★</span>
+                <span class="when">04-25</span>
+                <span class="where">N. Pacific · 38.1° / −165.4°</span>
+                <span class="energy">2.1 kt</span>
+              </div>
+              <div class="row">
+                <span class="star">★</span>
+                <span class="when">04-22</span>
+                <span class="where">S. Atlantic · −24.7° / −15.2°</span>
+                <span class="energy">1.6 kt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="gl-bottom">
+          <div class="gl-glass gl-asteroid-card">
+            <div class="head">
+              <div>
+                <h3>Near-Earth approaches</h3>
+                <span class="sub" style="display:block; margin-top:4px;">Next 7 days · NeoWs · 8 of 23 listed</span>
+              </div>
+              <div style="display:flex; gap:14px; align-items:center; font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color: var(--ink-dim);">
+                <span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--magenta); box-shadow:0 0 8px var(--magenta); margin-right:6px;"></span>&lt; 1 LD</span>
+                <span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--amber); margin-right:6px;"></span>1–5 LD</span>
+                <span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: rgba(243,246,251,0.4); margin-right:6px;"></span>&gt; 5 LD</span>
+              </div>
+            </div>
+            <table class="gl-asteroid-table">
+              <thead><tr><th>Object</th><th>Date</th><th>Miss</th><th>Velocity</th><th>⌀</th><th>Mag</th><th class="haz">Haz</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="obj-name">2024 PT5</span><span class="obj-id">a0050</span></td>
+                  <td>Apr 29</td>
+                  <td class="miss-mid">3.41 LD</td>
+                  <td>9.4 km/s</td>
+                  <td>11 m</td>
+                  <td>27.6</td>
+                  <td class="haz">—</td>
+                </tr>
+                <tr class="is-haz">
+                  <td><span class="obj-name">99942 Apophis</span><span class="obj-id">a0042</span></td>
+                  <td>Apr 30</td>
+                  <td class="miss-mid">2.18 LD</td>
+                  <td>12.6 km/s</td>
+                  <td>340 m</td>
+                  <td>19.7</td>
+                  <td class="haz">⚠ PHA</td>
+                </tr>
+                <tr>
+                  <td><span class="obj-name">2007 FT3</span><span class="obj-id">a0103</span></td>
+                  <td>May 01</td>
+                  <td class="miss-far">12.0 LD</td>
+                  <td>7.1 km/s</td>
+                  <td>340 m</td>
+                  <td>20.6</td>
+                  <td class="haz">—</td>
+                </tr>
+                <tr class="is-haz">
+                  <td><span class="obj-name">2009 JF1</span><span class="obj-id">a0091</span></td>
+                  <td>May 03</td>
+                  <td class="miss-near">0.87 LD</td>
+                  <td>14.3 km/s</td>
+                  <td>13 m</td>
+                  <td>27.1</td>
+                  <td class="haz">⚠ PHA</td>
+                </tr>
+                <tr>
+                  <td><span class="obj-name">410777 (2009 FD)</span><span class="obj-id">a0410</span></td>
+                  <td>May 04</td>
+                  <td class="miss-far">8.52 LD</td>
+                  <td>10.8 km/s</td>
+                  <td>160 m</td>
+                  <td>22.1</td>
+                  <td class="haz">—</td>
+                </tr>
+                <tr>
+                  <td><span class="obj-name">2014 JO25</span><span class="obj-id">a0014</span></td>
+                  <td>May 05</td>
+                  <td class="miss-far">5.91 LD</td>
+                  <td>15.2 km/s</td>
+                  <td>650 m</td>
+                  <td>17.0</td>
+                  <td class="haz">—</td>
+                </tr>
+                <tr>
+                  <td><span class="obj-name">2024 RB</span><span class="obj-id">a0210</span></td>
+                  <td>May 06</td>
+                  <td class="miss-mid">2.04 LD</td>
+                  <td>11.8 km/s</td>
+                  <td>22 m</td>
+                  <td>26.2</td>
+                  <td class="haz">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="gl-glass gl-apod">
+            <div class="gl-apod-img"></div>
+            <div class="gl-apod-overlay">
+              <div class="label">Astronomy picture of the day</div>
+              <h3>The Pillars of Creation, in fresh light</h3>
+              <p>Star-forming columns of gas and dust within the Eagle Nebula, captured by JWST.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="gl-ticker">
+          <span class="gl-ticker-tag">Live feed</span>
+          <div class="gl-ticker-track">
+            <div class="gl-ticker-strip">
+              <span class="item"><span class="dot" style="background:#fb7185;box-shadow:0 0 8px #fb7185"></span><span class="lbl fire">Fire</span> Wildfire · Sierra Nevada, CA — 38.91° / −120.4°</span>
+              <span class="item"><span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span><span class="lbl iss">ISS</span> Over Pacific — 408 km altitude · 27,580 km/h</span>
+              <span class="item"><span class="dot" style="background:var(--amber)"></span><span class="lbl quake">Quake</span> M5.4 · Honshu, Japan — depth 32 km</span>
+              <span class="item"><span class="dot" style="background:#fb923c"></span><span class="lbl volcano">Volcano</span> Sangay · Ecuador — plume 6.1 km</span>
+              <span class="item"><span class="dot" style="background:var(--magenta);box-shadow:0 0 8px var(--magenta)"></span><span class="lbl sentry">Sentry</span> 2009 JF1 — 0.87 LD · 4.2 × 10⁻⁵ impact P</span>
+              <span class="item"><span class="dot" style="background:#fde68a;box-shadow:0 0 8px #fde68a"></span><span class="lbl fireball">Fireball</span> Indian Ocean — 4.5 kt</span>
+              <span class="item"><span class="dot" style="background:var(--amber)"></span><span class="lbl solar">Solar</span> M2.1 flare · AR3576 — 04:12 UT</span>
+              <span class="item"><span class="dot" style="background:#fb7185;box-shadow:0 0 8px #fb7185"></span><span class="lbl fire">Fire</span> Wildfire · Sierra Nevada, CA — 38.91° / −120.4°</span>
+              <span class="item"><span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span><span class="lbl iss">ISS</span> Over Pacific — 408 km altitude · 27,580 km/h</span>
+              <span class="item"><span class="dot" style="background:var(--amber)"></span><span class="lbl quake">Quake</span> M5.4 · Honshu, Japan — depth 32 km</span>
+              <span class="item"><span class="dot" style="background:#fb923c"></span><span class="lbl volcano">Volcano</span> Sangay · Ecuador — plume 6.1 km</span>
+              <span class="item"><span class="dot" style="background:var(--magenta);box-shadow:0 0 8px var(--magenta)"></span><span class="lbl sentry">Sentry</span> 2009 JF1 — 0.87 LD · 4.2 × 10⁻⁵ impact P</span>
+              <span class="item"><span class="dot" style="background:#fde68a;box-shadow:0 0 8px #fde68a"></span><span class="lbl fireball">Fireball</span> Indian Ocean — 4.5 kt</span>
+              <span class="item"><span class="dot" style="background:var(--amber)"></span><span class="lbl solar">Solar</span> M2.1 flare · AR3576 — 04:12 UT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- DIRECTION 03 — HYBRID                       -->
+  <!-- =========================================== -->
+  <section id="hy">
+    <div class="section-divider">
+      <div class="label">Direction 03</div>
+      <h2>Hybrid · Editorial Mission Control</h2>
+      <p>Mission-control structure (broadcast ticker, monospace data labels, dense readouts) wrapped in glass-luxury treatment (frosted panels, gradient bloom, editorial display type for headlines). Best of both — readable, premium, alive.</p>
+      <div class="meta">
+        <span>Type<strong>Inter Tight + JetBrains Mono + Fraunces</strong></span>
+        <span>Bg<strong>#060810 + bloom</strong></span>
+        <span>Cyan<strong>#5cd8ff</strong></span>
+        <span>Amber<strong>#ffb547</strong></span>
+        <span>Magenta<strong>#ff5cf2</strong></span>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-frame hy">
+        <div class="hy-statusbar">
+          <span class="brand">Cosmo<span class="accent">.</span></span>
+          <div class="stats">
+            <span class="stat"><span class="pulse"></span><strong>Live</strong></span>
+            <span class="stat">04:28:13 <strong>UTC</strong></span>
+            <span class="stat">Refresh <strong>00:42</strong></span>
+            <span class="stat">API <strong>847 / 1000</strong></span>
+          </div>
+        </div>
+
+        <div class="hy-hero">
+          <div class="hy-headline">
+            <div class="eyebrow">Observatory · Live</div>
+            <h1>Earth in motion, <em>tonight</em>.</h1>
+            <div class="lede">A live read of every wildfire, storm, quake, volcano, fireball, and near-Earth object NASA is tracking right now — plus the station passing overhead.</div>
+            <div class="hy-stats">
+              <div class="item">
+                <div class="num"><span class="accent">144</span></div>
+                <div class="lbl">Active events</div>
+              </div>
+              <div class="item">
+                <div class="num">5</div>
+                <div class="lbl">NEOs &lt; 1 LD</div>
+              </div>
+              <div class="item">
+                <div class="num">408 <span style="font-size:14px;color:rgba(243,246,251,0.4);">km</span></div>
+                <div class="lbl">ISS altitude</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hy-bento">
+            <div class="hy-tile iss">
+              <div class="tile-head"><span class="name">▸ ISS · Zarya</span><span>27580 km/h</span></div>
+              <div class="tile-num">408.2 <span style="font-size:14px;color:rgba(243,246,251,0.5);">km</span></div>
+              <div class="tile-row"><span>Lat</span><strong>+34.21°</strong></div>
+              <div class="tile-row"><span>Lon</span><strong>+128.40°</strong></div>
+              <div class="tile-row"><span>Next pass</span><strong>2 h 14 m</strong></div>
+            </div>
+            <div class="hy-tile ast">
+              <div class="tile-head"><span class="name">▸ Sentry · top risk</span><span>1950 DA</span></div>
+              <div class="tile-num" style="color:#ff5cf2">−2.32 <span style="font-size:14px;color:rgba(243,246,251,0.5);">Palermo</span></div>
+              <div class="tile-row"><span>Impact P</span><strong>2.6 × 10⁻⁴</strong></div>
+              <div class="tile-row"><span>Diameter</span><strong>1.3 km</strong></div>
+              <div class="tile-row"><span>Encounter</span><strong>2880-03-16</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hy-map-wrap">
+          <div class="head">
+            <h3>Live world map · EONET</h3>
+            <div class="legend">
+              <span><span class="dot" style="background:#ff5470"></span>Fire</span>
+              <span><span class="dot" style="background:#5cb8ff"></span>Storm</span>
+              <span><span class="dot" style="background:#ffb547"></span>Quake</span>
+              <span><span class="dot" style="background:#ff8a3c"></span>Volcano</span>
+              <span><span class="dot" style="background:#5cd8ff;box-shadow:0 0 8px #5cd8ff"></span>ISS</span>
+            </div>
+          </div>
+          <svg class="hy-world-svg" viewBox="0 0 1000 440" preserveAspectRatio="xMidYMid meet">
+            <g class="grid-line">
+              <line x1="0" y1="110" x2="1000" y2="110" />
+              <line x1="0" y1="220" x2="1000" y2="220" />
+              <line x1="0" y1="330" x2="1000" y2="330" />
+              <line x1="167" y1="0" x2="167" y2="440" />
+              <line x1="333" y1="0" x2="333" y2="440" />
+              <line x1="500" y1="0" x2="500" y2="440" />
+              <line x1="667" y1="0" x2="667" y2="440" />
+              <line x1="833" y1="0" x2="833" y2="440" />
+            </g>
+            <g>
+              <path class="land" d="M120,110 Q140,90 180,95 L240,100 Q280,105 290,130 L295,170 Q280,200 250,215 L220,225 Q190,230 160,215 L130,190 Q115,160 120,110 Z" />
+              <path class="land" d="M310,70 Q330,60 350,70 L355,100 Q345,115 325,110 L310,90 Z" />
+              <path class="land" d="M280,250 Q290,240 305,245 L320,280 Q325,330 310,370 L295,390 Q280,385 270,360 L265,320 Q270,280 280,250 Z" />
+              <path class="land" d="M490,120 Q510,110 535,115 L550,130 Q555,150 540,160 L515,165 Q495,160 485,145 Z" />
+              <path class="land" d="M495,190 Q520,185 545,200 L555,250 Q550,300 535,330 L515,350 Q495,345 485,320 L480,270 Q485,225 495,190 Z" />
+              <path class="land" d="M555,170 Q575,165 590,180 L595,205 Q585,215 565,210 L555,190 Z" />
+              <path class="land" d="M580,110 Q620,95 680,100 L740,105 Q790,115 820,140 L830,175 Q820,200 790,210 L740,215 Q690,215 640,205 L600,190 Q580,170 580,130 Z" />
+              <path class="land" d="M650,200 Q670,195 685,215 L690,245 Q680,265 665,260 L655,240 Q648,220 650,200 Z" />
+              <path class="land" d="M730,225 Q755,220 780,235 L790,255 Q775,265 750,265 L735,250 Z" />
+              <path class="land" d="M800,300 Q840,290 875,305 L880,335 Q860,350 825,348 L800,335 Q790,315 800,300 Z" />
+              <path class="land" d="M50,395 L950,395 L950,420 L50,420 Z" />
+              <path class="land" d="M470,130 Q480,125 485,135 L482,148 Q472,150 467,140 Z" />
+              <path class="land" d="M830,160 Q840,155 845,165 L843,185 Q833,190 828,180 Z" />
+              <path class="land" d="M895,345 Q905,345 908,355 L905,368 Q898,368 893,360 Z" />
+              <path class="land" d="M755,265 Q775,262 790,268 L795,278 Q780,280 760,277 Z" />
+              <path class="land" d="M580,300 Q588,295 592,308 L588,325 Q582,325 578,315 Z" />
+            </g>
+            <path class="iss-trail" d="M50,250 Q200,170 380,250 Q560,330 760,210 Q860,160 950,250" />
+            <circle class="marker-fire" cx="200" cy="170" r="3.5" />
+            <circle class="marker-fire" cx="220" cy="190" r="3.5" />
+            <circle class="marker-fire" cx="510" cy="310" r="3.5" />
+            <circle class="marker-fire" cx="820" cy="325" r="3.5" />
+            <circle class="marker-fire" cx="700" cy="180" r="3" />
+            <circle class="marker-storm" cx="160" cy="230" r="4" />
+            <circle class="marker-storm" cx="640" cy="240" r="4" />
+            <circle class="marker-storm" cx="780" cy="260" r="4" />
+            <circle class="marker-quake" cx="190" cy="260" r="3.5" />
+            <circle class="marker-quake" cx="760" cy="230" r="3.5" />
+            <circle class="marker-quake" cx="295" cy="310" r="3.5" />
+            <circle class="marker-quake" cx="780" cy="170" r="3.5" />
+            <circle class="marker-volcano" cx="130" cy="170" r="3.5" />
+            <circle class="marker-volcano" cx="800" cy="270" r="3.5" />
+            <circle class="marker-volcano" cx="290" cy="360" r="3.5" />
+            <g>
+              <circle class="marker-iss" cx="760" cy="210" r="6.5" />
+              <circle cx="760" cy="210" r="16" fill="none" stroke="#5cd8ff" stroke-width="0.7" opacity="0.5" />
+              <circle cx="760" cy="210" r="28" fill="none" stroke="#5cd8ff" stroke-width="0.5" opacity="0.25" />
+              <text x="775" y="208" font-family="JetBrains Mono" font-size="10" fill="#5cd8ff">ISS</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="hy-ticker">
+          <span class="hy-ticker-tag">Live</span>
+          <div class="hy-ticker-track">
+            <div class="hy-ticker-strip">
+              <span class="item"><span class="lbl">Fire</span> Wildfire · Sierra Nevada, CA — 38.91° / −120.4°</span>
+              <span class="item"><span class="lbl">ISS</span> Over Pacific — 408 km · 27,580 km/h</span>
+              <span class="item"><span class="lbl">Quake</span> M5.4 · Honshu, Japan — depth 32 km</span>
+              <span class="item"><span class="lbl">Volcano</span> Sangay · Ecuador — plume 6.1 km</span>
+              <span class="item"><span class="lbl">Sentry</span> 2009 JF1 — 0.87 LD · 4.2 × 10⁻⁵</span>
+              <span class="item"><span class="lbl">Fireball</span> Indian Ocean — 4.5 kt</span>
+              <span class="item"><span class="lbl">Solar</span> M2.1 flare · AR3576 — 04:12 UT</span>
+              <span class="item"><span class="lbl">Fire</span> Wildfire · Sierra Nevada, CA — 38.91° / −120.4°</span>
+              <span class="item"><span class="lbl">ISS</span> Over Pacific — 408 km · 27,580 km/h</span>
+              <span class="item"><span class="lbl">Quake</span> M5.4 · Honshu, Japan — depth 32 km</span>
+              <span class="item"><span class="lbl">Volcano</span> Sangay · Ecuador — plume 6.1 km</span>
+              <span class="item"><span class="lbl">Sentry</span> 2009 JF1 — 0.87 LD · 4.2 × 10⁻⁵</span>
+              <span class="item"><span class="lbl">Fireball</span> Indian Ocean — 4.5 kt</span>
+              <span class="item"><span class="lbl">Solar</span> M2.1 flare · AR3576 — 04:12 UT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- COMPARISON SUMMARY                           -->
+  <!-- =========================================== -->
+  <section id="summary">
+    <div class="section-divider">
+      <div class="label">Compare</div>
+      <h2>Trade-offs at a glance</h2>
+      <p>Each direction shows the same data with the same v1 feature set — only the visual treatment differs. Pick the one whose feel matches what you want, and the rest of the plan locks in around it.</p>
+    </div>
+
+    <div class="summary">
+      <div class="sum-card">
+        <h4>01 · Mission Control</h4>
+        <div class="tagline">Dense, technical, broadcast</div>
+        <ul>
+          <li><span class="k">Density</span><span>High</span></li>
+          <li><span class="k">Personality</span><span>Authoritative · ops</span></li>
+          <li><span class="k">Type</span><span>Inter + JetBrains Mono</span></li>
+          <li><span class="k">Material</span><span>Flat panels, grid lines</span></li>
+          <li><span class="k">Feels like</span><span>Real-time dashboard</span></li>
+          <li><span class="k">Risk</span><span>Can read "techy" not "premium"</span></li>
+        </ul>
+      </div>
+
+      <div class="sum-card">
+        <h4>02 · Glass / Luxury</h4>
+        <div class="tagline">Spacious, premium, keynote</div>
+        <ul>
+          <li><span class="k">Density</span><span>Lower</span></li>
+          <li><span class="k">Personality</span><span>Calm · cinematic</span></li>
+          <li><span class="k">Type</span><span>Inter Tight + Plex Mono + Fraunces</span></li>
+          <li><span class="k">Material</span><span>Frosted glass + bloom</span></li>
+          <li><span class="k">Feels like</span><span>Apple keynote / luxury product</span></li>
+          <li><span class="k">Risk</span><span>Lower data density</span></li>
+        </ul>
+      </div>
+
+      <div class="sum-card">
+        <h4>03 · Hybrid</h4>
+        <div class="tagline">Editorial mission-control</div>
+        <ul>
+          <li><span class="k">Density</span><span>Balanced</span></li>
+          <li><span class="k">Personality</span><span>Authoritative + premium</span></li>
+          <li><span class="k">Type</span><span>Inter Tight + JetBrains Mono + Fraunces</span></li>
+          <li><span class="k">Material</span><span>Glass over grid, soft bloom</span></li>
+          <li><span class="k">Feels like</span><span>NYT-style live ops dashboard</span></li>
+          <li><span class="k">Risk</span><span>Most work to get right</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

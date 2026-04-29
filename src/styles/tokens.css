@@ -1,0 +1,60 @@
+:root {
+  /* Background */
+  --bg: #04060f;
+
+  /* Bloom layers — applied as background-image on body */
+  --bloom-a: radial-gradient(ellipse at 30% 20%, rgba(125, 211, 252, 0.18) 0%, transparent 55%);
+  --bloom-b: radial-gradient(ellipse at 75% 10%, rgba(167, 139, 250, 0.12) 0%, transparent 45%);
+  --bloom-c: radial-gradient(ellipse at 50% 100%, rgba(34, 211, 238, 0.1) 0%, transparent 50%);
+
+  /* Ink */
+  --ink: #f3f6fb;
+  --ink-dim: rgba(243, 246, 251, 0.55);
+  --ink-faint: rgba(243, 246, 251, 0.3);
+
+  /* Semantic accents */
+  --cyan: #7dd3fc; /* telemetry, ISS */
+  --amber: #fbbf24; /* alerts, warnings */
+  --magenta: #f472b6; /* risk, Sentry */
+  --green: #6ee7a7; /* live, all-clear */
+  --warm: #fb7185; /* wildfire */
+  --orange: #fb923c; /* volcano */
+  --gold: #fde68a; /* fireball */
+
+  /* Glass material */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(24px) saturate(140%);
+  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* Status bar */
+  --status-bar-bg: rgba(4, 6, 15, 0.85);
+  --status-bar-border: rgba(255, 255, 255, 0.06);
+  --status-bar-h: 44px;
+
+  /* Ticker */
+  --ticker-h: 52px;
+
+  /* Typography */
+  --font-display: 'Inter Tight', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-editorial: 'Fraunces', georgia, serif;
+  --text-base: clamp(0.9375rem, 0.85rem + 0.4vw, 1.0625rem);
+  --text-sm: 0.8125rem;
+  --text-xs: 0.6875rem;
+  --text-display: clamp(2rem, 1rem + 4vw, 4rem);
+
+  /* Spacing */
+  --radius-tile: 14px;
+  --radius-panel: 18px;
+  --radius-hero: 20px;
+  --space-section: clamp(20px, 2vw, 28px);
+  --space-gap: 12px;
+
+  /* Motion */
+  --duration-fast: 200ms;
+  --duration-normal: 350ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --pulse-duration: 1.5s;
+}

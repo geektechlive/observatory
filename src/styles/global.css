@@ -1,0 +1,45 @@
+@import './reset.css';
+@import './tokens.css';
+@import './typography.css';
+@import './starfield.css';
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  padding: 8px 16px;
+  background: var(--cyan);
+  color: var(--bg);
+  font-weight: 600;
+  z-index: 9999;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
