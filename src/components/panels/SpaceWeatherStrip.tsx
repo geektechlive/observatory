@@ -1,5 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useDonki } from '@/hooks/useDonki'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { DataAge } from '@/components/ui/DataAge'
 import { formatRelativeTime } from '@/lib/format'
 import styles from './space-weather-strip.module.css'
 
@@ -12,6 +14,7 @@ interface RecentEvent {
 
 export function SpaceWeatherStrip() {
   const { data, isLoading, error } = useDonki()
+  const updatedAt = useQueryClient().getQueryState(['donki'])?.dataUpdatedAt ?? 0
 
   if (isLoading && !data) {
     return (
@@ -86,6 +89,7 @@ export function SpaceWeatherStrip() {
 
   return (
     <GlassPanel variant="tile" label="Space Weather">
+      <DataAge updatedAt={updatedAt} />
       <div className={styles.strip ?? ''}>
         <div className={styles.countRow ?? ''}>
           <div className={styles.countChip ?? ''}>

@@ -1,10 +1,13 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useFireball } from '@/hooks/useFireball'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { DataAge } from '@/components/ui/DataAge'
 import { formatKt, formatRelativeTime, formatDateUtc } from '@/lib/format'
 import styles from './fireball-list.module.css'
 
 export function FireballList() {
   const { data, isLoading, error } = useFireball()
+  const updatedAt = useQueryClient().getQueryState(['fireball'])?.dataUpdatedAt ?? 0
 
   if (isLoading && !data) {
     return (
@@ -34,6 +37,7 @@ export function FireballList() {
 
   return (
     <GlassPanel variant="tile" label="Fireballs">
+      <DataAge updatedAt={updatedAt} />
       <div className={styles.fireballList ?? ''}>
         <ol className={styles.list ?? ''}>
           {recent.map((fb, idx) => {

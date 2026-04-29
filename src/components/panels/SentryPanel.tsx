@@ -1,11 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useSentry } from '@/hooks/useSentry'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { ScalePill } from '@/components/ui/ScalePill'
+import { DataAge } from '@/components/ui/DataAge'
 import { formatPalermo, formatImpactProbability } from '@/lib/format'
 import styles from './sentry-panel.module.css'
 
 export function SentryPanel() {
   const { data, isLoading, error } = useSentry()
+  const updatedAt = useQueryClient().getQueryState(['sentry'])?.dataUpdatedAt ?? 0
 
   const sorted = [...(data?.data ?? [])]
     .sort((a, b) => {
@@ -76,6 +79,7 @@ export function SentryPanel() {
 
   return (
     <GlassPanel variant="tile" label="Sentry">
+      <DataAge updatedAt={updatedAt} />
       <div className={styles.sentryPanel ?? ''}>{renderContent()}</div>
     </GlassPanel>
   )

@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNeo } from '@/hooks/useNeo'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { DataAge } from '@/components/ui/DataAge'
 import { formatKm, formatLunarDistance, formatVelocity, formatDiameter } from '@/lib/format'
 import type { NeoObject } from '@/schemas/neo'
 import styles from './asteroid-table.module.css'
@@ -100,6 +102,7 @@ function SortableTh({ label, sortKey, current, dir, align = 'left', onSort }: So
 
 export function AsteroidTable() {
   const { data, isLoading, error } = useNeo()
+  const updatedAt = useQueryClient().getQueryState(['neo'])?.dataUpdatedAt ?? 0
   const [sortKey, setSortKey] = useState<SortKey>('missKm')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -208,6 +211,7 @@ export function AsteroidTable() {
 
   return (
     <GlassPanel variant="panel" label="Close Approaches · 7 days">
+      <DataAge updatedAt={updatedAt} />
       <div className={styles.asteroidTable ?? ''}>{renderContent()}</div>
     </GlassPanel>
   )
