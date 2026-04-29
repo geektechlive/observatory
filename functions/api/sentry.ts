@@ -9,7 +9,7 @@ interface Env {
 }
 
 export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
-  const kvKey = 'nasa:sentry:top20'
+  const kvKey = 'nasa:sentry:top50'
   const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
   if (!fresh) {
@@ -25,7 +25,7 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
     }
   }
 
-  const upstream = await fetch(`${SENTRY_API}?limit=20`)
+  const upstream = await fetch(SENTRY_API)
 
   if (!upstream.ok) {
     return new Response(JSON.stringify({ error: 'Upstream JPL Sentry API error' }), {
@@ -44,7 +44,16 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
     )
   }
 
-  const body = JSON.stringify(parsed.data)
+  // Sort by Palermo Scale descending and cap at 50 before caching — full catalog is 2000+ objects
+  const top50 = [...parsed.data.data]
+    .sort((a, b) => {
+      const aPs = parseFloat(a.ps_cum ?? '') || -Infinity
+      const bPs = parseFloat(b.ps_cum ?? '') || -Infinity
+      return bPs - aPs
+    })
+    .slice(0, 50)
+
+  const body = JSON.stringify({ count: parsed.data.count, data: top50 })
   await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
 
   const missHeaders: Record<string, string> = {

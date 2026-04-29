@@ -7,7 +7,7 @@ const SentryObjectSchema = z.object({
   ps_cum: z.string().optional(),
   ps_max: z.string().optional(),
   ip: z.string().optional(),
-  n_imp: z.string().optional(),
+  n_imp: z.number().optional(),
   diameter: z.string().nullable().optional(),
   v_inf: z.string().optional(),
   h: z.string().optional(),
