@@ -3,8 +3,18 @@ import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { DataAge } from '@/components/ui/DataAge'
-import type { Launch } from '@/schemas/launches'
+import type { RLLLaunch } from '@/schemas/launches'
 import styles from './launch-panel.module.css'
+
+function launchTime(launch: RLLLaunch): string | null {
+  return launch.t0 ?? launch.win_open ?? null
+}
+
+function launchStatus(launch: RLLLaunch): { abbrev: string; color: string } {
+  if (launch.t0) return { abbrev: 'GO', color: 'var(--green)' }
+  if (launch.win_open) return { abbrev: 'TBC', color: 'var(--amber)' }
+  return { abbrev: 'TBD', color: 'var(--ink-dim)' }
+}
 
 function formatCountdown(net: string | null, now: Date): string {
   if (!net) return 'NET TBD'
@@ -25,8 +35,9 @@ function formatCountdown(net: string | null, now: Date): string {
   return `T- ${hh}:${mm}:${ss}`
 }
 
-function formatNet(net: string | null): string {
-  if (!net) return '—'
+function formatNet(launch: RLLLaunch): string {
+  const net = launchTime(launch)
+  if (!net) return launch.date_str ?? '—'
   const d = new Date(net)
   const months = [
     'JAN',
@@ -49,16 +60,13 @@ function formatNet(net: string | null): string {
   return `${day} ${month} · ${hh}:${mm} UTC`
 }
 
-function statusColor(abbrev: string): string {
-  const a = abbrev.toUpperCase()
-  if (a === 'GO') return 'var(--green)'
-  if (a === 'TBD' || a === 'TBC') return 'var(--amber)'
-  if (a === 'HOLD') return 'var(--magenta)'
-  return 'var(--ink-dim)'
+function rocketName(launch: RLLLaunch): string {
+  return launch.vehicle?.name ?? launch.name
 }
 
-function rocketName(launch: Launch): string {
-  return launch.rocket?.configuration.full_name ?? launch.rocket?.configuration.name ?? launch.name
+function launchLocation(launch: RLLLaunch): string {
+  const parts = [launch.pad?.name, launch.pad?.location?.state ?? launch.pad?.location?.country]
+  return parts.filter(Boolean).join(', ')
 }
 
 export function LaunchPanel() {
@@ -74,7 +82,7 @@ export function LaunchPanel() {
     )
   }
 
-  if (error || !data || data.results.length === 0) {
+  if (error || !data || data.result.length === 0) {
     return (
       <GlassPanel variant="tile" label="Launches">
         <div className={styles.unavailable ?? ''}>Data unavailable</div>
@@ -82,7 +90,7 @@ export function LaunchPanel() {
     )
   }
 
-  const [next, ...upcoming] = data.results
+  const [next, ...upcoming] = data.result
   if (!next) {
     return (
       <GlassPanel variant="tile" label="Launches">
@@ -91,9 +99,11 @@ export function LaunchPanel() {
     )
   }
 
-  const countdown = formatCountdown(next.net, now)
-  const provider = next.launch_service_provider?.name ?? ''
-  const pad = next.pad?.location?.name ?? next.pad?.name ?? ''
+  const net = launchTime(next)
+  const countdown = formatCountdown(net, now)
+  const status = launchStatus(next)
+  const provider = next.provider?.name ?? ''
+  const location = launchLocation(next)
 
   return (
     <GlassPanel variant="tile" label="Launches">
@@ -102,9 +112,9 @@ export function LaunchPanel() {
         <div className={styles.nextUp ?? ''}>
           <div className={styles.nextLabel ?? ''}>NEXT UP</div>
           <div className={styles.rocketName ?? ''}>{rocketName(next)}</div>
-          {provider || pad ? (
+          {provider || location ? (
             <div className={styles.provider ?? ''}>
-              {[provider, pad].filter(Boolean).join(' · ')}
+              {[provider, location].filter(Boolean).join(' · ')}
             </div>
           ) : null}
           <div
@@ -116,12 +126,9 @@ export function LaunchPanel() {
           </div>
           <div
             className={styles.statusBadge ?? ''}
-            style={{
-              color: statusColor(next.status.abbrev),
-              borderColor: statusColor(next.status.abbrev),
-            }}
+            style={{ color: status.color, borderColor: status.color }}
           >
-            {next.status.abbrev}
+            {status.abbrev}
           </div>
         </div>
 
@@ -129,18 +136,18 @@ export function LaunchPanel() {
           <>
             <div className={styles.divider ?? ''} />
             <div className={styles.upcomingList ?? ''}>
-              {upcoming.slice(0, 3).map((launch) => (
-                <div key={launch.id} className={styles.upcomingItem ?? ''}>
-                  <span className={styles.upcomingRocket ?? ''}>{rocketName(launch)}</span>
-                  <span className={styles.upcomingNet ?? ''}>{formatNet(launch.net)}</span>
-                  <span
-                    className={styles.upcomingStatus ?? ''}
-                    style={{ color: statusColor(launch.status.abbrev) }}
-                  >
-                    {launch.status.abbrev}
-                  </span>
-                </div>
-              ))}
+              {upcoming.slice(0, 3).map((launch) => {
+                const s = launchStatus(launch)
+                return (
+                  <div key={launch.id} className={styles.upcomingItem ?? ''}>
+                    <span className={styles.upcomingRocket ?? ''}>{rocketName(launch)}</span>
+                    <span className={styles.upcomingNet ?? ''}>{formatNet(launch)}</span>
+                    <span className={styles.upcomingStatus ?? ''} style={{ color: s.color }}>
+                      {s.abbrev}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </>
         )}

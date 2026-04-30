@@ -1,59 +1,47 @@
 import { z } from 'zod'
 
-const LaunchStatusSchema = z.object({
+const RLLProviderSchema = z.object({
   id: z.number(),
   name: z.string(),
-  abbrev: z.string(),
+  slug: z.string().optional().nullable(),
 })
 
-const LaunchConfigSchema = z.object({
-  id: z.number().optional(),
-  name: z.string(),
-  full_name: z.string().optional().nullable(),
-})
-
-const RocketSchema = z.object({
-  configuration: LaunchConfigSchema,
-})
-
-const PadLocationSchema = z.object({
-  id: z.number().optional(),
+const RLLVehicleSchema = z.object({
+  id: z.number(),
   name: z.string(),
 })
 
-const PadSchema = z.object({
-  id: z.number().optional(),
+const RLLLocationSchema = z.object({
+  id: z.number(),
   name: z.string(),
-  location: PadLocationSchema.optional().nullable(),
+  state: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
 })
 
-const MissionSchema = z.object({
-  id: z.number().optional(),
+const RLLPadSchema = z.object({
+  id: z.number(),
   name: z.string(),
-  type: z.string().optional().nullable(),
-  description: z.string().optional().nullable(),
+  location: RLLLocationSchema.optional().nullable(),
 })
 
-const LaunchSchema = z.object({
-  id: z.string(),
+const RLLLaunchSchema = z.object({
+  id: z.number(),
   name: z.string(),
-  net: z.string().nullable(),
-  status: LaunchStatusSchema,
-  rocket: RocketSchema.optional().nullable(),
-  launch_service_provider: z
-    .object({ id: z.number().optional(), name: z.string() })
-    .optional()
-    .nullable(),
-  pad: PadSchema.optional().nullable(),
-  mission: MissionSchema.optional().nullable(),
+  sort_date: z.string(),
+  t0: z.string().optional().nullable(),
+  win_open: z.string().optional().nullable(),
+  date_str: z.string().optional().nullable(),
+  provider: RLLProviderSchema.optional().nullable(),
+  vehicle: RLLVehicleSchema.optional().nullable(),
+  pad: RLLPadSchema.optional().nullable(),
+  launch_description: z.string().optional().nullable(),
 })
 
 export const LaunchesResponseSchema = z.object({
+  valid_auth: z.boolean(),
   count: z.number(),
-  next: z.string().nullable(),
-  previous: z.string().nullable(),
-  results: z.array(LaunchSchema),
+  result: z.array(RLLLaunchSchema),
 })
 
-export type Launch = z.infer<typeof LaunchSchema>
+export type RLLLaunch = z.infer<typeof RLLLaunchSchema>
 export type LaunchesResponse = z.infer<typeof LaunchesResponseSchema>

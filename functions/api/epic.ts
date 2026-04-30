@@ -1,12 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { RawEpicArraySchema } from '../../src/schemas/epic'
 
-const NASA_API_BASE = 'https://api.nasa.gov'
+const EPIC_API_BASE = 'https://epic.gsfc.nasa.gov'
 const CACHE_TTL_SECONDS = 3600 // 1 hour — EPIC images update ~daily
 
 interface Env {
   OBSERVATORY_CACHE: KVNamespace
-  NASA_API_KEY: string
 }
 
 export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
@@ -27,8 +26,7 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
     }
   }
 
-  const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
-  const url = `${NASA_API_BASE}/EPIC/api/natural/images?api_key=${apiKey}`
+  const url = `${EPIC_API_BASE}/api/natural`
   const upstream = await fetch(url)
 
   if (!upstream.ok) {
@@ -70,13 +68,11 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
   const body = JSON.stringify(result)
   await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
 
-  const missHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Cache': 'MISS',
-    'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-  }
-  const quota = upstream.headers.get('X-RateLimit-Remaining')
-  if (quota !== null) missHeaders['X-Quota-Remaining'] = quota
-
-  return new Response(body, { headers: missHeaders })
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Cache': 'MISS',
+      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+    },
+  })
 }

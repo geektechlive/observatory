@@ -1,12 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-const NASA_API_BASE = 'https://api.nasa.gov'
+const EPIC_ARCHIVE_BASE = 'https://epic.gsfc.nasa.gov'
 
 interface Env {
-  NASA_API_KEY: string
+  OBSERVATORY_CACHE: KVNamespace
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequest: PagesFunction<Env> = async ({ request }) => {
   const { searchParams } = new URL(request.url)
   const year = searchParams.get('year')
   const month = searchParams.get('month')
@@ -32,8 +32,7 @@ export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
     })
   }
 
-  const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
-  const url = `${NASA_API_BASE}/EPIC/archive/natural/${year}/${month}/${day}/png/${image}.png?api_key=${apiKey}`
+  const url = `${EPIC_ARCHIVE_BASE}/archive/natural/${year}/${month}/${day}/png/${image}.png`
 
   const upstream = await fetch(url)
 
