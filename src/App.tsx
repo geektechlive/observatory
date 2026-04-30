@@ -11,6 +11,9 @@ import { AsteroidTable } from '@/components/panels/AsteroidTable'
 import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
 import { FireballList } from '@/components/panels/FireballList'
 import { ApodCard } from '@/components/panels/ApodCard'
+import { EpicPanel } from '@/components/panels/EpicPanel'
+import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
+import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
@@ -62,6 +65,24 @@ export function App() {
           <div className={appStyles.apodArea ?? ''}>
             <ErrorBoundary label="APOD">
               <ApodCard />
+            </ErrorBoundary>
+          </div>
+
+          <div className={appStyles.epicArea ?? ''}>
+            <ErrorBoundary label="Earth Now">
+              <EpicPanel />
+            </ErrorBoundary>
+          </div>
+
+          <div className={appStyles.launchArea ?? ''}>
+            <ErrorBoundary label="Launches">
+              <LaunchPanel />
+            </ErrorBoundary>
+          </div>
+
+          <div className={appStyles.solarWindArea ?? ''}>
+            <ErrorBoundary label="Solar Wind">
+              <SolarWindPanel />
             </ErrorBoundary>
           </div>
 
