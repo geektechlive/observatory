@@ -5,7 +5,7 @@ import { useUiStore } from '@/store/ui'
 import { TickerItem } from './TickerItem'
 import styles from './ticker.module.css'
 
-const TICKER_SPEED_PX_PER_S = 80
+const TICKER_SPEED_PX_PER_S = 160
 
 export function Ticker() {
   const items = useTicker()

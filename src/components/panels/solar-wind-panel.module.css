@@ -86,7 +86,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  min-height: 160px;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--ink-faint);
