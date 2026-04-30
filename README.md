@@ -4,6 +4,9 @@ A real-time NASA data dashboard for the web — live ISS tracking, EONET natural
 
 Live at **[observatory.geektechlive.com](https://observatory.geektechlive.com)**
 
+<img width="1461" height="814" alt="Screenshot 2026-04-29 at 9 27 05 PM" src="https://github.com/user-attachments/assets/8be50245-dafc-4267-99ae-70894ed80ffe" />
+
+
 ## Credits
 
 This project is a port of and is inspired by **[cosmo-tui](https://github.com/irahulstomar/cosmo-tui)** by [Rahul Tomar (@irahulstomar)](https://github.com/irahulstomar) — a beautifully crafted Python Textual terminal dashboard for NASA's open APIs. cosmo-tui demonstrated that NASA's data could be made genuinely compelling to look at. This web version carries that spirit into a browser.
