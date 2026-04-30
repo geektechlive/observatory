@@ -24,11 +24,6 @@
   flex-shrink: 0;
 }
 
-.brandDot {
-  color: var(--cyan);
-  margin: 0 0.5px;
-}
-
 .divider {
   width: 1px;
   height: 16px;

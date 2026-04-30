@@ -69,12 +69,10 @@ export function AboutPopover({ onClose }: AboutPopoverProps) {
       ref={ref}
       id="about-popover"
       role="dialog"
-      aria-label="About cosmo.observatory"
+      aria-label="About observatory"
       className={styles.popover ?? ''}
     >
-      <p className={styles.name ?? ''}>
-        cosmo<span className={styles.dot ?? ''}>.</span>observatory
-      </p>
+      <p className={styles.name ?? ''}>observatory</p>
       <p className={styles.description ?? ''}>
         Real-time NASA data dashboard — live ISS tracking, natural events, asteroids, space weather,
         and more.

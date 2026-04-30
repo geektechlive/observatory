@@ -16,9 +16,7 @@ export function StatusBar() {
   return (
     <header role="banner">
       <nav className={styles.bar} aria-label="Observatory status">
-        <span className={styles.brand}>
-          cosmo<span className={styles.brandDot}>.</span>observatory
-        </span>
+        <span className={styles.brand}>observatory</span>
 
         <span className={styles.divider} aria-hidden="true" />
 
@@ -38,7 +36,7 @@ export function StatusBar() {
           <button
             type="button"
             className={styles.infoBtn}
-            aria-label="About cosmo.observatory"
+            aria-label="About observatory"
             aria-expanded={aboutOpen}
             aria-controls="about-popover"
             title="About"

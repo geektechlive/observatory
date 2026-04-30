@@ -19,8 +19,6 @@ import appStyles from './App.module.css'
 export function App() {
   return (
     <>
-      <div className="starfield" aria-hidden="true" />
-
       <StatusBar />
 
       <main id="main-content" className={appStyles.main ?? ''}>

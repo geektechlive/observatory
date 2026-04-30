@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Landing page', () => {
   test('loads and has correct title', async ({ page }) => {
     await page.goto('/')
-    await expect(page).toHaveTitle('cosmo.observatory')
+    await expect(page).toHaveTitle('observatory')
   })
 
   test('status bar is visible', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Landing page', () => {
   test('brand mark is present', async ({ page }) => {
     await page.goto('/')
     const nav = page.locator('nav[aria-label="Observatory status"]')
-    await expect(nav.getByText('cosmo')).toBeVisible()
+    await expect(nav.getByText('observatory')).toBeVisible()
   })
 
   test('main content area is present', async ({ page }) => {
