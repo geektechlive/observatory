@@ -89,6 +89,9 @@ export function WorldMap() {
 
     mapRef.current = map
 
+    const resizeObserver = new ResizeObserver(() => map.resize())
+    resizeObserver.observe(containerRef.current)
+
     map.on('load', () => {
       map.addSource('iss-trail', {
         type: 'geojson',
@@ -235,6 +238,7 @@ export function WorldMap() {
     })
 
     return () => {
+      resizeObserver.disconnect()
       popupRef.current?.remove()
       map.remove()
       mapRef.current = null
