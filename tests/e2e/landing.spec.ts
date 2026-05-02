@@ -8,14 +8,14 @@ test.describe('Landing page', () => {
 
   test('status bar is visible', async ({ page }) => {
     await page.goto('/')
-    const statusBar = page.locator('nav[aria-label="Observatory status"]')
-    await expect(statusBar).toBeVisible()
+    const header = page.locator('header[role="banner"]')
+    await expect(header).toBeVisible()
   })
 
   test('brand mark is present', async ({ page }) => {
     await page.goto('/')
-    const nav = page.locator('nav[aria-label="Observatory status"]')
-    await expect(nav.getByText('observatory')).toBeVisible()
+    const header = page.locator('header[role="banner"]')
+    await expect(header.getByRole('heading', { name: /observatory/i })).toBeVisible()
   })
 
   test('main content area is present', async ({ page }) => {
