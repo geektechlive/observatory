@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
@@ -35,7 +36,7 @@ function formatCountdown(net: string | null, now: Date): string {
   return `T- ${hh}:${mm}:${ss}`
 }
 
-function formatNet(launch: RLLLaunch): string {
+function formatDate(launch: RLLLaunch): string {
   const net = launchTime(launch)
   if (!net) return launch.date_str ?? '—'
   const d = new Date(net)
@@ -60,19 +61,37 @@ function formatNet(launch: RLLLaunch): string {
   return `${day} ${month} · ${hh}:${mm} UTC`
 }
 
-function rocketName(launch: RLLLaunch): string {
-  return launch.vehicle?.name ?? launch.name
+function headerMeta(launch: RLLLaunch): string {
+  const provider = launch.provider?.name ?? ''
+  const pad = launch.pad?.name ?? ''
+  const loc =
+    launch.pad?.location?.state ??
+    launch.pad?.location?.statename ??
+    launch.pad?.location?.country ??
+    ''
+  return [provider, pad, loc].filter(Boolean).join(' · ')
 }
 
-function launchLocation(launch: RLLLaunch): string {
-  const parts = [launch.pad?.name, launch.pad?.location?.state ?? launch.pad?.location?.country]
-  return parts.filter(Boolean).join(', ')
+function launchUrl(launch: RLLLaunch): string | null {
+  if (!launch.slug) return null
+  return `https://rocketlaunch.live/launch/${launch.slug}`
+}
+
+function weatherSummary(launch: RLLLaunch): string | null {
+  const cond = launch.weather_condition
+  if (!cond) return null
+  const temp = launch.weather_temp ? `${Math.round(parseFloat(launch.weather_temp))}°F` : null
+  const wind = launch.weather_wind_mph
+    ? `${Math.round(parseFloat(launch.weather_wind_mph))} mph wind`
+    : null
+  return [cond, temp, wind].filter(Boolean).join(' · ')
 }
 
 export function LaunchPanel() {
   const { data, isLoading, error } = useLaunches()
   const updatedAt = useQueryClient().getQueryState(['launches'])?.dataUpdatedAt ?? 0
   const now = useNow()
+  const [expandedId, setExpandedId] = useState<number | null | 'unset'>('unset')
 
   if (isLoading && !data) {
     return (
@@ -90,67 +109,106 @@ export function LaunchPanel() {
     )
   }
 
-  const [next, ...upcoming] = data.result
-  if (!next) {
-    return (
-      <GlassPanel variant="tile" label="Launches">
-        <div className={styles.unavailable ?? ''}>No upcoming launches</div>
-      </GlassPanel>
-    )
-  }
+  const launches = data.result
+  const firstId = launches[0]?.id ?? null
+  const effectiveId = expandedId === 'unset' ? firstId : expandedId
 
-  const net = launchTime(next)
-  const countdown = formatCountdown(net, now)
-  const status = launchStatus(next)
-  const provider = next.provider?.name ?? ''
-  const location = launchLocation(next)
+  function toggle(id: number) {
+    setExpandedId((prev) => {
+      const current = prev === 'unset' ? firstId : prev
+      return current === id ? null : id
+    })
+  }
 
   return (
     <GlassPanel variant="tile" label="Launches">
       <DataAge updatedAt={updatedAt} />
-      <div className={styles.launchPanel ?? ''}>
-        <div className={styles.nextUp ?? ''}>
-          <div className={styles.nextLabel ?? ''}>NEXT UP</div>
-          <div className={styles.rocketName ?? ''}>{rocketName(next)}</div>
-          {provider || location ? (
-            <div className={styles.provider ?? ''}>
-              {[provider, location].filter(Boolean).join(' · ')}
-            </div>
-          ) : null}
-          <div
-            className={styles.countdown ?? ''}
-            aria-live="polite"
-            aria-label={`Launch countdown: ${countdown}`}
-          >
-            {countdown}
-          </div>
-          <div
-            className={styles.statusBadge ?? ''}
-            style={{ color: status.color, borderColor: status.color }}
-          >
-            {status.abbrev}
-          </div>
-        </div>
+      <div className={styles.accordion ?? ''}>
+        {launches.map((launch, idx) => {
+          const isOpen = effectiveId === launch.id
+          const net = launchTime(launch)
+          const status = launchStatus(launch)
+          const countdown = formatCountdown(net, now)
+          const url = launchUrl(launch)
+          const meta = headerMeta(launch)
+          const weather = weatherSummary(launch)
+          const tags = launch.tags ?? []
+          const vehicle = launch.vehicle?.name ?? launch.name
 
-        {upcoming.length > 0 && (
-          <>
-            <div className={styles.divider ?? ''} />
-            <div className={styles.upcomingList ?? ''}>
-              {upcoming.slice(0, 3).map((launch) => {
-                const s = launchStatus(launch)
-                return (
-                  <div key={launch.id} className={styles.upcomingItem ?? ''}>
-                    <span className={styles.upcomingRocket ?? ''}>{rocketName(launch)}</span>
-                    <span className={styles.upcomingNet ?? ''}>{formatNet(launch)}</span>
-                    <span className={styles.upcomingStatus ?? ''} style={{ color: s.color }}>
-                      {s.abbrev}
+          return (
+            <div
+              key={launch.id}
+              className={`${styles.accordionItem ?? ''} ${isOpen ? (styles.open ?? '') : ''} ${idx === 0 ? (styles.first ?? '') : ''}`}
+            >
+              <button
+                type="button"
+                className={styles.accordionHeader ?? ''}
+                onClick={() => toggle(launch.id)}
+                aria-expanded={isOpen}
+                aria-label={`${vehicle}, ${isOpen ? 'collapse' : 'expand'} launch details`}
+              >
+                <span
+                  className={styles.statusDot ?? ''}
+                  style={{ background: status.color }}
+                  aria-hidden="true"
+                />
+                <span className={styles.headerVehicle ?? ''}>{vehicle}</span>
+                <span className={styles.headerMeta ?? ''}>{meta}</span>
+                <span className={styles.headerDate ?? ''}>{formatDate(launch)}</span>
+                <span className={styles.chevron ?? ''} aria-hidden="true">
+                  {isOpen ? '▲' : '▼'}
+                </span>
+              </button>
+
+              {isOpen && (
+                <div className={styles.accordionBody ?? ''}>
+                  {launch.launch_description && (
+                    <p className={styles.bodyDesc ?? ''}>{launch.launch_description}</p>
+                  )}
+
+                  {(weather !== null || tags.length > 0) && (
+                    <div className={styles.bodyChips ?? ''}>
+                      {weather !== null && (
+                        <span className={styles.weatherChip ?? ''}>{weather}</span>
+                      )}
+                      {tags.map((tag) => (
+                        <span key={tag.id} className={styles.tagChip ?? ''}>
+                          {tag.text}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className={styles.bodyFooter ?? ''}>
+                    <span
+                      className={styles.countdown ?? ''}
+                      aria-live="polite"
+                      aria-label={`Launch countdown: ${countdown}`}
+                    >
+                      {countdown}
                     </span>
+                    <span
+                      className={styles.statusBadge ?? ''}
+                      style={{ color: status.color, borderColor: status.color }}
+                    >
+                      {status.abbrev}
+                    </span>
+                    {url !== null && (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.launchLink ?? ''}
+                      >
+                        rocketlaunch.live →
+                      </a>
+                    )}
                   </div>
-                )
-              })}
+                </div>
+              )}
             </div>
-          </>
-        )}
+          )
+        })}
       </div>
     </GlassPanel>
   )
