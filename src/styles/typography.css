@@ -1,8 +1,19 @@
 /* Self-hosted fonts — latin subset only */
 @font-face {
+  font-family: 'Special Elite';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/special-elite-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
   font-family: 'Inter Tight';
   font-style: normal;
-  font-weight: 600 700;
+  font-weight: 300 700;
   font-display: swap;
   src: url('/fonts/inter-tight-latin.woff2') format('woff2');
   unicode-range:
@@ -46,7 +57,7 @@
 @font-face {
   font-family: Fraunces;
   font-style: italic;
-  font-weight: 500 600;
+  font-weight: 300 600;
   font-display: swap;
   src: url('/fonts/fraunces-italic-latin.woff2') format('woff2');
   unicode-range:
@@ -58,7 +69,7 @@ body {
   font-family: var(--font-body);
   font-size: var(--text-base);
   font-weight: 400;
-  color: var(--ink);
+  color: var(--bone);
 }
 
 h1,
@@ -66,9 +77,10 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1.15;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--bone);
+  line-height: 1.1;
 }
 
 code,
@@ -85,25 +97,38 @@ kbd,
 }
 
 .text-dim {
-  color: var(--ink-dim);
+  color: var(--bone-dim);
 }
 
 .text-faint {
-  color: var(--ink-faint);
+  color: var(--bone-faint);
 }
 
-.text-cyan {
-  color: var(--cyan);
+.text-signal {
+  color: var(--signal);
+}
+
+.text-copper {
+  color: var(--copper-glow);
 }
 
 .text-amber {
   color: var(--amber);
 }
 
+.text-mcrn {
+  color: var(--mcrn);
+}
+
+/* Legacy aliases */
+.text-cyan {
+  color: var(--signal);
+}
+
 .text-magenta {
-  color: var(--magenta);
+  color: var(--mcrn);
 }
 
 .text-green {
-  color: var(--green);
+  color: var(--terminal);
 }

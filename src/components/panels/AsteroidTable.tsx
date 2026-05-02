@@ -210,7 +210,7 @@ export function AsteroidTable() {
   }
 
   return (
-    <GlassPanel variant="panel" label="Close Approaches · 7 days">
+    <GlassPanel variant="panel" label="Close Approaches · 7 days" breathe>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.asteroidTable ?? ''}>{renderContent()}</div>
     </GlassPanel>

@@ -12,8 +12,7 @@ export const onRequest: PagesFunction = async (context) => {
   const { request, next, env } = context
 
   // Rate limiting — per-IP token bucket stored in KV
-  const ip =
-    request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? 'unknown'
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
 
   if (request.url.includes('/api/')) {
     const kvKey = `rate:${ip}`

@@ -49,7 +49,7 @@ export function IssPanel() {
   }
 
   return (
-    <GlassPanel variant="tile" label="ISS">
+    <GlassPanel variant="tile" label="ISS" breathe>
       <div className={styles.issPanel ?? ''}>{content()}</div>
     </GlassPanel>
   )

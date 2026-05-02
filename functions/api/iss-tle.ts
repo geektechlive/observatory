@@ -20,21 +20,18 @@ function parseTle(text: string): { name: string; line1: string; line2: string } 
   return { name, line1, line2 }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequest: PagesFunction<Env> = async ({ env }) => {
   const kvKey = 'nasa:iss-tle'
-  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
-  if (!fresh) {
-    const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-    if (cached !== null) {
-      return new Response(cached, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Cache': 'HIT',
-          'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-        },
-      })
-    }
+  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
+  if (cached !== null) {
+    return new Response(cached, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cache': 'HIT',
+        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+      },
+    })
   }
 
   const upstream = await fetch(CELESTRAK_URL)

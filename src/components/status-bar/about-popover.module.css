@@ -1,7 +1,7 @@
 .popover {
-  position: fixed;
-  top: calc(var(--status-bar-h) + 8px);
-  right: 16px;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
   z-index: 200;
   width: 280px;
   padding: 16px;

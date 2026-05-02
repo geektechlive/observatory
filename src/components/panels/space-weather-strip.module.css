@@ -19,15 +19,15 @@
   gap: 4px;
   padding: 10px 6px;
   border-radius: var(--radius-tile);
-  background: rgba(251, 191, 36, 0.06);
-  border: 1px solid rgba(251, 191, 36, 0.14);
+  background: oklch(0.85 0.13 220 / 0.06);
+  border: 1px solid oklch(0.85 0.13 220 / 0.14);
 }
 
 .countValue {
   font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--amber);
+  color: var(--signal);
   line-height: 1;
 }
 
@@ -105,6 +105,6 @@
 .divider {
   width: 100%;
   height: 1px;
-  background: var(--glass-border);
+  background: var(--panel-border);
   flex-shrink: 0;
 }

@@ -11,13 +11,14 @@ import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
 
 function categoryColor(categoryId: string): string {
-  if (categoryId === 'wildfires') return '#fb7185'
-  if (categoryId === 'severeStorms') return '#fbbf24'
-  if (categoryId === 'earthquakes') return '#f472b6'
-  if (categoryId === 'volcanoes') return '#fb923c'
-  if (categoryId === 'floods') return '#67e8f9'
-  if (categoryId === 'landslides') return '#a78bfa'
-  return '#cbd5e1'
+  if (categoryId === 'wildfires') return '#e84020'
+  if (categoryId === 'severeStorms') return '#38d4ff'
+  if (categoryId === 'earthquakes') return '#ffe044'
+  if (categoryId === 'volcanoes') return '#dd44ff'
+  if (categoryId === 'floods') return '#2255dd'
+  if (categoryId === 'landslides') return '#b08040'
+  if (categoryId === 'seaLakeIce') return '#cceeee'
+  return '#c89050'
 }
 
 function categoryLabel(categoryId: string): string {
@@ -27,6 +28,7 @@ function categoryLabel(categoryId: string): string {
   if (categoryId === 'volcanoes') return 'Volcano'
   if (categoryId === 'floods') return 'Flood'
   if (categoryId === 'landslides') return 'Landslide'
+  if (categoryId === 'seaLakeIce') return 'Sea/Lake Ice'
   return 'Event'
 }
 
@@ -35,7 +37,8 @@ interface EventFeatureProperties {
   title: string
   id: string
   categoryId: string
-  link: string
+  sourceUrl: string
+  eventDate: string
 }
 
 function eventsToGeoJson(
@@ -55,7 +58,8 @@ function eventsToGeoJson(
           title: event.title,
           id: event.id,
           categoryId,
-          link: event.link,
+          sourceUrl: event.sources[0]?.url ?? '',
+          eventDate: geom.date,
         },
       })
     }
@@ -68,6 +72,7 @@ export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const popupRef = useRef<maplibregl.Popup | null>(null)
+  const clickPopupRef = useRef<maplibregl.Popup | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
   const { data: events } = useEvents()
@@ -167,6 +172,23 @@ export function WorldMap() {
           'circle-stroke-color': 'rgba(255,255,255,0.8)',
         },
       })
+      map.addLayer({
+        id: 'iss-label',
+        type: 'symbol',
+        source: 'iss-position',
+        layout: {
+          'text-field': 'ISS',
+          'text-size': 10,
+          'text-offset': [0, -1.6],
+          'text-anchor': 'bottom',
+          'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+        },
+        paint: {
+          'text-color': '#7dd3fc',
+          'text-halo-color': 'rgba(4,6,15,0.85)',
+          'text-halo-width': 1.5,
+        },
+      })
 
       map.on(
         'click',
@@ -174,8 +196,65 @@ export function WorldMap() {
         (e: MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0]
           if (!feature) return
-          const link = (feature.properties['link'] as string | undefined) ?? ''
-          if (link) window.open(link, '_blank', 'noopener,noreferrer')
+          const geom = feature.geometry as GeoJSON.Point
+          const coords = geom.coordinates as [number, number]
+          const title = (feature.properties['title'] as string | undefined) ?? ''
+          const catId = (feature.properties['categoryId'] as string | undefined) ?? ''
+          const color = (feature.properties['color'] as string | undefined) ?? '#cbd5e1'
+          const sourceUrl = (feature.properties['sourceUrl'] as string | undefined) ?? ''
+          const eventDate = (feature.properties['eventDate'] as string | undefined) ?? ''
+
+          if (popupRef.current) {
+            popupRef.current.remove()
+            popupRef.current = null
+          }
+
+          const inner = document.createElement('div')
+          inner.className = 'eonet-popup-inner'
+
+          const labelEl = document.createElement('div')
+          labelEl.className = 'eonet-popup-label'
+          labelEl.style.color = color
+          labelEl.textContent = categoryLabel(catId)
+          inner.appendChild(labelEl)
+
+          const titleEl = document.createElement('div')
+          titleEl.className = 'eonet-popup-title'
+          titleEl.textContent = title
+          inner.appendChild(titleEl)
+
+          if (eventDate) {
+            const dateEl = document.createElement('div')
+            dateEl.className = 'eonet-popup-date'
+            dateEl.textContent = new Date(eventDate).toLocaleDateString()
+            inner.appendChild(dateEl)
+          }
+
+          if (sourceUrl) {
+            const linkEl = document.createElement('a')
+            linkEl.className = 'eonet-popup-link'
+            linkEl.href = sourceUrl
+            linkEl.target = '_blank'
+            linkEl.rel = 'noopener noreferrer'
+            linkEl.textContent = 'View source →'
+            inner.appendChild(linkEl)
+          }
+
+          if (clickPopupRef.current) clickPopupRef.current.remove()
+
+          clickPopupRef.current = new maplibregl.Popup({
+            closeButton: true,
+            closeOnClick: true,
+            offset: 10,
+            className: 'eonet-popup',
+          })
+            .setLngLat(coords)
+            .setDOMContent(inner)
+            .addTo(map)
+
+          const clickPopupEl = clickPopupRef.current.getElement()
+          const mapWrap = containerRef.current?.parentElement
+          if (clickPopupEl && mapWrap) mapWrap.appendChild(clickPopupEl)
         },
       )
 
@@ -240,6 +319,7 @@ export function WorldMap() {
     return () => {
       resizeObserver.disconnect()
       popupRef.current?.remove()
+      clickPopupRef.current?.remove()
       map.remove()
       mapRef.current = null
       setMapLoaded(false)

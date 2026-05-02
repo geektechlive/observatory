@@ -23,6 +23,8 @@ const RLLLocationSchema = z.object({
 const RLLPadSchema = z.object({
   id: z.number(),
   name: z.string(),
+  latitude: z.string().optional().nullable(),
+  longitude: z.string().optional().nullable(),
   location: RLLLocationSchema.optional().nullable(),
 })
 

@@ -13,12 +13,13 @@ interface CategoryDef {
 }
 
 const CATEGORIES: CategoryDef[] = [
-  { id: 'wildfires', label: 'Wildfires', color: '#fb7185' },
-  { id: 'severeStorms', label: 'Severe Storms', color: '#fbbf24' },
-  { id: 'earthquakes', label: 'Earthquakes', color: '#f472b6' },
-  { id: 'volcanoes', label: 'Volcanoes', color: '#fb923c' },
-  { id: 'floods', label: 'Floods', color: '#67e8f9' },
-  { id: 'landslides', label: 'Landslides', color: '#a78bfa' },
+  { id: 'wildfires', label: 'Wildfire', color: 'oklch(0.70 0.22 28)' },
+  { id: 'severeStorms', label: 'Storm', color: 'var(--signal)' },
+  { id: 'earthquakes', label: 'Earthquake', color: 'var(--amber)' },
+  { id: 'volcanoes', label: 'Volcano', color: 'var(--copper-glow)' },
+  { id: 'floods', label: 'Flood', color: 'oklch(0.75 0.18 240)' },
+  { id: 'landslides', label: 'Landslide', color: 'var(--copper)' },
+  { id: 'seaLakeIce', label: 'Sea Ice', color: 'oklch(0.88 0.06 200)' },
 ]
 
 export function MapLegend({ events, issVisible }: MapLegendProps) {
@@ -36,6 +37,7 @@ export function MapLegend({ events, issVisible }: MapLegendProps) {
 
   return (
     <div className={styles.legend ?? ''}>
+      <div className={styles.heading ?? ''}>EONET · LIVE</div>
       {activeCategories.map((cat) => (
         <div key={cat.id} className={styles.row ?? ''}>
           <span className={styles.dot ?? ''} style={{ background: cat.color }} />
@@ -47,7 +49,7 @@ export function MapLegend({ events, issVisible }: MapLegendProps) {
       {issVisible && <div className={styles.sectionLabel ?? ''}>Sky</div>}
       {issVisible && (
         <div className={styles.row ?? ''}>
-          <span className={styles.dot ?? ''} style={{ background: '#7dd3fc' }} />
+          <span className={styles.dot ?? ''} style={{ background: 'var(--signal)' }} />
           <span className={styles.label ?? ''}>ISS</span>
         </div>
       )}

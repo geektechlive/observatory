@@ -8,7 +8,6 @@ import { SentryPanel } from '@/components/panels/SentryPanel'
 import { AsteroidTable } from '@/components/panels/AsteroidTable'
 import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
 import { FireballList } from '@/components/panels/FireballList'
-import { ApodCard } from '@/components/panels/ApodCard'
 import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
@@ -16,6 +15,7 @@ import { Footer } from '@/components/footer/Footer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useIss } from '@/hooks/useIss'
 import { useEvents } from '@/hooks/useEvents'
+import { useLaunches } from '@/hooks/useLaunches'
 import { useNeo } from '@/hooks/useNeo'
 import { isPointGeometry } from '@/schemas/eonet'
 import appStyles from './App.module.css'
@@ -37,13 +37,21 @@ export function App() {
   const [mapMode, setMapMode] = useState<MapMode>('globe')
   const { position: issPos, trail: issTrail } = useIss()
   const { data: eventsData } = useEvents()
+  const { data: launchData } = useLaunches()
   const { data: neoData } = useNeo()
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
     const geom = ev.geometry.find(isPointGeometry)
     if (!geom) return []
     const kind = ev.categories[0]?.id ?? 'other'
-    return [{ lat: geom.coordinates[1], lon: geom.coordinates[0], kind }]
+    return [{ lat: geom.coordinates[1] ?? 0, lon: geom.coordinates[0] ?? 0, kind }]
+  })
+
+  const launchMarkers = (launchData?.result ?? []).flatMap((launch) => {
+    const lat = parseFloat(launch.pad?.latitude ?? '')
+    const lon = parseFloat(launch.pad?.longitude ?? '')
+    if (isNaN(lat) || isNaN(lon)) return []
+    return [{ lat, lon, name: launch.pad?.name ?? launch.name }]
   })
 
   const issLat = issPos?.lat
@@ -81,6 +89,7 @@ export function App() {
                   issLon={issLon}
                   trail={issTrail}
                   events={globeEvents}
+                  launches={launchMarkers}
                   warm={true}
                   autoRotate={true}
                   radarSweep={true}
@@ -229,10 +238,20 @@ export function App() {
           </div>
         </section>
 
-        {/* Section 2: Big news row */}
+        {/* Section 2: Launches — full width */}
+        <section
+          className={`${appStyles.launchSection ?? ''} ${appStyles.panelEnter ?? ''}`}
+          style={{ animationDelay: '300ms' }}
+        >
+          <ErrorBoundary label="Launches">
+            <LaunchPanel />
+          </ErrorBoundary>
+        </section>
+
+        {/* Section 3: Sentry + Space Weather */}
         <section
           className={`${appStyles.newsSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '300ms' }}
+          style={{ animationDelay: '450ms' }}
         >
           <ErrorBoundary label="Sentry">
             <SentryPanel />
@@ -242,17 +261,7 @@ export function App() {
           </ErrorBoundary>
         </section>
 
-        {/* Section 3: Launches — full width */}
-        <section
-          className={`${appStyles.launchSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '450ms' }}
-        >
-          <ErrorBoundary label="Launches">
-            <LaunchPanel />
-          </ErrorBoundary>
-        </section>
-
-        {/* Section 4: Asteroid table + APOD */}
+        {/* Section 4: Asteroid table + Fireballs */}
         <section
           className={`${appStyles.asteroidSection ?? ''} ${appStyles.panelEnter ?? ''}`}
           style={{ animationDelay: '600ms' }}
@@ -260,21 +269,18 @@ export function App() {
           <ErrorBoundary label="Close Approaches">
             <AsteroidTable />
           </ErrorBoundary>
-          <ErrorBoundary label="APOD">
-            <ApodCard />
+          <ErrorBoundary label="Fireballs">
+            <FireballList />
           </ErrorBoundary>
         </section>
 
-        {/* Section 5: Solar Wind + Fireballs */}
+        {/* Section 5: Solar Wind */}
         <section
           className={`${appStyles.solarSection ?? ''} ${appStyles.panelEnter ?? ''}`}
           style={{ animationDelay: '750ms' }}
         >
           <ErrorBoundary label="Solar Wind">
             <SolarWindPanel />
-          </ErrorBoundary>
-          <ErrorBoundary label="Fireballs">
-            <FireballList />
           </ErrorBoundary>
         </section>
 

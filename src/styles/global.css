@@ -9,17 +9,168 @@ body {
 }
 
 body {
-  background-color: var(--bg);
   min-height: 100dvh;
   overflow-x: hidden;
+  color: var(--bone);
+}
+
+/* Hull plate texture overlay — scanlines + panel seams */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.65;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 3px, oklch(1 0 0 / 0.012) 3px 4px),
+    repeating-linear-gradient(90deg, transparent 0 200px, oklch(0 0 0 / 0.15) 200px 201px),
+    repeating-linear-gradient(0deg, transparent 0 160px, oklch(0 0 0 / 0.18) 160px 161px);
+}
+
+/* Grease stain / paint splotch overlays */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image:
+    radial-gradient(ellipse 280px 90px at 18% 22%, oklch(0.18 0.04 60 / 0.6) 0%, transparent 70%),
+    radial-gradient(ellipse 200px 70px at 78% 48%, oklch(0.15 0.03 50 / 0.5) 0%, transparent 60%),
+    radial-gradient(ellipse 340px 110px at 45% 76%, oklch(0.2 0.04 60 / 0.45) 0%, transparent 65%),
+    radial-gradient(circle 60px at 88% 12%, oklch(0.55 0.15 45 / 0.18) 0%, transparent 70%);
 }
 
 #root {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  position: relative;
-  z-index: 1;
+}
+
+/* ============================================================
+   ROCI KEYFRAMES
+   ============================================================ */
+
+@keyframes roci-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes roci-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes roci-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes roci-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: brightness(0.5);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes roci-telemetry-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+    text-shadow:
+      0 0 6px oklch(0.78 0.1 60 / 0.35),
+      0 0 14px oklch(0.78 0.1 60 / 0.15);
+  }
+
+  50% {
+    filter: brightness(1.15);
+    text-shadow:
+      0 0 10px oklch(0.78 0.1 60 / 0.55),
+      0 0 22px oklch(0.78 0.1 60 / 0.3);
+  }
+}
+
+@keyframes roci-needle {
+  0%,
+  100% {
+    transform: rotate(-32deg);
+  }
+
+  50% {
+    transform: rotate(34deg);
+  }
+}
+
+@keyframes roci-blink-slow {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ============================================================
+   GLOBAL UTILITY CLASSES
+   ============================================================ */
+
+.stencil {
+  font-family: var(--font-stencil);
+  font-weight: var(--font-stencil-weight);
+  letter-spacing: var(--font-stencil-tracking);
+  text-transform: uppercase;
+}
+
+.belter {
+  display: block;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.005em;
+  margin-top: 4px;
+  color: var(--copper);
+  opacity: 0.85;
 }
 
 /* Skip link */
@@ -28,8 +179,8 @@ body {
   top: -100%;
   left: 0;
   padding: 8px 16px;
-  background: var(--cyan);
-  color: var(--bg);
+  background: var(--copper);
+  color: var(--void);
   font-weight: 600;
   z-index: 9999;
 }
@@ -40,19 +191,23 @@ body {
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--signal);
   outline-offset: 2px;
 }
 
-/* MapLibre event popup */
+/* Selection */
+::selection {
+  background: var(--copper);
+  color: var(--void);
+}
+
+/* MapLibre event popup — hull-dark style */
 .eonet-popup .maplibregl-popup-content {
-  background: rgba(4, 6, 15, 0.88);
-  backdrop-filter: blur(16px) saturate(130%);
-  -webkit-backdrop-filter: blur(16px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 6px;
+  background: oklch(0.1 0.02 50 / 0.92);
+  border: 1px solid var(--plate-edge);
+  border-radius: 4px;
   padding: 10px 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.6);
   max-width: 220px;
 }
 
@@ -61,32 +216,31 @@ body {
 }
 
 .eonet-popup-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-stencil);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-weight: 400;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-bottom: 4px;
+  color: var(--copper-glow);
 }
 
 .eonet-popup-title {
   font-family: var(--font-body);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--bone-dim);
   line-height: 1.45;
 }
 
-/* MapLibre attribution — glass style */
+/* MapLibre attribution — hull style */
 .maplibregl-ctrl-attrib {
-  background: rgba(4, 6, 15, 0.7) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: oklch(0.1 0.02 50 / 0.8) !important;
   border-radius: 4px !important;
   font-family: var(--font-mono) !important;
   font-size: 10px !important;
-  color: var(--ink-faint) !important;
+  color: var(--bone-faint) !important;
 }
 
 .maplibregl-ctrl-attrib a {
-  color: var(--ink-dim) !important;
+  color: var(--bone-dim) !important;
 }

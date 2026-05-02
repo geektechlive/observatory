@@ -26,7 +26,7 @@
   padding: 0 var(--gutter) 24px;
 }
 
-/* Section 3: Asteroid table + APOD */
+/* Section 4: Asteroid table + Fireballs */
 .asteroidSection {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
@@ -34,15 +34,12 @@
   padding: 0 var(--gutter) 24px;
 }
 
-/* Section 4: Solar Wind + Fireballs */
+/* Section 5: Solar Wind — full width */
 .solarSection {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: var(--space-gap);
   padding: 0 var(--gutter) 24px;
 }
 
-/* Section 5: Launches — full width */
+/* Section 2: Launches — full width */
 .launchSection {
   padding: 0 var(--gutter) 24px;
 }
@@ -147,11 +144,19 @@
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    oklch(0.85 0.13 220 / 0.02) 60deg,
-    oklch(0.85 0.13 220 / 0.3) 110deg,
-    oklch(0.92 0.15 220 / 0.85) 119deg,
+    oklch(0.85 0.13 220 / 0.008) 20deg,
+    oklch(0.85 0.13 220 / 0.018) 40deg,
+    oklch(0.85 0.13 220 / 0.035) 60deg,
+    oklch(0.85 0.13 220 / 0.065) 78deg,
+    oklch(0.86 0.13 220 / 0.11) 92deg,
+    oklch(0.87 0.14 220 / 0.18) 103deg,
+    oklch(0.89 0.14 220 / 0.32) 110deg,
+    oklch(0.91 0.15 220 / 0.52) 115deg,
+    oklch(0.93 0.16 220 / 0.74) 118deg,
+    oklch(0.96 0.17 220 / 0.92) 119.5deg,
     oklch(1 0 0 / 1) 120deg,
-    transparent 121deg,
+    oklch(0.92 0.15 220 / 0.18) 121.5deg,
+    transparent 124deg,
     transparent 360deg
   );
   animation: roci-sweep 6s linear infinite;
@@ -404,8 +409,7 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .asteroidSection,
-  .solarSection {
+  .asteroidSection {
     grid-template-columns: 1fr;
   }
 }
@@ -413,9 +417,13 @@
 @media (width <= 899px) {
   .globeSection,
   .newsSection,
-  .asteroidSection,
-  .solarSection {
+  .asteroidSection {
     grid-template-columns: 1fr;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .solarSection {
     padding-left: 16px;
     padding-right: 16px;
   }

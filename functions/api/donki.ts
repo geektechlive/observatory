@@ -43,25 +43,24 @@ async function fetchDonkiEndpoint<T>(
   }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequest: PagesFunction<Env> = async ({ env }) => {
   const endDate = dateString(0)
   const startDate = dateString(-7)
   const kvKey = `nasa:donki:${endDate}`
-  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
-  if (!fresh) {
-    const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-    if (cached !== null) {
-      return new Response(cached, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Cache': 'HIT',
-          'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-        },
-      })
-    }
+  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
+  if (cached !== null) {
+    return new Response(cached, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cache': 'HIT',
+        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+      },
+    })
   }
 
+  if (!env.NASA_API_KEY)
+    console.warn('[donki] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
   const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
 
   const [flaresResult, cmesResult, stormsResult, sepsResult] = await Promise.all([

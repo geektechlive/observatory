@@ -15,26 +15,24 @@ function midnightUtcMs(): number {
   return Math.floor((midnight.getTime() - now.getTime()) / 1000)
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequest: PagesFunction<Env> = async ({ env }) => {
   const utcDate = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   const kvKey = `nasa:apod:${utcDate}`
-  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
-  // Serve from cache unless ?fresh=1
-  if (!fresh) {
-    const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-    if (cached !== null) {
-      return new Response(cached, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Cache': 'HIT',
-          'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-        },
-      })
-    }
+  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
+  if (cached !== null) {
+    return new Response(cached, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cache': 'HIT',
+        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+      },
+    })
   }
 
   // Fetch from NASA
+  if (!env.NASA_API_KEY)
+    console.warn('[apod] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
   const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
   const upstream = await fetch(`${NASA_API_BASE}/planetary/apod?api_key=${apiKey}`)
 

@@ -1,75 +1,12 @@
-/*
-  Stars on body background. Small stars are crisp in uncovered gaps.
-  Large stars (5-8px) survive the 24px backdrop-blur on glass panels —
-  they spread into soft luminous halos visible through the frosted glass.
-*/
+/* Atmospheric blooms — copper warm and signal-blue accents.
+   Individual star dots are handled by the StarField canvas component. */
 body {
-  background-color: var(--bg);
+  background-color: var(--void);
   background-attachment: fixed;
   background-image:
-    var(--bloom-a),
-    var(--bloom-b),
-    var(--bloom-c),
-    /* hero stars — 7-8px: broad soft halo through glass */
-    radial-gradient(circle at 8% 14%, rgba(255, 255, 255, 0.98) 0, transparent 8px),
-    radial-gradient(circle at 62% 8%, rgba(255, 255, 255, 0.95) 0, transparent 7px),
-    radial-gradient(circle at 91% 22%, rgba(255, 255, 255, 0.97) 0, transparent 8px),
-    radial-gradient(circle at 34% 88%, rgba(255, 255, 255, 0.93) 0, transparent 7px),
-    radial-gradient(circle at 78% 71%, rgba(255, 255, 255, 0.96) 0, transparent 7px),
-    /* bright stars — 4-5px: visible halo through glass */
-    radial-gradient(circle at 19% 52%, rgba(255, 255, 255, 0.92) 0, transparent 5px),
-    radial-gradient(circle at 44% 27%, rgba(255, 255, 255, 0.88) 0, transparent 4px),
-    radial-gradient(circle at 57% 63%, rgba(255, 255, 255, 0.9) 0, transparent 5px),
-    radial-gradient(circle at 83% 44%, rgba(255, 255, 255, 0.85) 0, transparent 4px),
-    radial-gradient(circle at 26% 73%, rgba(255, 255, 255, 0.9) 0, transparent 5px),
-    radial-gradient(circle at 70% 92%, rgba(255, 255, 255, 0.87) 0, transparent 4px),
-    radial-gradient(circle at 95% 57%, rgba(255, 255, 255, 0.9) 0, transparent 5px),
-    radial-gradient(circle at 48% 6%, rgba(255, 255, 255, 0.88) 0, transparent 4px),
-    radial-gradient(circle at 3% 82%, rgba(255, 255, 255, 0.85) 0, transparent 5px),
-    radial-gradient(circle at 73% 18%, rgba(255, 255, 255, 0.92) 0, transparent 4px),
-    /* medium stars — 2-2.5px */
-    radial-gradient(circle at 7% 38%, rgba(255, 255, 255, 0.82) 0, transparent 2.5px),
-    radial-gradient(circle at 13% 67%, rgba(255, 255, 255, 0.78) 0, transparent 2px),
-    radial-gradient(circle at 22% 19%, rgba(255, 255, 255, 0.85) 0, transparent 2.5px),
-    radial-gradient(circle at 29% 44%, rgba(255, 255, 255, 0.75) 0, transparent 2px),
-    radial-gradient(circle at 37% 96%, rgba(255, 255, 255, 0.8) 0, transparent 2.5px),
-    radial-gradient(circle at 41% 58%, rgba(255, 255, 255, 0.72) 0, transparent 2px),
-    radial-gradient(circle at 52% 34%, rgba(255, 255, 255, 0.82) 0, transparent 2.5px),
-    radial-gradient(circle at 58% 79%, rgba(255, 255, 255, 0.78) 0, transparent 2px),
-    radial-gradient(circle at 65% 47%, rgba(255, 255, 255, 0.75) 0, transparent 2px),
-    radial-gradient(circle at 68% 12%, rgba(255, 255, 255, 0.85) 0, transparent 2.5px),
-    radial-gradient(circle at 76% 84%, rgba(255, 255, 255, 0.72) 0, transparent 2px),
-    radial-gradient(circle at 80% 31%, rgba(255, 255, 255, 0.8) 0, transparent 2.5px),
-    radial-gradient(circle at 87% 68%, rgba(255, 255, 255, 0.75) 0, transparent 2px),
-    radial-gradient(circle at 93% 9%, rgba(255, 255, 255, 0.82) 0, transparent 2.5px),
-    radial-gradient(circle at 98% 86%, rgba(255, 255, 255, 0.78) 0, transparent 2px),
-    radial-gradient(circle at 2% 55%, rgba(255, 255, 255, 0.72) 0, transparent 2px),
-    radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.8) 0, transparent 2.5px),
-    radial-gradient(circle at 54% 91%, rgba(255, 255, 255, 0.75) 0, transparent 2px),
-    radial-gradient(circle at 86% 5%, rgba(255, 255, 255, 0.82) 0, transparent 2.5px),
-    /* small stars — 1-1.5px */
-    radial-gradient(circle at 5% 71%, rgba(255, 255, 255, 0.65) 0, transparent 1.5px),
-    radial-gradient(circle at 11% 29%, rgba(255, 255, 255, 0.6) 0, transparent 1px),
-    radial-gradient(circle at 17% 84%, rgba(255, 255, 255, 0.62) 0, transparent 1.5px),
-    radial-gradient(circle at 24% 6%, rgba(255, 255, 255, 0.58) 0, transparent 1px),
-    radial-gradient(circle at 28% 61%, rgba(255, 255, 255, 0.65) 0, transparent 1.5px),
-    radial-gradient(circle at 33% 39%, rgba(255, 255, 255, 0.6) 0, transparent 1px),
-    radial-gradient(circle at 39% 17%, rgba(255, 255, 255, 0.62) 0, transparent 1px),
-    radial-gradient(circle at 45% 75%, rgba(255, 255, 255, 0.58) 0, transparent 1.5px),
-    radial-gradient(circle at 50% 49%, rgba(255, 255, 255, 0.65) 0, transparent 1px),
-    radial-gradient(circle at 55% 21%, rgba(255, 255, 255, 0.6) 0, transparent 1.5px),
-    radial-gradient(circle at 60% 87%, rgba(255, 255, 255, 0.62) 0, transparent 1px),
-    radial-gradient(circle at 64% 33%, rgba(255, 255, 255, 0.58) 0, transparent 1px),
-    radial-gradient(circle at 71% 56%, rgba(255, 255, 255, 0.65) 0, transparent 1.5px),
-    radial-gradient(circle at 75% 4%, rgba(255, 255, 255, 0.6) 0, transparent 1px),
-    radial-gradient(circle at 82% 78%, rgba(255, 255, 255, 0.62) 0, transparent 1.5px),
-    radial-gradient(circle at 88% 42%, rgba(255, 255, 255, 0.58) 0, transparent 1px),
-    radial-gradient(circle at 90% 93%, rgba(255, 255, 255, 0.6) 0, transparent 1px),
-    radial-gradient(circle at 96% 66%, rgba(255, 255, 255, 0.62) 0, transparent 1.5px),
-    radial-gradient(circle at 4% 97%, rgba(255, 255, 255, 0.55) 0, transparent 1px),
-    radial-gradient(circle at 16% 47%, rgba(255, 255, 255, 0.6) 0, transparent 1px),
-    radial-gradient(circle at 46% 13%, rgba(255, 255, 255, 0.58) 0, transparent 1.5px),
-    radial-gradient(circle at 61% 72%, rgba(255, 255, 255, 0.62) 0, transparent 1px),
-    radial-gradient(circle at 79% 25%, rgba(255, 255, 255, 0.6) 0, transparent 1px),
-    radial-gradient(circle at 97% 38%, rgba(255, 255, 255, 0.55) 0, transparent 1.5px);
+    /* copper radial blooms */
+    radial-gradient(ellipse at 80% 0%, oklch(0.55 0.15 45 / 0.2) 0%, transparent 55%),
+    radial-gradient(ellipse at 0% 100%, oklch(0.4 0.1 60 / 0.18) 0%, transparent 50%),
+    /* signal-blue accent glow — bottom right */
+    radial-gradient(ellipse at 100% 85%, oklch(0.85 0.13 220 / 0.07) 0%, transparent 40%);
 }

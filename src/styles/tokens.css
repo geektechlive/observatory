@@ -1,60 +1,112 @@
+/* ROCI RETROFIT — Belter Station design tokens
+   Two color worlds: warm copper hull + cool cyan telemetry.
+   MCRN-red is hazard-only. Bone for ink, void for background. */
+
 :root {
-  /* Background */
-  --bg: #04060f;
+  /* VOID + HULL */
+  --void: oklch(0.08 0.01 50);
+  --hull: oklch(0.13 0.01 60);
+  --hull-2: oklch(0.18 0.02 60);
+  --plate-edge: oklch(0.28 0.03 60 / 0.6);
+  --plate-seam: oklch(0.4 0.02 60 / 0.35);
 
-  /* Bloom layers — applied as background-image on body */
-  --bloom-a: radial-gradient(ellipse at 30% 20%, rgba(125, 211, 252, 0.18) 0%, transparent 55%);
-  --bloom-b: radial-gradient(ellipse at 75% 10%, rgba(167, 139, 250, 0.12) 0%, transparent 45%);
-  --bloom-c: radial-gradient(ellipse at 50% 100%, rgba(34, 211, 238, 0.1) 0%, transparent 50%);
+  /* INK */
+  --bone: oklch(0.94 0.01 80);
+  --bone-dim: oklch(0.94 0.01 80 / 0.66);
+  --bone-faint: oklch(0.94 0.01 80 / 0.4);
 
-  /* Ink */
-  --ink: #f3f6fb;
-  --ink-dim: rgba(243, 246, 251, 0.55);
-  --ink-faint: rgba(243, 246, 251, 0.5);
+  /* WARM WORLD — copper hull, brass fittings */
+  --copper: oklch(0.62 0.13 48);
+  --copper-2: oklch(0.55 0.14 45);
+  --copper-glow: oklch(0.78 0.14 55);
+  --brass: oklch(0.82 0.14 80);
 
-  /* Semantic accents */
-  --cyan: #7dd3fc; /* telemetry, ISS */
-  --amber: #fbbf24; /* alerts, warnings */
-  --magenta: #f472b6; /* risk, Sentry */
-  --green: #6ee7a7; /* live, all-clear */
-  --warm: #fb7185; /* wildfire */
-  --orange: #fb923c; /* volcano */
-  --gold: #fde68a; /* fireball */
+  /* COOL WORLD — cyan telemetry */
+  --signal: oklch(0.85 0.13 220);
+  --signal-2: oklch(0.72 0.13 220);
+  --terminal: oklch(0.78 0.18 145);
 
-  /* Glass material */
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur: blur(24px) saturate(140%);
-  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* HAZARD */
+  --mcrn: oklch(0.62 0.2 25);
+  --mcrn-2: oklch(0.5 0.22 25);
+  --amber: oklch(0.84 0.16 80);
 
-  /* Status bar */
-  --status-bar-bg: rgba(4, 6, 15, 0.85);
-  --status-bar-border: rgba(255, 255, 255, 0.06);
-  --status-bar-h: 44px;
+  /* Legacy aliases — preserve component references */
+  --bg: var(--void);
+  --ink: var(--bone);
+  --ink-dim: var(--bone-dim);
+  --ink-faint: var(--bone-faint);
+  --cyan: var(--signal);
+  --magenta: var(--mcrn);
+  --green: var(--terminal);
+  --warm: oklch(0.62 0.2 30);
+  --orange: oklch(0.72 0.15 50);
+  --gold: var(--amber);
 
-  /* Ticker */
-  --ticker-h: 52px;
-
-  /* Typography */
-  --font-display: 'Inter Tight', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
+  /* TYPOGRAPHY */
+  --font-display: 'Fraunces', georgia, serif;
+  --font-body: 'Inter Tight', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Stencil → IBM Plex Mono 500 for all functional ops labels */
+  --font-stencil: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-stencil-weight: 500;
+  --font-stencil-tracking: 0.18em;
+
+  /* Paint → Special Elite retained for decorative painted elements only */
+  --font-paint: 'Special Elite', 'Courier New', monospace;
   --font-editorial: 'Fraunces', georgia, serif;
+
   --text-base: clamp(0.9375rem, 0.85rem + 0.4vw, 1.0625rem);
   --text-sm: 0.8125rem;
   --text-xs: 0.6875rem;
   --text-display: clamp(2rem, 1rem + 4vw, 4rem);
 
-  /* Spacing */
-  --radius-tile: 14px;
-  --radius-panel: 18px;
-  --radius-hero: 20px;
-  --space-section: clamp(20px, 2vw, 28px);
-  --space-gap: 12px;
+  /* STRUCTURAL PANEL BORDERS */
+  --panel-border: oklch(0.28 0.06 200 / 0.48);
+  --panel-border-strong: oklch(0.34 0.08 200 / 0.65);
 
-  /* Motion */
+  /* GLASS + DEPTH */
+  --glass-blur: 10px;
+  --glass-saturate: 1.35;
+  --glass-alpha-near: 0.68;
+  --glass-alpha-mid: 0.58;
+  --glass-alpha-far: 0.48;
+
+  --depth-shadow-near:
+    inset 0 1px 0 oklch(1 0 0 / 0.08), inset 0 -1px 0 oklch(0 0 0 / 0.45),
+    0 2px 4px oklch(0 0 0 / 0.35), 0 8px 18px oklch(0 0 0 / 0.45), 0 24px 60px oklch(0 0 0 / 0.55);
+
+  --depth-shadow-mid:
+    inset 0 1px 0 oklch(1 0 0 / 0.06), inset 0 -1px 0 oklch(0 0 0 / 0.35),
+    0 2px 3px oklch(0 0 0 / 0.3), 0 6px 14px oklch(0 0 0 / 0.38), 0 16px 40px oklch(0 0 0 / 0.45);
+
+  --depth-shadow-far:
+    inset 0 1px 0 oklch(1 0 0 / 0.04), 0 1px 2px oklch(0 0 0 / 0.25), 0 4px 8px oklch(0 0 0 / 0.3),
+    0 10px 24px oklch(0 0 0 / 0.35);
+
+  /* PANEL MATERIAL — hull plate (replaces glass tokens) */
+  --glass-bg: oklch(0.13 0.02 220 / var(--glass-alpha-near));
+  --glass-border: var(--plate-edge);
+  --glass-shadow: var(--depth-shadow-near);
+
+  /* LAYOUT */
+  --status-bar-bg: oklch(0.1 0.02 50 / 0.95);
+  --status-bar-border: var(--plate-edge);
+  --status-bar-h: 0px;
+  --ticker-h: 56px;
+  --gutter: clamp(24px, 4vw, 48px);
+
+  /* SPACING + SHAPE */
+  --radius-tile: 4px;
+  --radius-panel: 4px;
+  --radius-hero: 4px;
+  --space-section: clamp(20px, 2vw, 28px);
+  --space-gap: 18px;
+
+  /* MOTION */
   --duration-fast: 200ms;
   --duration-normal: 350ms;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --pulse-duration: 1.5s;
+  --pulse-duration: 1.6s;
 }

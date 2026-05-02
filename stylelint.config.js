@@ -13,6 +13,9 @@ export default {
     'property-no-vendor-prefix': null,
     // Intentional alpha values on color vars
     'alpha-value-notation': null,
+    // Project uses decimal oklch notation throughout (e.g. 0.16 not 16%, 60 not 60deg)
+    'lightness-notation': null,
+    'hue-degree-notation': null,
     // CSS custom properties don't need empty lines
     'custom-property-empty-line-before': null,
     // @import syntax handled by bundler

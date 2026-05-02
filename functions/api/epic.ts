@@ -8,22 +8,19 @@ interface Env {
   OBSERVATORY_CACHE: KVNamespace
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequest: PagesFunction<Env> = async ({ env }) => {
   const today = new Date().toISOString().slice(0, 10)
   const kvKey = `nasa:epic:latest:${today}`
-  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
-  if (!fresh) {
-    const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-    if (cached !== null) {
-      return new Response(cached, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Cache': 'HIT',
-          'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-        },
-      })
-    }
+  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
+  if (cached !== null) {
+    return new Response(cached, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cache': 'HIT',
+        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+      },
+    })
   }
 
   const url = `${EPIC_API_BASE}/api/natural`

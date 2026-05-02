@@ -15,25 +15,24 @@ function dateString(offsetDays: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequest: PagesFunction<Env> = async ({ env }) => {
   const startDate = dateString(0)
   const endDate = dateString(7)
   const kvKey = `nasa:neo:${startDate}`
-  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
-  if (!fresh) {
-    const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-    if (cached !== null) {
-      return new Response(cached, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Cache': 'HIT',
-          'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-        },
-      })
-    }
+  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
+  if (cached !== null) {
+    return new Response(cached, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cache': 'HIT',
+        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
+      },
+    })
   }
 
+  if (!env.NASA_API_KEY)
+    console.warn('[neo] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
   const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
   const url = `${NASA_API_BASE}/neo/rest/v1/feed?start_date=${startDate}&end_date=${endDate}&api_key=${apiKey}`
   const upstream = await fetch(url)

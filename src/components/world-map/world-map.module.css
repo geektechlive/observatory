@@ -4,6 +4,17 @@
   height: 100%;
 }
 
+/* Copper warmth overlay — tints the basemap without breaking MapLibre interactions */
+.mapWrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-panel);
+  background: oklch(0.55 0.15 45 / 0.22);
+  pointer-events: none;
+  z-index: 5;
+}
+
 .container {
   position: relative;
   width: 100%;
@@ -11,6 +22,9 @@
   min-height: 480px;
   border-radius: var(--radius-panel);
   overflow: hidden;
+
+  /* Warm the cold CARTO dark-matter tiles toward the copper palette */
+  filter: sepia(0.55) brightness(0.82) saturate(1.2);
 }
 
 .eonetBadge {
