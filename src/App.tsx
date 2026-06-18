@@ -15,6 +15,7 @@ import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
 import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
 import { PeopleInSpacePanel } from '@/components/panels/PeopleInSpacePanel'
 import { DsnPanel } from '@/components/panels/DsnPanel'
+import { PlanetsPanel } from '@/components/panels/PlanetsPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
@@ -297,6 +298,9 @@ export function App() {
           </ErrorBoundary>
           <ErrorBoundary label="Deep Space Network">
             <DsnPanel />
+          </ErrorBoundary>
+          <ErrorBoundary label="Planets Tonight">
+            <PlanetsPanel />
           </ErrorBoundary>
         </section>
 

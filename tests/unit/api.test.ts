@@ -13,6 +13,7 @@ import { fetchSunMoon } from '@/lib/api/sunMoon'
 import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
 import { fetchSolarCycle } from '@/lib/api/solarCycle'
 import { fetchGdacs } from '@/lib/api/gdacs'
+import { fetchPlanets } from '@/lib/api/planets'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -425,5 +426,27 @@ describe('fetchGdacs', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchGdacs()).rejects.toThrow(/GDACS fetch failed/)
+  })
+})
+
+const PLANETS_FIXTURE = {
+  bodies: [
+    { name: 'Sun', raHours: 5.9, decDeg: 23.4, mag: -26.7, elongation: 0 },
+    { name: 'Mars', raHours: 3.3, decDeg: 17.8, mag: 1.3, elongation: 34.6 },
+  ],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchPlanets', () => {
+  it('returns parsed ephemerides on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, PLANETS_FIXTURE))
+    const result = await fetchPlanets()
+    expect(result.bodies).toHaveLength(2)
+    expect(result.bodies[1]?.name).toBe('Mars')
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchPlanets()).rejects.toThrow(/Planets fetch failed/)
   })
 })
