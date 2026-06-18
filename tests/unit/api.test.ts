@@ -14,6 +14,7 @@ import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
 import { fetchSolarCycle } from '@/lib/api/solarCycle'
 import { fetchGdacs } from '@/lib/api/gdacs'
 import { fetchPlanets } from '@/lib/api/planets'
+import { fetchSatellites } from '@/lib/api/satellites'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -448,5 +449,29 @@ describe('fetchPlanets', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchPlanets()).rejects.toThrow(/Planets fetch failed/)
+  })
+})
+
+const SATELLITES_FIXTURE = {
+  satellites: [
+    {
+      name: 'Hubble',
+      line1: '1 20580U 90037B   26169.12115247  .00005032  00000+0  15694-3 0  9998',
+      line2: '2 20580  28.4721  74.1921 0001766 152.2420 207.8270 15.30755230788719',
+    },
+  ],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchSatellites', () => {
+  it('returns parsed TLEs on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, SATELLITES_FIXTURE))
+    const result = await fetchSatellites()
+    expect(result.satellites[0]?.name).toBe('Hubble')
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchSatellites()).rejects.toThrow(/Satellites fetch failed/)
   })
 })

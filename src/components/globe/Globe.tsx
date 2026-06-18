@@ -78,6 +78,12 @@ interface GlobeDisaster {
   name: string
 }
 
+interface GlobeSatellite {
+  name: string
+  lat: number
+  lon: number
+}
+
 interface GlobeProps {
   size?: number | undefined
   issLat?: number | undefined
@@ -91,6 +97,7 @@ interface GlobeProps {
   fireballs?: GlobeFireball[] | undefined
   quakes?: GlobeQuake[] | undefined
   disasters?: GlobeDisaster[] | undefined
+  satellites?: GlobeSatellite[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
   radarSweep?: boolean | undefined
@@ -246,8 +253,11 @@ const LEGEND_ITEMS = [
   { key: 'fireball', label: '✦  Fireball', color: FIREBALL_COLOR },
   { key: 'quake', label: '○  Seismic', color: 'oklch(0.80 0.18 55)' },
   { key: 'disaster', label: '◆  Alert', color: 'oklch(0.62 0.22 25)' },
+  { key: 'sat', label: '●  Satellite', color: 'var(--terminal)' },
   { key: 'iss', label: '◉  ISS', color: 'var(--signal)' },
 ]
+
+const SAT_COLOR = 'oklch(0.78 0.18 145)'
 
 // 4-point sparkle path centered at (cx, cy), radius r.
 function sparklePath(cx: number, cy: number, r: number): string {
@@ -274,6 +284,7 @@ export function Globe({
   fireballs = [],
   quakes = [],
   disasters = [],
+  satellites = [],
   warm = true,
   autoRotate = true,
   radarSweep = false,
@@ -756,6 +767,31 @@ export function Globe({
               filter="url(#iss-glow)"
             />
           )}
+
+          {/* 9d — Other tracked satellites (Hubble, Tiangong) */}
+          {satellites.map((sat, i) => {
+            const p = project(sat.lat, sat.lon, rotation, R)
+            if (!p.visible) return null
+            return (
+              <g key={`sat${i}`} pointerEvents="none">
+                <title>{sat.name}</title>
+                <circle cx={p.x} cy={p.y} r={3.4} fill="none" stroke={SAT_COLOR} strokeWidth="1" />
+                <circle cx={p.x} cy={p.y} r={1.4} fill={SAT_COLOR} />
+                <text
+                  x={p.x + 5}
+                  y={p.y + 2.5}
+                  fill={SAT_COLOR}
+                  fontSize="6.5"
+                  fontFamily="var(--font-stencil)"
+                  letterSpacing="0.06em"
+                  opacity="0.85"
+                  aria-hidden="true"
+                >
+                  {sat.name}
+                </text>
+              </g>
+            )
+          })}
 
           {/* 10 — ISS tactical crosshair marker + label */}
           {hasIss && issDot?.visible && (
