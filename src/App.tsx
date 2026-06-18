@@ -10,6 +10,7 @@ import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
 import { FireballList } from '@/components/panels/FireballList'
 import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
 import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
+import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
@@ -281,6 +282,9 @@ export function App() {
           </ErrorBoundary>
           <ErrorBoundary label="Space Weather">
             <SpaceWeatherStrip />
+          </ErrorBoundary>
+          <ErrorBoundary label="Sun & Moon">
+            <SunMoonPanel />
           </ErrorBoundary>
         </section>
 

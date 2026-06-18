@@ -1,0 +1,116 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 36px 16px 16px;
+  height: 100%;
+}
+
+.moonRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.moonSvg {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px oklch(0.92 0.03 95 / 0.18));
+}
+
+.moonMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.phaseName {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--bone);
+}
+
+.illum {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-dim);
+}
+
+.nextPhase {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--cyan);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+
+.nextDays {
+  color: var(--ink-dim);
+}
+
+.times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.timesCol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px;
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-tile);
+}
+
+.colHead {
+  font-family: var(--font-stencil);
+  font-size: var(--text-xs);
+  color: var(--copper-glow);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.rowLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.rowValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--bone);
+}
+
+.footer {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  text-align: right;
+}
+
+.loading,
+.unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}

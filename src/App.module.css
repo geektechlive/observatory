@@ -21,7 +21,7 @@
 /* Section 2: Big news row — 3 equal cards */
 .newsSection {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: var(--space-gap);
   padding: 0 var(--gutter) 24px;
 }

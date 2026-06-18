@@ -9,6 +9,7 @@ import { fetchLaunches } from '@/lib/api/launches'
 import { fetchNeo } from '@/lib/api/neo'
 import { fetchQuakes } from '@/lib/api/quakes'
 import { fetchSolarActivity } from '@/lib/api/solarActivity'
+import { fetchSunMoon } from '@/lib/api/sunMoon'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -292,5 +293,41 @@ describe('fetchSolarActivity', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(500, {}))
     await expect(fetchSolarActivity()).rejects.toThrow(/Solar activity fetch failed/)
+  })
+})
+
+const SUN_MOON_FIXTURE = {
+  date: '2026-06-18',
+  tz: -4,
+  lat: 40.7,
+  lon: -74,
+  curPhase: 'Waxing Crescent',
+  fracIllum: 18,
+  closestPhase: { phase: 'First Quarter', date: '2026-06-21', time: '17:55' },
+  sun: {
+    rise: '05:25',
+    set: '20:30',
+    transit: '12:57',
+    civilBegin: '04:51',
+    civilEnd: '21:03',
+  },
+  moon: { rise: '09:19', set: '23:41' },
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchSunMoon', () => {
+  it('returns parsed sun/moon data on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, SUN_MOON_FIXTURE))
+    const result = await fetchSunMoon({ lat: 40.7, lon: -74, tz: -4, date: '2026-06-18' })
+    expect(result.curPhase).toBe('Waxing Crescent')
+    expect(result.fracIllum).toBe(18)
+    expect(result.sun.rise).toBe('05:25')
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(400, {}))
+    await expect(fetchSunMoon({ lat: 0, lon: 0, tz: 0, date: '2026-06-18' })).rejects.toThrow(
+      /Sun\/Moon fetch failed/,
+    )
   })
 })
