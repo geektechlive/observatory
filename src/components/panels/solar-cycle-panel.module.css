@@ -1,0 +1,87 @@
+.panel {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  padding: 36px 16px 16px;
+}
+
+.cycle,
+.forecast {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cycleHead {
+  display: flex;
+  gap: 24px;
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+}
+
+.bigNum {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--copper-glow);
+}
+
+.bigLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.axis,
+.forecastNote {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+}
+
+.forecastLabel {
+  font-family: var(--font-stencil);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--copper-glow);
+}
+
+.forecastNote {
+  justify-content: flex-start;
+}
+
+.noForecast {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  padding: 16px 0;
+}
+
+.loading,
+.unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+
+@media (width <= 768px) {
+  .panel {
+    grid-template-columns: 1fr;
+  }
+}

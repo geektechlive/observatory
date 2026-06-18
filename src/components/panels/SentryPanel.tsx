@@ -1,10 +1,40 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useSentry } from '@/hooks/useSentry'
 import { GlassPanel } from '@/components/ui/GlassPanel'
-import { ScalePill } from '@/components/ui/ScalePill'
 import { DataAge } from '@/components/ui/DataAge'
 import { formatPalermo, formatImpactProbability } from '@/lib/format'
 import styles from './sentry-panel.module.css'
+
+// Palermo Scale is logarithmic vs background risk; typical Sentry objects sit
+// around −4..0. Map to a thermometer so relative hazard reads at a glance.
+const PALERMO_MIN = -4
+const PALERMO_MAX = 1
+
+function palermoColor(ps: number): string {
+  if (ps >= -1) return 'var(--magenta)'
+  if (ps >= -2.5) return 'var(--amber)'
+  return 'var(--cyan)'
+}
+
+function PalermoGauge({ value }: { value: string | null | undefined }) {
+  const ps = value != null ? parseFloat(value) : NaN
+  const valid = isFinite(ps)
+  const t = valid ? Math.min(1, Math.max(0, (ps - PALERMO_MIN) / (PALERMO_MAX - PALERMO_MIN))) : 0
+  const color = valid ? palermoColor(ps) : 'var(--ink-faint)'
+  return (
+    <div className={styles.gauge ?? ''}>
+      <span className={styles.gaugeValue ?? ''} style={{ color }}>
+        {formatPalermo(value ?? undefined)}
+      </span>
+      <span className={styles.gaugeTrack ?? ''} aria-hidden="true">
+        <span
+          className={styles.gaugeFill ?? ''}
+          style={{ width: `${t * 100}%`, background: color }}
+        />
+      </span>
+    </div>
+  )
+}
 
 export function SentryPanel() {
   const { data, isLoading, error } = useSentry()
@@ -62,7 +92,7 @@ export function SentryPanel() {
                 {obj.fullname ?? obj.name ?? obj.des}
               </td>
               <td className={`${styles.td ?? ''} ${styles.tdRight ?? ''}`}>
-                <ScalePill label={formatPalermo(obj.ps_cum)} variant="magenta" />
+                <PalermoGauge value={obj.ps_cum} />
               </td>
               <td className={`${styles.td ?? ''} ${styles.tdRight ?? ''}`}>
                 {formatImpactProbability(obj.ip)}

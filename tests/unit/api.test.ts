@@ -11,6 +11,7 @@ import { fetchQuakes } from '@/lib/api/quakes'
 import { fetchSolarActivity } from '@/lib/api/solarActivity'
 import { fetchSunMoon } from '@/lib/api/sunMoon'
 import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
+import { fetchSolarCycle } from '@/lib/api/solarCycle'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -368,5 +369,30 @@ describe('fetchPeopleInSpace', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchPeopleInSpace()).rejects.toThrow(/People-in-space fetch failed/)
+  })
+})
+
+const SOLAR_CYCLE_FIXTURE = {
+  cycle: [
+    { month: '2019-01', ssn: 5 },
+    { month: '2026-05', ssn: 101.4 },
+  ],
+  latestSsn: 101.4,
+  latestF107: 125.7,
+  kpForecast: [{ time: '2026-06-18T00:00:00', kp: 3, kind: 'predicted', scale: null }],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchSolarCycle', () => {
+  it('returns parsed solar cycle on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, SOLAR_CYCLE_FIXTURE))
+    const result = await fetchSolarCycle()
+    expect(result.latestSsn).toBe(101.4)
+    expect(result.kpForecast[0]?.kp).toBe(3)
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchSolarCycle()).rejects.toThrow(/Solar cycle fetch failed/)
   })
 })

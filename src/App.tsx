@@ -10,6 +10,7 @@ import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
 import { FireballList } from '@/components/panels/FireballList'
 import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
 import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
+import { SolarCyclePanel } from '@/components/panels/SolarCyclePanel'
 import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
 import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
 import { PeopleInSpacePanel } from '@/components/panels/PeopleInSpacePanel'
@@ -330,6 +331,16 @@ export function App() {
           </ErrorBoundary>
           <ErrorBoundary label="Solar Wind">
             <SolarWindPanel />
+          </ErrorBoundary>
+        </section>
+
+        {/* Section 5b: Solar Cycle 25 + Kp forecast (full width) */}
+        <section
+          className={`${appStyles.cycleSection ?? ''} ${appStyles.panelEnter ?? ''}`}
+          style={{ animationDelay: '825ms' }}
+        >
+          <ErrorBoundary label="Solar Cycle 25">
+            <SolarCyclePanel />
           </ErrorBoundary>
         </section>
 
