@@ -5,9 +5,11 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEvents } from '@/hooks/useEvents'
 import { useIss } from '@/hooks/useIss'
 import { useQuakes } from '@/hooks/useQuakes'
+import { useGdacs } from '@/hooks/useGdacs'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
 import type { Quake } from '@/schemas/quakes'
+import type { GdacsEvent } from '@/schemas/gdacs'
 import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
@@ -101,6 +103,22 @@ function gibsDate(): string {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`
 }
 
+function gdacsToGeoJson(
+  events: GdacsEvent[],
+): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string; title: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: events.map((e) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [e.lon, e.lat] },
+      properties: {
+        color: e.alert === 'Red' ? '#ff5a3c' : '#ffb020',
+        title: `${e.alert} · ${e.name}`,
+      },
+    })),
+  }
+}
+
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -112,6 +130,7 @@ export function WorldMap() {
   const { data: events } = useEvents()
   const { position, trail } = useIss()
   const { data: quakeData } = useQuakes()
+  const { data: gdacsData } = useGdacs()
   const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
@@ -213,6 +232,23 @@ export function WorldMap() {
           'circle-opacity': 0.9,
           'circle-stroke-width': 1,
           'circle-stroke-color': 'rgba(255,255,255,0.25)',
+        },
+      })
+
+      map.addSource('gdacs', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'gdacs-alerts',
+        type: 'circle',
+        source: 'gdacs',
+        paint: {
+          'circle-radius': 6,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': 'rgba(0,0,0,0.6)',
         },
       })
 
@@ -410,6 +446,13 @@ export function WorldMap() {
     if (!src) return
     src.setData(quakesToGeoJson(quakeData?.quakes ?? []))
   }, [mapLoaded, quakeData])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('gdacs') as GeoJSONSource | undefined
+    if (!src) return
+    src.setData(gdacsToGeoJson(gdacsData?.events ?? []))
+  }, [mapLoaded, gdacsData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return

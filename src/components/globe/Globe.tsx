@@ -70,6 +70,14 @@ interface GlobeQuake {
   place: string
 }
 
+interface GlobeDisaster {
+  lat: number
+  lon: number
+  type: string
+  alert: string
+  name: string
+}
+
 interface GlobeProps {
   size?: number | undefined
   issLat?: number | undefined
@@ -82,6 +90,7 @@ interface GlobeProps {
   launches?: GlobeLaunch[] | undefined
   fireballs?: GlobeFireball[] | undefined
   quakes?: GlobeQuake[] | undefined
+  disasters?: GlobeDisaster[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
   radarSweep?: boolean | undefined
@@ -212,6 +221,20 @@ function quakeRadius(mag: number | null): number {
   return Math.min(7, Math.max(1.6, 1.2 + (m - 2) * 0.9))
 }
 
+// GDACS disaster alerts: diamond glyphs colored by alert level.
+function alertColor(alert: string): string {
+  if (alert === 'Red') return 'oklch(0.62 0.22 25)'
+  return 'oklch(0.78 0.18 55)' // Orange
+}
+const DISASTER_LETTER: Record<string, string> = {
+  EQ: 'E',
+  TC: 'C',
+  FL: 'W',
+  VO: 'V',
+  WF: 'F',
+  DR: 'D',
+}
+
 const LEGEND_ITEMS = [
   { key: 'wildfires', label: 'F  Wildfire', color: 'oklch(0.72 0.22 32)' },
   { key: 'earthquakes', label: 'E  Earthquake', color: 'oklch(0.90 0.20 96)' },
@@ -222,6 +245,7 @@ const LEGEND_ITEMS = [
   { key: 'launch', label: '▲  Launch Pad', color: LAUNCH_COLOR },
   { key: 'fireball', label: '✦  Fireball', color: FIREBALL_COLOR },
   { key: 'quake', label: '○  Seismic', color: 'oklch(0.80 0.18 55)' },
+  { key: 'disaster', label: '◆  Alert', color: 'oklch(0.62 0.22 25)' },
   { key: 'iss', label: '◉  ISS', color: 'var(--signal)' },
 ]
 
@@ -249,6 +273,7 @@ export function Globe({
   launches = [],
   fireballs = [],
   quakes = [],
+  disasters = [],
   warm = true,
   autoRotate = true,
   radarSweep = false,
@@ -621,6 +646,41 @@ export function Globe({
                   opacity="0.85"
                 />
                 <circle cx={p.x} cy={p.y} r={0.8} fill={c} opacity="0.9" />
+              </g>
+            )
+          })}
+
+          {/* 8c — GDACS disaster-alert markers (diamonds, colored by alert) */}
+          {disasters.map((dz, i) => {
+            const p = project(dz.lat, dz.lon, rotation, R)
+            if (!p.visible) return null
+            const c = alertColor(dz.alert)
+            const s = 5
+            const letter = DISASTER_LETTER[dz.type] ?? '!'
+            return (
+              <g key={`dz${i}`} pointerEvents="none">
+                <title>
+                  {dz.alert} alert — {dz.name}
+                </title>
+                <path
+                  d={`M${p.x},${(p.y - s).toFixed(1)} L${(p.x + s).toFixed(1)},${p.y} L${p.x},${(p.y + s).toFixed(1)} L${(p.x - s).toFixed(1)},${p.y} Z`}
+                  fill={c}
+                  stroke="oklch(0.08 0.01 50)"
+                  strokeWidth="0.5"
+                  opacity="0.95"
+                />
+                <text
+                  x={p.x}
+                  y={p.y + 2}
+                  textAnchor="middle"
+                  fill="oklch(0.08 0.01 50)"
+                  fontSize="4.5"
+                  fontFamily="var(--font-stencil)"
+                  fontWeight="700"
+                  aria-hidden="true"
+                >
+                  {letter}
+                </text>
               </g>
             )
           })}

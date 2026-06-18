@@ -12,6 +12,7 @@ import { fetchSolarActivity } from '@/lib/api/solarActivity'
 import { fetchSunMoon } from '@/lib/api/sunMoon'
 import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
 import { fetchSolarCycle } from '@/lib/api/solarCycle'
+import { fetchGdacs } from '@/lib/api/gdacs'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -394,5 +395,35 @@ describe('fetchSolarCycle', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(500, {}))
     await expect(fetchSolarCycle()).rejects.toThrow(/Solar cycle fetch failed/)
+  })
+})
+
+const GDACS_FIXTURE = {
+  events: [
+    {
+      id: '1',
+      type: 'TC',
+      name: 'Cyclone X',
+      alert: 'Red',
+      lat: -15,
+      lon: 120,
+      country: 'AU',
+      from: '2026-06-18T00:00:00',
+    },
+  ],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchGdacs', () => {
+  it('returns parsed disaster alerts on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, GDACS_FIXTURE))
+    const result = await fetchGdacs()
+    expect(result.events[0]?.type).toBe('TC')
+    expect(result.events[0]?.alert).toBe('Red')
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchGdacs()).rejects.toThrow(/GDACS fetch failed/)
   })
 })
