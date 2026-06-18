@@ -94,12 +94,20 @@ function quakesToGeoJson(
   }
 }
 
+// NASA GIBS true-color tiles lag a few hours; use yesterday (UTC).
+function gibsDate(): string {
+  const d = new Date(Date.now() - 24 * 3600 * 1000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`
+}
+
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const popupRef = useRef<maplibregl.Popup | null>(null)
   const clickPopupRef = useRef<maplibregl.Popup | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [showImagery, setShowImagery] = useState(false)
 
   const { data: events } = useEvents()
   const { position, trail } = useIss()
@@ -125,6 +133,24 @@ export function WorldMap() {
     resizeObserver.observe(containerRef.current)
 
     map.on('load', () => {
+      // NASA GIBS MODIS true-color imagery (bottom layer, hidden until toggled).
+      map.addSource('gibs-truecolor', {
+        type: 'raster',
+        tiles: [
+          `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+        ],
+        tileSize: 256,
+        maxzoom: 9,
+        attribution: 'Imagery © NASA GIBS / EOSDIS',
+      })
+      map.addLayer({
+        id: 'gibs-layer',
+        type: 'raster',
+        source: 'gibs-truecolor',
+        layout: { visibility: 'none' },
+        paint: { 'raster-opacity': 0.85 },
+      })
+
       map.addSource('iss-trail', {
         type: 'geojson',
         data: {
@@ -387,6 +413,12 @@ export function WorldMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
+    if (!mapRef.current.getLayer('gibs-layer')) return
+    mapRef.current.setLayoutProperty('gibs-layer', 'visibility', showImagery ? 'visible' : 'none')
+  }, [mapLoaded, showImagery])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource('iss-trail') as GeoJSONSource | undefined
     if (!src) return
     src.setData({
@@ -430,6 +462,15 @@ export function WorldMap() {
     <div className={styles.mapWrap ?? ''}>
       <div ref={containerRef} className={styles.container ?? ''} />
       <MapLegend events={events?.events ?? []} issVisible={position !== null} />
+      <button
+        type="button"
+        className={`${styles.imageryToggle ?? ''} ${showImagery ? (styles.imageryToggleActive ?? '') : ''}`}
+        onClick={() => setShowImagery((s) => !s)}
+        aria-pressed={showImagery}
+        title="Toggle NASA MODIS true-color satellite imagery"
+      >
+        {showImagery ? '◉ Imagery' : '○ Imagery'}
+      </button>
       {eonetFailed && (
         <div className={styles.eonetBadge ?? ''} role="status" aria-live="polite">
           EONET unavailable

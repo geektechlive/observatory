@@ -3,5 +3,5 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apod.nasa.gov https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; font-src 'self'; connect-src 'self' https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';
+  Permissions-Policy: camera=(), microphone=(), geolocation=(self)
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apod.nasa.gov https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://sdo.gsfc.nasa.gov https://soho.nascom.nasa.gov https://gibs.earthdata.nasa.gov; font-src 'self'; connect-src 'self' https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://gibs.earthdata.nasa.gov; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';

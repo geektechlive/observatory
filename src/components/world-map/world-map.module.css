@@ -42,3 +42,32 @@
   pointer-events: none;
   backdrop-filter: blur(6px);
 }
+
+.imageryToggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(4, 6, 15, 0.75);
+  border: 1px solid var(--glass-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition:
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
+}
+
+.imageryToggle:hover {
+  color: var(--bone);
+  border-color: var(--copper);
+}
+
+.imageryToggleActive {
+  color: var(--signal);
+  border-color: var(--signal);
+}

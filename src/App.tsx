@@ -11,6 +11,7 @@ import { FireballList } from '@/components/panels/FireballList'
 import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
 import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
 import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
+import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
@@ -306,6 +307,9 @@ export function App() {
           className={`${appStyles.solarSection ?? ''} ${appStyles.panelEnter ?? ''}`}
           style={{ animationDelay: '750ms' }}
         >
+          <ErrorBoundary label="Live Sun">
+            <SunImageryPanel />
+          </ErrorBoundary>
           <ErrorBoundary label="Solar Activity">
             <SolarActivityPanel />
           </ErrorBoundary>
