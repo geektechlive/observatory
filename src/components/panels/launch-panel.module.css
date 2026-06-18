@@ -12,6 +12,19 @@
   border-bottom: none;
 }
 
+.progressTrack {
+  height: 2px;
+  width: 100%;
+  background: oklch(1 0 0 / 0.05);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width var(--duration-normal) var(--ease-out-expo);
+  opacity: 0.8;
+}
+
 .accordionHeader {
   width: 100%;
   display: grid;

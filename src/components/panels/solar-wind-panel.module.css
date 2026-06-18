@@ -81,6 +81,10 @@
   margin-top: 2px;
 }
 
+.metricSpark {
+  margin-top: 4px;
+}
+
 .loading,
 .unavailable {
   display: flex;

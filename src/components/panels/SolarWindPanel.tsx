@@ -2,8 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSolarWind } from '@/hooks/useSolarWind'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { DataAge } from '@/components/ui/DataAge'
+import { Sparkline } from '@/components/ui/Sparkline'
 import { KpSparkline } from './KpSparkline'
 import styles from './solar-wind-panel.module.css'
+
+const SPARK_H = 22
 
 function kpColor(kp: number): string {
   if (kp >= 6) return 'var(--magenta)'
@@ -79,6 +82,16 @@ export function SolarWindPanel() {
             </span>
             <span className={styles.metricLabel ?? ''}>km/s</span>
             <span className={styles.metricName ?? ''}>Wind Speed</span>
+            {data.windSpeedSeries.length > 1 && (
+              <Sparkline
+                values={data.windSpeedSeries}
+                mode="line"
+                height={SPARK_H}
+                color="var(--cyan)"
+                ariaLabel="Wind speed trend, last 24 hours"
+                className={styles.metricSpark ?? ''}
+              />
+            )}
           </div>
           <div className={styles.metric ?? ''}>
             <span
@@ -89,6 +102,17 @@ export function SolarWindPanel() {
             </span>
             <span className={styles.metricLabel ?? ''}>nT</span>
             <span className={styles.metricName ?? ''}>IMF Bz</span>
+            {data.imfBzSeries.length > 1 && (
+              <Sparkline
+                values={data.imfBzSeries}
+                mode="bars"
+                height={SPARK_H}
+                baseline={0}
+                color={bzColor}
+                ariaLabel="IMF Bz trend, last 24 hours"
+                className={styles.metricSpark ?? ''}
+              />
+            )}
           </div>
           <div className={styles.metric ?? ''}>
             <span className={styles.metricValue ?? ''}>
@@ -96,6 +120,16 @@ export function SolarWindPanel() {
             </span>
             <span className={styles.metricLabel ?? ''}>p/cc</span>
             <span className={styles.metricName ?? ''}>Density</span>
+            {data.windDensitySeries.length > 1 && (
+              <Sparkline
+                values={data.windDensitySeries}
+                mode="line"
+                height={SPARK_H}
+                color="var(--copper-glow)"
+                ariaLabel="Wind density trend, last 24 hours"
+                className={styles.metricSpark ?? ''}
+              />
+            )}
           </div>
         </div>
 

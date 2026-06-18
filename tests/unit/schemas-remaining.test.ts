@@ -182,4 +182,38 @@ describe('SolarWindSchema', () => {
     }
     expect(SolarWindSchema.safeParse(input).success).toBe(false)
   })
+
+  it('defaults trend series to empty arrays when absent (older cached payloads)', () => {
+    const input = {
+      kpReadings: [],
+      currentKp: null,
+      windSpeed: null,
+      windDensity: null,
+      imfBz: null,
+      updatedAt: '2025-01-01T00:00:00Z',
+    }
+    const result = SolarWindSchema.safeParse(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.windSpeedSeries).toEqual([])
+      expect(result.data.imfBzSeries).toEqual([])
+    }
+  })
+
+  it('accepts populated trend series', () => {
+    const input = {
+      kpReadings: [],
+      currentKp: null,
+      windSpeed: 450,
+      windDensity: 8,
+      imfBz: -5,
+      windSpeedSeries: [400, 420, 450],
+      windDensitySeries: [6, 7, 8],
+      imfBzSeries: [-2, -3, -5],
+      updatedAt: '2025-01-01T00:00:00Z',
+    }
+    const result = SolarWindSchema.safeParse(input)
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.windSpeedSeries).toHaveLength(3)
+  })
 })

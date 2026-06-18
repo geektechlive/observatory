@@ -10,9 +10,11 @@ test.describe('World map', () => {
     await expect(map).toHaveCount(1, { timeout: 15_000 })
   })
 
-  test('globe legend ISS label is visible on default view', async ({ page }) => {
+  test('globe renders on the default view', async ({ page }) => {
     await page.goto('/')
-    // Globe is the default — its legend always shows ISS
-    await expect(page.getByText('ISS')).toBeVisible({ timeout: 10_000 })
+    // Globe is the default view — assert the orthographic globe SVG is present.
+    await expect(page.getByRole('img', { name: /Orthographic globe/ })).toBeVisible({
+      timeout: 10_000,
+    })
   })
 })

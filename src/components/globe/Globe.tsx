@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from 'react'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { subsolarPoint, smallCircleRing, horizonRadiusDeg } from '@/lib/solar'
 import * as topojson from 'topojson-client'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import landTopo from 'world-atlas/land-110m.json'
@@ -55,17 +56,29 @@ interface GlobeLaunch {
   name: string
 }
 
+interface GlobeFireball {
+  lat: number
+  lon: number
+  /** Total radiated energy, kilotons. */
+  energy: number
+}
+
 interface GlobeProps {
   size?: number | undefined
   issLat?: number | undefined
   issLon?: number | undefined
+  /** ISS altitude, km — sizes the visibility footprint. */
+  issAlt?: number | undefined
   /** SGP4 trail from useIss() — [lon, lat][] pairs, ~90 min window */
   trail?: readonly [number, number][] | undefined
   events?: GlobeEvent[] | undefined
   launches?: GlobeLaunch[] | undefined
+  fireballs?: GlobeFireball[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
   radarSweep?: boolean | undefined
+  /** Day/night terminator overlay. */
+  showTerminator?: boolean | undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +190,7 @@ const EVENT_NAME: Record<string, string> = {
 }
 
 const LAUNCH_COLOR = 'oklch(0.84 0.16 80)'
+const FIREBALL_COLOR = 'oklch(0.88 0.18 60)'
 
 const LEGEND_ITEMS = [
   { key: 'wildfires', label: 'F  Wildfire', color: 'oklch(0.72 0.22 32)' },
@@ -186,8 +200,20 @@ const LEGEND_ITEMS = [
   { key: 'floods', label: 'W  Flood', color: 'oklch(0.65 0.18 248)' },
   { key: 'seaLakeIce', label: 'I  Sea Ice', color: 'oklch(0.92 0.04 194)' },
   { key: 'launch', label: '▲  Launch Pad', color: LAUNCH_COLOR },
+  { key: 'fireball', label: '✦  Fireball', color: FIREBALL_COLOR },
   { key: 'iss', label: '◉  ISS', color: 'var(--signal)' },
 ]
+
+// 4-point sparkle path centered at (cx, cy), radius r.
+function sparklePath(cx: number, cy: number, r: number): string {
+  const i = r * 0.34
+  return (
+    `M${cx},${(cy - r).toFixed(1)} L${(cx + i).toFixed(1)},${(cy - i).toFixed(1)} ` +
+    `L${(cx + r).toFixed(1)},${cy} L${(cx + i).toFixed(1)},${(cy + i).toFixed(1)} ` +
+    `L${cx},${(cy + r).toFixed(1)} L${(cx - i).toFixed(1)},${(cy + i).toFixed(1)} ` +
+    `L${(cx - r).toFixed(1)},${cy} L${(cx - i).toFixed(1)},${(cy - i).toFixed(1)} Z`
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Globe component
@@ -196,16 +222,22 @@ export function Globe({
   size = 460,
   issLat,
   issLon,
+  issAlt,
   trail,
   events = [],
   launches = [],
+  fireballs = [],
   warm = true,
   autoRotate = true,
   radarSweep = false,
+  showTerminator = true,
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
   const [rotation, setRotation] = useState(-12)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  // Real-world subsolar point — recomputed each minute (the globe's visual spin
+  // is a separate `rotation` offset, so the terminator is painted in lat/lon).
+  const [subsolar, setSubsolar] = useState(() => subsolarPoint(new Date()))
 
   const R = size / 2 - 10
   const center = size / 2
@@ -222,6 +254,13 @@ export function Globe({
     const id = setInterval(() => setRotation((r) => (r + 0.6) % 360), 100)
     return () => clearInterval(id)
   }, [autoRotate])
+
+  // Refresh the subsolar point once a minute (terminator drift is slow).
+  useEffect(() => {
+    if (!showTerminator) return
+    const id = setInterval(() => setSubsolar(subsolarPoint(new Date())), 60000)
+    return () => clearInterval(id)
+  }, [showTerminator])
 
   // Convert real SGP4 trail ([lon,lat]) → ([lat,lon]) for our projection
   const orbitPts = useMemo<[number, number][]>(() => {
@@ -251,6 +290,30 @@ export function Globe({
   const lonPaths = useMemo(() => LON_LINES.map((pts) => penPath(pts, rotation, R)), [rotation, R])
 
   const issDot = hasIss ? project(issLat, issLon, rotation, R) : null
+
+  // Day/night terminator: great circle 90° from the subsolar point.
+  const terminatorRing = useMemo(
+    () => (showTerminator ? smallCircleRing(subsolar.lat, subsolar.lon, 90, 120) : []),
+    [showTerminator, subsolar],
+  )
+  const terminatorPath = useMemo(
+    () => penPath(terminatorRing, rotation, R),
+    [terminatorRing, rotation, R],
+  )
+  const subsolarDot =
+    showTerminator && terminatorRing.length > 0
+      ? project(subsolar.lat, subsolar.lon, rotation, R)
+      : null
+
+  // ISS visibility footprint (small circle at the horizon angular radius).
+  const footprintRing = useMemo(
+    () => (hasIss ? smallCircleRing(issLat, issLon, horizonRadiusDeg(issAlt ?? 420), 72) : []),
+    [hasIss, issLat, issLon, issAlt],
+  )
+  const footprintPath = useMemo(
+    () => penPath(footprintRing, rotation, R),
+    [footprintRing, rotation, R],
+  )
 
   // Hover tooltip: compute screen position from SVG coordinates
   const hoveredEvent = hoveredIdx !== null ? events[hoveredIdx] : null
@@ -414,6 +477,34 @@ export function Globe({
             ))}
           </g>
 
+          {/* 5b — Day/night terminator: blurred twilight band + crisp boundary */}
+          {showTerminator && terminatorPath && (
+            <g clipPath={`url(#sphere-clip-${uid})`} pointerEvents="none">
+              <path
+                d={terminatorPath}
+                fill="none"
+                stroke="oklch(0.10 0.02 250)"
+                strokeWidth="16"
+                opacity="0.32"
+                filter={`url(#glow-${uid})`}
+              />
+              <path
+                d={terminatorPath}
+                fill="none"
+                stroke="oklch(0.75 0.08 250)"
+                strokeWidth="0.6"
+                strokeDasharray="3 4"
+                opacity="0.5"
+              />
+            </g>
+          )}
+          {subsolarDot?.visible && (
+            <g transform={`translate(${subsolarDot.x} ${subsolarDot.y})`} pointerEvents="none">
+              <circle r={5} fill="oklch(0.92 0.13 90)" opacity="0.9" filter={`url(#glow-${uid})`} />
+              <circle r={2.5} fill="oklch(0.98 0.06 90)" />
+            </g>
+          )}
+
           {/* 6 — Limb darkening */}
           <circle r={R} fill={`url(#rim-${uid})`} pointerEvents="none" />
 
@@ -506,6 +597,45 @@ export function Globe({
               </g>
             )
           })}
+
+          {/* 9b — Fireball markers (gold sparkles, sized by energy) */}
+          {fireballs.map((fb, i) => {
+            const p = project(fb.lat, fb.lon, rotation, R)
+            if (!p.visible) return null
+            const r = Math.min(8, Math.max(3, 3 + Math.sqrt(Math.max(0, fb.energy)) * 1.1))
+            return (
+              <g key={`fb${i}`} pointerEvents="none">
+                <title>
+                  Fireball — {fb.energy.toFixed(1)} kt · {fb.lat.toFixed(1)}° {fb.lon.toFixed(1)}°
+                </title>
+                <path
+                  d={sparklePath(p.x, p.y, r)}
+                  fill={FIREBALL_COLOR}
+                  opacity="0.9"
+                  filter={`url(#glow-${uid})`}
+                />
+                <path
+                  d={sparklePath(p.x, p.y, r * 0.5)}
+                  fill="oklch(0.98 0.04 90)"
+                  opacity="0.95"
+                />
+              </g>
+            )
+          })}
+
+          {/* 9c — ISS visibility footprint */}
+          {hasIss && footprintPath && (
+            <path
+              d={footprintPath}
+              fill={issColor}
+              fillOpacity="0.05"
+              stroke={issColor}
+              strokeWidth="0.6"
+              strokeDasharray="2 3"
+              opacity="0.5"
+              pointerEvents="none"
+            />
+          )}
 
           {/* 10 — Front orbit arc */}
           {hasIss && orbitFront && (

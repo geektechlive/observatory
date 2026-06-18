@@ -97,6 +97,15 @@
   margin-left: 4px;
 }
 
+.scale {
+  display: block;
+  width: 100%;
+  max-width: 120px;
+  height: 12px;
+  margin-top: 3px;
+  margin-left: auto;
+}
+
 .hazardIcon {
   color: var(--amber);
   font-size: 0.75rem;

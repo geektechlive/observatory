@@ -17,6 +17,7 @@ import { useIss } from '@/hooks/useIss'
 import { useEvents } from '@/hooks/useEvents'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNeo } from '@/hooks/useNeo'
+import { useFireball } from '@/hooks/useFireball'
 import { isPointGeometry } from '@/schemas/eonet'
 import appStyles from './App.module.css'
 
@@ -39,6 +40,7 @@ export function App() {
   const { data: eventsData } = useEvents()
   const { data: launchData } = useLaunches()
   const { data: neoData } = useNeo()
+  const { data: fireballData } = useFireball()
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
     const geom = ev.geometry.find(isPointGeometry)
@@ -52,6 +54,14 @@ export function App() {
     const lon = parseFloat(launch.pad?.longitude ?? '')
     if (isNaN(lat) || isNaN(lon)) return []
     return [{ lat, lon, name: launch.pad?.name ?? launch.name }]
+  })
+
+  const fireballMarkers = (fireballData?.data ?? []).flatMap((fb) => {
+    if (fb.lat === null || fb.lon === null) return []
+    const lat = parseFloat(fb.lat) * (fb.latDir === 'S' ? -1 : 1)
+    const lon = parseFloat(fb.lon) * (fb.lonDir === 'W' ? -1 : 1)
+    if (isNaN(lat) || isNaN(lon)) return []
+    return [{ lat, lon, energy: fb.energy !== null ? parseFloat(fb.energy) || 0 : 0 }]
   })
 
   const issLat = issPos?.lat
@@ -87,9 +97,11 @@ export function App() {
                   size={460}
                   issLat={issLat}
                   issLon={issLon}
+                  issAlt={issPos?.alt}
                   trail={issTrail}
                   events={globeEvents}
                   launches={launchMarkers}
+                  fireballs={fireballMarkers}
                   warm={true}
                   autoRotate={true}
                   radarSweep={true}

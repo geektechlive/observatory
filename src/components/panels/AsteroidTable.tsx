@@ -56,6 +56,48 @@ function sortNeos(neos: FlatNeo[], key: SortKey, dir: SortDir): FlatNeo[] {
   })
 }
 
+interface LunarScaleProps {
+  missLd: number
+  maxLd: number
+  hazard: boolean
+}
+
+/**
+ * Tiny shared-scale rail: Earth at 0, a Moon tick at 1 lunar distance, and a dot
+ * for the asteroid's closest approach — so "how close" reads at a glance. All rows
+ * share `maxLd` so bars are directly comparable.
+ */
+function LunarScale({ missLd, maxLd, hazard }: LunarScaleProps) {
+  const W = 120
+  const H = 12
+  const y = H / 2
+  const moonX = Math.min(1, 1 / maxLd) * W
+  const beyond = missLd > maxLd
+  const astX = Math.min(1, missLd / maxLd) * W
+  const dotColor = hazard ? 'var(--magenta)' : 'var(--cyan)'
+
+  return (
+    <svg
+      className={styles.scale ?? ''}
+      viewBox={`0 0 ${W} ${H}`}
+      role="img"
+      aria-label={`${missLd.toFixed(1)} lunar distances`}
+      preserveAspectRatio="none"
+    >
+      <line x1={0} x2={W} y1={y} y2={y} stroke="var(--glass-border)" strokeWidth={1} />
+      <circle cx={2} cy={y} r={2.5} fill="var(--signal-2)" />
+      <line x1={moonX} x2={moonX} y1={y - 3} y2={y + 3} stroke="var(--ink-faint)" strokeWidth={1} />
+      <circle
+        cx={beyond ? W - 1 : astX}
+        cy={y}
+        r={2.5}
+        fill={dotColor}
+        opacity={beyond ? 0.5 : 1}
+      />
+    </svg>
+  )
+}
+
 interface SortableThProps {
   label: string
   sortKey: SortKey
@@ -131,6 +173,10 @@ export function AsteroidTable() {
       return <div className={styles.empty ?? ''}>No close approaches in the next 7 days</div>
     }
 
+    // Shared domain for the lunar-distance rails: at least 5 LD, capped at 40.
+    const finiteLds = neos.map((n) => n.missLd).filter((d) => isFinite(d))
+    const maxLd = Math.min(40, Math.max(5, ...finiteLds))
+
     return (
       <table className={styles.table ?? ''}>
         <caption className={styles.caption ?? ''}>Near-Earth Objects · Next 7 days</caption>
@@ -188,6 +234,9 @@ export function AsteroidTable() {
               <td className={`${styles.td ?? ''} ${styles.tdRight ?? ''} ${styles.missKm ?? ''}`}>
                 {formatKm(neo.missKm)}
                 <span className={styles.missLd ?? ''}>{formatLunarDistance(neo.missLd)}</span>
+                {isFinite(neo.missLd) && (
+                  <LunarScale missLd={neo.missLd} maxLd={maxLd} hazard={neo.isHazardous} />
+                )}
               </td>
               <td className={`${styles.td ?? ''} ${styles.tdRight ?? ''}`}>
                 {formatVelocity(neo.velocityKps)}

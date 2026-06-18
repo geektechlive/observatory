@@ -36,6 +36,16 @@ function formatCountdown(net: string | null, now: Date): string {
   return `T- ${hh}:${mm}:${ss}`
 }
 
+const COUNTDOWN_WINDOW_MS = 48 * 3600 * 1000 // bar fills over the final 48h to T-0
+
+/** 0 → ~48h+ out, 1 → at/after T-0. null when no NET is known. */
+function countdownProgress(net: string | null, now: Date): number | null {
+  if (!net) return null
+  const diff = new Date(net).getTime() - now.getTime()
+  if (diff <= 0) return 1
+  return Math.min(1, Math.max(0, 1 - diff / COUNTDOWN_WINDOW_MS))
+}
+
 function formatDate(launch: RLLLaunch): string {
   const net = launchTime(launch)
   if (!net) return launch.date_str ?? '—'
@@ -129,6 +139,7 @@ export function LaunchPanel() {
           const net = launchTime(launch)
           const status = launchStatus(launch)
           const countdown = formatCountdown(net, now)
+          const progress = countdownProgress(net, now)
           const url = launchUrl(launch)
           const meta = headerMeta(launch)
           const weather = weatherSummary(launch)
@@ -159,6 +170,22 @@ export function LaunchPanel() {
                   {isOpen ? '▲' : '▼'}
                 </span>
               </button>
+
+              {progress !== null && progress > 0 && (
+                <div
+                  className={styles.progressTrack ?? ''}
+                  role="progressbar"
+                  aria-valuenow={Math.round(progress * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Countdown progress: ${countdown}`}
+                >
+                  <div
+                    className={styles.progressFill ?? ''}
+                    style={{ width: `${progress * 100}%`, background: status.color }}
+                  />
+                </div>
+              )}
 
               {isOpen && (
                 <div className={styles.accordionBody ?? ''}>

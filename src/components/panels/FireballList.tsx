@@ -27,6 +27,10 @@ export function FireballList() {
 
   const recent = data.data.slice(0, 8)
 
+  // Energy spans orders of magnitude → log-scale the bar against the visible max.
+  const energyOf = (e: string | null): number => (e !== null ? parseFloat(e) || 0 : 0)
+  const maxLog = Math.log10(Math.max(1.1, ...recent.map((fb) => energyOf(fb.impactE))))
+
   if (recent.length === 0) {
     return (
       <GlassPanel variant="tile" label="Fireballs">
@@ -46,6 +50,8 @@ export function FireballList() {
               ? `${fb.lat}° ${fb.latDir ?? ''} · ${fb.lon}° ${fb.lonDir ?? ''}`
               : 'Location unavailable'
             const vel = fb.vel != null ? `${parseFloat(fb.vel).toFixed(1)} km/s` : null
+            const e = energyOf(fb.impactE)
+            const energyPct = e > 0 ? Math.max(4, (Math.log10(e + 1) / maxLog) * 100) : 0
 
             return (
               <li key={`${fb.date}-${idx}`} className={styles.item ?? ''}>
@@ -53,6 +59,11 @@ export function FireballList() {
                   <span className={styles.relTime ?? ''}>{formatRelativeTime(fb.date)}</span>
                   <span className={styles.energy ?? ''}>{formatKt(fb.impactE)}</span>
                 </div>
+                {energyPct > 0 && (
+                  <div className={styles.energyTrack ?? ''} aria-hidden="true">
+                    <div className={styles.energyFill ?? ''} style={{ width: `${energyPct}%` }} />
+                  </div>
+                )}
                 <div className={styles.utcDate ?? ''}>{formatDateUtc(fb.date)}</div>
                 <div className={styles.itemBottom ?? ''}>
                   {vel && (

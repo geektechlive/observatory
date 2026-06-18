@@ -6,6 +6,10 @@ export const SolarWindSchema = z.object({
   windSpeed: z.number().nullable(),
   windDensity: z.number().nullable(),
   imfBz: z.number().nullable(),
+  // ~24h downsampled trend series; default [] keeps older cached payloads valid.
+  windSpeedSeries: z.array(z.number()).default([]),
+  windDensitySeries: z.array(z.number()).default([]),
+  imfBzSeries: z.array(z.number()).default([]),
   updatedAt: z.string(),
 })
 
