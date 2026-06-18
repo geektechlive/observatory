@@ -42,6 +42,13 @@
   padding: 0 var(--gutter) 24px;
 }
 
+.deepSpaceSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-gap);
+  padding: 0 var(--gutter) 24px;
+}
+
 /* Section 2: Launches — full width */
 .launchSection {
   padding: 0 var(--gutter) 24px;
@@ -430,7 +437,8 @@
     padding-right: 16px;
   }
 
-  .solarSection {
+  .solarSection,
+  .deepSpaceSection {
     grid-template-columns: 1fr;
     padding-left: 16px;
     padding-right: 16px;

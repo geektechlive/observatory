@@ -12,6 +12,8 @@ import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
 import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
 import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
 import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
+import { PeopleInSpacePanel } from '@/components/panels/PeopleInSpacePanel'
+import { DsnPanel } from '@/components/panels/DsnPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
@@ -270,6 +272,19 @@ export function App() {
         >
           <ErrorBoundary label="Launches">
             <LaunchPanel />
+          </ErrorBoundary>
+        </section>
+
+        {/* Section 2b: Deep space — humans in orbit + DSN comms */}
+        <section
+          className={`${appStyles.deepSpaceSection ?? ''} ${appStyles.panelEnter ?? ''}`}
+          style={{ animationDelay: '375ms' }}
+        >
+          <ErrorBoundary label="Humans in Orbit">
+            <PeopleInSpacePanel />
+          </ErrorBoundary>
+          <ErrorBoundary label="Deep Space Network">
+            <DsnPanel />
           </ErrorBoundary>
         </section>
 

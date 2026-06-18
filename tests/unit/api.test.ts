@@ -10,6 +10,7 @@ import { fetchNeo } from '@/lib/api/neo'
 import { fetchQuakes } from '@/lib/api/quakes'
 import { fetchSolarActivity } from '@/lib/api/solarActivity'
 import { fetchSunMoon } from '@/lib/api/sunMoon'
+import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -329,5 +330,43 @@ describe('fetchSunMoon', () => {
     await expect(fetchSunMoon({ lat: 0, lon: 0, tz: 0, date: '2026-06-18' })).rejects.toThrow(
       /Sun\/Moon fetch failed/,
     )
+  })
+})
+
+const PEOPLE_FIXTURE = {
+  number: 2,
+  expedition: '74',
+  people: [
+    {
+      name: 'A',
+      craft: 'ISS',
+      country: 'USA',
+      agency: 'NASA',
+      flagCode: 'us',
+      launched: 1764232077,
+    },
+    {
+      name: 'B',
+      craft: 'Tiangong',
+      country: 'China',
+      agency: 'CMSA',
+      flagCode: 'cn',
+      launched: null,
+    },
+  ],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchPeopleInSpace', () => {
+  it('returns parsed roster on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, PEOPLE_FIXTURE))
+    const result = await fetchPeopleInSpace()
+    expect(result.number).toBe(2)
+    expect(result.people[1]?.craft).toBe('Tiangong')
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchPeopleInSpace()).rejects.toThrow(/People-in-space fetch failed/)
   })
 })
