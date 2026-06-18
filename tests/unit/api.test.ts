@@ -8,6 +8,7 @@ import { fetchIssTle } from '@/lib/api/iss'
 import { fetchLaunches } from '@/lib/api/launches'
 import { fetchNeo } from '@/lib/api/neo'
 import { fetchQuakes } from '@/lib/api/quakes'
+import { fetchSolarActivity } from '@/lib/api/solarActivity'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -271,5 +272,25 @@ describe('fetchQuakes', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchQuakes()).rejects.toThrow(/Quakes fetch failed/)
+  })
+})
+
+const SOLAR_ACTIVITY_FIXTURE = {
+  xray: { series: [1e-7, 2e-7, 4.8e-7], currentFlux: 4.8e-7, currentClass: 'B4.8' },
+  scales: [{ offset: 0, date: '2026-06-18', r: 0, s: 0, g: 1 }],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchSolarActivity', () => {
+  it('returns parsed solar activity on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, SOLAR_ACTIVITY_FIXTURE))
+    const result = await fetchSolarActivity()
+    expect(result.xray.currentClass).toBe('B4.8')
+    expect(result.scales[0]?.g).toBe(1)
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchSolarActivity()).rejects.toThrow(/Solar activity fetch failed/)
   })
 })

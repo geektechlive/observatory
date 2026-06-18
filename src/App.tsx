@@ -9,6 +9,7 @@ import { AsteroidTable } from '@/components/panels/AsteroidTable'
 import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
 import { FireballList } from '@/components/panels/FireballList'
 import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
+import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
@@ -301,6 +302,9 @@ export function App() {
           className={`${appStyles.solarSection ?? ''} ${appStyles.panelEnter ?? ''}`}
           style={{ animationDelay: '750ms' }}
         >
+          <ErrorBoundary label="Solar Activity">
+            <SolarActivityPanel />
+          </ErrorBoundary>
           <ErrorBoundary label="Solar Wind">
             <SolarWindPanel />
           </ErrorBoundary>

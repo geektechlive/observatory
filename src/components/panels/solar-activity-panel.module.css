@@ -1,0 +1,106 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 36px 16px 16px;
+  height: 100%;
+}
+
+.xrayRow {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.xrayReadout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 4.5ch;
+}
+
+.xrayClass {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.4vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.xrayLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.xraySpark {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.bandLabels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+.scalesGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scalesHeaderRow,
+.scaleRow {
+  display: grid;
+  grid-template-columns: 1.4rem repeat(4, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.scaleColHead {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.scaleRowLabel {
+  font-family: var(--font-stencil);
+  font-size: var(--text-xs);
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.scaleCell {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+  padding: 3px 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-tile);
+  background: oklch(1 0 0 / 0.02);
+}
+
+.loading,
+.unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}

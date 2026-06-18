@@ -3,6 +3,7 @@ import { RawEpicArraySchema, EpicResponseSchema } from '@/schemas/epic'
 import { IssTleSchema } from '@/schemas/iss-tle'
 import { LaunchesResponseSchema } from '@/schemas/launches'
 import { SolarWindSchema } from '@/schemas/solarWind'
+import { fluxToClass } from '@/schemas/solarActivity'
 
 describe('RawEpicArraySchema', () => {
   it('parses an array of raw epic images', () => {
@@ -215,5 +216,19 @@ describe('SolarWindSchema', () => {
     const result = SolarWindSchema.safeParse(input)
     expect(result.success).toBe(true)
     if (result.success) expect(result.data.windSpeedSeries).toHaveLength(3)
+  })
+})
+
+describe('fluxToClass', () => {
+  it('maps GOES long-band flux to flare classes', () => {
+    expect(fluxToClass(4.8e-7)).toBe('B4.8')
+    expect(fluxToClass(2e-6)).toBe('C2.0')
+    expect(fluxToClass(1.2e-5)).toBe('M1.2')
+    expect(fluxToClass(2e-4)).toBe('X2.0')
+  })
+
+  it('returns null for null / non-positive flux', () => {
+    expect(fluxToClass(null)).toBeNull()
+    expect(fluxToClass(0)).toBeNull()
   })
 })
