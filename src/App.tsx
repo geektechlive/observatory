@@ -18,6 +18,7 @@ import { useEvents } from '@/hooks/useEvents'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNeo } from '@/hooks/useNeo'
 import { useFireball } from '@/hooks/useFireball'
+import { useQuakes } from '@/hooks/useQuakes'
 import { isPointGeometry } from '@/schemas/eonet'
 import appStyles from './App.module.css'
 
@@ -41,6 +42,7 @@ export function App() {
   const { data: launchData } = useLaunches()
   const { data: neoData } = useNeo()
   const { data: fireballData } = useFireball()
+  const { data: quakeData } = useQuakes()
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
     const geom = ev.geometry.find(isPointGeometry)
@@ -63,6 +65,13 @@ export function App() {
     if (isNaN(lat) || isNaN(lon)) return []
     return [{ lat, lon, energy: fb.energy !== null ? parseFloat(fb.energy) || 0 : 0 }]
   })
+
+  const quakeMarkers = (quakeData?.quakes ?? []).map((q) => ({
+    lat: q.lat,
+    lon: q.lon,
+    mag: q.mag,
+    place: q.place,
+  }))
 
   const issLat = issPos?.lat
   const issLon = issPos?.lon
@@ -102,6 +111,7 @@ export function App() {
                   events={globeEvents}
                   launches={launchMarkers}
                   fireballs={fireballMarkers}
+                  quakes={quakeMarkers}
                   warm={true}
                   autoRotate={true}
                   radarSweep={true}

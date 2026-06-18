@@ -4,8 +4,10 @@ import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEvents } from '@/hooks/useEvents'
 import { useIss } from '@/hooks/useIss'
+import { useQuakes } from '@/hooks/useQuakes'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
+import type { Quake } from '@/schemas/quakes'
 import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
@@ -68,6 +70,30 @@ function eventsToGeoJson(
   return { type: 'FeatureCollection', features }
 }
 
+function quakeMapColor(mag: number | null): string {
+  if (mag === null) return '#8aa0a8'
+  if (mag >= 6) return '#ff5a3c'
+  if (mag >= 4.5) return '#ffb020'
+  return '#ffe044'
+}
+
+function quakesToGeoJson(
+  quakes: Quake[],
+): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string; radius: number; title: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: quakes.map((q) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [q.lon, q.lat] },
+      properties: {
+        color: quakeMapColor(q.mag),
+        radius: Math.min(9, Math.max(2.5, 2 + (q.mag ?? 2.5) * 0.9)),
+        title: `M${q.mag?.toFixed(1) ?? '?'} — ${q.place}`,
+      },
+    })),
+  }
+}
+
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -77,6 +103,7 @@ export function WorldMap() {
 
   const { data: events } = useEvents()
   const { position, trail } = useIss()
+  const { data: quakeData } = useQuakes()
   const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
@@ -115,6 +142,23 @@ export function WorldMap() {
           'line-width': 1.5,
           'line-opacity': 0.35,
           'line-dasharray': [3, 3],
+        },
+      })
+
+      map.addSource('quakes', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'quake-rings',
+        type: 'circle',
+        source: 'quakes',
+        paint: {
+          'circle-radius': ['get', 'radius'],
+          'circle-color': 'rgba(0,0,0,0)',
+          'circle-stroke-width': 1.1,
+          'circle-stroke-color': ['get', 'color'],
+          'circle-stroke-opacity': 0.85,
         },
       })
 
@@ -333,6 +377,13 @@ export function WorldMap() {
     const data = eventsToGeoJson(events?.events ?? [])
     src.setData(data)
   }, [mapLoaded, events])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('quakes') as GeoJSONSource | undefined
+    if (!src) return
+    src.setData(quakesToGeoJson(quakeData?.quakes ?? []))
+  }, [mapLoaded, quakeData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return

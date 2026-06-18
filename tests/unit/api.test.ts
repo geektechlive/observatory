@@ -7,6 +7,7 @@ import { fetchFireball } from '@/lib/api/fireball'
 import { fetchIssTle } from '@/lib/api/iss'
 import { fetchLaunches } from '@/lib/api/launches'
 import { fetchNeo } from '@/lib/api/neo'
+import { fetchQuakes } from '@/lib/api/quakes'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -239,5 +240,36 @@ describe('trackQuota', () => {
 
     trackQuota(res)
     expect(useUiStore.getState().quotaRemaining).toBeNull()
+  })
+})
+
+const QUAKES_FIXTURE = {
+  updatedAt: '2026-06-18T00:00:00Z',
+  quakes: [
+    {
+      id: 'us1000',
+      mag: 5.2,
+      place: '120km SSW of Somewhere',
+      lat: -10.5,
+      lon: 160.2,
+      depthKm: 33.4,
+      time: 1_750_000_000_000,
+      tsunami: false,
+      url: 'https://earthquake.usgs.gov/x',
+    },
+  ],
+}
+
+describe('fetchQuakes', () => {
+  it('returns parsed quakes on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, QUAKES_FIXTURE))
+    const result = await fetchQuakes()
+    expect(result.quakes).toHaveLength(1)
+    expect(result.quakes[0]?.mag).toBe(5.2)
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchQuakes()).rejects.toThrow(/Quakes fetch failed/)
   })
 })

@@ -63,6 +63,13 @@ interface GlobeFireball {
   energy: number
 }
 
+interface GlobeQuake {
+  lat: number
+  lon: number
+  mag: number | null
+  place: string
+}
+
 interface GlobeProps {
   size?: number | undefined
   issLat?: number | undefined
@@ -74,6 +81,7 @@ interface GlobeProps {
   events?: GlobeEvent[] | undefined
   launches?: GlobeLaunch[] | undefined
   fireballs?: GlobeFireball[] | undefined
+  quakes?: GlobeQuake[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
   radarSweep?: boolean | undefined
@@ -192,6 +200,18 @@ const EVENT_NAME: Record<string, string> = {
 const LAUNCH_COLOR = 'oklch(0.84 0.16 80)'
 const FIREBALL_COLOR = 'oklch(0.88 0.18 60)'
 
+// Seismic markers: hollow rings colored by magnitude tier.
+function quakeColor(mag: number | null): string {
+  if (mag === null) return 'oklch(0.70 0.04 200)'
+  if (mag >= 6) return 'oklch(0.62 0.22 25)'
+  if (mag >= 4.5) return 'oklch(0.80 0.18 55)'
+  return 'oklch(0.88 0.16 95)'
+}
+function quakeRadius(mag: number | null): number {
+  const m = mag ?? 2.5
+  return Math.min(7, Math.max(1.6, 1.2 + (m - 2) * 0.9))
+}
+
 const LEGEND_ITEMS = [
   { key: 'wildfires', label: 'F  Wildfire', color: 'oklch(0.72 0.22 32)' },
   { key: 'earthquakes', label: 'E  Earthquake', color: 'oklch(0.90 0.20 96)' },
@@ -201,6 +221,7 @@ const LEGEND_ITEMS = [
   { key: 'seaLakeIce', label: 'I  Sea Ice', color: 'oklch(0.92 0.04 194)' },
   { key: 'launch', label: '▲  Launch Pad', color: LAUNCH_COLOR },
   { key: 'fireball', label: '✦  Fireball', color: FIREBALL_COLOR },
+  { key: 'quake', label: '○  Seismic', color: 'oklch(0.80 0.18 55)' },
   { key: 'iss', label: '◉  ISS', color: 'var(--signal)' },
 ]
 
@@ -227,6 +248,7 @@ export function Globe({
   events = [],
   launches = [],
   fireballs = [],
+  quakes = [],
   warm = true,
   autoRotate = true,
   radarSweep = false,
@@ -574,6 +596,31 @@ export function Globe({
                 >
                   {letter}
                 </text>
+              </g>
+            )
+          })}
+
+          {/* 8b — Seismic markers (hollow rings, sized/colored by magnitude) */}
+          {quakes.map((q, i) => {
+            const p = project(q.lat, q.lon, rotation, R)
+            if (!p.visible) return null
+            const c = quakeColor(q.mag)
+            const r = quakeRadius(q.mag)
+            return (
+              <g key={`q${i}`} pointerEvents="none">
+                <title>
+                  M{q.mag?.toFixed(1) ?? '?'} — {q.place}
+                </title>
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={r}
+                  fill="none"
+                  stroke={c}
+                  strokeWidth="1.1"
+                  opacity="0.85"
+                />
+                <circle cx={p.x} cy={p.y} r={0.8} fill={c} opacity="0.9" />
               </g>
             )
           })}
