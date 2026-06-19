@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, useRef } from 'react'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { subsolarPoint, smallCircleRing, horizonRadiusDeg } from '@/lib/solar'
 import * as topojson from 'topojson-client'
@@ -112,6 +112,16 @@ interface GlobeProps {
   showTerminator?: boolean | undefined
   /** ORBIT "tracking station" mode — shows DSN ground stations + tracking decor. */
   tracking?: boolean | undefined
+  /** OVATION aurora oval — [lon, lat, intensity] triplets, drawn on a canvas overlay. */
+  aurora?: [number, number, number][] | undefined
+}
+
+// Aurora intensity (0-29) → glow color at the given alpha.
+function auroraRgba(intensity: number, a: number): string {
+  if (intensity >= 22) return `rgba(255,90,200,${a})`
+  if (intensity >= 14) return `rgba(180,255,120,${a})`
+  if (intensity >= 8) return `rgba(90,255,170,${a})`
+  return `rgba(60,220,150,${a})`
 }
 
 // NASA Deep Space Network ground stations.
@@ -299,8 +309,10 @@ export function Globe({
   radarSweep = false,
   showTerminator = true,
   tracking = false,
+  aurora = [],
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
+  const auroraCanvasRef = useRef<HTMLCanvasElement>(null)
   const [rotation, setRotation] = useState(-12)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   // Real-world subsolar point — recomputed each minute (the globe's visual spin
@@ -329,6 +341,35 @@ export function Globe({
     const id = setInterval(() => setSubsolar(subsolarPoint(new Date())), 60000)
     return () => clearInterval(id)
   }, [showTerminator])
+
+  // OVATION aurora — drawn on a canvas overlay, projected with the live rotation.
+  useEffect(() => {
+    const canvas = auroraCanvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    if (canvas.width !== size * dpr) {
+      canvas.width = size * dpr
+      canvas.height = size * dpr
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, size, size)
+    if (aurora.length === 0) return
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(center, center, R, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.globalCompositeOperation = 'lighter'
+    for (const [lon, lat, intensity] of aurora) {
+      const p = project(lat, lon, rotation, R)
+      if (!p.visible) continue
+      ctx.fillStyle = auroraRgba(intensity, Math.min(0.45, 0.07 + intensity / 70))
+      ctx.beginPath()
+      ctx.arc(center + p.x, center + p.y, 5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+  }, [aurora, rotation, R, center, size])
 
   // Convert real SGP4 trail ([lon,lat]) → ([lat,lon]) for our projection
   const orbitPts = useMemo<[number, number][]>(() => {
@@ -392,6 +433,19 @@ export function Globe({
 
   return (
     <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+      <canvas
+        ref={auroraCanvasRef}
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: size,
+          height: size,
+          pointerEvents: 'none',
+          zIndex: 2,
+        }}
+      />
       <svg
         width={size}
         height={size}

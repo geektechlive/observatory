@@ -12,6 +12,7 @@ const GLOBE_LAYERS: LayerDef[] = [
   { key: 'events', label: 'Events', dot: 'oklch(0.72 0.22 32)' },
   { key: 'quakes', label: 'Quakes', dot: 'oklch(0.8 0.18 55)' },
   { key: 'terminator', label: 'Day/Night', dot: 'oklch(0.75 0.08 250)' },
+  { key: 'aurora', label: 'Aurora', dot: 'oklch(0.8 0.2 145)' },
   { key: 'fires', label: 'Fires', dot: 'oklch(0.85 0.2 55)' },
   { key: 'disasters', label: 'Alerts', dot: 'oklch(0.62 0.22 25)' },
   { key: 'satellites', label: 'Satellites', dot: 'var(--terminal)' },

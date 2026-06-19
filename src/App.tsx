@@ -27,6 +27,7 @@ import { useQuakes } from '@/hooks/useQuakes'
 import { useGdacs } from '@/hooks/useGdacs'
 import { useSatellites } from '@/hooks/useSatellites'
 import { useFires } from '@/hooks/useFires'
+import { useAurora } from '@/hooks/useAurora'
 import { isPointGeometry } from '@/schemas/eonet'
 import appStyles from './App.module.css'
 
@@ -68,6 +69,7 @@ export function App() {
   const { data: gdacsData } = useGdacs(layers.disasters)
   const satellites = useSatellites(layers.satellites || tracking)
   const { data: firesData } = useFires(layers.fires)
+  const { data: auroraData } = useAurora(layers.aurora)
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
     const geom = ev.geometry.find(isPointGeometry)
@@ -159,6 +161,7 @@ export function App() {
                     disasters={layers.disasters && !tracking ? disasterMarkers : []}
                     satellites={layers.satellites || tracking ? satellites : []}
                     fires={layers.fires && !tracking ? (firesData?.fires ?? []) : []}
+                    aurora={layers.aurora ? (auroraData?.points ?? []) : []}
                     showTerminator={layers.terminator}
                     warm={!tracking}
                     tracking={tracking}

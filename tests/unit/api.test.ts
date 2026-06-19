@@ -27,6 +27,7 @@ import { fetchSwpcAlerts } from '@/lib/api/swpcAlerts'
 import { fetchNwsAlerts } from '@/lib/api/nws'
 import { fetchAircraft } from '@/lib/api/aircraft'
 import { fetchBuoys } from '@/lib/api/buoys'
+import { fetchAurora } from '@/lib/api/aurora'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -715,5 +716,29 @@ describe('fetchBuoys', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(500, {}))
     await expect(fetchBuoys()).rejects.toThrow(/Buoys fetch failed/)
+  })
+})
+
+describe('fetchAurora', () => {
+  it('returns parsed aurora points on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        points: [
+          [0, 65, 12],
+          [10, 70, 20],
+        ],
+        observationTime: 'x',
+        forecastTime: 'y',
+        updatedAt: 'z',
+      }),
+    )
+    const r = await fetchAurora()
+    expect(r.points).toHaveLength(2)
+    expect(r.points[1]?.[2]).toBe(20)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchAurora()).rejects.toThrow(/Aurora fetch failed/)
   })
 })
