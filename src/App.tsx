@@ -56,6 +56,9 @@ export function App() {
   const layers = useUiStore((s) => s.layers)
   const [mapMode, setMapMode] = useState<MapMode>('globe')
 
+  // ORBIT reframes the globe as a tracking station — orbital layers always on.
+  const tracking = view === 'orbit'
+
   const { position: issPos, trail: issTrail } = useIss()
   const { data: eventsData } = useEvents()
   const { data: launchData } = useLaunches()
@@ -63,7 +66,7 @@ export function App() {
   const { data: fireballData } = useFireball(layers.fireballs)
   const { data: quakeData } = useQuakes()
   const { data: gdacsData } = useGdacs(layers.disasters)
-  const satellites = useSatellites(layers.satellites)
+  const satellites = useSatellites(layers.satellites || tracking)
   const { data: firesData } = useFires(layers.fires)
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
@@ -149,15 +152,16 @@ export function App() {
                     issLon={issLon}
                     issAlt={issOn ? issPos?.alt : undefined}
                     trail={issOn ? issTrail : []}
-                    events={layers.events ? globeEvents : []}
-                    launches={layers.launches ? launchMarkers : []}
-                    fireballs={layers.fireballs ? fireballMarkers : []}
-                    quakes={layers.quakes ? quakeMarkers : []}
-                    disasters={layers.disasters ? disasterMarkers : []}
-                    satellites={layers.satellites ? satellites : []}
-                    fires={layers.fires ? (firesData?.fires ?? []) : []}
+                    events={layers.events && !tracking ? globeEvents : []}
+                    launches={layers.launches || tracking ? launchMarkers : []}
+                    fireballs={layers.fireballs && !tracking ? fireballMarkers : []}
+                    quakes={layers.quakes && !tracking ? quakeMarkers : []}
+                    disasters={layers.disasters && !tracking ? disasterMarkers : []}
+                    satellites={layers.satellites || tracking ? satellites : []}
+                    fires={layers.fires && !tracking ? (firesData?.fires ?? []) : []}
                     showTerminator={layers.terminator}
-                    warm={true}
+                    warm={!tracking}
+                    tracking={tracking}
                     autoRotate={true}
                     radarSweep={true}
                   />

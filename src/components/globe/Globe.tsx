@@ -110,7 +110,16 @@ interface GlobeProps {
   radarSweep?: boolean | undefined
   /** Day/night terminator overlay. */
   showTerminator?: boolean | undefined
+  /** ORBIT "tracking station" mode — shows DSN ground stations + tracking decor. */
+  tracking?: boolean | undefined
 }
+
+// NASA Deep Space Network ground stations.
+const DSN_STATIONS: { name: string; lat: number; lon: number }[] = [
+  { name: 'GOLDSTONE', lat: 35.43, lon: -116.89 },
+  { name: 'MADRID', lat: 40.43, lon: -4.25 },
+  { name: 'CANBERRA', lat: -35.4, lon: 148.98 },
+]
 
 // ---------------------------------------------------------------------------
 // Orthographic projection
@@ -289,6 +298,7 @@ export function Globe({
   autoRotate = true,
   radarSweep = false,
   showTerminator = true,
+  tracking = false,
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
   const [rotation, setRotation] = useState(-12)
@@ -712,6 +722,59 @@ export function Globe({
               </g>
             )
           })}
+
+          {/* 8d — DSN ground stations (ORBIT tracking mode) */}
+          {tracking &&
+            DSN_STATIONS.map((st, i) => {
+              const p = project(st.lat, st.lon, rotation, R)
+              if (!p.visible) return null
+              return (
+                <g key={`dsn${i}`} pointerEvents="none">
+                  <title>DSN · {st.name}</title>
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={6}
+                    fill="none"
+                    stroke={issColor}
+                    strokeWidth="0.7"
+                    opacity="0.5"
+                  >
+                    <animate
+                      attributeName="r"
+                      values="4;11;4"
+                      dur="3s"
+                      begin={`${i * 0.7}s`}
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.7;0;0.7"
+                      dur="3s"
+                      begin={`${i * 0.7}s`}
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                  <path
+                    d={`M${p.x},${(p.y - 5).toFixed(1)} L${(p.x + 4).toFixed(1)},${(p.y + 3).toFixed(1)} L${(p.x - 4).toFixed(1)},${(p.y + 3).toFixed(1)} Z`}
+                    fill={issColor}
+                    opacity="0.9"
+                  />
+                  <text
+                    x={p.x + 8}
+                    y={p.y + 2.5}
+                    fill={issColor}
+                    fontSize="6"
+                    fontFamily="var(--font-stencil)"
+                    letterSpacing="0.1em"
+                    opacity="0.8"
+                    aria-hidden="true"
+                  >
+                    {st.name}
+                  </text>
+                </g>
+              )
+            })}
 
           {/* 9 — Launch pad markers */}
           {launches.map((lp, i) => {
