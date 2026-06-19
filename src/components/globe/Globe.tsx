@@ -84,6 +84,12 @@ interface GlobeSatellite {
   lon: number
 }
 
+interface GlobeFire {
+  lat: number
+  lon: number
+  frp: number
+}
+
 interface GlobeProps {
   size?: number | undefined
   issLat?: number | undefined
@@ -98,6 +104,7 @@ interface GlobeProps {
   quakes?: GlobeQuake[] | undefined
   disasters?: GlobeDisaster[] | undefined
   satellites?: GlobeSatellite[] | undefined
+  fires?: GlobeFire[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
   radarSweep?: boolean | undefined
@@ -253,11 +260,19 @@ const LEGEND_ITEMS = [
   { key: 'fireball', label: '✦  Fireball', color: FIREBALL_COLOR },
   { key: 'quake', label: '○  Seismic', color: 'oklch(0.80 0.18 55)' },
   { key: 'disaster', label: '◆  Alert', color: 'oklch(0.62 0.22 25)' },
+  { key: 'fire', label: '·  Active Fire', color: 'oklch(0.85 0.2 55)' },
   { key: 'sat', label: '●  Satellite', color: 'var(--terminal)' },
   { key: 'iss', label: '◉  ISS', color: 'var(--signal)' },
 ]
 
 const SAT_COLOR = 'oklch(0.78 0.18 145)'
+
+// FIRMS active fires: hot-body ramp by Fire Radiative Power (MW).
+function fireColor(frp: number): string {
+  if (frp >= 100) return 'oklch(0.95 0.06 90)' // white-hot
+  if (frp >= 30) return 'oklch(0.85 0.2 55)' // bright orange
+  return 'oklch(0.72 0.2 35)' // ember
+}
 
 // 4-point sparkle path centered at (cx, cy), radius r.
 function sparklePath(cx: number, cy: number, r: number): string {
@@ -285,6 +300,7 @@ export function Globe({
   quakes = [],
   disasters = [],
   satellites = [],
+  fires = [],
   warm = true,
   autoRotate = true,
   radarSweep = false,
@@ -570,6 +586,23 @@ export function Globe({
           <circle r={R + 1.5} fill="none" stroke={continentColor} strokeWidth="0.5" opacity="0.5" />
           <circle r={R + 7} fill="none" stroke={continentColor} strokeWidth="0.4" opacity="0.10" />
           <circle r={R + 15} stroke="oklch(0.45 0.10 220 / 0.18)" strokeWidth={0.5} fill="none" />
+
+          {/* 7b — FIRMS active fires (hot dots, background layer) */}
+          {fires.map((f, i) => {
+            const p = project(f.lat, f.lon, rotation, R)
+            if (!p.visible) return null
+            return (
+              <circle
+                key={`fire${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={f.frp >= 50 ? 1.8 : 1.2}
+                fill={fireColor(f.frp)}
+                opacity={0.85}
+                pointerEvents="none"
+              />
+            )
+          })}
 
           {/* 8 — EONET event markers */}
           {events.map((e, i) => {

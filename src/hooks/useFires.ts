@@ -1,0 +1,20 @@
+import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchFires } from '@/lib/api/fires'
+import { useUiStore } from '@/store/ui'
+
+export function useFires() {
+  const query = useQuery({
+    queryKey: ['fires'],
+    queryFn: fetchFires,
+    staleTime: 4 * 60 * 60 * 1000,
+    refetchInterval: 4 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  useEffect(() => {
+    useUiStore.getState().setSourceError('fires', query.error != null)
+  }, [query.error])
+
+  return query
+}

@@ -6,10 +6,12 @@ import { useEvents } from '@/hooks/useEvents'
 import { useIss } from '@/hooks/useIss'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useGdacs } from '@/hooks/useGdacs'
+import { useFires } from '@/hooks/useFires'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
 import type { Quake } from '@/schemas/quakes'
 import type { GdacsEvent } from '@/schemas/gdacs'
+import type { Fire } from '@/schemas/fires'
 import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
@@ -119,6 +121,25 @@ function gdacsToGeoJson(
   }
 }
 
+function fireMapColor(frp: number): string {
+  if (frp >= 100) return '#fff0c0'
+  if (frp >= 30) return '#ff9020'
+  return '#e8602a'
+}
+
+function firesToGeoJson(
+  fires: Fire[],
+): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: fires.map((f) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [f.lon, f.lat] },
+      properties: { color: fireMapColor(f.frp) },
+    })),
+  }
+}
+
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -131,6 +152,7 @@ export function WorldMap() {
   const { position, trail } = useIss()
   const { data: quakeData } = useQuakes()
   const { data: gdacsData } = useGdacs()
+  const { data: firesData } = useFires()
   const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
@@ -187,6 +209,22 @@ export function WorldMap() {
           'line-width': 1.5,
           'line-opacity': 0.35,
           'line-dasharray': [3, 3],
+        },
+      })
+
+      map.addSource('fires', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'fire-dots',
+        type: 'circle',
+        source: 'fires',
+        paint: {
+          'circle-radius': 2.5,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.85,
+          'circle-blur': 0.3,
         },
       })
 
@@ -453,6 +491,13 @@ export function WorldMap() {
     if (!src) return
     src.setData(gdacsToGeoJson(gdacsData?.events ?? []))
   }, [mapLoaded, gdacsData])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('fires') as GeoJSONSource | undefined
+    if (!src) return
+    src.setData(firesToGeoJson(firesData?.fires ?? []))
+  }, [mapLoaded, firesData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return

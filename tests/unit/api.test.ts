@@ -15,6 +15,7 @@ import { fetchSolarCycle } from '@/lib/api/solarCycle'
 import { fetchGdacs } from '@/lib/api/gdacs'
 import { fetchPlanets } from '@/lib/api/planets'
 import { fetchSatellites } from '@/lib/api/satellites'
+import { fetchFires } from '@/lib/api/fires'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -473,5 +474,27 @@ describe('fetchSatellites', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchSatellites()).rejects.toThrow(/Satellites fetch failed/)
+  })
+})
+
+const FIRES_FIXTURE = {
+  fires: [
+    { lat: -18.4, lon: 26.5, frp: 12.3, confidence: 'n', acqDate: '2026-06-19', daynight: 'N' },
+  ],
+  total: 189,
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchFires', () => {
+  it('returns parsed fire detections on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, FIRES_FIXTURE))
+    const result = await fetchFires()
+    expect(result.total).toBe(189)
+    expect(result.fires[0]?.frp).toBeCloseTo(12.3, 1)
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchFires()).rejects.toThrow(/Fires fetch failed/)
   })
 })

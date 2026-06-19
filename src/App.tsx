@@ -28,6 +28,7 @@ import { useFireball } from '@/hooks/useFireball'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useGdacs } from '@/hooks/useGdacs'
 import { useSatellites } from '@/hooks/useSatellites'
+import { useFires } from '@/hooks/useFires'
 import { isPointGeometry } from '@/schemas/eonet'
 import appStyles from './App.module.css'
 
@@ -54,6 +55,7 @@ export function App() {
   const { data: quakeData } = useQuakes()
   const { data: gdacsData } = useGdacs()
   const satellites = useSatellites()
+  const { data: firesData } = useFires()
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
     const geom = ev.geometry.find(isPointGeometry)
@@ -133,6 +135,7 @@ export function App() {
                   quakes={quakeMarkers}
                   disasters={disasterMarkers}
                   satellites={satellites}
+                  fires={firesData?.fires ?? []}
                   warm={true}
                   autoRotate={true}
                   radarSweep={true}
