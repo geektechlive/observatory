@@ -342,9 +342,11 @@ export function WorldMap() {
         source: 'aircraft',
         layout: { visibility: 'none' },
         paint: {
-          'circle-radius': 2.4,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 5, 4.5, 9, 7],
           'circle-color': ['get', 'color'],
-          'circle-opacity': 0.85,
+          'circle-opacity': 0.95,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': 'rgba(255,255,255,0.35)',
         },
       })
 
