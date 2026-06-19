@@ -31,15 +31,15 @@
     ]
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.100.6",
+    "@tanstack/react-query": "^5.101.0",
     "maplibre-gl": "^5.24.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "satellite.js": "^5.0.0",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2",
-    "zod": "^4.3.6",
-    "zustand": "^5.0.12"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -49,31 +49,31 @@
     ]
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260426.1",
+    "@cloudflare/workers-types": "^4.20260619.1",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.61.0",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^24.12.2",
-    "@types/react": "^19.2.14",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
-    "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "^4.1.5",
-    "eslint": "^10.2.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.5.0",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.6.0",
     "husky": "^9.1.7",
-    "jsdom": "^29.1.0",
+    "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.3",
-    "stylelint": "^17.9.1",
+    "prettier": "^3.8.4",
+    "stylelint": "^17.13.0",
     "stylelint-config-standard": "^40.0.0",
-    "typescript": "~6.0.2",
-    "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10",
-    "vitest": "^4.1.5",
-    "wrangler": "^4.86.0"
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.61.1",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.102.0"
   }
 }
