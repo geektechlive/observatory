@@ -43,9 +43,9 @@
   backdrop-filter: blur(6px);
 }
 
-.imageryToggle {
+.imageryToggle,
+.airToggle {
   position: absolute;
-  top: 12px;
   right: 12px;
   padding: 5px 10px;
   border-radius: 999px;
@@ -62,7 +62,16 @@
     border-color var(--duration-fast) ease;
 }
 
-.imageryToggle:hover {
+.imageryToggle {
+  top: 12px;
+}
+
+.airToggle {
+  top: 46px;
+}
+
+.imageryToggle:hover,
+.airToggle:hover {
   color: var(--bone);
   border-color: var(--copper);
 }

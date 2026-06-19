@@ -7,11 +7,13 @@ import { useIss } from '@/hooks/useIss'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useGdacs } from '@/hooks/useGdacs'
 import { useFires } from '@/hooks/useFires'
+import { useAirQuality } from '@/hooks/useAirQuality'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
 import type { Quake } from '@/schemas/quakes'
 import type { GdacsEvent } from '@/schemas/gdacs'
 import type { Fire } from '@/schemas/fires'
+import type { AirStation } from '@/schemas/airQuality'
 import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
@@ -140,6 +142,28 @@ function firesToGeoJson(
   }
 }
 
+// US-EPA PM2.5 (µg/m³) → AQI color band.
+function aqiColor(pm25: number): string {
+  if (pm25 <= 12) return '#4ade80'
+  if (pm25 <= 35.4) return '#fde047'
+  if (pm25 <= 55.4) return '#fb923c'
+  if (pm25 <= 150.4) return '#ef4444'
+  return '#a855f7'
+}
+
+function airToGeoJson(
+  stations: AirStation[],
+): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: stations.map((s) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+      properties: { color: aqiColor(s.pm25) },
+    })),
+  }
+}
+
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -147,12 +171,14 @@ export function WorldMap() {
   const clickPopupRef = useRef<maplibregl.Popup | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [showImagery, setShowImagery] = useState(false)
+  const [showAir, setShowAir] = useState(false)
 
   const { data: events } = useEvents()
   const { position, trail } = useIss()
   const { data: quakeData } = useQuakes()
   const { data: gdacsData } = useGdacs()
   const { data: firesData } = useFires()
+  const { data: airData } = useAirQuality(showAir)
   const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
@@ -209,6 +235,23 @@ export function WorldMap() {
           'line-width': 1.5,
           'line-opacity': 0.35,
           'line-dasharray': [3, 3],
+        },
+      })
+
+      map.addSource('air-quality', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'air-dots',
+        type: 'circle',
+        source: 'air-quality',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': 4,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.55,
+          'circle-blur': 0.5,
         },
       })
 
@@ -501,6 +544,15 @@ export function WorldMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('air-quality') as GeoJSONSource | undefined
+    if (src) src.setData(airToGeoJson(airData?.stations ?? []))
+    if (mapRef.current.getLayer('air-dots')) {
+      mapRef.current.setLayoutProperty('air-dots', 'visibility', showAir ? 'visible' : 'none')
+    }
+  }, [mapLoaded, airData, showAir])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
     if (!mapRef.current.getLayer('gibs-layer')) return
     mapRef.current.setLayoutProperty('gibs-layer', 'visibility', showImagery ? 'visible' : 'none')
   }, [mapLoaded, showImagery])
@@ -558,6 +610,15 @@ export function WorldMap() {
         title="Toggle NASA MODIS true-color satellite imagery"
       >
         {showImagery ? '◉ Imagery' : '○ Imagery'}
+      </button>
+      <button
+        type="button"
+        className={`${styles.airToggle ?? ''} ${showAir ? (styles.imageryToggleActive ?? '') : ''}`}
+        onClick={() => setShowAir((s) => !s)}
+        aria-pressed={showAir}
+        title="Toggle OpenAQ PM2.5 air-quality stations"
+      >
+        {showAir ? '◉ Air PM2.5' : '○ Air PM2.5'}
       </button>
       {eonetFailed && (
         <div className={styles.eonetBadge ?? ''} role="status" aria-live="polite">

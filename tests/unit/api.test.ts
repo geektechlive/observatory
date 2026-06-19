@@ -16,6 +16,7 @@ import { fetchGdacs } from '@/lib/api/gdacs'
 import { fetchPlanets } from '@/lib/api/planets'
 import { fetchSatellites } from '@/lib/api/satellites'
 import { fetchFires } from '@/lib/api/fires'
+import { fetchAirQuality } from '@/lib/api/airQuality'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -496,5 +497,23 @@ describe('fetchFires', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchFires()).rejects.toThrow(/Fires fetch failed/)
+  })
+})
+
+const AIR_FIXTURE = {
+  stations: [{ lat: 28.6, lon: 77.2, pm25: 142.5 }],
+  updatedAt: '2026-06-18T00:00:00Z',
+}
+
+describe('fetchAirQuality', () => {
+  it('returns parsed stations on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, AIR_FIXTURE))
+    const result = await fetchAirQuality()
+    expect(result.stations[0]?.pm25).toBeCloseTo(142.5, 1)
+  })
+
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchAirQuality()).rejects.toThrow(/Air quality fetch failed/)
   })
 })
