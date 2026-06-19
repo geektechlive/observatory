@@ -2,6 +2,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { PeopleInSpacePanel } from '@/components/panels/PeopleInSpacePanel'
 import { DsnPanel } from '@/components/panels/DsnPanel'
+import { SpaceNewsPanel } from '@/components/panels/SpaceNewsPanel'
 import styles from './console.module.css'
 
 export function OrbitConsole() {
@@ -22,6 +23,11 @@ export function OrbitConsole() {
       <ErrorBoundary label="Deep Space Network">
         <DsnPanel />
       </ErrorBoundary>
+      <div className={styles.wide ?? ''}>
+        <ErrorBoundary label="Mission Intel">
+          <SpaceNewsPanel />
+        </ErrorBoundary>
+      </div>
     </div>
   )
 }

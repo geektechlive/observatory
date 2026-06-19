@@ -17,6 +17,10 @@ import { fetchPlanets } from '@/lib/api/planets'
 import { fetchSatellites } from '@/lib/api/satellites'
 import { fetchFires } from '@/lib/api/fires'
 import { fetchAirQuality } from '@/lib/api/airQuality'
+import { fetchMarsWeather } from '@/lib/api/marsWeather'
+import { fetchExoplanets } from '@/lib/api/exoplanets'
+import { fetchCo2 } from '@/lib/api/co2'
+import { fetchSpaceNews } from '@/lib/api/spaceNews'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -515,5 +519,73 @@ describe('fetchAirQuality', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchAirQuality()).rejects.toThrow(/Air quality fetch failed/)
+  })
+})
+
+describe('fetchMarsWeather', () => {
+  const FIXTURE = {
+    sol: 4927,
+    terrestrialDate: '2026-06-16',
+    minTemp: -69,
+    maxTemp: 0,
+    pressure: 804,
+    opacity: 'Sunny',
+    season: 'Month 11',
+    sunrise: '06:35',
+    sunset: '18:49',
+    uv: 'Moderate',
+    updatedAt: '2026-06-18T00:00:00Z',
+  }
+  it('returns parsed Mars weather on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, FIXTURE))
+    const r = await fetchMarsWeather()
+    expect(r.sol).toBe(4927)
+    expect(r.maxTemp).toBe(0)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchMarsWeather()).rejects.toThrow(/Mars weather fetch failed/)
+  })
+})
+
+describe('fetchExoplanets', () => {
+  it('returns parsed count on success', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { count: 6298, updatedAt: '2026-06-18T00:00:00Z' }))
+    expect((await fetchExoplanets()).count).toBe(6298)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchExoplanets()).rejects.toThrow(/Exoplanets fetch failed/)
+  })
+})
+
+describe('fetchCo2', () => {
+  it('returns parsed ppm on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, { ppm: 427.7, date: '2026-06-17', yearAgo: 424.5, updatedAt: 'x' }),
+    )
+    expect((await fetchCo2()).ppm).toBeCloseTo(427.7, 1)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchCo2()).rejects.toThrow(/CO2 fetch failed/)
+  })
+})
+
+describe('fetchSpaceNews', () => {
+  it('returns parsed articles on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        articles: [{ title: 'T', site: 'NASA', publishedAt: 'x', url: 'https://x' }],
+        updatedAt: 'x',
+      }),
+    )
+    expect((await fetchSpaceNews()).articles[0]?.site).toBe('NASA')
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchSpaceNews()).rejects.toThrow(/Space news fetch failed/)
   })
 })

@@ -5,6 +5,8 @@ import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
 import { SentryPanel } from '@/components/panels/SentryPanel'
 import { AsteroidTable } from '@/components/panels/AsteroidTable'
 import { FireballList } from '@/components/panels/FireballList'
+import { MarsWeatherPanel } from '@/components/panels/MarsWeatherPanel'
+import { ExoplanetPanel } from '@/components/panels/ExoplanetPanel'
 import styles from './console.module.css'
 
 export function SkyConsole() {
@@ -35,6 +37,12 @@ export function SkyConsole() {
       </ErrorBoundary>
       <ErrorBoundary label="Sentry">
         <SentryPanel />
+      </ErrorBoundary>
+      <ErrorBoundary label="Mars Weather">
+        <MarsWeatherPanel />
+      </ErrorBoundary>
+      <ErrorBoundary label="Exoplanets">
+        <ExoplanetPanel />
       </ErrorBoundary>
     </div>
   )

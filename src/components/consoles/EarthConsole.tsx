@@ -1,5 +1,6 @@
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { EpicPanel } from '@/components/panels/EpicPanel'
+import { Co2Panel } from '@/components/panels/Co2Panel'
 import styles from './console.module.css'
 
 export function EarthConsole() {
@@ -16,6 +17,9 @@ export function EarthConsole() {
           <EpicPanel />
         </ErrorBoundary>
       </div>
+      <ErrorBoundary label="Atmospheric CO₂">
+        <Co2Panel />
+      </ErrorBoundary>
     </div>
   )
 }
