@@ -1,0 +1,114 @@
+.dial {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(12px, 4vw, 48px);
+  padding: 14px var(--gutter) 18px;
+}
+
+.orbitLine {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, 90%);
+  height: 40px;
+  pointer-events: none;
+}
+
+.node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--bone-dim);
+  transition: color var(--duration-fast) var(--ease-out-expo);
+}
+
+.node:hover {
+  color: var(--bone);
+}
+
+.glyphRing {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: oklch(0.1 0.02 50 / 0.6);
+  color: var(--copper);
+  transition:
+    border-color var(--duration-fast) var(--ease-out-expo),
+    color var(--duration-fast) var(--ease-out-expo),
+    box-shadow var(--duration-normal) var(--ease-out-expo),
+    transform var(--duration-normal) var(--ease-out-expo);
+}
+
+.glyph {
+  width: 26px;
+  height: 26px;
+}
+
+.nodeActive .glyphRing {
+  color: var(--signal);
+  border-color: var(--signal);
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 18px oklch(0.85 0.13 220 / 0.4),
+    inset 0 0 12px oklch(0.85 0.13 220 / 0.15);
+}
+
+.node:hover .glyphRing {
+  border-color: var(--copper);
+}
+
+.nodeLabel {
+  font-family: var(--font-stencil);
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
+  color: var(--bone-dim);
+}
+
+.nodeActive .nodeLabel {
+  color: var(--signal);
+}
+
+.nodeSub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.nodeActive {
+  color: var(--bone);
+}
+
+@media (width <= 640px) {
+  .dial {
+    gap: 6px;
+    padding: 10px 8px 12px;
+  }
+
+  .orbitLine {
+    display: none;
+  }
+
+  .glyphRing {
+    width: 38px;
+    height: 38px;
+  }
+
+  .nodeSub {
+    display: none;
+  }
+}

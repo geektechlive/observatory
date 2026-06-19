@@ -124,6 +124,22 @@
   min-height: 400px;
 }
 
+.layerOverlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+}
+
+@media (width <= 560px) {
+  .layerOverlay {
+    top: 6px;
+    right: 6px;
+    transform: scale(0.86);
+    transform-origin: top right;
+  }
+}
+
 .globeCenter::before {
   content: '';
   position: absolute;

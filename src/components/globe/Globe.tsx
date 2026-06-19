@@ -249,22 +249,6 @@ const DISASTER_LETTER: Record<string, string> = {
   DR: 'D',
 }
 
-const LEGEND_ITEMS = [
-  { key: 'wildfires', label: 'F  Wildfire', color: 'oklch(0.72 0.22 32)' },
-  { key: 'earthquakes', label: 'E  Earthquake', color: 'oklch(0.90 0.20 96)' },
-  { key: 'severeStorms', label: 'S  Storm', color: 'oklch(0.82 0.20 215)' },
-  { key: 'volcanoes', label: 'V  Volcano', color: 'oklch(0.72 0.22 320)' },
-  { key: 'floods', label: 'W  Flood', color: 'oklch(0.65 0.18 248)' },
-  { key: 'seaLakeIce', label: 'I  Sea Ice', color: 'oklch(0.92 0.04 194)' },
-  { key: 'launch', label: '▲  Launch Pad', color: LAUNCH_COLOR },
-  { key: 'fireball', label: '✦  Fireball', color: FIREBALL_COLOR },
-  { key: 'quake', label: '○  Seismic', color: 'oklch(0.80 0.18 55)' },
-  { key: 'disaster', label: '◆  Alert', color: 'oklch(0.62 0.22 25)' },
-  { key: 'fire', label: '·  Active Fire', color: 'oklch(0.85 0.2 55)' },
-  { key: 'sat', label: '●  Satellite', color: 'var(--terminal)' },
-  { key: 'iss', label: '◉  ISS', color: 'var(--signal)' },
-]
-
 const SAT_COLOR = 'oklch(0.78 0.18 145)'
 
 // FIRMS active fires: hot-body ramp by Fire Radiative Power (MW).
@@ -914,61 +898,6 @@ export function Globe({
           </div>
         </div>
       )}
-
-      {/* Legend — lower-left corner overlay */}
-      <div
-        aria-label="Globe legend"
-        style={{
-          position: 'absolute',
-          bottom: 52,
-          left: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 5,
-          padding: '8px 10px',
-          background: 'oklch(0.08 0.01 50 / 0.82)',
-          border: '1px solid var(--plate-seam)',
-          borderRadius: 2,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: 'var(--font-stencil)',
-            fontSize: 10,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: 'var(--copper-glow)',
-            marginBottom: 2,
-          }}
-        >
-          LEGEND
-        </div>
-        {LEGEND_ITEMS.map((item) => (
-          <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: '50%',
-                background: item.color,
-                flexShrink: 0,
-                display: 'inline-block',
-              }}
-            />
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                letterSpacing: '0.06em',
-                color: 'var(--bone-dim)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

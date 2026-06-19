@@ -16,13 +16,14 @@ export interface TrackedSatellite {
  * positions recompute every 2s — these are secondary to the 5Hz ISS track, so
  * a coarser cadence keeps the globe cheap.
  */
-export function useSatellites(): TrackedSatellite[] {
+export function useSatellites(enabled = true): TrackedSatellite[] {
   const { data, error } = useQuery({
     queryKey: ['satellites'],
     queryFn: fetchSatellites,
     staleTime: 24 * 60 * 60 * 1000,
     refetchInterval: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    enabled,
   })
 
   const [positions, setPositions] = useState<TrackedSatellite[]>([])

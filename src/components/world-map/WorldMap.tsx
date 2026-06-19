@@ -170,15 +170,14 @@ export function WorldMap() {
   const popupRef = useRef<maplibregl.Popup | null>(null)
   const clickPopupRef = useRef<maplibregl.Popup | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
-  const [showImagery, setShowImagery] = useState(false)
-  const [showAir, setShowAir] = useState(false)
 
+  const layers = useUiStore((s) => s.layers)
   const { data: events } = useEvents()
   const { position, trail } = useIss()
   const { data: quakeData } = useQuakes()
-  const { data: gdacsData } = useGdacs()
-  const { data: firesData } = useFires()
-  const { data: airData } = useAirQuality(showAir)
+  const { data: gdacsData } = useGdacs(layers.disasters)
+  const { data: firesData } = useFires(layers.fires)
+  const { data: airData } = useAirQuality(layers.air)
   const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
@@ -546,16 +545,29 @@ export function WorldMap() {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource('air-quality') as GeoJSONSource | undefined
     if (src) src.setData(airToGeoJson(airData?.stations ?? []))
-    if (mapRef.current.getLayer('air-dots')) {
-      mapRef.current.setLayoutProperty('air-dots', 'visibility', showAir ? 'visible' : 'none')
-    }
-  }, [mapLoaded, airData, showAir])
+  }, [mapLoaded, airData])
 
+  // Layer visibility driven by the shared LayerControl (store).
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return
-    if (!mapRef.current.getLayer('gibs-layer')) return
-    mapRef.current.setLayoutProperty('gibs-layer', 'visibility', showImagery ? 'visible' : 'none')
-  }, [mapLoaded, showImagery])
+    const map = mapRef.current
+    if (!mapLoaded || !map) return
+    const vis: [string, boolean][] = [
+      ['gibs-layer', layers.gibs],
+      ['air-dots', layers.air],
+      ['eonet-halos', layers.events],
+      ['eonet-dots', layers.events],
+      ['quake-rings', layers.quakes],
+      ['fire-dots', layers.fires],
+      ['gdacs-alerts', layers.disasters],
+      ['iss-trail-line', layers.iss],
+      ['iss-halo', layers.iss],
+      ['iss-dot', layers.iss],
+      ['iss-label', layers.iss],
+    ]
+    for (const [id, on] of vis) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
+    }
+  }, [mapLoaded, layers])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
@@ -602,24 +614,6 @@ export function WorldMap() {
     <div className={styles.mapWrap ?? ''}>
       <div ref={containerRef} className={styles.container ?? ''} />
       <MapLegend events={events?.events ?? []} issVisible={position !== null} />
-      <button
-        type="button"
-        className={`${styles.imageryToggle ?? ''} ${showImagery ? (styles.imageryToggleActive ?? '') : ''}`}
-        onClick={() => setShowImagery((s) => !s)}
-        aria-pressed={showImagery}
-        title="Toggle NASA MODIS true-color satellite imagery"
-      >
-        {showImagery ? '◉ Imagery' : '○ Imagery'}
-      </button>
-      <button
-        type="button"
-        className={`${styles.airToggle ?? ''} ${showAir ? (styles.imageryToggleActive ?? '') : ''}`}
-        onClick={() => setShowAir((s) => !s)}
-        aria-pressed={showAir}
-        title="Toggle OpenAQ PM2.5 air-quality stations"
-      >
-        {showAir ? '◉ Air PM2.5' : '○ Air PM2.5'}
-      </button>
       {eonetFailed && (
         <div className={styles.eonetBadge ?? ''} role="status" aria-live="polite">
           EONET unavailable

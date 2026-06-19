@@ -1,25 +1,21 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useState, type ComponentType } from 'react'
 import { useCountUp } from '@/hooks/useCountUp'
 import { BelterHeader } from '@/components/status-bar/BelterHeader'
 import { HazardChevron } from '@/components/ui/HazardChevron'
 import { StarField } from '@/components/starfield/StarField'
 import { Globe } from '@/components/globe/Globe'
-import { SentryPanel } from '@/components/panels/SentryPanel'
-import { AsteroidTable } from '@/components/panels/AsteroidTable'
-import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
-import { FireballList } from '@/components/panels/FireballList'
-import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
-import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
-import { SolarCyclePanel } from '@/components/panels/SolarCyclePanel'
-import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
-import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
-import { PeopleInSpacePanel } from '@/components/panels/PeopleInSpacePanel'
-import { DsnPanel } from '@/components/panels/DsnPanel'
-import { PlanetsPanel } from '@/components/panels/PlanetsPanel'
-import { LaunchPanel } from '@/components/panels/LaunchPanel'
+import { LayerControl } from '@/components/globe/LayerControl'
+import { VitalsSpine } from '@/components/status/VitalsSpine'
+import { OrbitalDial } from '@/components/nav/OrbitalDial'
+import { EarthConsole } from '@/components/consoles/EarthConsole'
+import { SunConsole } from '@/components/consoles/SunConsole'
+import { SkyConsole } from '@/components/consoles/SkyConsole'
+import { OrbitConsole } from '@/components/consoles/OrbitConsole'
 import { Ticker } from '@/components/ticker/Ticker'
 import { Footer } from '@/components/footer/Footer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { useHashView } from '@/hooks/useHashView'
+import { useUiStore, type ConsoleView } from '@/store/ui'
 import { useIss } from '@/hooks/useIss'
 import { useEvents } from '@/hooks/useEvents'
 import { useLaunches } from '@/hooks/useLaunches'
@@ -38,6 +34,13 @@ const WorldMap = lazy(() =>
 
 type MapMode = 'globe' | 'map'
 
+const CONSOLES: Record<ConsoleView, ComponentType> = {
+  earth: EarthConsole,
+  sun: SunConsole,
+  sky: SkyConsole,
+  orbit: OrbitConsole,
+}
+
 const RIVET_POSITIONS: { top?: number; bottom?: number; left?: number; right?: number }[] = [
   { top: 14, left: 14 },
   { top: 14, right: 14 },
@@ -46,16 +49,20 @@ const RIVET_POSITIONS: { top?: number; bottom?: number; left?: number; right?: n
 ]
 
 export function App() {
+  useHashView()
+  const view = useUiStore((s) => s.view)
+  const layers = useUiStore((s) => s.layers)
   const [mapMode, setMapMode] = useState<MapMode>('globe')
+
   const { position: issPos, trail: issTrail } = useIss()
   const { data: eventsData } = useEvents()
   const { data: launchData } = useLaunches()
   const { data: neoData } = useNeo()
-  const { data: fireballData } = useFireball()
+  const { data: fireballData } = useFireball(layers.fireballs)
   const { data: quakeData } = useQuakes()
-  const { data: gdacsData } = useGdacs()
-  const satellites = useSatellites()
-  const { data: firesData } = useFires()
+  const { data: gdacsData } = useGdacs(layers.disasters)
+  const satellites = useSatellites(layers.satellites)
+  const { data: firesData } = useFires(layers.fires)
 
   const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
     const geom = ev.geometry.find(isPointGeometry)
@@ -94,8 +101,10 @@ export function App() {
     name: d.name,
   }))
 
-  const issLat = issPos?.lat
-  const issLon = issPos?.lon
+  // Globe layer gating: pass data only when the layer is enabled.
+  const issOn = layers.iss
+  const issLat = issOn ? issPos?.lat : undefined
+  const issLon = issOn ? issPos?.lon : undefined
   const issAlt = issPos?.alt.toFixed(1) ?? '—'
   const issVel = issPos ? Math.round(issPos.vel).toLocaleString() : '—'
   const neoCount = neoData?.element_count ?? '—'
@@ -108,17 +117,20 @@ export function App() {
   const issVelAnimated = useCountUp(issVelNum)
   const neoCountAnimated = useCountUp(neoCountNum)
 
+  const ActiveConsole = CONSOLES[view]
+
   return (
     <>
       <StarField />
       <HazardChevron />
       <BelterHeader />
+      <VitalsSpine />
 
       <main id="main-content" className={appStyles.main ?? ''}>
-        {/* Section 1: Globe hero */}
+        {/* Stage — the persistent transforming instrument */}
         <section
           className={`${appStyles.globeSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '150ms' }}
+          style={{ animationDelay: '120ms' }}
         >
           <div className={appStyles.globeFrame ?? ''}>
             <div className={appStyles.globeCenter ?? ''}>
@@ -127,15 +139,16 @@ export function App() {
                   size={460}
                   issLat={issLat}
                   issLon={issLon}
-                  issAlt={issPos?.alt}
-                  trail={issTrail}
-                  events={globeEvents}
-                  launches={launchMarkers}
-                  fireballs={fireballMarkers}
-                  quakes={quakeMarkers}
-                  disasters={disasterMarkers}
-                  satellites={satellites}
-                  fires={firesData?.fires ?? []}
+                  issAlt={issOn ? issPos?.alt : undefined}
+                  trail={issOn ? issTrail : []}
+                  events={layers.events ? globeEvents : []}
+                  launches={layers.launches ? launchMarkers : []}
+                  fireballs={layers.fireballs ? fireballMarkers : []}
+                  quakes={layers.quakes ? quakeMarkers : []}
+                  disasters={layers.disasters ? disasterMarkers : []}
+                  satellites={layers.satellites ? satellites : []}
+                  fires={layers.fires ? (firesData?.fires ?? []) : []}
+                  showTerminator={layers.terminator}
                   warm={true}
                   autoRotate={true}
                   radarSweep={true}
@@ -146,28 +159,12 @@ export function App() {
                 </Suspense>
               )}
 
-              {/* Callouts */}
-              {mapMode === 'globe' && issPos && (
-                <>
-                  <span
-                    className={`${appStyles.globeCallout ?? ''} ${appStyles.globeCalloutSignal ?? ''}`}
-                    style={{ top: 16, left: 20 }}
-                    aria-hidden="true"
-                  >
-                    ISS-TRACK
-                  </span>
-                  <span
-                    className={appStyles.globeCallout ?? ''}
-                    style={{ bottom: 16, right: 20 }}
-                    aria-hidden="true"
-                  >
-                    EONET
-                  </span>
-                </>
-              )}
+              <div className={appStyles.layerOverlay ?? ''}>
+                <LayerControl showMapLayers={mapMode === 'map'} />
+              </div>
             </div>
 
-            {/* ISS readout bar — toggle lives here so it's always visible */}
+            {/* ISS readout bar — globe/map toggle lives here so it's always visible */}
             <div className={appStyles.issReadoutBar ?? ''}>
               <span className={appStyles.issReadoutLabel ?? ''}>ISS-1 · UNITY</span>
               <div className={appStyles.issReadoutValues ?? ''}>
@@ -222,13 +219,11 @@ export function App() {
               />
             ))}
 
-            {/* Brass plate header */}
             <div className={appStyles.brassPlate ?? ''} aria-label="Telemetry readout">
               <span>STATION TELEMETRY</span>
               <span>SYS-04</span>
             </div>
 
-            {/* Salvage plates — big number readouts */}
             <div className={appStyles.salvagePlates ?? ''}>
               <div className={appStyles.salvagePlate ?? ''}>
                 <div>
@@ -284,86 +279,11 @@ export function App() {
           </div>
         </section>
 
-        {/* Section 2: Launches — full width */}
-        <section
-          className={`${appStyles.launchSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '300ms' }}
-        >
-          <ErrorBoundary label="Launches">
-            <LaunchPanel />
-          </ErrorBoundary>
-        </section>
-
-        {/* Section 2b: Deep space — humans in orbit + DSN comms */}
-        <section
-          className={`${appStyles.deepSpaceSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '375ms' }}
-        >
-          <ErrorBoundary label="Humans in Orbit">
-            <PeopleInSpacePanel />
-          </ErrorBoundary>
-          <ErrorBoundary label="Deep Space Network">
-            <DsnPanel />
-          </ErrorBoundary>
-          <ErrorBoundary label="Planets Tonight">
-            <PlanetsPanel />
-          </ErrorBoundary>
-        </section>
-
-        {/* Section 3: Sentry + Space Weather */}
-        <section
-          className={`${appStyles.newsSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '450ms' }}
-        >
-          <ErrorBoundary label="Sentry">
-            <SentryPanel />
-          </ErrorBoundary>
-          <ErrorBoundary label="Space Weather">
-            <SpaceWeatherStrip />
-          </ErrorBoundary>
-          <ErrorBoundary label="Sun & Moon">
-            <SunMoonPanel />
-          </ErrorBoundary>
-        </section>
-
-        {/* Section 4: Asteroid table + Fireballs */}
-        <section
-          className={`${appStyles.asteroidSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '600ms' }}
-        >
-          <ErrorBoundary label="Close Approaches">
-            <AsteroidTable />
-          </ErrorBoundary>
-          <ErrorBoundary label="Fireballs">
-            <FireballList />
-          </ErrorBoundary>
-        </section>
-
-        {/* Section 5: Solar Wind */}
-        <section
-          className={`${appStyles.solarSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '750ms' }}
-        >
-          <ErrorBoundary label="Live Sun">
-            <SunImageryPanel />
-          </ErrorBoundary>
-          <ErrorBoundary label="Solar Activity">
-            <SolarActivityPanel />
-          </ErrorBoundary>
-          <ErrorBoundary label="Solar Wind">
-            <SolarWindPanel />
-          </ErrorBoundary>
-        </section>
-
-        {/* Section 5b: Solar Cycle 25 + Kp forecast (full width) */}
-        <section
-          className={`${appStyles.cycleSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '825ms' }}
-        >
-          <ErrorBoundary label="Solar Cycle 25">
-            <SolarCyclePanel />
-          </ErrorBoundary>
-        </section>
+        {/* Console selector + active console */}
+        <OrbitalDial />
+        <ErrorBoundary label="Console">
+          <ActiveConsole />
+        </ErrorBoundary>
 
         <Footer />
       </main>
