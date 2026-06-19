@@ -16,6 +16,9 @@ export type LayerKey =
   | 'launches'
   | 'gibs'
   | 'air'
+  | 'nws'
+  | 'aircraft'
+  | 'buoys'
 
 // Curated-clean default: a tasteful subset on, everything else opt-in.
 const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
@@ -30,6 +33,9 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   launches: false,
   gibs: false,
   air: false,
+  nws: false,
+  aircraft: false,
+  buoys: false,
 }
 
 interface UiState {

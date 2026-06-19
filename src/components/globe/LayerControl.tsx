@@ -22,6 +22,9 @@ const GLOBE_LAYERS: LayerDef[] = [
 const MAP_LAYERS: LayerDef[] = [
   { key: 'gibs', label: 'Imagery', dot: 'oklch(0.7 0.1 150)' },
   { key: 'air', label: 'Air PM2.5', dot: 'oklch(0.85 0.16 95)' },
+  { key: 'nws', label: 'US Alerts', dot: '#ff3b30' },
+  { key: 'aircraft', label: 'Aircraft', dot: '#4ade80' },
+  { key: 'buoys', label: 'Ocean Buoys', dot: '#38d4ff' },
 ]
 
 function Toggle({ def }: { def: LayerDef }) {

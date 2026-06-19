@@ -24,6 +24,9 @@ import { fetchSpaceNews } from '@/lib/api/spaceNews'
 import { fetchGeomag } from '@/lib/api/geomag'
 import { fetchCme } from '@/lib/api/cme'
 import { fetchSwpcAlerts } from '@/lib/api/swpcAlerts'
+import { fetchNwsAlerts } from '@/lib/api/nws'
+import { fetchAircraft } from '@/lib/api/aircraft'
+import { fetchBuoys } from '@/lib/api/buoys'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -651,5 +654,66 @@ describe('fetchSwpcAlerts', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchSwpcAlerts()).rejects.toThrow(/SWPC alerts fetch failed/)
+  })
+})
+
+describe('fetchNwsAlerts', () => {
+  it('returns parsed alert features on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        features: [
+          {
+            geometry: { type: 'Polygon', coordinates: [] },
+            color: '#ff3b30',
+            event: 'Flash Flood Warning',
+            severity: 'Severe',
+            headline: 'h',
+          },
+        ],
+        updatedAt: 'x',
+      }),
+    )
+    expect((await fetchNwsAlerts()).features[0]?.event).toBe('Flash Flood Warning')
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchNwsAlerts()).rejects.toThrow(/NWS alerts fetch failed/)
+  })
+})
+
+describe('fetchAircraft', () => {
+  it('returns parsed aircraft on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        aircraft: [{ lat: 40.8, lon: -112, track: 87, altM: 10000, callsign: 'AAL1' }],
+        updatedAt: 'x',
+      }),
+    )
+    expect((await fetchAircraft()).aircraft[0]?.callsign).toBe('AAL1')
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchAircraft()).rejects.toThrow(/Aircraft fetch failed/)
+  })
+})
+
+describe('fetchBuoys', () => {
+  it('returns parsed buoys on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        buoys: [
+          { station: '22103', lat: 34, lon: 127.5, waterTemp: 23.2, waveHeight: 0.5, windSpeed: 4 },
+        ],
+        updatedAt: 'x',
+      }),
+    )
+    expect((await fetchBuoys()).buoys[0]?.waterTemp).toBe(23.2)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchBuoys()).rejects.toThrow(/Buoys fetch failed/)
   })
 })

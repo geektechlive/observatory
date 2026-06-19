@@ -8,12 +8,18 @@ import { useQuakes } from '@/hooks/useQuakes'
 import { useGdacs } from '@/hooks/useGdacs'
 import { useFires } from '@/hooks/useFires'
 import { useAirQuality } from '@/hooks/useAirQuality'
+import { useNwsAlerts } from '@/hooks/useNwsAlerts'
+import { useAircraft } from '@/hooks/useAircraft'
+import { useBuoys } from '@/hooks/useBuoys'
 import { isPointGeometry } from '@/schemas/eonet'
 import type { EonetEvent } from '@/schemas/eonet'
 import type { Quake } from '@/schemas/quakes'
 import type { GdacsEvent } from '@/schemas/gdacs'
 import type { Fire } from '@/schemas/fires'
 import type { AirStation } from '@/schemas/airQuality'
+import type { NwsFeature } from '@/schemas/nws'
+import type { Aircraft } from '@/schemas/aircraft'
+import type { Buoy } from '@/schemas/buoys'
 import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
@@ -164,6 +170,54 @@ function airToGeoJson(
   }
 }
 
+function nwsToGeoJson(features: NwsFeature[]): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: features.map((f) => ({
+      type: 'Feature',
+      geometry: f.geometry as GeoJSON.Geometry,
+      properties: { color: f.color, event: f.event },
+    })),
+  }
+}
+
+function altColor(altM: number | null): string {
+  if (altM === null) return '#8aa0a8'
+  if (altM < 3000) return '#ffb020'
+  if (altM < 9000) return '#4ade80'
+  return '#38d4ff'
+}
+function aircraftToGeoJson(
+  list: Aircraft[],
+): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: list.map((a) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
+      properties: { color: altColor(a.altM) },
+    })),
+  }
+}
+
+function sstColor(t: number | null): string {
+  if (t === null) return '#6a8090'
+  if (t <= 5) return '#4a6fff'
+  if (t <= 15) return '#38d4ff'
+  if (t <= 24) return '#4ade80'
+  return '#ff9500'
+}
+function buoysToGeoJson(list: Buoy[]): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: list.map((b) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [b.lon, b.lat] },
+      properties: { color: sstColor(b.waterTemp) },
+    })),
+  }
+}
+
 export function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -178,6 +232,9 @@ export function WorldMap() {
   const { data: gdacsData } = useGdacs(layers.disasters)
   const { data: firesData } = useFires(layers.fires)
   const { data: airData } = useAirQuality(layers.air)
+  const { data: nwsData } = useNwsAlerts(layers.nws)
+  const { data: aircraftData } = useAircraft(layers.aircraft)
+  const { data: buoysData } = useBuoys(layers.buoys)
   const eonetFailed = useUiStore((s) => s.sourceErrors['eonet'] === true)
 
   useEffect(() => {
@@ -234,6 +291,60 @@ export function WorldMap() {
           'line-width': 1.5,
           'line-opacity': 0.35,
           'line-dasharray': [3, 3],
+        },
+      })
+
+      // NWS alert polygons (bottom of the marker stack, hidden until toggled).
+      map.addSource('nws', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'nws-fill',
+        type: 'fill',
+        source: 'nws',
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.22 },
+      })
+      map.addLayer({
+        id: 'nws-outline',
+        type: 'line',
+        source: 'nws',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 1, 'line-opacity': 0.7 },
+      })
+
+      map.addSource('buoys', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'buoy-dots',
+        type: 'circle',
+        source: 'buoys',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': 3,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.8,
+          'circle-stroke-width': 0.5,
+          'circle-stroke-color': 'rgba(255,255,255,0.3)',
+        },
+      })
+
+      map.addSource('aircraft', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'aircraft-dots',
+        type: 'circle',
+        source: 'aircraft',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': 2.4,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.85,
         },
       })
 
@@ -547,6 +658,24 @@ export function WorldMap() {
     if (src) src.setData(airToGeoJson(airData?.stations ?? []))
   }, [mapLoaded, airData])
 
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('nws') as GeoJSONSource | undefined
+    if (src) src.setData(nwsToGeoJson(nwsData?.features ?? []))
+  }, [mapLoaded, nwsData])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('aircraft') as GeoJSONSource | undefined
+    if (src) src.setData(aircraftToGeoJson(aircraftData?.aircraft ?? []))
+  }, [mapLoaded, aircraftData])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    const src = mapRef.current.getSource('buoys') as GeoJSONSource | undefined
+    if (src) src.setData(buoysToGeoJson(buoysData?.buoys ?? []))
+  }, [mapLoaded, buoysData])
+
   // Layer visibility driven by the shared LayerControl (store).
   useEffect(() => {
     const map = mapRef.current
@@ -554,6 +683,10 @@ export function WorldMap() {
     const vis: [string, boolean][] = [
       ['gibs-layer', layers.gibs],
       ['air-dots', layers.air],
+      ['nws-fill', layers.nws],
+      ['nws-outline', layers.nws],
+      ['aircraft-dots', layers.aircraft],
+      ['buoy-dots', layers.buoys],
       ['eonet-halos', layers.events],
       ['eonet-dots', layers.events],
       ['quake-rings', layers.quakes],
