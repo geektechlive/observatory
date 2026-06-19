@@ -3,6 +3,7 @@ import { useSolarActivity } from '@/hooks/useSolarActivity'
 import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useQuakes } from '@/hooks/useQuakes'
+import { useGeomag } from '@/hooks/useGeomag'
 import { useNow } from '@/hooks/useNow'
 import styles from './vitals-spine.module.css'
 
@@ -46,6 +47,11 @@ function quakeColor(m: number): string {
   if (m >= 4.5) return 'var(--amber)'
   return 'var(--bone)'
 }
+function dstColor(dst: number): string {
+  if (dst <= -50) return 'var(--magenta)'
+  if (dst <= -30) return 'var(--amber)'
+  return 'var(--cyan)'
+}
 
 function nextLaunchCountdown(net: string | null, now: Date): string {
   if (!net) return '—'
@@ -65,6 +71,7 @@ export function VitalsSpine() {
   const { data: people } = usePeopleInSpace()
   const { data: launches } = useLaunches()
   const { data: quakeData } = useQuakes()
+  const { data: geomag } = useGeomag()
   const now = useNow()
 
   const kp = sw?.currentKp ?? null
@@ -93,6 +100,12 @@ export function VitalsSpine() {
           color={kp !== null ? kpColor(kp) : undefined}
         />
         <Cell label="X-RAY" value={flare ?? '—'} color={flareColor(flare)} />
+        <Cell
+          label="DST"
+          value={geomag?.currentDst != null ? String(geomag.currentDst) : '—'}
+          unit=" nT"
+          color={geomag?.currentDst != null ? dstColor(geomag.currentDst) : undefined}
+        />
         <Cell
           label="WIND"
           value={windSpeed !== null ? String(Math.round(windSpeed)) : '—'}

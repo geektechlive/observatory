@@ -1,0 +1,105 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 36px 16px 16px;
+  height: 100%;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--terminal);
+  box-shadow: 0 0 8px var(--terminal);
+}
+
+.alert .statusDot {
+  background: var(--magenta);
+  box-shadow: 0 0 10px var(--magenta);
+  animation: roci-pulse 1.4s ease-in-out infinite;
+}
+
+.statusText {
+  font-family: var(--font-stencil);
+  font-size: var(--text-sm);
+  letter-spacing: 0.1em;
+  color: var(--terminal);
+}
+
+.alert .statusText {
+  color: var(--magenta);
+}
+
+.arrival {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.arrivalLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.arrivalValue {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+.model {
+  display: flex;
+  gap: 18px;
+  margin-top: auto;
+}
+
+.modelStat {
+  display: flex;
+  flex-direction: column;
+}
+
+.modelValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--bone);
+}
+
+.modelLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.source {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.loading,
+.unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert .statusDot {
+    animation: none;
+  }
+}

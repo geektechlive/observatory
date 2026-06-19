@@ -21,6 +21,9 @@ import { fetchMarsWeather } from '@/lib/api/marsWeather'
 import { fetchExoplanets } from '@/lib/api/exoplanets'
 import { fetchCo2 } from '@/lib/api/co2'
 import { fetchSpaceNews } from '@/lib/api/spaceNews'
+import { fetchGeomag } from '@/lib/api/geomag'
+import { fetchCme } from '@/lib/api/cme'
+import { fetchSwpcAlerts } from '@/lib/api/swpcAlerts'
 import { trackQuota } from '@/lib/api/quota'
 import { fetchSentry } from '@/lib/api/sentry'
 import { fetchSolarWind } from '@/lib/api/solarWind'
@@ -587,5 +590,66 @@ describe('fetchSpaceNews', () => {
   it('throws on a non-ok response', async () => {
     vi.stubGlobal('fetch', mockFetch(502, {}))
     await expect(fetchSpaceNews()).rejects.toThrow(/Space news fetch failed/)
+  })
+})
+
+describe('fetchGeomag', () => {
+  it('returns parsed Dst/Bz on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        dstSeries: [-10, -16],
+        currentDst: -16,
+        bzSeries: [1, -2, 1.6],
+        currentBz: 1.6,
+        updatedAt: 'x',
+      }),
+    )
+    const r = await fetchGeomag()
+    expect(r.currentDst).toBe(-16)
+    expect(r.bzSeries).toHaveLength(3)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchGeomag()).rejects.toThrow(/Geomag fetch failed/)
+  })
+})
+
+describe('fetchCme', () => {
+  it('returns parsed CME status on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        inbound: false,
+        arrival: null,
+        earthSpeed: 447,
+        earthDensity: 6.7,
+        updatedAt: 'x',
+      }),
+    )
+    const r = await fetchCme()
+    expect(r.inbound).toBe(false)
+    expect(r.earthSpeed).toBe(447)
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}))
+    await expect(fetchCme()).rejects.toThrow(/CME fetch failed/)
+  })
+})
+
+describe('fetchSwpcAlerts', () => {
+  it('returns parsed alerts on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        alerts: [{ productId: 'EF3A', issued: 'x', summary: 'Electron flux high' }],
+        updatedAt: 'x',
+      }),
+    )
+    expect((await fetchSwpcAlerts()).alerts[0]?.productId).toBe('EF3A')
+  })
+  it('throws on a non-ok response', async () => {
+    vi.stubGlobal('fetch', mockFetch(502, {}))
+    await expect(fetchSwpcAlerts()).rejects.toThrow(/SWPC alerts fetch failed/)
   })
 })
