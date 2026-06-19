@@ -4,6 +4,8 @@ import { BelterHeader } from '@/components/status-bar/BelterHeader'
 import { HazardChevron } from '@/components/ui/HazardChevron'
 import { StarField } from '@/components/starfield/StarField'
 import { Globe } from '@/components/globe/Globe'
+import { SunStage } from '@/components/stage/SunStage'
+import { SkyStage } from '@/components/stage/SkyStage'
 import { LayerControl } from '@/components/globe/LayerControl'
 import { VitalsSpine } from '@/components/status/VitalsSpine'
 import { OrbitalDial } from '@/components/nav/OrbitalDial'
@@ -118,6 +120,7 @@ export function App() {
   const neoCountAnimated = useCountUp(neoCountNum)
 
   const ActiveConsole = CONSOLES[view]
+  const stageKind = view === 'sun' ? 'sun' : view === 'sky' ? 'sky' : 'globe'
 
   return (
     <>
@@ -134,78 +137,88 @@ export function App() {
         >
           <div className={appStyles.globeFrame ?? ''}>
             <div className={appStyles.globeCenter ?? ''}>
-              {mapMode === 'globe' ? (
-                <Globe
-                  size={460}
-                  issLat={issLat}
-                  issLon={issLon}
-                  issAlt={issOn ? issPos?.alt : undefined}
-                  trail={issOn ? issTrail : []}
-                  events={layers.events ? globeEvents : []}
-                  launches={layers.launches ? launchMarkers : []}
-                  fireballs={layers.fireballs ? fireballMarkers : []}
-                  quakes={layers.quakes ? quakeMarkers : []}
-                  disasters={layers.disasters ? disasterMarkers : []}
-                  satellites={layers.satellites ? satellites : []}
-                  fires={layers.fires ? (firesData?.fires ?? []) : []}
-                  showTerminator={layers.terminator}
-                  warm={true}
-                  autoRotate={true}
-                  radarSweep={true}
-                />
-              ) : (
-                <Suspense fallback={null}>
-                  <WorldMap />
-                </Suspense>
-              )}
-
-              <div className={appStyles.layerOverlay ?? ''}>
-                <LayerControl showMapLayers={mapMode === 'map'} />
+              <div className={appStyles.stageMorph ?? ''} key={stageKind}>
+                {stageKind === 'sun' ? (
+                  <SunStage size={460} />
+                ) : stageKind === 'sky' ? (
+                  <SkyStage size={460} />
+                ) : mapMode === 'globe' ? (
+                  <Globe
+                    size={460}
+                    issLat={issLat}
+                    issLon={issLon}
+                    issAlt={issOn ? issPos?.alt : undefined}
+                    trail={issOn ? issTrail : []}
+                    events={layers.events ? globeEvents : []}
+                    launches={layers.launches ? launchMarkers : []}
+                    fireballs={layers.fireballs ? fireballMarkers : []}
+                    quakes={layers.quakes ? quakeMarkers : []}
+                    disasters={layers.disasters ? disasterMarkers : []}
+                    satellites={layers.satellites ? satellites : []}
+                    fires={layers.fires ? (firesData?.fires ?? []) : []}
+                    showTerminator={layers.terminator}
+                    warm={true}
+                    autoRotate={true}
+                    radarSweep={true}
+                  />
+                ) : (
+                  <Suspense fallback={null}>
+                    <WorldMap />
+                  </Suspense>
+                )}
               </div>
+
+              {stageKind === 'globe' && (
+                <div className={appStyles.layerOverlay ?? ''}>
+                  <LayerControl showMapLayers={mapMode === 'map'} />
+                </div>
+              )}
             </div>
 
             {/* ISS readout bar — globe/map toggle lives here so it's always visible */}
-            <div className={appStyles.issReadoutBar ?? ''}>
-              <span className={appStyles.issReadoutLabel ?? ''}>ISS-1 · UNITY</span>
-              <div className={appStyles.issReadoutValues ?? ''}>
-                <span>
-                  LAT{' '}
-                  <span className={appStyles.issVal ?? ''}>
-                    {issPos ? issPos.lat.toFixed(2) : '—'}
+            {stageKind === 'globe' && (
+              <div className={appStyles.issReadoutBar ?? ''}>
+                <span className={appStyles.issReadoutLabel ?? ''}>ISS-1 · UNITY</span>
+                <div className={appStyles.issReadoutValues ?? ''}>
+                  <span>
+                    LAT{' '}
+                    <span className={appStyles.issVal ?? ''}>
+                      {issPos ? issPos.lat.toFixed(2) : '—'}
+                    </span>
+                    °
                   </span>
-                  °
-                </span>
-                <span>
-                  LON{' '}
-                  <span className={appStyles.issVal ?? ''}>
-                    {issPos ? issPos.lon.toFixed(2) : '—'}
+                  <span>
+                    LON{' '}
+                    <span className={appStyles.issVal ?? ''}>
+                      {issPos ? issPos.lon.toFixed(2) : '—'}
+                    </span>
+                    °
                   </span>
-                  °
-                </span>
-                <span>
-                  ALT <span className={appStyles.issVal ?? ''}>{issAlt}</span> km
-                </span>
-                <span className={appStyles.issReadoutDelta ?? ''}>+5Hz SGP4</span>
+                  <span>
+                    ALT <span className={appStyles.issVal ?? ''}>{issAlt}</span> km
+                  </span>
+                  <span className={appStyles.issReadoutDelta ?? ''}>+5Hz SGP4</span>
+                </div>
+                <div className={appStyles.mapToggle ?? ''} role="group" aria-label="Map view mode">
+                  <button
+                    type="button"
+                    className={`${appStyles.mapToggleBtn ?? ''} ${mapMode === 'globe' ? (appStyles.mapToggleBtnActive ?? '') : ''}`}
+                    onClick={() => setMapMode('globe')}
+                    aria-pressed={mapMode === 'globe'}
+                  >
+                    Globe
+                  </button>
+                  <button
+                    type="button"
+                    className={`${appStyles.mapToggleBtn ?? ''} ${mapMode === 'map' ? (appStyles.mapToggleBtnActive ?? '') : ''}`}
+                    onClick={() => setMapMode('map')}
+                    aria-pressed={mapMode === 'map'}
+                  >
+                    Map
+                  </button>
+                </div>
               </div>
-              <div className={appStyles.mapToggle ?? ''} role="group" aria-label="Map view mode">
-                <button
-                  type="button"
-                  className={`${appStyles.mapToggleBtn ?? ''} ${mapMode === 'globe' ? (appStyles.mapToggleBtnActive ?? '') : ''}`}
-                  onClick={() => setMapMode('globe')}
-                  aria-pressed={mapMode === 'globe'}
-                >
-                  Globe
-                </button>
-                <button
-                  type="button"
-                  className={`${appStyles.mapToggleBtn ?? ''} ${mapMode === 'map' ? (appStyles.mapToggleBtnActive ?? '') : ''}`}
-                  onClick={() => setMapMode('map')}
-                  aria-pressed={mapMode === 'map'}
-                >
-                  Map
-                </button>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Telemetry plate */}

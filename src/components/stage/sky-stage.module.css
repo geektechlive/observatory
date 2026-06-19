@@ -1,0 +1,32 @@
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.sky {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 30px oklch(0.3 0.1 250 / 0.4));
+}
+
+.caption {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.capLabel {
+  font-family: var(--font-stencil);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  color: var(--signal);
+}
+
+.capSub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--ink-faint);
+}
