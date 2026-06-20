@@ -1,16 +1,13 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 import { fluxToClass } from '../../src/schemas/solarActivity'
+import { cachedJson } from './_cache'
 
 // GOES X-ray flux (flare detector) + NOAA space-weather scales. Public, no key.
 const XRAY_FEED = 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json'
 const SCALES_FEED = 'https://services.swpc.noaa.gov/products/noaa-scales.json'
 const CACHE_TTL_SECONDS = 120 // 2 min — GOES updates every minute
 const SERIES_POINTS = 60
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const XrayRawSchema = z.array(
   z.object({ time_tag: z.string(), flux: z.number().nullable(), energy: z.string() }),
@@ -89,30 +86,8 @@ async function fetchScales(): Promise<
   return out
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'noaa:solar-activity:latest'
-
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  const [xray, scales] = await Promise.all([fetchXray(), fetchScales()])
-
-  const body = JSON.stringify({ xray, scales, updatedAt: new Date().toISOString() })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'noaa:solar-activity:latest', CACHE_TTL_SECONDS, async () => {
+    const [xray, scales] = await Promise.all([fetchXray(), fetchScales()])
+    return { body: JSON.stringify({ xray, scales, updatedAt: new Date().toISOString() }) }
   })
-}

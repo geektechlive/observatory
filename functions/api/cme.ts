@@ -1,14 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 // NOAA WSA-ENLIL solar wind model time series. Public, no key.
 // `cloud` is non-null for time steps inside a modeled (Earth-directed) CME.
 const SOURCE = 'https://services.swpc.noaa.gov/json/enlil_time_series.json'
 const CACHE_TTL_SECONDS = 3 * 3600 // 3h — model reruns every several hours
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const RawSchema = z.array(
   z.object({
@@ -19,56 +16,37 @@ const RawSchema = z.array(
   }),
 )
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'noaa:cme:enlil:v1'
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'noaa:cme:enlil:v1', CACHE_TTL_SECONDS, async () => {
+    const upstream = await fetch(SOURCE)
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream ENLIL error' }), {
+        status: upstream.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    const parsed = RawSchema.safeParse(await upstream.json())
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: 'Invalid upstream response' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const upstream = await fetch(SOURCE)
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream ENLIL error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+    const rows = parsed.data
+    const nowIso = new Date().toISOString()
+    const cmeRow = rows.find((r) => r.cloud != null && r.cloud !== '' && r.time_tag > nowIso)
+    const last = rows[rows.length - 1]
 
-  const parsed = RawSchema.safeParse(await upstream.json())
-  if (!parsed.success) {
-    return new Response(JSON.stringify({ error: 'Invalid upstream response' }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const rows = parsed.data
-  const nowIso = new Date().toISOString()
-  const cmeRow = rows.find((r) => r.cloud != null && r.cloud !== '' && r.time_tag > nowIso)
-  const last = rows[rows.length - 1]
-
-  const body = JSON.stringify({
-    inbound: cmeRow !== undefined,
-    arrival: cmeRow?.time_tag ?? null,
-    earthSpeed: typeof last?.v_r === 'number' ? last.v_r : null,
-    earthDensity:
-      typeof last?.earth_particles_per_cm3 === 'number' ? last.earth_particles_per_cm3 : null,
-    updatedAt: nowIso,
+    return {
+      body: JSON.stringify({
+        inbound: cmeRow !== undefined,
+        arrival: cmeRow?.time_tag ?? null,
+        earthSpeed: typeof last?.v_r === 'number' ? last.v_r : null,
+        earthDensity:
+          typeof last?.earth_particles_per_cm3 === 'number' ? last.earth_particles_per_cm3 : null,
+        updatedAt: nowIso,
+      }),
+    }
   })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
-  })
-}

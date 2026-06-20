@@ -1,13 +1,10 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { parseHorizons } from '../../src/lib/horizons'
+import { cachedJson } from './_cache'
 
 // JPL Horizons geocentric ephemerides for the planets, Moon and Sun. Public, no key.
 const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 const CACHE_TTL_SECONDS = 3600 // 1h
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const BODIES: { name: string; id: string }[] = [
   { name: 'Sun', id: '10' },
@@ -69,40 +66,20 @@ async function fetchBody(
   }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
+export const onRequest: PagesFunction = (ctx) => {
   const start = ymd(new Date())
-  const kvKey = `horizons:planets:${start}`
+  return cachedJson(ctx, `horizons:planets:${start}`, CACHE_TTL_SECONDS, async () => {
+    const stop = ymd(new Date(Date.now() + 86_400_000))
+    const results = await Promise.all(BODIES.map((b) => fetchBody(b.name, b.id, start, stop)))
+    const bodies = results.filter((b): b is NonNullable<typeof b> => b !== null)
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    if (bodies.length === 0) {
+      return new Response(JSON.stringify({ error: 'Horizons unavailable' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const stop = ymd(new Date(Date.now() + 86_400_000))
-  const results = await Promise.all(BODIES.map((b) => fetchBody(b.name, b.id, start, stop)))
-  const bodies = results.filter((b): b is NonNullable<typeof b> => b !== null)
-
-  if (bodies.length === 0) {
-    return new Response(JSON.stringify({ error: 'Horizons unavailable' }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const body = JSON.stringify({ bodies, updatedAt: new Date().toISOString() })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    return { body: JSON.stringify({ bodies, updatedAt: new Date().toISOString() }) }
   })
 }

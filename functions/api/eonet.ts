@@ -1,58 +1,29 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { EonetResponseSchema } from '../../src/schemas/eonet'
+import { cachedJson } from './_cache'
 
 const EONET_API = 'https://eonet.gsfc.nasa.gov/api/v3/events'
 const CACHE_TTL_SECONDS = 300 // 5 min
 
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
-
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'nasa:eonet:open'
-
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  // EONET is public — no API key required
-  const upstream = await fetch(`${EONET_API}?days=14&status=open&limit=200`)
-
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream EONET API error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const raw: unknown = await upstream.json()
-
-  const parsed = EonetResponseSchema.safeParse(raw)
-  if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-      {
-        status: 502,
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'nasa:eonet:open', CACHE_TTL_SECONDS, async () => {
+    // EONET is public — no API key required
+    const upstream = await fetch(`${EONET_API}?days=14&status=open&limit=200`)
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream EONET API error' }), {
+        status: upstream.status,
         headers: { 'Content-Type': 'application/json' },
-      },
-    )
-  }
+      })
+    }
 
-  const body = JSON.stringify(parsed.data)
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
+    const raw: unknown = await upstream.json()
+    const parsed = EonetResponseSchema.safeParse(raw)
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    return { body: JSON.stringify(parsed.data) }
   })
-}

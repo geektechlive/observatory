@@ -1,11 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { ApodSchema } from '../../src/schemas/apod'
+import { cachedJson } from './_cache'
 
 const NASA_API_BASE = 'https://api.nasa.gov'
 const CACHE_TTL_SECONDS = 86400 // 24h — APOD changes once per UTC day
 
 interface Env {
-  OBSERVATORY_CACHE: KVNamespace
   NASA_API_KEY: string
 }
 
@@ -15,61 +15,35 @@ function midnightUtcMs(): number {
   return Math.floor((midnight.getTime() - now.getTime()) / 1000)
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
+export const onRequest: PagesFunction<Env> = (ctx) => {
   const utcDate = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
-  const kvKey = `nasa:apod:${utcDate}`
+  return cachedJson(ctx, `nasa:apod:${utcDate}`, CACHE_TTL_SECONDS, async () => {
+    if (!ctx.env.NASA_API_KEY)
+      console.warn('[apod] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
+    const apiKey = ctx.env.NASA_API_KEY ?? 'DEMO_KEY'
+    const upstream = await fetch(`${NASA_API_BASE}/planetary/apod?api_key=${apiKey}`)
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  // Fetch from NASA
-  if (!env.NASA_API_KEY)
-    console.warn('[apod] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
-  const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
-  const upstream = await fetch(`${NASA_API_BASE}/planetary/apod?api_key=${apiKey}`)
-
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream NASA API error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const raw: unknown = await upstream.json()
-
-  // Validate with Zod before caching
-  const parsed = ApodSchema.safeParse(raw)
-  if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-      {
-        status: 502,
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream NASA API error' }), {
+        status: upstream.status,
         headers: { 'Content-Type': 'application/json' },
-      },
-    )
-  }
+      })
+    }
 
-  const body = JSON.stringify(parsed.data)
+    const raw: unknown = await upstream.json()
+    const parsed = ApodSchema.safeParse(raw)
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
-  // Cache until next UTC midnight
-  const ttl = midnightUtcMs()
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: Math.max(ttl, 60) })
+    const extraHeaders: Record<string, string> = {}
+    const quota = upstream.headers.get('X-RateLimit-Remaining')
+    if (quota !== null) extraHeaders['X-Quota-Remaining'] = quota
 
-  const missHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Cache': 'MISS',
-    'X-Cache-TTL': String(ttl),
-  }
-  const quota = upstream.headers.get('X-RateLimit-Remaining')
-  if (quota !== null) missHeaders['X-Quota-Remaining'] = quota
-
-  return new Response(body, { headers: missHeaders })
+    // Cache until next UTC midnight.
+    return { body: JSON.stringify(parsed.data), ttl: Math.max(midnightUtcMs(), 60), extraHeaders }
+  })
 }

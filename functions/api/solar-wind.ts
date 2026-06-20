@@ -1,14 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 const SolarWindRow = z.array(z.string())
 const SolarWindRawSchema = z.array(SolarWindRow)
 
 const CACHE_TTL_SECONDS = 300 // 5 min — NOAA updates every 3h for Kp, every min for plasma
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 function parseNum(v: unknown): number | null {
   if (v === null || v === undefined) return null
@@ -114,46 +111,25 @@ async function fetchMag(): Promise<{ imfBz: number | null; bzSeries: number[] }>
   return { imfBz: null, bzSeries }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'noaa:solar-wind:latest'
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'noaa:solar-wind:latest', CACHE_TTL_SECONDS, async () => {
+    const [kpResult, plasmaResult, magResult] = await Promise.all([
+      fetchKp(),
+      fetchPlasma(),
+      fetchMag(),
+    ])
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  const [kpResult, plasmaResult, magResult] = await Promise.all([
-    fetchKp(),
-    fetchPlasma(),
-    fetchMag(),
-  ])
-
-  const result = {
-    kpReadings: kpResult.readings,
-    currentKp: kpResult.current,
-    windSpeed: plasmaResult.speed,
-    windDensity: plasmaResult.density,
-    imfBz: magResult.imfBz,
-    windSpeedSeries: plasmaResult.speedSeries,
-    windDensitySeries: plasmaResult.densitySeries,
-    imfBzSeries: magResult.bzSeries,
-    updatedAt: new Date().toISOString(),
-  }
-
-  const body = JSON.stringify(result)
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    return {
+      body: JSON.stringify({
+        kpReadings: kpResult.readings,
+        currentKp: kpResult.current,
+        windSpeed: plasmaResult.speed,
+        windDensity: plasmaResult.density,
+        imfBz: magResult.imfBz,
+        windSpeedSeries: plasmaResult.speedSeries,
+        windDensitySeries: plasmaResult.densitySeries,
+        imfBzSeries: magResult.bzSeries,
+        updatedAt: new Date().toISOString(),
+      }),
+    }
   })
-}

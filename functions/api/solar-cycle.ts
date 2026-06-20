@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 // Solar Cycle 25 sunspot trend + 3-day Kp forecast. Public NOAA, no key.
 const CYCLE_FEED =
@@ -8,10 +9,6 @@ const KP_FORECAST_FEED =
   'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json'
 const CACHE_TTL_SECONDS = 3 * 3600 // 3h — Kp forecast refreshes ~every 3h
 const CYCLE_START = '2019-01' // Solar Cycle 25 onset
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const CycleRawSchema = z.array(
   z.object({
@@ -65,36 +62,16 @@ async function fetchKpForecast(): Promise<
     .map((r) => ({ time: r.time_tag, kp: r.kp, kind: r.observed, scale: r.noaa_scale }))
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'noaa:solar-cycle:latest'
-
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  const [cycleData, kpForecast] = await Promise.all([fetchCycle(), fetchKpForecast()])
-
-  const body = JSON.stringify({
-    cycle: cycleData.cycle,
-    latestSsn: cycleData.latestSsn,
-    latestF107: cycleData.latestF107,
-    kpForecast,
-    updatedAt: new Date().toISOString(),
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'noaa:solar-cycle:latest', CACHE_TTL_SECONDS, async () => {
+    const [cycleData, kpForecast] = await Promise.all([fetchCycle(), fetchKpForecast()])
+    return {
+      body: JSON.stringify({
+        cycle: cycleData.cycle,
+        latestSsn: cycleData.latestSsn,
+        latestF107: cycleData.latestF107,
+        kpForecast,
+        updatedAt: new Date().toISOString(),
+      }),
+    }
   })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
-  })
-}

@@ -1,4 +1,5 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
+import { cachedJson } from './_cache'
 
 // NASA FIRMS active fire detections (VIIRS, last 24h). Needs a free MAP_KEY,
 // kept server-side (env), never shipped to the client. Cached so we hit FIRMS
@@ -8,7 +9,6 @@ const CACHE_TTL_SECONDS = 4 * 3600 // 4h — matches satellite overpass cadence
 const MAX_FIRES = 500 // top by FRP, to keep the globe/map light
 
 interface Env {
-  OBSERVATORY_CACHE: KVNamespace
   FIRMS_MAP_KEY?: string
 }
 
@@ -63,53 +63,33 @@ function parseCsv(text: string): {
   return { fires, total }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  if (!env.FIRMS_MAP_KEY) {
+export const onRequest: PagesFunction<Env> = (ctx) => {
+  const mapKey = ctx.env.FIRMS_MAP_KEY
+  if (!mapKey) {
     // Graceful empty payload until the key is configured in Cloudflare.
-    return new Response(
-      JSON.stringify({ fires: [], total: 0, updatedAt: new Date().toISOString() }),
-      {
+    return Promise.resolve(
+      new Response(JSON.stringify({ fires: [], total: 0, updatedAt: new Date().toISOString() }), {
         headers: {
           'Content-Type': 'application/json',
           'X-Cache': 'MISS',
           'X-Cache-TTL': '0',
           'X-Firms-Key': 'missing',
         },
-      },
+      }),
     )
   }
 
-  const kvKey = 'firms:fires:viirs:v1'
+  return cachedJson(ctx, 'firms:fires:viirs:v1', CACHE_TTL_SECONDS, async () => {
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/${SOURCE}/world/1`
+    const upstream = await fetch(url)
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream FIRMS error' }), {
+        status: upstream.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${env.FIRMS_MAP_KEY}/${SOURCE}/world/1`
-  const upstream = await fetch(url)
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream FIRMS error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { fires, total } = parseCsv(await upstream.text())
-  const body = JSON.stringify({ fires, total, updatedAt: new Date().toISOString() })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    const { fires, total } = parseCsv(await upstream.text())
+    return { body: JSON.stringify({ fires, total, updatedAt: new Date().toISOString() }) }
   })
 }

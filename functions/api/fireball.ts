@@ -1,12 +1,9 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { FireballResponseSchema, type Fireball } from '../../src/schemas/fireball'
+import { cachedJson } from './_cache'
 
 const FIREBALL_API = 'https://ssd-api.jpl.nasa.gov/fireball.api'
 const CACHE_TTL_SECONDS = 3600 // 1 h
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 // Map columnar API response to named objects
 function parseFireballData(fields: string[], rows: (string | null)[][]): Fireball[] {
@@ -24,54 +21,32 @@ function parseFireballData(fields: string[], rows: (string | null)[][]): Firebal
   }))
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'nasa:fireball:recent30'
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'nasa:fireball:recent30', CACHE_TTL_SECONDS, async () => {
+    const upstream = await fetch(`${FIREBALL_API}?limit=30`)
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream JPL Fireball API error' }), {
+        status: upstream.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    const raw = (await upstream.json()) as {
+      count?: string
+      fields?: string[]
+      data?: (string | null)[][]
+    }
 
-  const upstream = await fetch(`${FIREBALL_API}?limit=30`)
+    const fireballs = parseFireballData(raw.fields ?? [], raw.data ?? [])
+    const normalized = { count: raw.count ?? String(fireballs.length), data: fireballs }
 
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream JPL Fireball API error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+    const parsed = FireballResponseSchema.safeParse(normalized)
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
-  const raw = (await upstream.json()) as {
-    count?: string
-    fields?: string[]
-    data?: (string | null)[][]
-  }
-
-  const fireballs = parseFireballData(raw.fields ?? [], raw.data ?? [])
-  const normalized = { count: raw.count ?? String(fireballs.length), data: fireballs }
-
-  const parsed = FireballResponseSchema.safeParse(normalized)
-  if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
-
-  const body = JSON.stringify(parsed.data)
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    return { body: JSON.stringify(parsed.data) }
   })
-}

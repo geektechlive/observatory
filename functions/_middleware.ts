@@ -8,42 +8,43 @@ interface RateLimitEntry {
   windowStart: number
 }
 
-export const onRequest: PagesFunction = async (context) => {
-  const { request, next, env } = context
+// Best-effort in-memory rate limiter, scoped to the current Worker isolate.
+// Deliberately NOT backed by KV: a per-request KV write blew the free-tier
+// 1,000 writes/day budget (every /api/ hit was a write). This costs zero KV.
+// Caveat: state is per-isolate, not global — it throttles a single abuser
+// hammering one colo, and Cloudflare's platform DDoS protection covers the rest.
+const buckets = new Map<string, RateLimitEntry>()
 
-  // Rate limiting — per-IP token bucket stored in KV
-  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+function isRateLimited(ip: string, now: number): boolean {
+  const entry = buckets.get(ip)
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
+    // Drop entries whose window has lapsed so the Map can't grow unbounded across
+    // the isolate's lifetime (the KV version relied on TTL for this).
+    if (buckets.size > 1000) {
+      for (const [key, e] of buckets) {
+        if (now - e.windowStart > RATE_LIMIT_WINDOW) buckets.delete(key)
+      }
+    }
+    buckets.set(ip, { count: 1, windowStart: now })
+    return false
+  }
+  entry.count++
+  return entry.count > RATE_LIMIT_MAX
+}
+
+export const onRequest: PagesFunction = async (context) => {
+  const { request, next } = context
 
   if (request.url.includes('/api/')) {
-    const kvKey = `rate:${ip}`
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const kv = (env as unknown as Record<string, any>)['OBSERVATORY_CACHE']
-
-    if (kv) {
-      const raw: string | null = await kv.get(kvKey)
-      const now = Date.now()
-      const entry: RateLimitEntry = raw
-        ? (JSON.parse(raw) as RateLimitEntry)
-        : { count: 0, windowStart: now }
-
-      if (now - entry.windowStart > RATE_LIMIT_WINDOW) {
-        entry.count = 0
-        entry.windowStart = now
-      }
-
-      entry.count++
-
-      if (entry.count > RATE_LIMIT_MAX) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': '60',
-          },
-        })
-      }
-
-      await kv.put(kvKey, JSON.stringify(entry), { expirationTtl: 120 })
+    const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+    if (isRateLimited(ip, Date.now())) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': '60',
+        },
+      })
     }
   }
 

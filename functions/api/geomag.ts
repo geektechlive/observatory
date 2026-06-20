@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 // Kyoto Dst ring-current index + propagated L1 IMF Bz. Public NOAA, no key.
 const DST_FEED = 'https://services.swpc.noaa.gov/products/kyoto-dst.json'
@@ -7,10 +8,6 @@ const PSW_FEED = 'https://services.swpc.noaa.gov/products/geospace/propagated-so
 const CACHE_TTL_SECONDS = 300 // 5 min
 const BZ_POINTS = 60
 const BZ_WINDOW = 1440 // last ~24h of 1-min samples
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const DstSchema = z.array(z.object({ time_tag: z.string(), dst: z.number() }))
 const PswSchema = z.array(z.array(z.union([z.string(), z.null()])))
@@ -52,35 +49,16 @@ async function fetchBz(): Promise<{ series: number[]; current: number | null }> 
   }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'noaa:geomag:latest'
-
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
-
-  const [dst, bz] = await Promise.all([fetchDst(), fetchBz()])
-  const body = JSON.stringify({
-    dstSeries: dst.series,
-    currentDst: dst.current,
-    bzSeries: bz.series,
-    currentBz: bz.current,
-    updatedAt: new Date().toISOString(),
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'noaa:geomag:latest', CACHE_TTL_SECONDS, async () => {
+    const [dst, bz] = await Promise.all([fetchDst(), fetchBz()])
+    return {
+      body: JSON.stringify({
+        dstSeries: dst.series,
+        currentDst: dst.current,
+        bzSeries: bz.series,
+        currentBz: bz.current,
+        updatedAt: new Date().toISOString(),
+      }),
+    }
   })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
-  })
-}

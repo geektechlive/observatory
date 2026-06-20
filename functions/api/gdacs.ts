@@ -1,15 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 // GDACS global disaster alerts (Orange/Red = active). Public, no key.
 const GDACS_API =
   'https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ,TC,FL,VO,WF,DR&alertlevel=Orange,Red&limit=100&format=geojson'
 const CACHE_TTL_SECONDS = 900 // 15 min
 const MAX_EVENTS = 60
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const GdacsRawSchema = z.object({
   features: z.array(
@@ -27,67 +24,46 @@ const GdacsRawSchema = z.object({
   ),
 })
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'gdacs:active:v1'
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'gdacs:active:v1', CACHE_TTL_SECONDS, async () => {
+    const upstream = await fetch(GDACS_API)
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream GDACS error' }), {
+        status: upstream.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    const parsed = GdacsRawSchema.safeParse(await upstream.json())
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
-  const upstream = await fetch(GDACS_API)
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream GDACS error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+    const events = parsed.data.features
+      .flatMap((f, i) => {
+        const coords = f.geometry?.coordinates
+        if (!coords || coords.length < 2) return []
+        const lon = coords[0]
+        const lat = coords[1]
+        if (typeof lon !== 'number' || typeof lat !== 'number') return []
+        const p = f.properties
+        return [
+          {
+            id: p.eventid != null ? String(p.eventid) : `gdacs-${i}`,
+            type: p.eventtype ?? '?',
+            name: p.name ?? 'Disaster alert',
+            alert: p.alertlevel ?? 'Orange',
+            lat,
+            lon,
+            country: p.country ?? '',
+            from: p.fromdate ?? '',
+          },
+        ]
+      })
+      .slice(0, MAX_EVENTS)
 
-  const parsed = GdacsRawSchema.safeParse(await upstream.json())
-  if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
-
-  const events = parsed.data.features
-    .flatMap((f, i) => {
-      const coords = f.geometry?.coordinates
-      if (!coords || coords.length < 2) return []
-      const lon = coords[0]
-      const lat = coords[1]
-      if (typeof lon !== 'number' || typeof lat !== 'number') return []
-      const p = f.properties
-      return [
-        {
-          id: p.eventid != null ? String(p.eventid) : `gdacs-${i}`,
-          type: p.eventtype ?? '?',
-          name: p.name ?? 'Disaster alert',
-          alert: p.alertlevel ?? 'Orange',
-          lat,
-          lon,
-          country: p.country ?? '',
-          from: p.fromdate ?? '',
-        },
-      ]
-    })
-    .slice(0, MAX_EVENTS)
-
-  const body = JSON.stringify({ events, updatedAt: new Date().toISOString() })
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    return { body: JSON.stringify({ events, updatedAt: new Date().toISOString() }) }
   })
-}

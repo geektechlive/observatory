@@ -1,14 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 // Community-maintained crew roster (open-notify is dead). Public, no key.
 const SOURCE =
   'https://raw.githubusercontent.com/corquaid/international-space-station-APIs/master/JSON/people-in-space.json'
 const CACHE_TTL_SECONDS = 6 * 3600 // 6h — source is a hand-updated static file
-
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
 
 const RawSchema = z.object({
   number: z.number(),
@@ -25,58 +22,37 @@ const RawSchema = z.object({
   ),
 })
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
-  const kvKey = 'iss:people:v1'
+export const onRequest: PagesFunction = (ctx) =>
+  cachedJson(ctx, 'iss:people:v1', CACHE_TTL_SECONDS, async () => {
+    const upstream = await fetch(SOURCE)
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream people-in-space error' }), {
+        status: upstream.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    const parsed = RawSchema.safeParse(await upstream.json())
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
-  const upstream = await fetch(SOURCE)
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream people-in-space error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const parsed = RawSchema.safeParse(await upstream.json())
-  if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
-
-  const result = {
-    number: parsed.data.number,
-    expedition: parsed.data.iss_expedition != null ? String(parsed.data.iss_expedition) : null,
-    people: parsed.data.people.map((p) => ({
-      name: p.name,
-      craft: p.spacecraft ?? 'Unknown',
-      country: p.country ?? '',
-      agency: p.agency ?? '',
-      flagCode: p.flag_code ?? null,
-      launched: p.launched ?? null,
-    })),
-    updatedAt: new Date().toISOString(),
-  }
-
-  const body = JSON.stringify(result)
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    return {
+      body: JSON.stringify({
+        number: parsed.data.number,
+        expedition: parsed.data.iss_expedition != null ? String(parsed.data.iss_expedition) : null,
+        people: parsed.data.people.map((p) => ({
+          name: p.name,
+          craft: p.spacecraft ?? 'Unknown',
+          country: p.country ?? '',
+          agency: p.agency ?? '',
+          flagCode: p.flag_code ?? null,
+          launched: p.launched ?? null,
+        })),
+        updatedAt: new Date().toISOString(),
+      }),
+    }
   })
-}

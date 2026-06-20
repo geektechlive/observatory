@@ -2,11 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 
 const EPIC_ARCHIVE_BASE = 'https://epic.gsfc.nasa.gov'
 
-interface Env {
-  OBSERVATORY_CACHE: KVNamespace
-}
-
-export const onRequest: PagesFunction<Env> = async ({ request }) => {
+export const onRequest: PagesFunction = async ({ request }) => {
   const { searchParams } = new URL(request.url)
   const year = searchParams.get('year')
   const month = searchParams.get('month')

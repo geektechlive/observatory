@@ -7,12 +7,12 @@ import {
   type DonkiResponse,
 } from '../../src/schemas/donki'
 import { z } from 'zod'
+import { cachedJson } from './_cache'
 
 const NASA_API_BASE = 'https://api.nasa.gov'
 const CACHE_TTL_SECONDS = 900 // 15 min
 
 interface Env {
-  OBSERVATORY_CACHE: KVNamespace
   NASA_API_KEY: string
 }
 
@@ -37,61 +37,41 @@ async function fetchDonkiEndpoint<T>(
   return {
     data: raw
       .map((item) => schema.safeParse(item))
-      .filter((r): r is z.SafeParseSuccess<T> => r.success)
+      .filter((r): r is z.ZodSafeParseSuccess<T> => r.success)
       .map((r) => r.data),
     ok: true,
   }
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
+export const onRequest: PagesFunction<Env> = (ctx) => {
   const endDate = dateString(0)
   const startDate = dateString(-7)
-  const kvKey = `nasa:donki:${endDate}`
+  return cachedJson(ctx, `nasa:donki:${endDate}`, CACHE_TTL_SECONDS, async () => {
+    if (!ctx.env.NASA_API_KEY)
+      console.warn('[donki] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
+    const apiKey = ctx.env.NASA_API_KEY ?? 'DEMO_KEY'
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    const [flaresResult, cmesResult, stormsResult, sepsResult] = await Promise.all([
+      fetchDonkiEndpoint('FLR', SolarFlareSchema, apiKey, startDate, endDate),
+      fetchDonkiEndpoint('CME', CmeSchema, apiKey, startDate, endDate),
+      fetchDonkiEndpoint('GST', GeomagneticStormSchema, apiKey, startDate, endDate),
+      fetchDonkiEndpoint('SEP', SepSchema, apiKey, startDate, endDate),
+    ])
 
-  if (!env.NASA_API_KEY)
-    console.warn('[donki] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
-  const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
+    const allFailed = !flaresResult.ok && !cmesResult.ok && !stormsResult.ok && !sepsResult.ok
+    if (allFailed) {
+      return new Response(JSON.stringify({ error: 'All DONKI endpoints unavailable' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  const [flaresResult, cmesResult, stormsResult, sepsResult] = await Promise.all([
-    fetchDonkiEndpoint('FLR', SolarFlareSchema, apiKey, startDate, endDate),
-    fetchDonkiEndpoint('CME', CmeSchema, apiKey, startDate, endDate),
-    fetchDonkiEndpoint('GST', GeomagneticStormSchema, apiKey, startDate, endDate),
-    fetchDonkiEndpoint('SEP', SepSchema, apiKey, startDate, endDate),
-  ])
-
-  const allFailed = !flaresResult.ok && !cmesResult.ok && !stormsResult.ok && !sepsResult.ok
-  if (allFailed) {
-    return new Response(JSON.stringify({ error: 'All DONKI endpoints unavailable' }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const data: DonkiResponse = {
-    flares: flaresResult.data,
-    cmes: cmesResult.data,
-    geomagneticStorms: stormsResult.data,
-    seps: sepsResult.data,
-  }
-  const body = JSON.stringify(data)
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS',
-      'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-    },
+    const data: DonkiResponse = {
+      flares: flaresResult.data,
+      cmes: cmesResult.data,
+      geomagneticStorms: stormsResult.data,
+      seps: sepsResult.data,
+    }
+    return { body: JSON.stringify(data) }
   })
 }

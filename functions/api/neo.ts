@@ -1,11 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { NeoResponseSchema } from '../../src/schemas/neo'
+import { cachedJson } from './_cache'
 
 const NASA_API_BASE = 'https://api.nasa.gov'
 const CACHE_TTL_SECONDS = 900 // 15 min
 
 interface Env {
-  OBSERVATORY_CACHE: KVNamespace
   NASA_API_KEY: string
 }
 
@@ -15,55 +15,36 @@ function dateString(offsetDays: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export const onRequest: PagesFunction<Env> = async ({ env }) => {
+export const onRequest: PagesFunction<Env> = (ctx) => {
   const startDate = dateString(0)
   const endDate = dateString(7)
-  const kvKey = `nasa:neo:${startDate}`
+  return cachedJson(ctx, `nasa:neo:${startDate}`, CACHE_TTL_SECONDS, async () => {
+    if (!ctx.env.NASA_API_KEY)
+      console.warn('[neo] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
+    const apiKey = ctx.env.NASA_API_KEY ?? 'DEMO_KEY'
+    const url = `${NASA_API_BASE}/neo/rest/v1/feed?start_date=${startDate}&end_date=${endDate}&api_key=${apiKey}`
+    const upstream = await fetch(url)
 
-  const cached: string | null = await env.OBSERVATORY_CACHE.get(kvKey)
-  if (cached !== null) {
-    return new Response(cached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Cache': 'HIT',
-        'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-      },
-    })
-  }
+    if (!upstream.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream NASA NeoWs API error' }), {
+        status: upstream.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-  if (!env.NASA_API_KEY)
-    console.warn('[neo] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
-  const apiKey = env.NASA_API_KEY ?? 'DEMO_KEY'
-  const url = `${NASA_API_BASE}/neo/rest/v1/feed?start_date=${startDate}&end_date=${endDate}&api_key=${apiKey}`
-  const upstream = await fetch(url)
+    const raw: unknown = await upstream.json()
+    const parsed = NeoResponseSchema.safeParse(raw)
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
 
-  if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream NASA NeoWs API error' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+    const extraHeaders: Record<string, string> = {}
+    const quota = upstream.headers.get('X-RateLimit-Remaining')
+    if (quota !== null) extraHeaders['X-Quota-Remaining'] = quota
 
-  const raw: unknown = await upstream.json()
-  const parsed = NeoResponseSchema.safeParse(raw)
-
-  if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
-
-  const body = JSON.stringify(parsed.data)
-  await env.OBSERVATORY_CACHE.put(kvKey, body, { expirationTtl: CACHE_TTL_SECONDS })
-
-  const missHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Cache': 'MISS',
-    'X-Cache-TTL': String(CACHE_TTL_SECONDS),
-  }
-  const quota = upstream.headers.get('X-RateLimit-Remaining')
-  if (quota !== null) missHeaders['X-Quota-Remaining'] = quota
-
-  return new Response(body, { headers: missHeaders })
+    return { body: JSON.stringify(parsed.data), extraHeaders }
+  })
 }
