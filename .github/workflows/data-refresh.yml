@@ -1,0 +1,68 @@
+name: data-refresh
+
+# Two scheduled jobs in one workflow. GitHub has no per-job schedule, so both crons
+# are declared here and each job filters on github.event.schedule to claim its own.
+# On workflow_dispatch neither filter matches "schedule", so both jobs run.
+on:
+  schedule:
+    - cron: '17 */12 * * *' # refresh: twice a day
+    - cron: '41 */6 * * *' # health: four times a day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: data-refresh-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Fetch TLEs and launch data from an ordinary network (CelesTrak returns 522 to
+  # Cloudflare Workers egress) and write them into Workers KV. The Pages Functions
+  # only read KV, so this is the sole writer.
+  refresh:
+    name: Refresh KV snapshots
+    if: github.event_name != 'schedule' || github.event.schedule == '17 */12 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Refresh KV snapshots
+        run: node scripts/refresh-data.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # Probe the live site's headline endpoints. Fails on non-200, missing fields, or an
+  # X-Data-Degraded marker, which is how a silent fallback gets caught.
+  health:
+    name: Endpoint health check
+    if: github.event_name != 'schedule' || github.event.schedule == '41 */6 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Job-level env so the failure step's `if:` can read it. A step-level env is not
+    # visible to that expression.
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check endpoints
+        run: node scripts/check-health.mjs
+
+      - name: Notify Slack
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          payload=$(node -e 'process.stdout.write(JSON.stringify({ text: "observatory health check failed: " + process.env.RUN_URL }))')
+          curl -sS -X POST -H 'Content-Type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
