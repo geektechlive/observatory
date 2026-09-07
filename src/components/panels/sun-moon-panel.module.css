@@ -95,6 +95,35 @@
   color: var(--bone);
 }
 
+.locateBtn {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  color: var(--copper-glow);
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-tile);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.locateBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.locateBtn:hover:not(:disabled) {
+  background: oklch(1 0 0 / 0.06);
+}
+
+.locateDenied {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
 .footer {
   font-family: var(--font-mono);
   font-size: 0.6rem;

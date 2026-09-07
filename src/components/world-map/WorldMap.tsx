@@ -1,26 +1,29 @@
-import { useEffect, useRef, useState } from 'react'
-import maplibregl from 'maplibre-gl'
-import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useEvents } from '@/hooks/useEvents'
-import { useIss } from '@/hooks/useIss'
-import { useQuakes } from '@/hooks/useQuakes'
-import { useGdacs } from '@/hooks/useGdacs'
-import { useFires } from '@/hooks/useFires'
-import { useAirQuality } from '@/hooks/useAirQuality'
-import { useNwsAlerts } from '@/hooks/useNwsAlerts'
+
+import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
+import maplibregl from 'maplibre-gl'
+import { useEffect, useRef, useState } from 'react'
+
 import { useAircraft } from '@/hooks/useAircraft'
+import { useAirQuality } from '@/hooks/useAirQuality'
 import { useBuoys } from '@/hooks/useBuoys'
-import { isPointGeometry } from '@/schemas/eonet'
-import type { EonetEvent } from '@/schemas/eonet'
-import type { Quake } from '@/schemas/quakes'
-import type { GdacsEvent } from '@/schemas/gdacs'
-import type { Fire } from '@/schemas/fires'
-import type { AirStation } from '@/schemas/airQuality'
-import type { NwsFeature } from '@/schemas/nws'
+import { useEvents } from '@/hooks/useEvents'
+import { useFires } from '@/hooks/useFires'
+import { useGdacs } from '@/hooks/useGdacs'
+import { useIss } from '@/hooks/useIss'
+import { useNwsAlerts } from '@/hooks/useNwsAlerts'
+import { useQuakes } from '@/hooks/useQuakes'
 import type { Aircraft } from '@/schemas/aircraft'
+import type { AirStation } from '@/schemas/airQuality'
 import type { Buoy } from '@/schemas/buoys'
+import type { EonetEvent } from '@/schemas/eonet'
+import { isPointGeometry } from '@/schemas/eonet'
+import type { Fire } from '@/schemas/fires'
+import type { GdacsEvent } from '@/schemas/gdacs'
+import type { NwsFeature } from '@/schemas/nws'
+import type { Quake } from '@/schemas/quakes'
 import { useUiStore } from '@/store/ui'
+
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
 
@@ -529,7 +532,7 @@ export function WorldMap() {
             inner.appendChild(dateEl)
           }
 
-          if (sourceUrl) {
+          if (sourceUrl && sourceUrl.startsWith('https://')) {
             const linkEl = document.createElement('a')
             linkEl.className = 'eonet-popup-link'
             linkEl.href = sourceUrl
@@ -627,7 +630,7 @@ export function WorldMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('eonet-events') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('eonet-events')
     if (!src) return
     const data = eventsToGeoJson(events?.events ?? [])
     src.setData(data)
@@ -635,46 +638,46 @@ export function WorldMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('quakes') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('quakes')
     if (!src) return
     src.setData(quakesToGeoJson(quakeData?.quakes ?? []))
   }, [mapLoaded, quakeData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('gdacs') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('gdacs')
     if (!src) return
     src.setData(gdacsToGeoJson(gdacsData?.events ?? []))
   }, [mapLoaded, gdacsData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('fires') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('fires')
     if (!src) return
     src.setData(firesToGeoJson(firesData?.fires ?? []))
   }, [mapLoaded, firesData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('air-quality') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('air-quality')
     if (src) src.setData(airToGeoJson(airData?.stations ?? []))
   }, [mapLoaded, airData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('nws') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('nws')
     if (src) src.setData(nwsToGeoJson(nwsData?.features ?? []))
   }, [mapLoaded, nwsData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('aircraft') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('aircraft')
     if (src) src.setData(aircraftToGeoJson(aircraftData?.aircraft ?? []))
   }, [mapLoaded, aircraftData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('buoys') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('buoys')
     if (src) src.setData(buoysToGeoJson(buoysData?.buoys ?? []))
   }, [mapLoaded, buoysData])
 
@@ -706,7 +709,7 @@ export function WorldMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('iss-trail') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('iss-trail')
     if (!src) return
     src.setData({
       type: 'Feature',
@@ -717,7 +720,7 @@ export function WorldMap() {
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
-    const src = mapRef.current.getSource('iss-position') as GeoJSONSource | undefined
+    const src = mapRef.current.getSource<GeoJSONSource>('iss-position')
     if (!src) return
     src.setData({
       type: 'FeatureCollection',
@@ -742,7 +745,7 @@ export function WorldMap() {
     if (!event) return
     const geom = event.geometry.find(isPointGeometry)
     if (!geom) return
-    mapRef.current.flyTo({ center: geom.coordinates as [number, number], zoom: 3, duration: 1000 })
+    mapRef.current.flyTo({ center: geom.coordinates, zoom: 3, duration: 1000 })
   }, [mapLoaded, selectedEventId, events])
 
   return (

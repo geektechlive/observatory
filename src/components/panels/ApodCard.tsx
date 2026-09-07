@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useApod } from '@/hooks/useApod'
+
 import { GlassPanel } from '@/components/ui/GlassPanel'
-import { ApodLightbox } from './ApodLightbox'
+import { useApod } from '@/hooks/useApod'
+
 import styles from './apod-card.module.css'
+import { ApodLightbox } from './ApodLightbox'
 
 export function ApodCard() {
   const { data, isLoading, error } = useApod()
@@ -33,28 +35,34 @@ export function ApodCard() {
       <div className={styles.apodCard ?? ''}>
         {data.media_type === 'image' ? (
           <div className={styles.imageWrap ?? ''}>
-            <img
-              src={data.url}
-              alt={data.title}
-              className={`${styles.image ?? ''}${canLightbox ? ` ${styles.imageClickable ?? ''}` : ''}`}
-              loading="lazy"
-              width={1200}
-              height={220}
-              onClick={canLightbox ? () => setLightboxOpen(true) : undefined}
-              role={canLightbox ? 'button' : undefined}
-              tabIndex={canLightbox ? 0 : undefined}
-              onKeyDown={
-                canLightbox
-                  ? (e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setLightboxOpen(true)
-                      }
-                    }
-                  : undefined
-              }
-              aria-label={canLightbox ? `View full-size: ${data.title}` : undefined}
-            />
+            {canLightbox ? (
+              <button
+                type="button"
+                className={styles.imageButton ?? ''}
+                onClick={() => {
+                  setLightboxOpen(true)
+                }}
+                aria-label={`View full-size: ${data.title}`}
+              >
+                <img
+                  src={data.url}
+                  alt={data.title}
+                  className={`${styles.image ?? ''} ${styles.imageClickable ?? ''}`}
+                  loading="lazy"
+                  width={1200}
+                  height={220}
+                />
+              </button>
+            ) : (
+              <img
+                src={data.url}
+                alt={data.title}
+                className={styles.image ?? ''}
+                loading="lazy"
+                width={1200}
+                height={220}
+              />
+            )}
           </div>
         ) : (
           <div className={styles.videoPlaceholder ?? ''}>
@@ -83,7 +91,9 @@ export function ApodCard() {
         <button
           type="button"
           className={styles.readMore ?? ''}
-          onClick={() => setExpanded((prev) => !prev)}
+          onClick={() => {
+            setExpanded((prev) => !prev)
+          }}
           aria-expanded={expanded}
         >
           {expanded ? 'Show less' : 'Read more'}
@@ -96,7 +106,13 @@ export function ApodCard() {
       </div>
 
       {lightboxOpen && canLightbox && (
-        <ApodLightbox src={lightboxSrc} alt={data.title} onClose={() => setLightboxOpen(false)} />
+        <ApodLightbox
+          src={lightboxSrc}
+          alt={data.title}
+          onClose={() => {
+            setLightboxOpen(false)
+          }}
+        />
       )}
     </GlassPanel>
   )

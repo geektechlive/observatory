@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 export interface GeoCoords {
   lat: number
@@ -6,28 +6,47 @@ export interface GeoCoords {
   isFallback: boolean
 }
 
-// Greenwich Observatory — a meaningful default when geolocation is unavailable
-// or denied (rise/set still resolves; moon phase/illumination is global anyway).
-const FALLBACK: GeoCoords = { lat: 51.4779, lon: 0, isFallback: true }
+export type GeoStatus = 'idle' | 'requesting' | 'granted' | 'denied' | 'unsupported'
+
+export interface GeoState {
+  coords: GeoCoords | null
+  status: GeoStatus
+  request: () => void
+}
+
+// Greenwich Observatory — a meaningful default when geolocation is unavailable,
+// denied, or not yet requested (rise/set still resolves; moon phase/illumination
+// is global anyway).
+export const FALLBACK: GeoCoords = { lat: 51.4779, lon: 0, isFallback: true }
 
 /**
- * Browser geolocation with graceful fallback. Starts at the fallback observer
- * and upgrades to the visitor's location only if permission is granted.
+ * Browser geolocation, requested only on demand. Never prompts on mount — callers
+ * must invoke `request()` in response to explicit user action. Stays on the
+ * Greenwich fallback observer until permission is granted.
  */
-export function useGeolocation(): GeoCoords {
-  const [coords, setCoords] = useState<GeoCoords>(FALLBACK)
+export function useGeolocation(): GeoState {
+  const [coords, setCoords] = useState<GeoCoords | null>(null)
+  const [status, setStatus] = useState<GeoStatus>(
+    typeof navigator === 'undefined' || !navigator.geolocation ? 'unsupported' : 'idle',
+  )
 
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+  const request = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setStatus('unsupported')
+      return
+    }
+    setStatus('requesting')
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude, isFallback: false }),
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude, isFallback: false })
+        setStatus('granted')
+      },
       () => {
-        /* denied or errored — keep the fallback observer */
+        setStatus('denied')
       },
       { timeout: 8000, maximumAge: 60 * 60 * 1000 },
     )
   }, [])
 
-  return coords
+  return { coords, status, request }
 }

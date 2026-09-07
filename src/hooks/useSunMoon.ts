@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
+import { FALLBACK, useGeolocation } from '@/hooks/useGeolocation'
 import { fetchSunMoon } from '@/lib/api/sunMoon'
-import { useGeolocation } from '@/hooks/useGeolocation'
 import { useUiStore } from '@/store/ui'
 
 function localISODate(d: Date): string {
@@ -12,7 +13,10 @@ function localISODate(d: Date): string {
 }
 
 export function useSunMoon() {
-  const { lat, lon, isFallback } = useGeolocation()
+  const { coords, status, request } = useGeolocation()
+  const lat = coords?.lat ?? FALLBACK.lat
+  const lon = coords?.lon ?? FALLBACK.lon
+  const isFallback = coords === null
   const tz = -new Date().getTimezoneOffset() / 60
   const date = localISODate(new Date())
 
@@ -28,5 +32,5 @@ export function useSunMoon() {
     useUiStore.getState().setSourceError('sunMoon', query.error != null)
   }, [query.error])
 
-  return { ...query, isFallbackLocation: isFallback }
+  return { ...query, isFallbackLocation: isFallback, geoStatus: status, requestLocation: request }
 }

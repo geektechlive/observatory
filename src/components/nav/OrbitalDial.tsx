@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
-import { useUiStore, CONSOLE_VIEWS, type ConsoleView } from '@/store/ui'
+import { type ReactNode, useRef } from 'react'
+
+import { CONSOLE_VIEWS, type ConsoleView, useUiStore } from '@/store/ui'
+
 import styles from './orbital-dial.module.css'
 
 const META: Record<ConsoleView, { label: string; sub: string; glyph: ReactNode }> = {
@@ -74,63 +76,81 @@ const META: Record<ConsoleView, { label: string; sub: string; glyph: ReactNode }
 export function OrbitalDial() {
   const view = useUiStore((s) => s.view)
   const setView = useUiStore((s) => s.setView)
+  const tabRefs = useRef<Record<ConsoleView, HTMLButtonElement | null>>({
+    earth: null,
+    sun: null,
+    sky: null,
+    orbit: null,
+  })
+
+  const focusAndSetView = (next: ConsoleView) => {
+    setView(next)
+    tabRefs.current[next]?.focus()
+  }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const idx = CONSOLE_VIEWS.indexOf(view)
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault()
-      setView(CONSOLE_VIEWS[(idx + 1) % CONSOLE_VIEWS.length] as ConsoleView)
+      focusAndSetView(CONSOLE_VIEWS[(idx + 1) % CONSOLE_VIEWS.length] as ConsoleView)
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault()
-      setView(CONSOLE_VIEWS[(idx - 1 + CONSOLE_VIEWS.length) % CONSOLE_VIEWS.length] as ConsoleView)
+      focusAndSetView(
+        CONSOLE_VIEWS[(idx - 1 + CONSOLE_VIEWS.length) % CONSOLE_VIEWS.length] as ConsoleView,
+      )
     }
   }
 
   return (
-    <div
-      className={styles.dial ?? ''}
-      role="tablist"
-      aria-label="Observatory console"
-      onKeyDown={onKeyDown}
-    >
-      <svg
-        className={styles.orbitLine ?? ''}
-        viewBox="0 0 400 40"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M10 30 Q200 2 390 30"
-          fill="none"
-          stroke="var(--copper)"
-          strokeWidth="0.75"
-          opacity="0.4"
-          strokeDasharray="2 4"
-        />
-      </svg>
-      {CONSOLE_VIEWS.map((v) => {
-        const active = v === view
-        const m = META[v]
-        return (
-          <button
-            key={v}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            tabIndex={active ? 0 : -1}
-            className={`${styles.node ?? ''} ${active ? (styles.nodeActive ?? '') : ''}`}
-            onClick={() => setView(v)}
-          >
-            <span className={styles.glyphRing ?? ''} aria-hidden="true">
-              <svg viewBox="-12 -12 24 24" className={styles.glyph ?? ''}>
-                {m.glyph}
-              </svg>
-            </span>
-            <span className={styles.nodeLabel ?? ''}>{m.label}</span>
-            <span className={styles.nodeSub ?? ''}>{m.sub}</span>
-          </button>
-        )
-      })}
-    </div>
+    <nav aria-label="Consoles">
+      <div className={styles.dial ?? ''} role="tablist" aria-label="Observatory console">
+        <svg
+          className={styles.orbitLine ?? ''}
+          viewBox="0 0 400 40"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M10 30 Q200 2 390 30"
+            fill="none"
+            stroke="var(--copper)"
+            strokeWidth="0.75"
+            opacity="0.4"
+            strokeDasharray="2 4"
+          />
+        </svg>
+        {CONSOLE_VIEWS.map((v) => {
+          const active = v === view
+          const m = META[v]
+          return (
+            <button
+              key={v}
+              ref={(el) => {
+                tabRefs.current[v] = el
+              }}
+              id={`console-tab-${v}`}
+              type="button"
+              role="tab"
+              onKeyDown={onKeyDown}
+              aria-selected={active}
+              aria-controls="console-panel"
+              tabIndex={active ? 0 : -1}
+              className={`${styles.node ?? ''} ${active ? (styles.nodeActive ?? '') : ''}`}
+              onClick={() => {
+                setView(v)
+              }}
+            >
+              <span className={styles.glyphRing ?? ''} aria-hidden="true">
+                <svg viewBox="-12 -12 24 24" className={styles.glyph ?? ''}>
+                  {m.glyph}
+                </svg>
+              </span>
+              <span className={styles.nodeLabel ?? ''}>{m.label}</span>
+              <span className={styles.nodeSub ?? ''}>{m.sub}</span>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
   )
 }

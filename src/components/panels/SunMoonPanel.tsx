@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSunMoon } from '@/hooks/useSunMoon'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useSunMoon } from '@/hooks/useSunMoon'
 import { isWaxing, moonLitPath } from '@/lib/moon'
+
 import styles from './sun-moon-panel.module.css'
 
 const MOON_R = 34
@@ -47,7 +49,7 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 export function SunMoonPanel() {
-  const { data, isLoading, error, isFallbackLocation } = useSunMoon()
+  const { data, isLoading, error, isFallbackLocation, geoStatus, requestLocation } = useSunMoon()
   const updatedAt = useQueryClient().getQueryState(['sun-moon'])?.dataUpdatedAt ?? 0
 
   if (isLoading && !data) {
@@ -106,6 +108,20 @@ export function SunMoonPanel() {
             <Row label="Phase" value={`${data.fracIllum}%`} />
           </div>
         </div>
+
+        {geoStatus !== 'granted' && geoStatus !== 'unsupported' && (
+          <button
+            type="button"
+            className={styles.locateBtn ?? ''}
+            onClick={requestLocation}
+            disabled={geoStatus === 'requesting'}
+          >
+            {geoStatus === 'requesting' ? 'Locating…' : 'Use my location'}
+          </button>
+        )}
+        {geoStatus === 'denied' && (
+          <span className={styles.locateDenied ?? ''}>Location denied — showing Greenwich</span>
+        )}
 
         <div className={styles.footer ?? ''}>
           {isFallbackLocation
