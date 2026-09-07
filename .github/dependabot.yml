@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # v7 ships a WASM/pthreads build with top-level await that Vite/rolldown
+      # cannot bundle as iife; v5 pure-JS is sufficient for 5Hz SGP4 propagation.
+      # See CLAUDE.md "Gotchas".
+      - dependency-name: "satellite.js"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
