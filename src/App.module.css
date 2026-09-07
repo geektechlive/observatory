@@ -504,6 +504,15 @@
   .globeCenter {
     min-height: 300px;
   }
+
+  /* OrbitalDial becomes a fixed hull bar above the ticker at this breakpoint
+     (see orbital-dial.module.css) — reserve room so console content and the
+     footer don't render underneath it. 108px matches the dial's --dial-bar-h
+     fallback; the 640px dial breakpoint uses a shorter bar, which just leaves
+     a little extra breathing room here rather than a hard cutoff. */
+  .main {
+    padding-bottom: calc(var(--ticker-h) + 108px + env(safe-area-inset-bottom));
+  }
 }
 
 .panelEnter {

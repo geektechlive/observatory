@@ -1,10 +1,11 @@
-import { useSolarWind } from '@/hooks/useSolarWind'
-import { useSolarActivity } from '@/hooks/useSolarActivity'
-import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
-import { useLaunches } from '@/hooks/useLaunches'
-import { useQuakes } from '@/hooks/useQuakes'
 import { useGeomag } from '@/hooks/useGeomag'
+import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
+import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
+import { useQuakes } from '@/hooks/useQuakes'
+import { useSolarActivity } from '@/hooks/useSolarActivity'
+import { useSolarWind } from '@/hooks/useSolarWind'
+
 import styles from './vitals-spine.module.css'
 
 function Cell({

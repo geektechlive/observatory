@@ -4,10 +4,29 @@
   gap: 16px;
   padding: 7px var(--gutter);
   border-bottom: 1px solid var(--panel-border);
-  background: oklch(0.09 0.01 50 / 0.7);
+  background-color: oklch(0.09 0.01 50 / 0.7);
+
+  /* Right-edge fade that only shows when the strip actually overflows: the
+     first layer (attachment: local) is a cover the same color as the strip,
+     anchored to the end of the *content* box — when content fits, that end
+     coincides with the visible edge and hides the shadow beneath it; when it
+     overflows, the cover sits past the visible edge and the viewport-pinned
+     shadow (attachment: scroll) shows through. */
+  background-image:
+    linear-gradient(to left, oklch(0.09 0.01 50) 30%, oklch(0.09 0.01 50 / 0) 100%),
+    linear-gradient(to left, oklch(0 0 0 / 0.55) 0%, oklch(0 0 0 / 0) 100%);
+  background-repeat: no-repeat;
+  background-position:
+    100% 0,
+    100% 0;
+  background-size:
+    26px 100%,
+    14px 100%;
+  background-attachment: local, scroll;
   backdrop-filter: blur(8px);
   overflow-x: auto;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
 }
 
 .spine::-webkit-scrollbar {
@@ -48,6 +67,7 @@
   padding: 0 16px;
   border-left: 1px solid var(--glass-border);
   white-space: nowrap;
+  scroll-snap-align: start;
 }
 
 .cell:first-child {
