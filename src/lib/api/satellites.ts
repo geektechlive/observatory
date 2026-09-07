@@ -1,5 +1,5 @@
-import { SatellitesResponseSchema } from '@/schemas/satellites'
 import type { SatellitesResponse } from '@/schemas/satellites'
+import { SatellitesResponseSchema } from '@/schemas/satellites'
 
 export async function fetchSatellites(): Promise<SatellitesResponse> {
   const res = await fetch('/api/satellites')

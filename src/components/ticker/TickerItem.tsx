@@ -1,5 +1,6 @@
 import type { TickerItem as TickerItemData } from '@/hooks/useTicker'
 import { formatRelativeTime } from '@/lib/format'
+
 import styles from './ticker.module.css'
 
 interface TickerItemProps {

@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { RawEpicArraySchema, EpicResponseSchema } from '@/schemas/epic'
+import { describe, expect, it } from 'vitest'
+
+import { EpicResponseSchema, RawEpicArraySchema } from '@/schemas/epic'
 import { IssTleSchema } from '@/schemas/iss-tle'
 import { LaunchesResponseSchema } from '@/schemas/launches'
-import { SolarWindSchema } from '@/schemas/solarWind'
 import { fluxToClass } from '@/schemas/solarActivity'
+import { SolarWindSchema } from '@/schemas/solarWind'
 
 describe('RawEpicArraySchema', () => {
   it('parses an array of raw epic images', () => {

@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchSwpcAlerts } from '@/lib/api/swpcAlerts'
 import { useUiStore } from '@/store/ui'
 

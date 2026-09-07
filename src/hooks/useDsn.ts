@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { parseDsn, type DsnData } from '@/lib/dsn'
+import { useEffect } from 'react'
+
+import { type DsnData, parseDsn } from '@/lib/dsn'
 import { useUiStore } from '@/store/ui'
 
 // NASA DSN Now feed — open CORS, polled directly (as NASA's own widget does).

@@ -1,5 +1,5 @@
-import { Co2Schema } from '@/schemas/co2'
 import type { Co2 } from '@/schemas/co2'
+import { Co2Schema } from '@/schemas/co2'
 
 export async function fetchCo2(): Promise<Co2> {
   const res = await fetch('/api/co2')

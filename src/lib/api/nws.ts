@@ -1,5 +1,5 @@
-import { NwsAlertsSchema } from '@/schemas/nws'
 import type { NwsAlerts } from '@/schemas/nws'
+import { NwsAlertsSchema } from '@/schemas/nws'
 
 export async function fetchNwsAlerts(): Promise<NwsAlerts> {
   const res = await fetch('/api/nws-alerts')

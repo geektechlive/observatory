@@ -1,5 +1,5 @@
-import { SolarCycleSchema } from '@/schemas/solarCycle'
 import type { SolarCycle } from '@/schemas/solarCycle'
+import { SolarCycleSchema } from '@/schemas/solarCycle'
 
 export async function fetchSolarCycle(): Promise<SolarCycle> {
   const res = await fetch('/api/solar-cycle')

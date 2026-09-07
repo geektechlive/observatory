@@ -1,5 +1,5 @@
-import { MarsWeatherSchema } from '@/schemas/marsWeather'
 import type { MarsWeather } from '@/schemas/marsWeather'
+import { MarsWeatherSchema } from '@/schemas/marsWeather'
 
 export async function fetchMarsWeather(): Promise<MarsWeather> {
   const res = await fetch('/api/mars-weather')

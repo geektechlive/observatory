@@ -1,4 +1,5 @@
-import { SentryResponseSchema, type SentryResponse } from '@/schemas/sentry'
+import { type SentryResponse, SentryResponseSchema } from '@/schemas/sentry'
+
 import { trackQuota } from './quota'
 
 export async function fetchSentry(): Promise<SentryResponse> {

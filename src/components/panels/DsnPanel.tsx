@@ -1,6 +1,7 @@
-import { useDsn } from '@/hooks/useDsn'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useDsn } from '@/hooks/useDsn'
 import type { DsnContact, DsnStation } from '@/lib/dsn'
+
 import styles from './dsn-panel.module.css'
 
 function bandColor(band: string): string {

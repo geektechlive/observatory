@@ -1,6 +1,7 @@
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { EpicPanel } from '@/components/panels/EpicPanel'
 import { Co2Panel } from '@/components/panels/Co2Panel'
+import { EpicPanel } from '@/components/panels/EpicPanel'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+
 import styles from './console.module.css'
 
 export function EarthConsole() {

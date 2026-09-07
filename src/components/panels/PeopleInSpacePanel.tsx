@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
 import type { Astronaut } from '@/schemas/peopleInSpace'
+
 import styles from './people-in-space-panel.module.css'
 
 function daysInSpace(launched: number | null): number | null {

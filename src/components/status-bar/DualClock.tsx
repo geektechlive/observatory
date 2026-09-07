@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+
 import clockStyles from './dual-clock.module.css'
 
 function formatTime(date: Date, timeZone: string) {

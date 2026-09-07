@@ -1,5 +1,5 @@
-import { AircraftResponseSchema } from '@/schemas/aircraft'
 import type { AircraftResponse } from '@/schemas/aircraft'
+import { AircraftResponseSchema } from '@/schemas/aircraft'
 
 export async function fetchAircraft(): Promise<AircraftResponse> {
   const res = await fetch('/api/aircraft')

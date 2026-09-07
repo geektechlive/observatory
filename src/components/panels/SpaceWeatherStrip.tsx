@@ -1,9 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useDonki } from '@/hooks/useDonki'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
-import { KpSparkline } from './KpSparkline'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useDonki } from '@/hooks/useDonki'
 import { formatRelativeTime } from '@/lib/format'
+
+import { KpSparkline } from './KpSparkline'
 import styles from './space-weather-strip.module.css'
 
 interface RecentEvent {

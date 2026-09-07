@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+
 import { fetchApod } from '@/lib/api/apod'
 import type { Apod } from '@/schemas/apod'
 

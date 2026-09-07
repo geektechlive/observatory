@@ -1,4 +1,4 @@
-import { FireballResponseSchema, type FireballResponse } from '@/schemas/fireball'
+import { type FireballResponse, FireballResponseSchema } from '@/schemas/fireball'
 
 export async function fetchFireball(): Promise<FireballResponse> {
   const res = await fetch('/api/fireball')

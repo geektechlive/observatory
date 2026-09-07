@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+
 import styles from './about-popover.module.css'
 
 interface AboutPopoverProps {

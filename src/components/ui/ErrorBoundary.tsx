@@ -1,5 +1,6 @@
-import { Component } from 'react'
 import type { ReactNode } from 'react'
+import { Component } from 'react'
+
 import styles from './error-boundary.module.css'
 
 interface ErrorBoundaryProps {

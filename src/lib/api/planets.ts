@@ -1,5 +1,5 @@
-import { PlanetsResponseSchema } from '@/schemas/planets'
 import type { PlanetsResponse } from '@/schemas/planets'
+import { PlanetsResponseSchema } from '@/schemas/planets'
 
 export async function fetchPlanets(): Promise<PlanetsResponse> {
   const res = await fetch('/api/planets')

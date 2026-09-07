@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test('map toggle is in ISS readout bar, not in telemetry plate', async ({ page }) => {
   await page.goto('/')

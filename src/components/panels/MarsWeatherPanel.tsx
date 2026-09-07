@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useMarsWeather } from '@/hooks/useMarsWeather'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useMarsWeather } from '@/hooks/useMarsWeather'
+
 import styles from './mars-weather-panel.module.css'
 
 function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {

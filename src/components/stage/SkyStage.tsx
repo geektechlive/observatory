@@ -1,6 +1,7 @@
 import { usePlanets } from '@/hooks/usePlanets'
 import { useSunMoon } from '@/hooks/useSunMoon'
 import { isWaxing, moonLitPath } from '@/lib/moon'
+
 import styles from './sky-stage.module.css'
 
 const PLANET_COLORS: Record<string, string> = {

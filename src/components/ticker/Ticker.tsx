@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { useTicker } from '@/hooks/useTicker'
+
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { useTicker } from '@/hooks/useTicker'
 import { useUiStore } from '@/store/ui'
-import { TickerItem } from './TickerItem'
+
 import styles from './ticker.module.css'
+import { TickerItem } from './TickerItem'
 
 const TICKER_SPEED_PX_PER_S = 160
 
@@ -35,7 +37,9 @@ export function Ticker() {
         className={styles.liveChip ?? ''}
         aria-pressed={tickerPaused}
         aria-label={tickerPaused ? 'Resume ticker' : 'Pause ticker'}
-        onClick={() => setTickerPaused(!tickerPaused)}
+        onClick={() => {
+          setTickerPaused(!tickerPaused)
+        }}
       >
         <span
           className={styles.liveDot ?? ''}
@@ -64,7 +68,11 @@ export function Ticker() {
                 key={item.id}
                 item={item}
                 onClick={
-                  item.id.startsWith('eonet-') ? () => setSelectedEventId(item.id) : undefined
+                  item.id.startsWith('eonet-')
+                    ? () => {
+                        setSelectedEventId(item.id)
+                      }
+                    : undefined
                 }
               />
             ))}

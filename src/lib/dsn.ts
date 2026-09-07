@@ -81,15 +81,13 @@ export function parseDsn(xml: string): DsnData {
       if (!craft || craft === 'DSN' || craft === '') continue
       const dir: 'up' | 'down' = sig.tagName.toLowerCase() === 'upsignal' ? 'up' : 'down'
       const band = sig.getAttribute('band') ?? ''
-      const contact =
-        byCraft.get(craft) ??
-        ({
-          spacecraft: craft,
-          rtlt: rtltByName.get(craft) ?? -1,
-          bands: [],
-          hasUp: false,
-          hasDown: false,
-        } as DsnContact)
+      const contact = byCraft.get(craft) ?? {
+        spacecraft: craft,
+        rtlt: rtltByName.get(craft) ?? -1,
+        bands: [],
+        hasUp: false,
+        hasDown: false,
+      }
       if (band && !contact.bands.includes(band)) contact.bands.push(band)
       if (dir === 'up') contact.hasUp = true
       else contact.hasDown = true

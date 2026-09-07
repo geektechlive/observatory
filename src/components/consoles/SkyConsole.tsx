@@ -1,12 +1,13 @@
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { ApodCard } from '@/components/panels/ApodCard'
-import { PlanetsPanel } from '@/components/panels/PlanetsPanel'
-import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
-import { SentryPanel } from '@/components/panels/SentryPanel'
 import { AsteroidTable } from '@/components/panels/AsteroidTable'
+import { ExoplanetPanel } from '@/components/panels/ExoplanetPanel'
 import { FireballList } from '@/components/panels/FireballList'
 import { MarsWeatherPanel } from '@/components/panels/MarsWeatherPanel'
-import { ExoplanetPanel } from '@/components/panels/ExoplanetPanel'
+import { PlanetsPanel } from '@/components/panels/PlanetsPanel'
+import { SentryPanel } from '@/components/panels/SentryPanel'
+import { SunMoonPanel } from '@/components/panels/SunMoonPanel'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+
 import styles from './console.module.css'
 
 export function SkyConsole() {

@@ -1,4 +1,5 @@
 import { useUiStore } from '@/store/ui'
+
 import styles from './api-quota-meter.module.css'
 
 const NASA_QUOTA_LIMIT = 1000

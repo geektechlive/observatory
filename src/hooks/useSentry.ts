@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+
 import { fetchSentry } from '@/lib/api/sentry'
 import type { SentryResponse } from '@/schemas/sentry'
 

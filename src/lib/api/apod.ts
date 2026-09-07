@@ -1,4 +1,5 @@
-import { ApodSchema, type Apod } from '@/schemas/apod'
+import { type Apod, ApodSchema } from '@/schemas/apod'
+
 import { trackQuota } from './quota'
 
 export async function fetchApod(): Promise<Apod> {

@@ -1,15 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  formatKm,
-  formatLunarDistance,
   formatAu,
-  formatVelocity,
-  formatDiameter,
-  formatKt,
   formatDateUtc,
-  formatRelativeTime,
-  formatPalermo,
+  formatDiameter,
   formatImpactProbability,
+  formatKm,
+  formatKt,
+  formatLunarDistance,
+  formatPalermo,
+  formatRelativeTime,
+  formatVelocity,
 } from '@/lib/format'
 
 describe('formatKm', () => {

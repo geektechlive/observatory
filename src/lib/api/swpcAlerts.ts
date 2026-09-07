@@ -1,5 +1,5 @@
-import { SwpcAlertsSchema } from '@/schemas/swpcAlerts'
 import type { SwpcAlerts } from '@/schemas/swpcAlerts'
+import { SwpcAlertsSchema } from '@/schemas/swpcAlerts'
 
 export async function fetchSwpcAlerts(): Promise<SwpcAlerts> {
   const res = await fetch('/api/swpc-alerts')

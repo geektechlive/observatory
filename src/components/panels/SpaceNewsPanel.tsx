@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSpaceNews } from '@/hooks/useSpaceNews'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useSpaceNews } from '@/hooks/useSpaceNews'
 import { formatRelativeTime } from '@/lib/format'
+
 import styles from './space-news-panel.module.css'
 
 export function SpaceNewsPanel() {

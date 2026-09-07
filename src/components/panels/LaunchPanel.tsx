@@ -1,10 +1,12 @@
-import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+
+import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
-import { GlassPanel } from '@/components/ui/GlassPanel'
-import { DataAge } from '@/components/ui/DataAge'
 import type { RLLLaunch } from '@/schemas/launches'
+
 import styles from './launch-panel.module.css'
 
 function launchTime(launch: RLLLaunch): string | null {
@@ -154,7 +156,9 @@ export function LaunchPanel() {
               <button
                 type="button"
                 className={styles.accordionHeader ?? ''}
-                onClick={() => toggle(launch.id)}
+                onClick={() => {
+                  toggle(launch.id)
+                }}
                 aria-expanded={isOpen}
                 aria-label={`${vehicle}, ${isOpen ? 'collapse' : 'expand'} launch details`}
               >

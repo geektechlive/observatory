@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchCme } from '@/lib/api/cme'
 import { useUiStore } from '@/store/ui'
 

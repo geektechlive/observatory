@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchNwsAlerts } from '@/lib/api/nws'
 import { useUiStore } from '@/store/ui'
 

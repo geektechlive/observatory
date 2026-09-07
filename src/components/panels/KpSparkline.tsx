@@ -1,4 +1,5 @@
 import { Sparkline } from '@/components/ui/Sparkline'
+
 import styles from './kp-sparkline.module.css'
 
 interface Reading {

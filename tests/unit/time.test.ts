@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { utcTimeString, localTimeString, localTimezoneAbbr, isoDateUtc } from '@/lib/time'
+import { describe, expect, it } from 'vitest'
+
+import { isoDateUtc, localTimeString, localTimezoneAbbr, utcTimeString } from '@/lib/time'
 
 describe('utcTimeString', () => {
   it('returns HH:MM:SS format', () => {

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { subsolarPoint, smallCircleRing, horizonRadiusDeg, normalizeLon } from '@/lib/solar'
+import { describe, expect, it } from 'vitest'
+
+import { horizonRadiusDeg, normalizeLon, smallCircleRing, subsolarPoint } from '@/lib/solar'
 
 describe('normalizeLon', () => {
   it('wraps into [-180, 180]', () => {

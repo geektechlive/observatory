@@ -1,5 +1,5 @@
-import { BuoysResponseSchema } from '@/schemas/buoys'
 import type { BuoysResponse } from '@/schemas/buoys'
+import { BuoysResponseSchema } from '@/schemas/buoys'
 
 export async function fetchBuoys(): Promise<BuoysResponse> {
   const res = await fetch('/api/buoys')

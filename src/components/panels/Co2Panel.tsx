@@ -1,5 +1,6 @@
-import { useCo2 } from '@/hooks/useCo2'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useCo2 } from '@/hooks/useCo2'
+
 import styles from './counter-panel.module.css'
 
 export function Co2Panel() {

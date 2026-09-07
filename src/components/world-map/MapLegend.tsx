@@ -1,4 +1,5 @@
 import type { EonetEvent } from '@/schemas/eonet'
+
 import styles from './map-legend.module.css'
 
 interface MapLegendProps {

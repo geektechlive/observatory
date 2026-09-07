@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+
 import { fetchSatellites } from '@/lib/api/satellites'
 import { propagateIss } from '@/lib/orbit/propagate'
 import { useUiStore } from '@/store/ui'
@@ -48,7 +49,9 @@ export function useSatellites(enabled = true): TrackedSatellite[] {
 
     update()
     const id = setInterval(update, 2000)
-    return () => clearInterval(id)
+    return () => {
+      clearInterval(id)
+    }
   }, [data])
 
   return positions

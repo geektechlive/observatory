@@ -1,4 +1,5 @@
-import { EpicResponseSchema, type EpicResponse } from '@/schemas/epic'
+import { type EpicResponse, EpicResponseSchema } from '@/schemas/epic'
+
 import { trackQuota } from './quota'
 
 export async function fetchEpic(): Promise<EpicResponse> {

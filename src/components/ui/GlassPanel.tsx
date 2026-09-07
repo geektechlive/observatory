@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+
 import styles from './GlassPanel.module.css'
 
 type Variant = 'tile' | 'panel' | 'hero'

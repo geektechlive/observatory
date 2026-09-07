@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSolarCycle } from '@/hooks/useSolarCycle'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useSolarCycle } from '@/hooks/useSolarCycle'
+
 import styles from './solar-cycle-panel.module.css'
 
 function kpColor(kp: number): string {

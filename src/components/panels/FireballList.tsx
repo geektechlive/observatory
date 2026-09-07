@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useFireball } from '@/hooks/useFireball'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
-import { formatKt, formatRelativeTime, formatDateUtc } from '@/lib/format'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useFireball } from '@/hooks/useFireball'
+import { formatDateUtc, formatKt, formatRelativeTime } from '@/lib/format'
+
 import styles from './fireball-list.module.css'
 
 export function FireballList() {

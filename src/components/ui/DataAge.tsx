@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+
 import styles from './data-age.module.css'
 
 interface DataAgeProps {
@@ -18,10 +19,14 @@ export function DataAge({ updatedAt }: DataAgeProps) {
   const [label, setLabel] = useState(() => formatAge(Date.now() - updatedAt))
 
   useEffect(() => {
-    const tick = () => setLabel(formatAge(Date.now() - updatedAt))
+    const tick = () => {
+      setLabel(formatAge(Date.now() - updatedAt))
+    }
     tick()
     const id = setInterval(tick, 30_000)
-    return () => clearInterval(id)
+    return () => {
+      clearInterval(id)
+    }
   }, [updatedAt])
 
   if (updatedAt === 0) return null

@@ -1,5 +1,5 @@
-import { FiresResponseSchema } from '@/schemas/fires'
 import type { FiresResponse } from '@/schemas/fires'
+import { FiresResponseSchema } from '@/schemas/fires'
 
 export async function fetchFires(): Promise<FiresResponse> {
   const res = await fetch('/api/fires')

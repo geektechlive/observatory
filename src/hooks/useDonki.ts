@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchDonki } from '@/lib/api/donki'
 import type { DonkiResponse } from '@/schemas/donki'
 import { useUiStore } from '@/store/ui'

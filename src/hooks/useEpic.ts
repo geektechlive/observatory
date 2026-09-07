@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchEpic } from '@/lib/api/epic'
 import type { EpicResponse } from '@/schemas/epic'
 import { useUiStore } from '@/store/ui'

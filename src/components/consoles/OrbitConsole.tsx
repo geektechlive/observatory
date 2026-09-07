@@ -1,8 +1,9 @@
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { DsnPanel } from '@/components/panels/DsnPanel'
 import { LaunchPanel } from '@/components/panels/LaunchPanel'
 import { PeopleInSpacePanel } from '@/components/panels/PeopleInSpacePanel'
-import { DsnPanel } from '@/components/panels/DsnPanel'
 import { SpaceNewsPanel } from '@/components/panels/SpaceNewsPanel'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+
 import styles from './console.module.css'
 
 export function OrbitConsole() {

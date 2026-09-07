@@ -1,5 +1,5 @@
-import { PeopleInSpaceSchema } from '@/schemas/peopleInSpace'
 import type { PeopleInSpace } from '@/schemas/peopleInSpace'
+import { PeopleInSpaceSchema } from '@/schemas/peopleInSpace'
 
 export async function fetchPeopleInSpace(): Promise<PeopleInSpace> {
   const res = await fetch('/api/people-in-space')

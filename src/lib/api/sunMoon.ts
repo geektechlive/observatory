@@ -1,5 +1,5 @@
-import { SunMoonSchema } from '@/schemas/sunMoon'
 import type { SunMoon } from '@/schemas/sunMoon'
+import { SunMoonSchema } from '@/schemas/sunMoon'
 
 export interface SunMoonQuery {
   lat: number

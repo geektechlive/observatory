@@ -1,36 +1,37 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { fetchAircraft } from '@/lib/api/aircraft'
+import { fetchAirQuality } from '@/lib/api/airQuality'
 import { fetchApod } from '@/lib/api/apod'
+import { fetchAurora } from '@/lib/api/aurora'
+import { fetchBuoys } from '@/lib/api/buoys'
+import { fetchCme } from '@/lib/api/cme'
+import { fetchCo2 } from '@/lib/api/co2'
 import { fetchDonki } from '@/lib/api/donki'
 import { fetchEonetEvents } from '@/lib/api/eonet'
 import { fetchEpic } from '@/lib/api/epic'
+import { fetchExoplanets } from '@/lib/api/exoplanets'
 import { fetchFireball } from '@/lib/api/fireball'
+import { fetchFires } from '@/lib/api/fires'
+import { fetchGdacs } from '@/lib/api/gdacs'
+import { fetchGeomag } from '@/lib/api/geomag'
 import { fetchIssTle } from '@/lib/api/iss'
 import { fetchLaunches } from '@/lib/api/launches'
-import { fetchNeo } from '@/lib/api/neo'
-import { fetchQuakes } from '@/lib/api/quakes'
-import { fetchSolarActivity } from '@/lib/api/solarActivity'
-import { fetchSunMoon } from '@/lib/api/sunMoon'
-import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
-import { fetchSolarCycle } from '@/lib/api/solarCycle'
-import { fetchGdacs } from '@/lib/api/gdacs'
-import { fetchPlanets } from '@/lib/api/planets'
-import { fetchSatellites } from '@/lib/api/satellites'
-import { fetchFires } from '@/lib/api/fires'
-import { fetchAirQuality } from '@/lib/api/airQuality'
 import { fetchMarsWeather } from '@/lib/api/marsWeather'
-import { fetchExoplanets } from '@/lib/api/exoplanets'
-import { fetchCo2 } from '@/lib/api/co2'
-import { fetchSpaceNews } from '@/lib/api/spaceNews'
-import { fetchGeomag } from '@/lib/api/geomag'
-import { fetchCme } from '@/lib/api/cme'
-import { fetchSwpcAlerts } from '@/lib/api/swpcAlerts'
+import { fetchNeo } from '@/lib/api/neo'
 import { fetchNwsAlerts } from '@/lib/api/nws'
-import { fetchAircraft } from '@/lib/api/aircraft'
-import { fetchBuoys } from '@/lib/api/buoys'
-import { fetchAurora } from '@/lib/api/aurora'
+import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
+import { fetchPlanets } from '@/lib/api/planets'
+import { fetchQuakes } from '@/lib/api/quakes'
 import { trackQuota } from '@/lib/api/quota'
+import { fetchSatellites } from '@/lib/api/satellites'
 import { fetchSentry } from '@/lib/api/sentry'
+import { fetchSolarActivity } from '@/lib/api/solarActivity'
+import { fetchSolarCycle } from '@/lib/api/solarCycle'
 import { fetchSolarWind } from '@/lib/api/solarWind'
+import { fetchSpaceNews } from '@/lib/api/spaceNews'
+import { fetchSunMoon } from '@/lib/api/sunMoon'
+import { fetchSwpcAlerts } from '@/lib/api/swpcAlerts'
 import { useUiStore } from '@/store/ui'
 
 function mockFetch(status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -246,7 +247,9 @@ describe('trackQuota', () => {
       headers: { get: () => null },
     } as unknown as Response
 
-    expect(() => trackQuota(res)).not.toThrow()
+    expect(() => {
+      trackQuota(res)
+    }).not.toThrow()
   })
 
   it('does not update store when header value is not a number', () => {

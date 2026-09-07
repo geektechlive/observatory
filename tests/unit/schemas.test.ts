@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+import { ApodSchema } from '@/schemas/apod'
+import { DonkiResponseSchema } from '@/schemas/donki'
+import { EonetResponseSchema } from '@/schemas/eonet'
+import { FireballResponseSchema } from '@/schemas/fireball'
 import { NeoResponseSchema } from '@/schemas/neo'
 import { SentryResponseSchema } from '@/schemas/sentry'
-import { DonkiResponseSchema } from '@/schemas/donki'
-import { ApodSchema } from '@/schemas/apod'
-import { FireballResponseSchema } from '@/schemas/fireball'
-import { EonetResponseSchema } from '@/schemas/eonet'
 
 describe('NeoResponseSchema', () => {
   it('parses valid NeoWs response', () => {

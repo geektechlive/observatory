@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { propagateIss, computeTrail } from '@/lib/orbit/propagate'
+import { describe, expect, it } from 'vitest'
+
+import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
 
 // Real ISS TLE from CelesTrak (representative, not live)
 const TLE_LINE1 = '1 25544U 98067A   24120.50000000  .00020000  00000-0  35000-3 0  9999'

@@ -1,10 +1,12 @@
-import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNeo } from '@/hooks/useNeo'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useState } from 'react'
+
 import { DataAge } from '@/components/ui/DataAge'
-import { formatKm, formatLunarDistance, formatVelocity, formatDiameter } from '@/lib/format'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useNeo } from '@/hooks/useNeo'
+import { formatDiameter, formatKm, formatLunarDistance, formatVelocity } from '@/lib/format'
 import type { NeoObject } from '@/schemas/neo'
+
 import styles from './asteroid-table.module.css'
 
 type SortKey = 'missKm' | 'velocity' | 'diameter' | 'hazardous'
@@ -125,7 +127,9 @@ function SortableTh({ label, sortKey, current, dir, align = 'left', onSort }: So
       scope="col"
       className={thClass}
       aria-sort={ariaSort}
-      onClick={() => onSort(sortKey)}
+      onClick={() => {
+        onSort(sortKey)
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()

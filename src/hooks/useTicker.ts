@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { useEvents } from '@/hooks/useEvents'
+
 import { useDonki } from '@/hooks/useDonki'
-import { useSentry } from '@/hooks/useSentry'
+import { useEvents } from '@/hooks/useEvents'
 import { useFireball } from '@/hooks/useFireball'
+import { useSentry } from '@/hooks/useSentry'
 import { formatKt, formatPalermo, formatRelativeTime } from '@/lib/format'
 
 export interface TickerItem {

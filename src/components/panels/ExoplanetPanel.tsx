@@ -1,6 +1,7 @@
-import { useExoplanets } from '@/hooks/useExoplanets'
-import { useCountUp } from '@/hooks/useCountUp'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useCountUp } from '@/hooks/useCountUp'
+import { useExoplanets } from '@/hooks/useExoplanets'
+
 import styles from './counter-panel.module.css'
 
 export function ExoplanetPanel() {

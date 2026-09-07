@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { usePlanets } from '@/hooks/usePlanets'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { usePlanets } from '@/hooks/usePlanets'
 import type { Planet } from '@/schemas/planets'
+
 import styles from './planets-panel.module.css'
 
 const COLORS: Record<string, string> = {

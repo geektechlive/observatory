@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSolarActivity } from '@/hooks/useSolarActivity'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useSolarActivity } from '@/hooks/useSolarActivity'
+
 import styles from './solar-activity-panel.module.css'
 
 // GOES X-ray flare-class thresholds (long band, W/m²).

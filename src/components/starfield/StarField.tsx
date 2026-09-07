@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
+
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+
 import styles from './starfield-canvas.module.css'
 
 interface Star {

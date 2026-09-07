@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSwpcAlerts } from '@/hooks/useSwpcAlerts'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useSwpcAlerts } from '@/hooks/useSwpcAlerts'
 import { formatRelativeTime } from '@/lib/format'
+
 import styles from './swpc-alerts-panel.module.css'
 
 // First letter of the NOAA product code maps to a rough severity hue.

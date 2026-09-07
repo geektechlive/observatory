@@ -1,5 +1,5 @@
-import { CmeSchema } from '@/schemas/cme'
 import type { Cme } from '@/schemas/cme'
+import { CmeSchema } from '@/schemas/cme'
 
 export async function fetchCme(): Promise<Cme> {
   const res = await fetch('/api/cme')

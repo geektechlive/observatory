@@ -1,5 +1,5 @@
-import { GdacsResponseSchema } from '@/schemas/gdacs'
 import type { GdacsResponse } from '@/schemas/gdacs'
+import { GdacsResponseSchema } from '@/schemas/gdacs'
 
 export async function fetchGdacs(): Promise<GdacsResponse> {
   const res = await fetch('/api/gdacs')

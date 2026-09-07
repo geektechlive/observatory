@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchPeopleInSpace } from '@/lib/api/peopleInSpace'
 import { useUiStore } from '@/store/ui'
 

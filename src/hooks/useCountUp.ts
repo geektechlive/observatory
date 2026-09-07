@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 
 export function useCountUp(target: number, duration = 600): number {
@@ -23,7 +24,9 @@ export function useCountUp(target: number, duration = 600): number {
       if (t < 1) rafId = requestAnimationFrame(tick)
     }
     rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
+    return () => {
+      cancelAnimationFrame(rafId)
+    }
   }, [target, duration, reducedMotion])
 
   return reducedMotion ? target : display

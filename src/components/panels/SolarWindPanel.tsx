@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSolarWind } from '@/hooks/useSolarWind'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useSolarWind } from '@/hooks/useSolarWind'
+
 import { KpSparkline } from './KpSparkline'
 import styles from './solar-wind-panel.module.css'
 

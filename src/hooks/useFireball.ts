@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+
 import { fetchFireball } from '@/lib/api/fireball'
 import type { FireballResponse } from '@/schemas/fireball'
 

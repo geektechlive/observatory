@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useGeomag } from '@/hooks/useGeomag'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
+import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useGeomag } from '@/hooks/useGeomag'
+
 import styles from './geomag-panel.module.css'
 
 function dstColor(dst: number): string {

@@ -1,5 +1,5 @@
-import { AuroraSchema } from '@/schemas/aurora'
 import type { Aurora } from '@/schemas/aurora'
+import { AuroraSchema } from '@/schemas/aurora'
 
 export async function fetchAurora(): Promise<Aurora> {
   const res = await fetch('/api/aurora')

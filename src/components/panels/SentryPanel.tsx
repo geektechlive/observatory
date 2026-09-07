@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useSentry } from '@/hooks/useSentry'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+
 import { DataAge } from '@/components/ui/DataAge'
-import { formatPalermo, formatImpactProbability } from '@/lib/format'
+import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useSentry } from '@/hooks/useSentry'
+import { formatImpactProbability, formatPalermo } from '@/lib/format'
+
 import styles from './sentry-panel.module.css'
 
 // Palermo Scale is logarithmic vs background risk; typical Sentry objects sit

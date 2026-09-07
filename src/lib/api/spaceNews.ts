@@ -1,5 +1,5 @@
-import { SpaceNewsSchema } from '@/schemas/spaceNews'
 import type { SpaceNews } from '@/schemas/spaceNews'
+import { SpaceNewsSchema } from '@/schemas/spaceNews'
 
 export async function fetchSpaceNews(): Promise<SpaceNews> {
   const res = await fetch('/api/space-news')

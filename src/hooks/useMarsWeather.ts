@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
 import { fetchMarsWeather } from '@/lib/api/marsWeather'
 import { useUiStore } from '@/store/ui'
 
