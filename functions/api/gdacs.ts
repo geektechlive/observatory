@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // GDACS global disaster alerts (Orange/Red = active). Public, no key.
 const GDACS_API =
@@ -26,20 +27,13 @@ const GdacsRawSchema = z.object({
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'gdacs:active:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(GDACS_API)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream GDACS error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(GDACS_API)
+    if (!upstream.ok) return upstreamError(upstream.status, 'GDACS upstream error')
 
     const parsed = GdacsRawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
-      )
+      console.warn('[gdacs] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid GDACS response')
     }
 
     const events = parsed.data.features

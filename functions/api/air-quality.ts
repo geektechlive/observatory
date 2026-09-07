@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // OpenAQ v3 latest PM2.5 across stations (one call). Needs a free API key, kept
 // server-side. Cached so we hit OpenAQ at most once per TTL (well under 60/min).
@@ -26,33 +27,27 @@ const OpenAqRawSchema = z.object({
 export const onRequest: PagesFunction<Env> = (ctx) => {
   const apiKey = ctx.env.OPENAQ_API_KEY
   if (!apiKey) {
+    // No key configured yet — degrade gracefully instead of erroring.
     return Promise.resolve(
       new Response(JSON.stringify({ stations: [], updatedAt: new Date().toISOString() }), {
         headers: {
           'Content-Type': 'application/json',
           'X-Cache': 'MISS',
           'X-Cache-TTL': '0',
-          'X-OpenAQ-Key': 'missing',
+          'X-Data-Degraded': '1',
         },
       }),
     )
   }
 
   return cachedJson(ctx, 'openaq:pm25:latest:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(OPENAQ_URL, { headers: { 'X-API-Key': apiKey } })
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream OpenAQ error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(OPENAQ_URL, { headers: { 'X-API-Key': apiKey } })
+    if (!upstream.ok) return upstreamError(upstream.status, 'OpenAQ upstream error')
 
     const parsed = OpenAqRawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
-      )
+      console.warn('[air-quality] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid OpenAQ response')
     }
 
     const stations = parsed.data.results

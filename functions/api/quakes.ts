@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // USGS real-time earthquake feed (M2.5+ over the past 24h). Public, no key.
 const USGS_FEED = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson'
@@ -26,21 +27,14 @@ const UsgsRawSchema = z.object({
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'usgs:quakes:2.5day', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(USGS_FEED)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream USGS feed error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(USGS_FEED)
+    if (!upstream.ok) return upstreamError(upstream.status, 'USGS upstream error')
 
     const raw: unknown = await upstream.json()
     const parsed = UsgsRawSchema.safeParse(raw)
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
-      )
+      console.warn('[quakes] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid USGS response')
     }
 
     const quakes = parsed.data.features

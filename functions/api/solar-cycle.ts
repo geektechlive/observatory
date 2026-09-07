@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream } from './_cache'
 
 // Solar Cycle 25 sunspot trend + 3-day Kp forecast. Public NOAA, no key.
 const CYCLE_FEED =
@@ -30,48 +31,62 @@ async function fetchCycle(): Promise<{
   cycle: { month: string; ssn: number }[]
   latestSsn: number | null
   latestF107: number | null
+  ok: boolean
 }> {
-  const empty = { cycle: [], latestSsn: null, latestF107: null }
-  const res = await fetch(CYCLE_FEED)
-  if (!res.ok) return empty
-  const parsed = CycleRawSchema.safeParse(await res.json())
-  if (!parsed.success) return empty
+  const empty = { cycle: [], latestSsn: null, latestF107: null, ok: false }
+  try {
+    const res = await fetchUpstream(CYCLE_FEED)
+    if (!res.ok) return empty
+    const parsed = CycleRawSchema.safeParse(await res.json())
+    if (!parsed.success) return empty
 
-  const recent = parsed.data.filter((r) => r['time-tag'] >= CYCLE_START)
-  const cycle = recent
-    .filter((r) => r.ssn !== null)
-    .map((r) => ({ month: r['time-tag'], ssn: r.ssn as number }))
-  const last = recent[recent.length - 1]
-  return {
-    cycle,
-    latestSsn: last?.ssn ?? null,
-    latestF107: last?.['f10.7'] ?? null,
+    const recent = parsed.data.filter((r) => r['time-tag'] >= CYCLE_START)
+    const cycle = recent
+      .filter((r) => r.ssn !== null)
+      .map((r) => ({ month: r['time-tag'], ssn: r.ssn as number }))
+    const last = recent[recent.length - 1]
+    return {
+      cycle,
+      latestSsn: last?.ssn ?? null,
+      latestF107: last?.['f10.7'] ?? null,
+      ok: true,
+    }
+  } catch {
+    return empty
   }
 }
 
-async function fetchKpForecast(): Promise<
-  { time: string; kp: number; kind: string; scale: string | null }[]
-> {
-  const res = await fetch(KP_FORECAST_FEED)
-  if (!res.ok) return []
-  const parsed = KpForecastRawSchema.safeParse(await res.json())
-  if (!parsed.success) return []
-  // Forward-looking window only (estimated + predicted).
-  return parsed.data
-    .filter((r) => r.observed !== 'observed')
-    .map((r) => ({ time: r.time_tag, kp: r.kp, kind: r.observed, scale: r.noaa_scale }))
+async function fetchKpForecast(): Promise<{
+  kpForecast: { time: string; kp: number; kind: string; scale: string | null }[]
+  ok: boolean
+}> {
+  try {
+    const res = await fetchUpstream(KP_FORECAST_FEED)
+    if (!res.ok) return { kpForecast: [], ok: false }
+    const parsed = KpForecastRawSchema.safeParse(await res.json())
+    if (!parsed.success) return { kpForecast: [], ok: false }
+    // Forward-looking window only (estimated + predicted).
+    const kpForecast = parsed.data
+      .filter((r) => r.observed !== 'observed')
+      .map((r) => ({ time: r.time_tag, kp: r.kp, kind: r.observed, scale: r.noaa_scale }))
+    return { kpForecast, ok: true }
+  } catch {
+    return { kpForecast: [], ok: false }
+  }
 }
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'noaa:solar-cycle:latest', CACHE_TTL_SECONDS, async () => {
-    const [cycleData, kpForecast] = await Promise.all([fetchCycle(), fetchKpForecast()])
+    const [cycleData, kpForecastData] = await Promise.all([fetchCycle(), fetchKpForecast()])
+    const degraded = !cycleData.ok || !kpForecastData.ok
     return {
       body: JSON.stringify({
         cycle: cycleData.cycle,
         latestSsn: cycleData.latestSsn,
         latestF107: cycleData.latestF107,
-        kpForecast,
+        kpForecast: kpForecastData.kpForecast,
         updatedAt: new Date().toISOString(),
       }),
+      degraded,
     }
   })

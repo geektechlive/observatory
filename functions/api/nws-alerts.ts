@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // US National Weather Service active alerts (GeoJSON). Public, no key.
 const SOURCE = 'https://api.weather.gov/alerts/active'
@@ -37,22 +38,15 @@ function severityColor(sev: string): string {
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'nws:alerts:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(SOURCE, {
+    const upstream = await fetchUpstream(SOURCE, {
       headers: { 'User-Agent': 'observatory.geektechlive.com', Accept: 'application/geo+json' },
     })
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream NWS error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    if (!upstream.ok) return upstreamError(upstream.status, 'NWS upstream error')
 
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
-      )
+      console.warn('[nws-alerts] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid NWS response')
     }
 
     const features = parsed.data.features

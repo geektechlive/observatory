@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // USNO sun/moon rise-set-twilight + moon phase. Public, no key. Proxied so we
 // can cache by rounded location and avoid CORS/CSP on the client.
@@ -36,6 +37,13 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
+function badRequest(message: string): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 export const onRequest: PagesFunction = (ctx) => {
   const url = new URL(ctx.request.url)
   const lat = parseFloat(url.searchParams.get('lat') ?? '')
@@ -43,36 +51,31 @@ export const onRequest: PagesFunction = (ctx) => {
   const tz = parseFloat(url.searchParams.get('tz') ?? '0')
   const date = url.searchParams.get('date') ?? ''
 
-  if (!isFinite(lat) || !isFinite(lon) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return Promise.resolve(
-      new Response(JSON.stringify({ error: 'Invalid lat/lon/date' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-  }
+  if (!isFinite(lat) || lat < -90 || lat > 90)
+    return Promise.resolve(badRequest('lat must be a number in [-90, 90]'))
+  if (!isFinite(lon) || lon < -180 || lon > 180)
+    return Promise.resolve(badRequest('lon must be a number in [-180, 180]'))
+  if (!isFinite(tz) || tz < -12 || tz > 14 || Math.abs(tz / 0.25 - Math.round(tz / 0.25)) > 1e-9)
+    return Promise.resolve(badRequest('tz must be a multiple of 0.25 in [-12, 14]'))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    return Promise.resolve(badRequest('date must be formatted YYYY-MM-DD'))
 
-  // Round location to ~11km so nearby visitors share a cache entry.
-  const latR = lat.toFixed(1)
-  const lonR = lon.toFixed(1)
-  const tzR = isFinite(tz) ? tz : 0
+  // Round location to 2 decimals (~1.1km) so nearby visitors share a cache entry.
+  const latR = lat.toFixed(2)
+  const lonR = lon.toFixed(2)
+  const tzR = tz
   const cacheKey = `usno:sunmoon:${latR}:${lonR}:${tzR}:${date}`
 
   return cachedJson(ctx, cacheKey, CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(`${USNO_API}?date=${date}&coords=${latR},${lonR}&tz=${tzR}`)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream USNO error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(
+      `${USNO_API}?date=${date}&coords=${latR},${lonR}&tz=${tzR}`,
+    )
+    if (!upstream.ok) return upstreamError(upstream.status, 'USNO upstream error')
 
     const parsed = UsnoRawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
-      )
+      console.warn('[sun-moon] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid USNO response')
     }
 
     const d = parsed.data.properties.data

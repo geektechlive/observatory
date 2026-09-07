@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA GML global CO2 trend (Mauna Loa). Public, no key.
 // CSV columns: year, month, day, smoothed, trend
@@ -8,13 +9,8 @@ const CACHE_TTL_SECONDS = 24 * 3600 // 1 day
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'noaa:co2:trend:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(SOURCE)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream NOAA CO2 error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(SOURCE)
+    if (!upstream.ok) return upstreamError(upstream.status, 'NOAA CO2 upstream error')
 
     const text = await upstream.text()
     const rows = text
@@ -25,12 +21,7 @@ export const onRequest: PagesFunction = (ctx) =>
       .filter((c) => c.length >= 5 && /^\d{4}$/.test(c[0] ?? ''))
 
     const last = rows[rows.length - 1]
-    if (!last) {
-      return new Response(JSON.stringify({ error: 'No CO2 data parsed' }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    if (!last) return upstreamError(502, 'No CO2 data parsed')
 
     const ppm = parseFloat(last[4] ?? '') // trend (deseasonalized)
     const date = `${last[0]}-${String(last[1]).padStart(2, '0')}-${String(last[2]).padStart(2, '0')}`

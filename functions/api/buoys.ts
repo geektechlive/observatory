@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA NDBC latest buoy observations (fixed-width text). Public, no key.
 // Columns: STN LAT LON YYYY MM DD hh mm WDIR WSPD GST WVHT DPD APD MWD PRES
@@ -16,13 +17,8 @@ function num(v: string | undefined): number | null {
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'ndbc:buoys:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(SOURCE)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream NDBC error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(SOURCE)
+    if (!upstream.ok) return upstreamError(upstream.status, 'NDBC upstream error')
 
     const text = await upstream.text()
     const buoys = text

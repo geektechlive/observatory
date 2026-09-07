@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // Curiosity REMS weather (latest sol). Public, no key.
 const SOURCE = 'https://mars.nasa.gov/rss/api/?feed=weather&category=msl&feedtype=json'
@@ -33,23 +34,17 @@ function num(v: string | undefined): number | null {
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'mars:weather:latest', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(SOURCE)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream Mars weather error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(SOURCE)
+    if (!upstream.ok) return upstreamError(upstream.status, 'Mars weather upstream error')
 
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid upstream response', details: parsed.error.flatten() }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
-      )
+      console.warn('[mars-weather] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid Mars weather response')
     }
 
-    const s = parsed.data.soles[0]!
+    const s = parsed.data.soles[0]
+    if (!s) return upstreamError(502, 'Mars weather upstream returned no soles')
     return {
       body: JSON.stringify({
         sol: parseInt(s.sol, 10) || 0,

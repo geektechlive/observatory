@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // NASA Exoplanet Archive confirmed-planet count (TAP). Public, no key.
 const TAP =
@@ -11,23 +12,19 @@ const RawSchema = z.array(z.object({ total: z.number() })).min(1)
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'exoplanets:count:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(TAP)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream Exoplanet Archive error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(TAP)
+    if (!upstream.ok) return upstreamError(upstream.status, 'Exoplanet Archive upstream error')
 
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(JSON.stringify({ error: 'Invalid upstream response' }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      console.warn('[exoplanets] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid Exoplanet Archive response')
     }
 
     return {
-      body: JSON.stringify({ count: parsed.data[0]!.total, updatedAt: new Date().toISOString() }),
+      body: JSON.stringify({
+        count: parsed.data[0]?.total ?? 0,
+        updatedAt: new Date().toISOString(),
+      }),
     }
   })

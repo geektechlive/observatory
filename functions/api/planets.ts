@@ -1,10 +1,16 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
+import { z } from 'zod'
+
 import { parseHorizons } from '../../src/lib/horizons'
-import { cachedJson } from './_cache'
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+
+// JPL Horizons wraps its fixed-width ephemeris table in a JSON `result` string.
+const HorizonsRawSchema = z.object({ result: z.string().optional() })
 
 // JPL Horizons geocentric ephemerides for the planets, Moon and Sun. Public, no key.
 const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 const CACHE_TTL_SECONDS = 3600 // 1h
+const FAN_OUT_TIMEOUT_MS = 12000
 
 const BODIES: { name: string; id: string }[] = [
   { name: 'Sun', id: '10' },
@@ -46,13 +52,15 @@ async function fetchBody(
     QUANTITIES: "'1,9,23'",
   })
   try {
-    const res = await fetch(`${HORIZONS}?${params.toString()}`, {
-      headers: { Accept: 'application/json', 'User-Agent': 'observatory.geektechlive.com' },
-    })
+    const res = await fetchUpstream(
+      `${HORIZONS}?${params.toString()}`,
+      { headers: { Accept: 'application/json', 'User-Agent': 'observatory.geektechlive.com' } },
+      { timeoutMs: FAN_OUT_TIMEOUT_MS },
+    )
     if (!res.ok) return null
-    const json = (await res.json()) as { result?: string }
-    if (!json.result) return null
-    const obs = parseHorizons(json.result)
+    const parsedJson = HorizonsRawSchema.safeParse(await res.json())
+    if (!parsedJson.success || !parsedJson.data.result) return null
+    const obs = parseHorizons(parsedJson.data.result)
     if (!obs) return null
     return {
       name,
@@ -72,14 +80,13 @@ export const onRequest: PagesFunction = (ctx) => {
     const stop = ymd(new Date(Date.now() + 86_400_000))
     const results = await Promise.all(BODIES.map((b) => fetchBody(b.name, b.id, start, stop)))
     const bodies = results.filter((b): b is NonNullable<typeof b> => b !== null)
+    const degraded = bodies.length < BODIES.length
 
-    if (bodies.length === 0) {
-      return new Response(JSON.stringify({ error: 'Horizons unavailable' }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    if (bodies.length === 0) return upstreamError(502, 'JPL Horizons unavailable')
+
+    return {
+      body: JSON.stringify({ bodies, updatedAt: new Date().toISOString() }),
+      degraded,
     }
-
-    return { body: JSON.stringify({ bodies, updatedAt: new Date().toISOString() }) }
   })
 }

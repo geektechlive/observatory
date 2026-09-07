@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream } from './_cache'
 
 // Live aircraft from adsb.lol (open ADS-B aggregator, no key). Unlike OpenSky's
 // anonymous API, this is reachable from datacenter IPs (Cloudflare egress).
@@ -18,6 +19,7 @@ const CENTERS: [number, number][] = [
 const RADIUS_NM = 250
 const CACHE_TTL_SECONDS = 60 // 1 min
 const MAX_AIRCRAFT = 700
+const FAN_OUT_TIMEOUT_MS = 12000
 
 const AcSchema = z.object({
   hex: z.string().optional(),
@@ -30,22 +32,25 @@ const AcSchema = z.object({
 })
 const RawSchema = z.object({ ac: z.array(AcSchema).nullable().optional() })
 
-async function fetchRegion(lat: number, lon: number): Promise<z.infer<typeof AcSchema>[]> {
+async function fetchRegion(lat: number, lon: number): Promise<z.infer<typeof AcSchema>[] | null> {
   try {
-    const res = await fetch(`https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${RADIUS_NM}`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) return []
+    const res = await fetchUpstream(
+      `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${RADIUS_NM}`,
+      { headers: { Accept: 'application/json' } },
+      { timeoutMs: FAN_OUT_TIMEOUT_MS },
+    )
+    if (!res.ok) return null
     const parsed = RawSchema.safeParse(await res.json())
-    return parsed.success ? (parsed.data.ac ?? []) : []
+    return parsed.success ? (parsed.data.ac ?? []) : null
   } catch {
-    return []
+    return null
   }
 }
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'adsb:aircraft:v2', CACHE_TTL_SECONDS, async () => {
     const regions = await Promise.all(CENTERS.map(([lat, lon]) => fetchRegion(lat, lon)))
+    const degraded = regions.some((r) => r === null)
 
     const seen = new Set<string>()
     const aircraft: {
@@ -56,6 +61,7 @@ export const onRequest: PagesFunction = (ctx) =>
       callsign: string
     }[] = []
     for (const region of regions) {
+      if (region === null) continue
       for (const a of region) {
         if (typeof a.lat !== 'number' || typeof a.lon !== 'number') continue
         const key = a.hex ?? `${a.lat},${a.lon}`
@@ -75,5 +81,8 @@ export const onRequest: PagesFunction = (ctx) =>
       if (aircraft.length >= MAX_AIRCRAFT) break
     }
 
-    return { body: JSON.stringify({ aircraft, updatedAt: new Date().toISOString() }) }
+    return {
+      body: JSON.stringify({ aircraft, updatedAt: new Date().toISOString() }),
+      degraded,
+    }
   })

@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
+
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA OVATION aurora forecast (global 1° grid). Public, no key.
 const SOURCE = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json'
@@ -16,20 +17,13 @@ const RawSchema = z.object({
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'noaa:aurora:ovation:v1', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetch(SOURCE)
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ error: 'Upstream OVATION error' }), {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const upstream = await fetchUpstream(SOURCE)
+    if (!upstream.ok) return upstreamError(upstream.status, 'OVATION upstream error')
 
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
-      return new Response(JSON.stringify({ error: 'Invalid upstream response' }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      console.warn('[aurora] invalid upstream response', parsed.error.issues)
+      return upstreamError(502, 'Invalid OVATION response')
     }
 
     // Keep the strongest oval cells; normalize lon to [-180,180].
