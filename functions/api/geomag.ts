@@ -1,19 +1,31 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
-import { cachedJson } from './_cache'
 
-// Kyoto Dst ring-current index + propagated L1 IMF Bz. Public NOAA, no key.
+import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { fetchPswHour } from './_swpc'
+
+// Kyoto Dst ring-current index. Public NOAA, no key. IMF Bz now comes from
+// _swpc.ts's shared 1-hour propagated-solar-wind feed (numeric cells, real
+// Bz values) instead of the old 1.1 MB string-cell propagated-solar-wind.json,
+// which this endpoint used to read directly and which always yielded an
+// empty Bz series.
 const DST_FEED = 'https://services.swpc.noaa.gov/products/kyoto-dst.json'
-const PSW_FEED = 'https://services.swpc.noaa.gov/products/geospace/propagated-solar-wind.json'
 const CACHE_TTL_SECONDS = 300 // 5 min
+const UPSTREAM_TIMEOUT_MS = 8000
 const BZ_POINTS = 60
-const BZ_WINDOW = 1440 // last ~24h of 1-min samples
+
+// Minimal structural shape of the Pages EventContext — mirrors _swpc.ts's
+// SwpcCacheCtx since _cache.ts's CacheCtx isn't exported.
+interface GeomagCacheCtx {
+  request: { url: string }
+  waitUntil(promise: Promise<unknown>): void
+}
 
 const DstSchema = z.array(z.object({ time_tag: z.string(), dst: z.number() }))
-const PswSchema = z.array(z.array(z.union([z.string(), z.null()])))
 
 function downsample(values: number[], target: number): number[] {
   if (values.length <= target) return values
+  if (target <= 1) return values.length ? [values[values.length - 1] as number] : []
   const out: number[] = []
   for (let i = 0; i < target; i++) {
     out.push(values[Math.floor((i * (values.length - 1)) / (target - 1))] as number)
@@ -21,8 +33,21 @@ function downsample(values: number[], target: number): number[] {
   return out
 }
 
-async function fetchDst(): Promise<{ series: number[]; current: number | null }> {
-  const res = await fetch(DST_FEED)
+async function fetchDst(
+  ctx: GeomagCacheCtx,
+): Promise<{ series: number[]; current: number | null }> {
+  const res = await cachedJson(ctx, 'noaa:dst:raw', CACHE_TTL_SECONDS, async () => {
+    try {
+      const upstream = await fetchUpstream(DST_FEED, undefined, { timeoutMs: UPSTREAM_TIMEOUT_MS })
+      if (!upstream.ok) {
+        return upstreamError(upstream.status, `SWPC upstream ${upstream.status} for ${DST_FEED}`)
+      }
+      const body = await upstream.text()
+      return { body }
+    } catch (err) {
+      return upstreamError(503, `SWPC fetch failed for ${DST_FEED}: ${String(err)}`)
+    }
+  })
   if (!res.ok) return { series: [], current: null }
   const parsed = DstSchema.safeParse(await res.json())
   if (!parsed.success) return { series: [], current: null }
@@ -30,19 +55,9 @@ async function fetchDst(): Promise<{ series: number[]; current: number | null }>
   return { series, current: series.length ? (series[series.length - 1] ?? null) : null }
 }
 
-async function fetchBz(): Promise<{ series: number[]; current: number | null }> {
-  const res = await fetch(PSW_FEED)
-  if (!res.ok) return { series: [], current: null }
-  const parsed = PswSchema.safeParse(await res.json())
-  if (!parsed.success || parsed.data.length < 2) return { series: [], current: null }
-  // [time, speed, density, temp, bx, by, bz(=6), ...]; first row is the header.
-  const rows = parsed.data.slice(1).slice(-BZ_WINDOW)
-  const vals: number[] = []
-  for (const r of rows) {
-    const v = r[6]
-    const n = typeof v === 'string' ? parseFloat(v) : NaN
-    if (isFinite(n)) vals.push(n)
-  }
+async function fetchBz(ctx: GeomagCacheCtx): Promise<{ series: number[]; current: number | null }> {
+  const rows = await fetchPswHour(ctx)
+  const vals = rows.map((r) => r.bz).filter((v): v is number => v !== null)
   return {
     series: downsample(vals, BZ_POINTS),
     current: vals.length ? (vals[vals.length - 1] ?? null) : null,
@@ -51,7 +66,9 @@ async function fetchBz(): Promise<{ series: number[]; current: number | null }> 
 
 export const onRequest: PagesFunction = (ctx) =>
   cachedJson(ctx, 'noaa:geomag:latest', CACHE_TTL_SECONDS, async () => {
-    const [dst, bz] = await Promise.all([fetchDst(), fetchBz()])
+    const [dst, bz] = await Promise.all([fetchDst(ctx), fetchBz(ctx)])
+    const degraded = dst.series.length === 0 || bz.series.length === 0
+
     return {
       body: JSON.stringify({
         dstSeries: dst.series,
@@ -60,5 +77,6 @@ export const onRequest: PagesFunction = (ctx) =>
         currentBz: bz.current,
         updatedAt: new Date().toISOString(),
       }),
+      degraded,
     }
   })
