@@ -1,19 +1,23 @@
 import { useState } from 'react'
+
+import { deriveLiveStatus } from '@/lib/health'
+import { useUiStore } from '@/store/ui'
+
+import { AboutPopover } from './AboutPopover'
+import { ApiQuotaMeter } from './ApiQuotaMeter'
+import styles from './belter-header.module.css'
 import { DualClock } from './DualClock'
 import { LiveIndicator } from './LiveIndicator'
-import { ApiQuotaMeter } from './ApiQuotaMeter'
-import { AboutPopover } from './AboutPopover'
-import { useUiStore } from '@/store/ui'
-import styles from './belter-header.module.css'
 
 const RIVET_COUNT = 26
 
 export function BelterHeader() {
   const [aboutOpen, setAboutOpen] = useState(false)
-  const sourceErrors = useUiStore((s) => s.sourceErrors)
-  const issDown = sourceErrors['iss'] === true
-  const othersDown = Object.entries(sourceErrors).some(([k, v]) => k !== 'iss' && v)
-  const liveStatus = issDown ? 'offline' : othersDown ? 'degraded' : 'live'
+  // LIVE now means every headline source returned data that passed its content
+  // contract. Before this, an empty-but-HTTP-200 payload still read as LIVE, which
+  // is how five dead feeds went unnoticed. SYNCING covers the pre-settle window.
+  const sourceHealth = useUiStore((s) => s.sourceHealth)
+  const liveStatus = deriveLiveStatus(sourceHealth)
 
   return (
     <header role="banner" className={styles.header ?? ''}>
@@ -66,11 +70,19 @@ export function BelterHeader() {
                 aria-expanded={aboutOpen}
                 aria-controls="about-popover"
                 title="About"
-                onClick={() => setAboutOpen((v) => !v)}
+                onClick={() => {
+                  setAboutOpen((v) => !v)
+                }}
               >
                 ⓘ
               </button>
-              {aboutOpen && <AboutPopover onClose={() => setAboutOpen(false)} />}
+              {aboutOpen && (
+                <AboutPopover
+                  onClose={() => {
+                    setAboutOpen(false)
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

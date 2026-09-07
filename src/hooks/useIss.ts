@@ -1,16 +1,23 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { fetchIssTle } from '@/lib/api/iss'
-import { propagateIss, computeTrail } from '@/lib/orbit/propagate'
-import type { IssPosition } from '@/lib/orbit/propagate'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
 import { useReducedMotion } from '@/hooks/useReducedMotion'
-import { useUiStore } from '@/store/ui'
+import { useSourceQuery } from '@/hooks/useSourceQuery'
+import { fetchIssTleEnvelope } from '@/lib/api/iss'
+import type { IssPosition } from '@/lib/orbit/propagate'
+import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
+
+/** Smooth-motion cadence: 5 Hz SGP4, matching the on-screen readout. */
+const LIVE_INTERVAL_MS = 200
+/** Reduced-motion cadence: still live, just not animated. */
+const REDUCED_INTERVAL_MS = 10_000
 
 export interface IssState {
   position: IssPosition | null
   trail: [number, number][]
   isLoading: boolean
   error: Error | null
+  /** Actual propagation cadence in ms, so the UI can label itself honestly. */
+  intervalMs: number
 }
 
 export function useIss(): IssState {
@@ -19,9 +26,9 @@ export function useIss(): IssState {
     data: tle,
     isLoading,
     error,
-  } = useQuery({
+  } = useSourceQuery('iss-tle', {
     queryKey: ['iss-tle'],
-    queryFn: fetchIssTle,
+    queryFn: fetchIssTleEnvelope,
     staleTime: 24 * 60 * 60 * 1000,
     refetchInterval: 24 * 60 * 60 * 1000,
   })
@@ -33,41 +40,40 @@ export function useIss(): IssState {
 
   const [position, setPosition] = useState<IssPosition | null>(null)
   const lastUpdateRef = useRef<number>(0)
+  const intervalMs = reducedMotion ? REDUCED_INTERVAL_MS : LIVE_INTERVAL_MS
 
   useEffect(() => {
     if (!tle) return
 
+    const update = () => {
+      const pos = propagateIss(tle.line1, tle.line2, new Date())
+      if (pos !== null) setPosition(pos)
+    }
+
+    update()
+
+    // Reduced motion means "do not animate", not "freeze the station in place":
+    // a slow interval keeps the position truthful without a per-frame loop.
     if (reducedMotion) {
-      const rafId = requestAnimationFrame(() => {
-        const pos = propagateIss(tle.line1, tle.line2, new Date())
-        if (pos !== null) setPosition(pos)
-      })
-      return () => cancelAnimationFrame(rafId)
+      const id = setInterval(update, REDUCED_INTERVAL_MS)
+      return () => {
+        clearInterval(id)
+      }
     }
 
     let rafId: number
-
     const tick = (timestamp: number) => {
-      if (timestamp - lastUpdateRef.current >= 200) {
+      if (timestamp - lastUpdateRef.current >= LIVE_INTERVAL_MS) {
         lastUpdateRef.current = timestamp
-        const pos = propagateIss(tle.line1, tle.line2, new Date())
-        if (pos !== null) setPosition(pos)
+        update()
       }
       rafId = requestAnimationFrame(tick)
     }
-
     rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
+    return () => {
+      cancelAnimationFrame(rafId)
+    }
   }, [tle, reducedMotion])
 
-  useEffect(() => {
-    useUiStore.getState().setSourceError('iss', error != null)
-  }, [error])
-
-  return {
-    position,
-    trail,
-    isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
-  }
+  return { position, trail, isLoading, error, intervalMs }
 }

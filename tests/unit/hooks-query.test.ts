@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import React from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api/apod')
 vi.mock('@/lib/api/donki')
@@ -24,13 +24,18 @@ import { useSentry } from '@/hooks/useSentry'
 import { useSolarWind } from '@/hooks/useSolarWind'
 import { fetchApod } from '@/lib/api/apod'
 import { fetchDonki } from '@/lib/api/donki'
+import { fetchEonetEventsEnvelope } from '@/lib/api/eonet'
 import { fetchEpic } from '@/lib/api/epic'
-import { fetchEonetEvents } from '@/lib/api/eonet'
 import { fetchFireball } from '@/lib/api/fireball'
-import { fetchLaunches } from '@/lib/api/launches'
-import { fetchNeo } from '@/lib/api/neo'
+import { fetchLaunchesEnvelope } from '@/lib/api/launches'
+import { fetchNeoEnvelope } from '@/lib/api/neo'
 import { fetchSentry } from '@/lib/api/sentry'
-import { fetchSolarWind } from '@/lib/api/solarWind'
+import { fetchSolarWindEnvelope } from '@/lib/api/solarWind'
+
+/** Wraps bare fixture data in the SourceEnvelope shape the hooks now consume. */
+function envelope<T>(data: T) {
+  return { data, degraded: false, dataAgeSeconds: null }
+}
 
 function createWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -56,7 +61,9 @@ describe('useApod', () => {
     vi.mocked(fetchApod).mockResolvedValue(APOD_DATA)
     const { result } = renderHook(() => useApod(), { wrapper: createWrapper() })
     expect(result.current.isLoading).toBe(true)
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.title).toBe('Test')
     expect(result.current.error).toBeNull()
   })
@@ -64,7 +71,9 @@ describe('useApod', () => {
   it('returns error when fetch throws', async () => {
     vi.mocked(fetchApod).mockRejectedValue(new Error('APOD fetch failed: 500'))
     const { result } = renderHook(() => useApod(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
     expect(result.current.data).toBeUndefined()
   })
@@ -76,7 +85,9 @@ describe('useDonki', () => {
   it('returns data after successful fetch', async () => {
     vi.mocked(fetchDonki).mockResolvedValue(DONKI_DATA)
     const { result } = renderHook(() => useDonki(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.flares).toEqual([])
     expect(result.current.error).toBeNull()
   })
@@ -84,7 +95,9 @@ describe('useDonki', () => {
   it('returns error when fetch throws', async () => {
     vi.mocked(fetchDonki).mockRejectedValue(new Error('DONKI fetch failed: 500'))
     const { result } = renderHook(() => useDonki(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -104,7 +117,9 @@ describe('useEpic', () => {
   it('returns data after successful fetch', async () => {
     vi.mocked(fetchEpic).mockResolvedValue(EPIC_DATA)
     const { result } = renderHook(() => useEpic(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.image).toBe('img')
     expect(result.current.error).toBeNull()
   })
@@ -112,7 +127,9 @@ describe('useEpic', () => {
   it('returns error when fetch throws', async () => {
     vi.mocked(fetchEpic).mockRejectedValue(new Error('EPIC fetch failed: 500'))
     const { result } = renderHook(() => useEpic(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -126,17 +143,21 @@ const EONET_DATA = {
 
 describe('useEvents', () => {
   it('returns data after successful fetch', async () => {
-    vi.mocked(fetchEonetEvents).mockResolvedValue(EONET_DATA)
+    vi.mocked(fetchEonetEventsEnvelope).mockResolvedValue(envelope(EONET_DATA))
     const { result } = renderHook(() => useEvents(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.events).toEqual([])
     expect(result.current.error).toBeNull()
   })
 
   it('returns error when fetch throws', async () => {
-    vi.mocked(fetchEonetEvents).mockRejectedValue(new Error('EONET fetch failed: 500'))
+    vi.mocked(fetchEonetEventsEnvelope).mockRejectedValue(new Error('EONET fetch failed: 500'))
     const { result } = renderHook(() => useEvents(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -147,7 +168,9 @@ describe('useFireball', () => {
   it('returns data after successful fetch', async () => {
     vi.mocked(fetchFireball).mockResolvedValue(FIREBALL_DATA)
     const { result } = renderHook(() => useFireball(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.count).toBe('0')
     expect(result.current.error).toBeNull()
   })
@@ -155,7 +178,9 @@ describe('useFireball', () => {
   it('returns error when fetch throws', async () => {
     vi.mocked(fetchFireball).mockRejectedValue(new Error('Fireball fetch failed: 500'))
     const { result } = renderHook(() => useFireball(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -164,17 +189,21 @@ const LAUNCHES_DATA = { valid_auth: true, count: 0, result: [] }
 
 describe('useLaunches', () => {
   it('returns data after successful fetch', async () => {
-    vi.mocked(fetchLaunches).mockResolvedValue(LAUNCHES_DATA)
+    vi.mocked(fetchLaunchesEnvelope).mockResolvedValue(envelope(LAUNCHES_DATA))
     const { result } = renderHook(() => useLaunches(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.count).toBe(0)
     expect(result.current.error).toBeNull()
   })
 
   it('returns error when fetch throws', async () => {
-    vi.mocked(fetchLaunches).mockRejectedValue(new Error('Launches fetch failed: 500'))
+    vi.mocked(fetchLaunchesEnvelope).mockRejectedValue(new Error('Launches fetch failed: 500'))
     const { result } = renderHook(() => useLaunches(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -183,17 +212,21 @@ const NEO_DATA = { element_count: 0, near_earth_objects: {} }
 
 describe('useNeo', () => {
   it('returns data after successful fetch', async () => {
-    vi.mocked(fetchNeo).mockResolvedValue(NEO_DATA)
+    vi.mocked(fetchNeoEnvelope).mockResolvedValue(envelope(NEO_DATA))
     const { result } = renderHook(() => useNeo(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.element_count).toBe(0)
     expect(result.current.error).toBeNull()
   })
 
   it('returns error when fetch throws', async () => {
-    vi.mocked(fetchNeo).mockRejectedValue(new Error('NeoWs fetch failed: 500'))
+    vi.mocked(fetchNeoEnvelope).mockRejectedValue(new Error('NeoWs fetch failed: 500'))
     const { result } = renderHook(() => useNeo(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -204,7 +237,9 @@ describe('useSentry', () => {
   it('returns data after successful fetch', async () => {
     vi.mocked(fetchSentry).mockResolvedValue(SENTRY_DATA)
     const { result } = renderHook(() => useSentry(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.count).toBe('0')
     expect(result.current.error).toBeNull()
   })
@@ -212,7 +247,9 @@ describe('useSentry', () => {
   it('returns error when fetch throws', async () => {
     vi.mocked(fetchSentry).mockRejectedValue(new Error('Sentry fetch failed: 500'))
     const { result } = renderHook(() => useSentry(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })
@@ -223,22 +260,29 @@ const SOLAR_WIND_DATA = {
   windSpeed: null,
   windDensity: null,
   imfBz: null,
+  windSpeedSeries: [],
+  windDensitySeries: [],
+  imfBzSeries: [],
   updatedAt: '2025-01-01T00:00:00Z',
 }
 
 describe('useSolarWind', () => {
   it('returns data after successful fetch', async () => {
-    vi.mocked(fetchSolarWind).mockResolvedValue(SOLAR_WIND_DATA)
+    vi.mocked(fetchSolarWindEnvelope).mockResolvedValue(envelope(SOLAR_WIND_DATA))
     const { result } = renderHook(() => useSolarWind(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.data?.currentKp).toBeNull()
     expect(result.current.error).toBeNull()
   })
 
   it('returns error when fetch throws', async () => {
-    vi.mocked(fetchSolarWind).mockRejectedValue(new Error('Solar wind fetch failed: 500'))
+    vi.mocked(fetchSolarWindEnvelope).mockRejectedValue(new Error('Solar wind fetch failed: 500'))
     const { result } = renderHook(() => useSolarWind(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeInstanceOf(Error)
   })
 })

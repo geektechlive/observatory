@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
-import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import React from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/hooks/useEvents')
 vi.mock('@/hooks/useDonki')
@@ -10,22 +10,22 @@ vi.mock('@/hooks/useFireball')
 vi.mock('@/lib/api/iss')
 vi.mock('@/lib/orbit/propagate')
 
+import { useDonki } from '@/hooks/useDonki'
+import { useEvents } from '@/hooks/useEvents'
+import { useFireball } from '@/hooks/useFireball'
+import { useIss } from '@/hooks/useIss'
 import { useNow } from '@/hooks/useNow'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
-import { useTicker } from '@/hooks/useTicker'
-import { useIss } from '@/hooks/useIss'
-import { useEvents } from '@/hooks/useEvents'
-import { useDonki } from '@/hooks/useDonki'
 import { useSentry } from '@/hooks/useSentry'
-import { useFireball } from '@/hooks/useFireball'
-import { fetchIssTle } from '@/lib/api/iss'
-import { propagateIss, computeTrail } from '@/lib/orbit/propagate'
+import { useTicker } from '@/hooks/useTicker'
+import { fetchIssTleEnvelope } from '@/lib/api/iss'
+import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
 
 const mockedUseEvents = vi.mocked(useEvents)
 const mockedUseDonki = vi.mocked(useDonki)
 const mockedUseSentry = vi.mocked(useSentry)
 const mockedUseFireball = vi.mocked(useFireball)
-const mockedFetchIssTle = vi.mocked(fetchIssTle)
+const mockedFetchIssTle = vi.mocked(fetchIssTleEnvelope)
 const mockedPropagateIss = vi.mocked(propagateIss)
 const mockedComputeTrail = vi.mocked(computeTrail)
 
@@ -86,7 +86,7 @@ describe('useReducedMotion', () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }
-    vi.spyOn(window, 'matchMedia').mockReturnValue(mockMq as unknown as MediaQueryList)
+    vi.spyOn(window, 'matchMedia').mockReturnValue(mockMq)
 
     const { result } = renderHook(() => useReducedMotion())
     expect(result.current).toBe(false)
@@ -307,7 +307,7 @@ describe('useIss', () => {
   }
 
   beforeEach(() => {
-    mockedFetchIssTle.mockResolvedValue(VALID_TLE)
+    mockedFetchIssTle.mockResolvedValue({ data: VALID_TLE, degraded: false, dataAgeSeconds: null })
     mockedPropagateIss.mockReturnValue({ lat: 10, lon: 20, alt: 400, vel: 27000 })
     mockedComputeTrail.mockReturnValue([[20, 10]])
   })
@@ -324,13 +324,17 @@ describe('useIss', () => {
 
   it('calls computeTrail after TLE resolves', async () => {
     const { result } = renderHook(() => useIss(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(mockedComputeTrail).toHaveBeenCalled()
   })
 
   it('error is null on successful fetch', async () => {
     const { result } = renderHook(() => useIss(), { wrapper: createWrapper() })
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
     expect(result.current.error).toBeNull()
   })
 })
