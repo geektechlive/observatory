@@ -6,32 +6,42 @@ Live at **[observatory.geektechlive.com](https://observatory.geektechlive.com)**
 
 <img width="1461" height="814" alt="Screenshot 2026-04-29 at 9 27 05 PM" src="https://github.com/user-attachments/assets/8be50245-dafc-4267-99ae-70894ed80ffe" />
 
-
 ## Credits
 
 This project is a port of and is inspired by **[cosmo-tui](https://github.com/irahulstomar/cosmo-tui)** by [Rahul Tomar (@irahulstomar)](https://github.com/irahulstomar) — a beautifully crafted Python Textual terminal dashboard for NASA's open APIs. cosmo-tui demonstrated that NASA's data could be made genuinely compelling to look at. This web version carries that spirit into a browser.
 
 ## Data sources
 
-| Source                       | Endpoint         |
-| ---------------------------- | ---------------- |
-| EONET natural events         | NASA EONET v3    |
-| Near-Earth Objects           | NASA NeoWs       |
-| Impact risk                  | JPL Sentry       |
-| Space weather                | NASA DONKI       |
-| Astronomy Picture of the Day | NASA APOD        |
-| Fireball events              | JPL Fireball API |
-| ISS orbital elements         | CelesTrak (TLE)  |
+Thirty-two endpoints across NASA, NOAA, USGS and others, grouped by console:
 
-All NASA API calls are proxied through Cloudflare Pages Functions with per-endpoint KV caching. The NASA API key never reaches the browser.
+| Console   | Sources                                                                                                                                            |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Earth** | EONET events, USGS earthquakes, GDACS disasters, FIRMS fires, OpenAQ air quality, NWS alerts, NDBC buoys, live aircraft (adsb.lol), EPIC imagery   |
+| **Sun**   | GOES X-ray and solar wind, planetary Kp, Kyoto Dst, IMF Bz, DONKI CME, SWPC alerts, solar cycle, SDO and SOHO LASCO imagery                        |
+| **Sky**   | APOD, sun/moon ephemeris, JPL Horizons planets, exoplanet archive, Mars weather, space news, CO2                                                   |
+| **Orbit** | ISS TLE and SGP4 tracking, satellite catalog, launch schedule, people in space, NEO close approaches, JPL Sentry and fireballs, Deep Space Network |
+
+API calls are proxied through Cloudflare Pages Functions, so API keys never reach
+the browser. Responses are cached with the Cloudflare Cache API; Workers KV holds
+only durable fallbacks, written out-of-band by a scheduled GitHub Action.
+
+Every source carries a content contract in `src/lib/health.ts`. A feed that changes
+shape and starts returning an empty-but-valid payload grades as an error and the
+header reads DEGRADED rather than LIVE.
+
+## Design
+
+The Phase 1 visual-direction mockup (Glass / Luxury Futurist) is kept as design
+history at [docs/design-history/mockups.html](docs/design-history/mockups.html).
 
 ## Stack
 
 - **Frontend**: Vite 8 + React 19 + TypeScript (strict)
-- **Data**: TanStack Query v5 with per-endpoint polling intervals
+- **Data**: TanStack Query v5 with per-endpoint polling intervals; Zod schemas on every response
 - **Map**: MapLibre GL JS + CARTO Dark Matter tiles
 - **Orbit math**: satellite.js v5 (SGP4 propagation, in-browser)
-- **API proxy**: Cloudflare Pages Functions + Workers KV
+- **State**: Zustand (layer toggles and map mode persisted)
+- **API proxy**: Cloudflare Pages Functions, Cloudflare Cache API for responses, Workers KV for durable fallbacks
 - **Hosting**: Cloudflare Pages at observatory.geektechlive.com
 
 ## Local development
@@ -50,7 +60,16 @@ Create `.dev.vars` (gitignored) for local Pages Functions:
 
 ```
 NASA_API_KEY=your_key_here
+FIRMS_MAP_KEY=your_key_here
+OPENAQ_API_KEY=your_key_here
 ```
+
+### Scheduled data refresh
+
+`.github/workflows/data-refresh.yml` writes TLE and launch snapshots into Workers KV
+twice a day, and probes the live endpoints every six hours. It needs three repository
+secrets: `CLOUDFLARE_API_TOKEN` (scoped to Workers KV Storage: Edit),
+`CLOUDFLARE_ACCOUNT_ID`, and optionally `SLACK_WEBHOOK_URL` for health alerts.
 
 ## Commands
 
