@@ -1,4 +1,7 @@
-import { useUiStore, type LayerKey } from '@/store/ui'
+import { useId, useState } from 'react'
+
+import { type LayerKey, useUiStore } from '@/store/ui'
+
 import styles from './layer-control.module.css'
 
 interface LayerDef {
@@ -37,7 +40,9 @@ function Toggle({ def }: { def: LayerDef }) {
       role="switch"
       aria-checked={on}
       className={`${styles.row ?? ''} ${on ? (styles.rowOn ?? '') : ''}`}
-      onClick={() => toggleLayer(def.key)}
+      onClick={() => {
+        toggleLayer(def.key)
+      }}
     >
       <span className={styles.mark ?? ''} aria-hidden="true">
         {on ? '◉' : '○'}
@@ -49,20 +54,36 @@ function Toggle({ def }: { def: LayerDef }) {
 }
 
 export function LayerControl({ showMapLayers = false }: { showMapLayers?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const listId = useId()
+
   return (
-    <div className={styles.control ?? ''} aria-label="Map layers">
-      <div className={styles.heading ?? ''}>Layers</div>
-      {GLOBE_LAYERS.map((d) => (
-        <Toggle key={d.key} def={d} />
-      ))}
-      {showMapLayers && (
-        <>
-          <div className={styles.divider ?? ''} aria-hidden="true" />
-          {MAP_LAYERS.map((d) => (
-            <Toggle key={d.key} def={d} />
-          ))}
-        </>
-      )}
+    <div className={styles.control ?? ''} role="group" aria-label="Map layers">
+      <button
+        type="button"
+        className={styles.chip ?? ''}
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => {
+          setOpen((o) => !o)
+        }}
+      >
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span> Layers
+      </button>
+      <div className={styles.list ?? ''} id={listId} data-open={open}>
+        <div className={styles.heading ?? ''}>Layers</div>
+        {GLOBE_LAYERS.map((d) => (
+          <Toggle key={d.key} def={d} />
+        ))}
+        {showMapLayers && (
+          <>
+            <div className={styles.divider ?? ''} aria-hidden="true" />
+            {MAP_LAYERS.map((d) => (
+              <Toggle key={d.key} def={d} />
+            ))}
+          </>
+        )}
+      </div>
     </div>
   )
 }

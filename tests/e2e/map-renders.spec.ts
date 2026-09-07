@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('World map', () => {
   test('map container is present in the DOM after switching to Map mode', async ({ page }) => {
@@ -12,8 +12,10 @@ test.describe('World map', () => {
 
   test('globe renders on the default view', async ({ page }) => {
     await page.goto('/')
-    // Globe is the default view — assert the orthographic globe SVG is present.
-    await expect(page.getByRole('img', { name: /Orthographic globe/ })).toBeVisible({
+    // Globe is the default view. It is role="group", not role="img": the globe
+    // holds focusable event and quake markers, and role="img" would hide those
+    // descendants from assistive tech.
+    await expect(page.getByRole('group', { name: /Orthographic globe/ })).toBeVisible({
       timeout: 10_000,
     })
   })

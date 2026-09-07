@@ -1,34 +1,36 @@
-import { lazy, Suspense, useState, type ComponentType } from 'react'
-import { useCountUp } from '@/hooks/useCountUp'
-import { BelterHeader } from '@/components/status-bar/BelterHeader'
-import { HazardChevron } from '@/components/ui/HazardChevron'
-import { StarField } from '@/components/starfield/StarField'
-import { Globe } from '@/components/globe/Globe'
-import { SunStage } from '@/components/stage/SunStage'
-import { SkyStage } from '@/components/stage/SkyStage'
-import { LayerControl } from '@/components/globe/LayerControl'
-import { VitalsSpine } from '@/components/status/VitalsSpine'
-import { OrbitalDial } from '@/components/nav/OrbitalDial'
+import { type ComponentType, lazy, Suspense, useMemo, useState } from 'react'
+
 import { EarthConsole } from '@/components/consoles/EarthConsole'
-import { SunConsole } from '@/components/consoles/SunConsole'
-import { SkyConsole } from '@/components/consoles/SkyConsole'
 import { OrbitConsole } from '@/components/consoles/OrbitConsole'
-import { Ticker } from '@/components/ticker/Ticker'
+import { SkyConsole } from '@/components/consoles/SkyConsole'
+import { SunConsole } from '@/components/consoles/SunConsole'
 import { Footer } from '@/components/footer/Footer'
+import { Globe } from '@/components/globe/Globe'
+import { LayerControl } from '@/components/globe/LayerControl'
+import { OrbitalDial } from '@/components/nav/OrbitalDial'
+import { SkyStage } from '@/components/stage/SkyStage'
+import { SunStage } from '@/components/stage/SunStage'
+import { StarField } from '@/components/starfield/StarField'
+import { VitalsSpine } from '@/components/status/VitalsSpine'
+import { BelterHeader } from '@/components/status-bar/BelterHeader'
+import { Ticker } from '@/components/ticker/Ticker'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { useHashView } from '@/hooks/useHashView'
-import { useUiStore, type ConsoleView } from '@/store/ui'
-import { useIss } from '@/hooks/useIss'
+import { HazardChevron } from '@/components/ui/HazardChevron'
+import { useAurora } from '@/hooks/useAurora'
+import { useCountUp } from '@/hooks/useCountUp'
 import { useEvents } from '@/hooks/useEvents'
+import { useFireball } from '@/hooks/useFireball'
+import { useFires } from '@/hooks/useFires'
+import { useGdacs } from '@/hooks/useGdacs'
+import { useHashView } from '@/hooks/useHashView'
+import { useIss } from '@/hooks/useIss'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNeo } from '@/hooks/useNeo'
-import { useFireball } from '@/hooks/useFireball'
 import { useQuakes } from '@/hooks/useQuakes'
-import { useGdacs } from '@/hooks/useGdacs'
 import { useSatellites } from '@/hooks/useSatellites'
-import { useFires } from '@/hooks/useFires'
-import { useAurora } from '@/hooks/useAurora'
 import { isPointGeometry } from '@/schemas/eonet'
+import { type ConsoleView, useUiStore } from '@/store/ui'
+
 import appStyles from './App.module.css'
 
 const WorldMap = lazy(() =>
@@ -60,7 +62,7 @@ export function App() {
   // ORBIT reframes the globe as a tracking station — orbital layers always on.
   const tracking = view === 'orbit'
 
-  const { position: issPos, trail: issTrail } = useIss()
+  const { position: issPos, trail: issTrail, intervalMs: issIntervalMs } = useIss()
   const { data: eventsData } = useEvents()
   const { data: launchData } = useLaunches()
   const { data: neoData } = useNeo()
@@ -71,42 +73,64 @@ export function App() {
   const { data: firesData } = useFires(layers.fires)
   const { data: auroraData } = useAurora(layers.aurora)
 
-  const globeEvents = (eventsData?.events ?? []).flatMap((ev) => {
-    const geom = ev.geometry.find(isPointGeometry)
-    if (!geom) return []
-    const kind = ev.categories[0]?.id ?? 'other'
-    return [{ lat: geom.coordinates[1] ?? 0, lon: geom.coordinates[0] ?? 0, kind }]
-  })
+  // These feed Globe, which re-renders at the ISS tick rate. Without useMemo every
+  // tick hands Globe five brand-new array identities and re-projects every marker.
+  const globeEvents = useMemo(
+    () =>
+      (eventsData?.events ?? []).flatMap((ev) => {
+        const geom = ev.geometry.find(isPointGeometry)
+        if (!geom) return []
+        const kind = ev.categories[0]?.id ?? 'other'
+        return [{ lat: geom.coordinates[1] ?? 0, lon: geom.coordinates[0] ?? 0, kind }]
+      }),
+    [eventsData],
+  )
 
-  const launchMarkers = (launchData?.result ?? []).flatMap((launch) => {
-    const lat = parseFloat(launch.pad?.latitude ?? '')
-    const lon = parseFloat(launch.pad?.longitude ?? '')
-    if (isNaN(lat) || isNaN(lon)) return []
-    return [{ lat, lon, name: launch.pad?.name ?? launch.name }]
-  })
+  const launchMarkers = useMemo(
+    () =>
+      (launchData?.result ?? []).flatMap((launch) => {
+        const lat = parseFloat(launch.pad?.latitude ?? '')
+        const lon = parseFloat(launch.pad?.longitude ?? '')
+        if (isNaN(lat) || isNaN(lon)) return []
+        return [{ lat, lon, name: launch.pad?.name ?? launch.name }]
+      }),
+    [launchData],
+  )
 
-  const fireballMarkers = (fireballData?.data ?? []).flatMap((fb) => {
-    if (fb.lat === null || fb.lon === null) return []
-    const lat = parseFloat(fb.lat) * (fb.latDir === 'S' ? -1 : 1)
-    const lon = parseFloat(fb.lon) * (fb.lonDir === 'W' ? -1 : 1)
-    if (isNaN(lat) || isNaN(lon)) return []
-    return [{ lat, lon, energy: fb.energy !== null ? parseFloat(fb.energy) || 0 : 0 }]
-  })
+  const fireballMarkers = useMemo(
+    () =>
+      (fireballData?.data ?? []).flatMap((fb) => {
+        if (fb.lat === null || fb.lon === null) return []
+        const lat = parseFloat(fb.lat) * (fb.latDir === 'S' ? -1 : 1)
+        const lon = parseFloat(fb.lon) * (fb.lonDir === 'W' ? -1 : 1)
+        if (isNaN(lat) || isNaN(lon)) return []
+        return [{ lat, lon, energy: fb.energy !== null ? parseFloat(fb.energy) || 0 : 0 }]
+      }),
+    [fireballData],
+  )
 
-  const quakeMarkers = (quakeData?.quakes ?? []).map((q) => ({
-    lat: q.lat,
-    lon: q.lon,
-    mag: q.mag,
-    place: q.place,
-  }))
+  const quakeMarkers = useMemo(
+    () =>
+      (quakeData?.quakes ?? []).map((q) => ({
+        lat: q.lat,
+        lon: q.lon,
+        mag: q.mag,
+        place: q.place,
+      })),
+    [quakeData],
+  )
 
-  const disasterMarkers = (gdacsData?.events ?? []).map((d) => ({
-    lat: d.lat,
-    lon: d.lon,
-    type: d.type,
-    alert: d.alert,
-    name: d.name,
-  }))
+  const disasterMarkers = useMemo(
+    () =>
+      (gdacsData?.events ?? []).map((d) => ({
+        lat: d.lat,
+        lon: d.lon,
+        type: d.type,
+        alert: d.alert,
+        name: d.name,
+      })),
+    [gdacsData],
+  )
 
   // Globe layer gating: pass data only when the layer is enabled.
   const issOn = layers.iss
@@ -204,13 +228,17 @@ export function App() {
                   <span>
                     ALT <span className={appStyles.issVal ?? ''}>{issAlt}</span> km
                   </span>
-                  <span className={appStyles.issReadoutDelta ?? ''}>+5Hz SGP4</span>
+                  <span className={appStyles.issReadoutDelta ?? ''}>
+                    {issIntervalMs <= 200 ? '+5Hz SGP4' : 'SGP4 (reduced motion)'}
+                  </span>
                 </div>
                 <div className={appStyles.mapToggle ?? ''} role="group" aria-label="Map view mode">
                   <button
                     type="button"
                     className={`${appStyles.mapToggleBtn ?? ''} ${mapMode === 'globe' ? (appStyles.mapToggleBtnActive ?? '') : ''}`}
-                    onClick={() => setMapMode('globe')}
+                    onClick={() => {
+                      setMapMode('globe')
+                    }}
                     aria-pressed={mapMode === 'globe'}
                   >
                     Globe
@@ -218,7 +246,9 @@ export function App() {
                   <button
                     type="button"
                     className={`${appStyles.mapToggleBtn ?? ''} ${mapMode === 'map' ? (appStyles.mapToggleBtnActive ?? '') : ''}`}
-                    onClick={() => setMapMode('map')}
+                    onClick={() => {
+                      setMapMode('map')
+                    }}
                     aria-pressed={mapMode === 'map'}
                   >
                     Map
@@ -302,7 +332,11 @@ export function App() {
         {/* Console selector + active console */}
         <OrbitalDial />
         <ErrorBoundary label="Console">
-          <ActiveConsole />
+          {/* OrbitalDial renders role="tab" buttons with id console-tab-<view>;
+              this is the panel those tabs control. */}
+          <div id="console-panel" role="tabpanel" aria-labelledby={`console-tab-${view}`}>
+            <ActiveConsole />
+          </div>
         </ErrorBoundary>
 
         <Footer />

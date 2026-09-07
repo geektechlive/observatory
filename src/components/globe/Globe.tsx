@@ -1,94 +1,39 @@
-import { useMemo, useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
 import { useReducedMotion } from '@/hooks/useReducedMotion'
-import { subsolarPoint, smallCircleRing, horizonRadiusDeg } from '@/lib/solar'
-import * as topojson from 'topojson-client'
-import type { Topology, GeometryCollection } from 'topojson-specification'
-import landTopo from 'world-atlas/land-110m.json'
+import { useVisible } from '@/hooks/useVisible'
+import { horizonRadiusDeg, smallCircleRing, subsolarPoint } from '@/lib/solar'
 
-// ---------------------------------------------------------------------------
-// Real coastline data — processed once at module load
-// GeoJSON is [lon, lat]; our project() takes (lat, lon) — swapped on import
-// ---------------------------------------------------------------------------
-const LAND_RINGS: [number, number][][] = (() => {
-  const topo = landTopo as unknown as Topology<{ land: GeometryCollection }>
-  const geo = topojson.feature(topo, topo.objects.land)
-  const rings: [number, number][][] = []
-  const features = 'features' in geo ? geo.features : [geo]
-  for (const feature of features) {
-    const geom = feature.geometry
-    if (!geom) continue
-    const polys =
-      geom.type === 'Polygon'
-        ? [geom.coordinates]
-        : geom.type === 'MultiPolygon'
-          ? geom.coordinates
-          : []
-    for (const poly of polys) {
-      const ring = poly[0]
-      if (!ring || ring.length < 6) continue
-      rings.push(ring.map((coord) => [coord[1] ?? 0, coord[0] ?? 0] as [number, number]))
-    }
-  }
-  return rings
-})()
+import { AuroraCanvas } from './markers/AuroraCanvas'
+import { Coastlines } from './markers/Coastlines'
+import { DisasterMarkers, type GlobeDisaster } from './markers/DisasterMarkers'
+import { EventMarkers, EventTooltip, type GlobeEvent } from './markers/EventMarkers'
+import { FireballMarkers, type GlobeFireball } from './markers/FireballMarkers'
+import { FireMarkers, type GlobeFire } from './markers/FireMarkers'
+import { IssMarker } from './markers/IssMarker'
+import { type GlobeLaunch, LaunchPadMarkers } from './markers/LaunchPadMarkers'
+import { type GlobeQuake, QuakeMarkers } from './markers/QuakeMarkers'
+import { RadarSweep } from './markers/RadarSweep'
+import { type GlobeSatellite, SatelliteMarkers } from './markers/SatelliteMarkers'
+import { StationMarkers } from './markers/StationMarkers'
+import { FALLBACK_ORBIT, LAT_LINES, LON_LINES, penPath, project } from './useGlobeProjection'
 
-// ---------------------------------------------------------------------------
-// Fallback sinusoid orbit (used only when no real trail is available)
-// ---------------------------------------------------------------------------
-const FALLBACK_ORBIT: [number, number][] = (() => {
-  const pts: [number, number][] = []
-  for (let lon = -180; lon <= 180; lon += 2) pts.push([51.6 * Math.sin((lon * Math.PI) / 180), lon])
-  return pts
-})()
+// Stable empty defaults. A fresh `[]` literal per render would defeat the
+// React.memo bail-out on every marker layer.
+const NO_EVENTS: readonly GlobeEvent[] = []
+const NO_LAUNCHES: readonly GlobeLaunch[] = []
+const NO_FIREBALLS: readonly GlobeFireball[] = []
+const NO_QUAKES: readonly GlobeQuake[] = []
+const NO_DISASTERS: readonly GlobeDisaster[] = []
+const NO_SATELLITES: readonly GlobeSatellite[] = []
+const NO_FIRES: readonly GlobeFire[] = []
+const NO_AURORA: readonly [number, number, number][] = []
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-interface GlobeEvent {
-  lat: number
-  lon: number
-  kind: string
-}
-
-interface GlobeLaunch {
-  lat: number
-  lon: number
-  name: string
-}
-
-interface GlobeFireball {
-  lat: number
-  lon: number
-  /** Total radiated energy, kilotons. */
-  energy: number
-}
-
-interface GlobeQuake {
-  lat: number
-  lon: number
-  mag: number | null
-  place: string
-}
-
-interface GlobeDisaster {
-  lat: number
-  lon: number
-  type: string
-  alert: string
-  name: string
-}
-
-interface GlobeSatellite {
-  name: string
-  lat: number
-  lon: number
-}
-
-interface GlobeFire {
-  lat: number
-  lon: number
-  frp: number
-}
+// 0.60°/100ms = 6°/sec ≈ 60-sec full rotation
+const ROTATION_STEP_DEG = 0.6
+const ROTATION_INTERVAL_MS = 100
+const SUBSOLAR_REFRESH_MS = 60000
+const DEFAULT_ISS_ALT_KM = 420
 
 interface GlobeProps {
   size?: number | undefined
@@ -98,13 +43,13 @@ interface GlobeProps {
   issAlt?: number | undefined
   /** SGP4 trail from useIss() — [lon, lat][] pairs, ~90 min window */
   trail?: readonly [number, number][] | undefined
-  events?: GlobeEvent[] | undefined
-  launches?: GlobeLaunch[] | undefined
-  fireballs?: GlobeFireball[] | undefined
-  quakes?: GlobeQuake[] | undefined
-  disasters?: GlobeDisaster[] | undefined
-  satellites?: GlobeSatellite[] | undefined
-  fires?: GlobeFire[] | undefined
+  events?: readonly GlobeEvent[] | undefined
+  launches?: readonly GlobeLaunch[] | undefined
+  fireballs?: readonly GlobeFireball[] | undefined
+  quakes?: readonly GlobeQuake[] | undefined
+  disasters?: readonly GlobeDisaster[] | undefined
+  satellites?: readonly GlobeSatellite[] | undefined
+  fires?: readonly GlobeFire[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
   radarSweep?: boolean | undefined
@@ -113,206 +58,31 @@ interface GlobeProps {
   /** ORBIT "tracking station" mode — shows DSN ground stations + tracking decor. */
   tracking?: boolean | undefined
   /** OVATION aurora oval — [lon, lat, intensity] triplets, drawn on a canvas overlay. */
-  aurora?: [number, number, number][] | undefined
+  aurora?: readonly [number, number, number][] | undefined
 }
 
-// Aurora intensity (0-29) → glow color at the given alpha.
-function auroraRgba(intensity: number, a: number): string {
-  if (intensity >= 22) return `rgba(255,90,200,${a})`
-  if (intensity >= 14) return `rgba(180,255,120,${a})`
-  if (intensity >= 8) return `rgba(90,255,170,${a})`
-  return `rgba(60,220,150,${a})`
-}
-
-// NASA Deep Space Network ground stations.
-const DSN_STATIONS: { name: string; lat: number; lon: number }[] = [
-  { name: 'GOLDSTONE', lat: 35.43, lon: -116.89 },
-  { name: 'MADRID', lat: 40.43, lon: -4.25 },
-  { name: 'CANBERRA', lat: -35.4, lon: 148.98 },
-]
-
-// ---------------------------------------------------------------------------
-// Orthographic projection
-// ---------------------------------------------------------------------------
-function project(lat: number, lon: number, rotation: number, R: number) {
-  const lr = ((lon + rotation + 540) % 360) - 180
-  const phi = (lat * Math.PI) / 180
-  const lam = (lr * Math.PI) / 180
-  const x = Math.cos(phi) * Math.sin(lam)
-  const y = Math.sin(phi)
-  const z = Math.cos(phi) * Math.cos(lam)
-  return { x: x * R, y: -y * R, z, visible: z > 0 }
-}
-
-// Pen-up path — never emits Z, handles back-hemisphere gaps correctly
-function penPath(
-  points: [number, number][],
-  rotation: number,
-  R: number,
-  backHemi = false,
-): string {
-  let d = ''
-  let penDown = false
-  for (const [lat, lon] of points) {
-    const p = project(lat, lon, rotation, R)
-    const draw = backHemi ? p.z <= 0 : p.z > 0
-    if (!draw) {
-      penDown = false
-      continue
-    }
-    d += penDown ? `L${p.x.toFixed(1)},${p.y.toFixed(1)}` : `M${p.x.toFixed(1)},${p.y.toFixed(1)}`
-    penDown = true
-  }
-  return d
-}
-
-// Coastline path — pen-up, tracks whether all points are front-hemisphere
-// Rings that straddle the boundary must be stroke-only to avoid SVG fill chord artifacts
-function coastPathData(
-  coords: [number, number][],
-  rotation: number,
-  R: number,
-): { d: string; full: boolean } {
-  let d = ''
-  let penDown = false
-  let full = true
-  for (const [lat, lon] of coords) {
-    const p = project(lat, lon, rotation, R)
-    if (!p.visible) {
-      full = false
-      penDown = false
-      continue
-    }
-    d += penDown ? `L${p.x.toFixed(1)},${p.y.toFixed(1)}` : `M${p.x.toFixed(1)},${p.y.toFixed(1)}`
-    penDown = true
-  }
-  return { d, full }
-}
-
-// ---------------------------------------------------------------------------
-// Static graticule point arrays
-// ---------------------------------------------------------------------------
-const LAT_LINES = [-60, -30, 0, 30, 60].map((lat) => {
-  const pts: [number, number][] = []
-  for (let lon = -180; lon <= 180; lon += 3) pts.push([lat, lon])
-  return pts
-})
-const LON_LINES = [-120, -90, -60, -30, 0, 30, 60, 90, 120].map((lon) => {
-  const pts: [number, number][] = []
-  for (let lat = -90; lat <= 90; lat += 3) pts.push([lat, lon])
-  return pts
-})
-
-// ---------------------------------------------------------------------------
-// Event categories — colors and labels
-// ---------------------------------------------------------------------------
-const EVENT_COLORS: Record<string, string> = {
-  wildfires: 'oklch(0.72 0.22 32)',
-  fire: 'oklch(0.72 0.22 32)',
-  earthquakes: 'oklch(0.90 0.20 96)',
-  severeStorms: 'oklch(0.82 0.20 215)',
-  volcanoes: 'oklch(0.72 0.22 320)',
-  floods: 'oklch(0.65 0.18 248)',
-  landslides: 'oklch(0.72 0.12 65)',
-  seaLakeIce: 'oklch(0.92 0.04 194)',
-  drought: 'oklch(0.90 0.20 96)',
-}
-const EVENT_LETTER: Record<string, string> = {
-  wildfires: 'F',
-  fire: 'F',
-  earthquakes: 'E',
-  severeStorms: 'S',
-  volcanoes: 'V',
-  floods: 'W',
-  landslides: 'L',
-  seaLakeIce: 'I',
-}
-const EVENT_NAME: Record<string, string> = {
-  wildfires: 'Wildfire',
-  fire: 'Wildfire',
-  earthquakes: 'Earthquake',
-  severeStorms: 'Severe Storm',
-  volcanoes: 'Volcano',
-  floods: 'Flood',
-  landslides: 'Landslide',
-  seaLakeIce: 'Sea/Lake Ice',
-  drought: 'Drought',
-}
-
-const LAUNCH_COLOR = 'oklch(0.84 0.16 80)'
-const FIREBALL_COLOR = 'oklch(0.88 0.18 60)'
-
-// Seismic markers: hollow rings colored by magnitude tier.
-function quakeColor(mag: number | null): string {
-  if (mag === null) return 'oklch(0.70 0.04 200)'
-  if (mag >= 6) return 'oklch(0.62 0.22 25)'
-  if (mag >= 4.5) return 'oklch(0.80 0.18 55)'
-  return 'oklch(0.88 0.16 95)'
-}
-function quakeRadius(mag: number | null): number {
-  const m = mag ?? 2.5
-  return Math.min(7, Math.max(1.6, 1.2 + (m - 2) * 0.9))
-}
-
-// GDACS disaster alerts: diamond glyphs colored by alert level.
-function alertColor(alert: string): string {
-  if (alert === 'Red') return 'oklch(0.62 0.22 25)'
-  return 'oklch(0.78 0.18 55)' // Orange
-}
-const DISASTER_LETTER: Record<string, string> = {
-  EQ: 'E',
-  TC: 'C',
-  FL: 'W',
-  VO: 'V',
-  WF: 'F',
-  DR: 'D',
-}
-
-const SAT_COLOR = 'oklch(0.78 0.18 145)'
-
-// FIRMS active fires: hot-body ramp by Fire Radiative Power (MW).
-function fireColor(frp: number): string {
-  if (frp >= 100) return 'oklch(0.95 0.06 90)' // white-hot
-  if (frp >= 30) return 'oklch(0.85 0.2 55)' // bright orange
-  return 'oklch(0.72 0.2 35)' // ember
-}
-
-// 4-point sparkle path centered at (cx, cy), radius r.
-function sparklePath(cx: number, cy: number, r: number): string {
-  const i = r * 0.34
-  return (
-    `M${cx},${(cy - r).toFixed(1)} L${(cx + i).toFixed(1)},${(cy - i).toFixed(1)} ` +
-    `L${(cx + r).toFixed(1)},${cy} L${(cx + i).toFixed(1)},${(cy + i).toFixed(1)} ` +
-    `L${cx},${(cy + r).toFixed(1)} L${(cx - i).toFixed(1)},${(cy + i).toFixed(1)} ` +
-    `L${(cx - r).toFixed(1)},${cy} L${(cx - i).toFixed(1)},${(cy - i).toFixed(1)} Z`
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Globe component
-// ---------------------------------------------------------------------------
 export function Globe({
   size = 460,
   issLat,
   issLon,
   issAlt,
   trail,
-  events = [],
-  launches = [],
-  fireballs = [],
-  quakes = [],
-  disasters = [],
-  satellites = [],
-  fires = [],
+  events = NO_EVENTS,
+  launches = NO_LAUNCHES,
+  fireballs = NO_FIREBALLS,
+  quakes = NO_QUAKES,
+  disasters = NO_DISASTERS,
+  satellites = NO_SATELLITES,
+  fires = NO_FIRES,
   warm = true,
   autoRotate = true,
   radarSweep = false,
   showTerminator = true,
   tracking = false,
-  aurora = [],
+  aurora = NO_AURORA,
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
-  const auroraCanvasRef = useRef<HTMLCanvasElement>(null)
+  const visible = useVisible()
   const [rotation, setRotation] = useState(-12)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   // Real-world subsolar point — recomputed each minute (the globe's visual spin
@@ -327,63 +97,42 @@ export function Globe({
   const continentFill = warm ? 'oklch(0.62 0.13 48 / 0.62)' : 'oklch(0.82 0.13 220 / 0.55)'
   const issColor = 'var(--signal)'
   const uid = warm ? 'w' : 'c'
+  const glowFilter = `url(#glow-${uid})`
 
-  // 0.60°/100ms = 6°/sec ≈ 60-sec full rotation
+  // rAF-driven spin, throttled to the same 100ms cadence the old setInterval
+  // used. Parked entirely while the tab is hidden or motion is reduced.
   useEffect(() => {
-    if (!autoRotate) return
-    const id = setInterval(() => setRotation((r) => (r + 0.6) % 360), 100)
-    return () => clearInterval(id)
-  }, [autoRotate])
+    if (!autoRotate || reducedMotion || !visible) return
+    let frame = 0
+    let last = performance.now()
+    const step = (now: number) => {
+      frame = requestAnimationFrame(step)
+      if (now - last < ROTATION_INTERVAL_MS) return
+      last = now
+      setRotation((r) => (r + ROTATION_STEP_DEG) % 360)
+    }
+    frame = requestAnimationFrame(step)
+    return () => {
+      cancelAnimationFrame(frame)
+    }
+  }, [autoRotate, reducedMotion, visible])
 
   // Refresh the subsolar point once a minute (terminator drift is slow).
   useEffect(() => {
     if (!showTerminator) return
-    const id = setInterval(() => setSubsolar(subsolarPoint(new Date())), 60000)
-    return () => clearInterval(id)
+    const id = setInterval(() => {
+      setSubsolar(subsolarPoint(new Date()))
+    }, SUBSOLAR_REFRESH_MS)
+    return () => {
+      clearInterval(id)
+    }
   }, [showTerminator])
-
-  // OVATION aurora — drawn on a canvas overlay, projected with the live rotation.
-  useEffect(() => {
-    const canvas = auroraCanvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
-    if (canvas.width !== size * dpr) {
-      canvas.width = size * dpr
-      canvas.height = size * dpr
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, size, size)
-    if (aurora.length === 0) return
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(center, center, R, 0, Math.PI * 2)
-    ctx.clip()
-    ctx.globalCompositeOperation = 'lighter'
-    for (const [lon, lat, intensity] of aurora) {
-      const p = project(lat, lon, rotation, R)
-      if (!p.visible) continue
-      ctx.fillStyle = auroraRgba(intensity, Math.min(0.45, 0.07 + intensity / 70))
-      ctx.beginPath()
-      ctx.arc(center + p.x, center + p.y, 5, 0, Math.PI * 2)
-      ctx.fill()
-    }
-    ctx.restore()
-  }, [aurora, rotation, R, center, size])
 
   // Convert real SGP4 trail ([lon,lat]) → ([lat,lon]) for our projection
   const orbitPts = useMemo<[number, number][]>(() => {
-    if (trail && trail.length > 0) {
-      return trail.map((pt) => [pt[1] ?? 0, pt[0] ?? 0])
-    }
+    if (trail && trail.length > 0) return trail.map((pt) => [pt[1], pt[0]])
     return FALLBACK_ORBIT
   }, [trail])
-
-  // Coastlines from world-atlas 110m
-  const coastData = useMemo(
-    () => LAND_RINGS.map((ring) => coastPathData(ring, rotation, R)).filter((x) => x.d !== ''),
-    [rotation, R],
-  )
 
   // Orbit: split front (z>0, over continents) and back (z≤0, ghost before sphere)
   const { orbitFront, orbitBack } = useMemo(
@@ -397,6 +146,7 @@ export function Globe({
   // Graticule
   const latPaths = useMemo(() => LAT_LINES.map((pts) => penPath(pts, rotation, R)), [rotation, R])
   const lonPaths = useMemo(() => LON_LINES.map((pts) => penPath(pts, rotation, R)), [rotation, R])
+  const equatorPath = useMemo(() => penPath(LAT_LINES[2] ?? [], rotation, R), [rotation, R])
 
   const issDot = hasIss ? project(issLat, issLon, rotation, R) : null
 
@@ -416,7 +166,10 @@ export function Globe({
 
   // ISS visibility footprint (small circle at the horizon angular radius).
   const footprintRing = useMemo(
-    () => (hasIss ? smallCircleRing(issLat, issLon, horizonRadiusDeg(issAlt ?? 420), 72) : []),
+    () =>
+      hasIss
+        ? smallCircleRing(issLat, issLon, horizonRadiusDeg(issAlt ?? DEFAULT_ISS_ALT_KM), 72)
+        : [],
     [hasIss, issLat, issLon, issAlt],
   )
   const footprintPath = useMemo(
@@ -424,34 +177,19 @@ export function Globe({
     [footprintRing, rotation, R],
   )
 
-  // Hover tooltip: compute screen position from SVG coordinates
-  const hoveredEvent = hoveredIdx !== null ? events[hoveredIdx] : null
-  const hoveredPos =
-    hoveredEvent !== undefined && hoveredEvent !== null
-      ? project(hoveredEvent.lat, hoveredEvent.lon, rotation, R)
-      : null
+  // Hover readout: resolve against the unfiltered events array.
+  const hoveredEvent = hoveredIdx !== null ? (events[hoveredIdx] ?? null) : null
+  const hoveredPos = hoveredEvent ? project(hoveredEvent.lat, hoveredEvent.lon, rotation, R) : null
 
   return (
     <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
-      <canvas
-        ref={auroraCanvasRef}
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: size,
-          height: size,
-          pointerEvents: 'none',
-          zIndex: 2,
-        }}
-      />
+      <AuroraCanvas aurora={aurora} rotation={rotation} R={R} center={center} size={size} />
       <svg
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         style={{ display: 'block' }}
-        role="img"
+        role="group"
         aria-label="Orthographic globe — Earth, ISS position, EONET events"
       >
         <defs>
@@ -488,74 +226,14 @@ export function Globe({
           {/* 1 — Sphere */}
           <circle r={R} fill={`url(#grad-${uid})`} />
 
-          {/* 1b — Radar sweep: pure SVG so mix-blend-mode composites correctly */}
+          {/* 1b — Radar sweep */}
           {radarSweep && (
-            <g clipPath={`url(#sphere-clip-${uid})`} style={{ mixBlendMode: 'screen' }}>
-              {/* Range rings at 33% and 67% */}
-              <circle
-                r={R * 0.33}
-                fill="none"
-                stroke="oklch(0.85 0.13 220)"
-                strokeWidth="0.5"
-                opacity={0.1}
-              />
-              <circle
-                r={R * 0.67}
-                fill="none"
-                stroke="oklch(0.85 0.13 220)"
-                strokeWidth="0.5"
-                opacity={0.1}
-              />
-              {/* Rotating sweep arm — SMIL rotate at globe center (0,0) */}
-              <g>
-                {!reducedMotion && (
-                  <animateTransform
-                    attributeName="transform"
-                    type="rotate"
-                    from="0 0 0"
-                    to="360 0 0"
-                    dur="6s"
-                    repeatCount="indefinite"
-                  />
-                )}
-                {/* Fading trailing arc — 5 sectors, opacity decays from lead edge to trailing edge */}
-                {(
-                  [
-                    { a1: 264, a2: 270, opacity: 0.22 },
-                    { a1: 258, a2: 264, opacity: 0.12 },
-                    { a1: 252, a2: 258, opacity: 0.06 },
-                    { a1: 246, a2: 252, opacity: 0.03 },
-                    { a1: 240, a2: 246, opacity: 0.01 },
-                  ] as { a1: number; a2: number; opacity: number }[]
-                ).map(({ a1, a2, opacity }, i) => {
-                  const a1r = (a1 * Math.PI) / 180
-                  const a2r = (a2 * Math.PI) / 180
-                  const x1 = (Math.cos(a1r) * R).toFixed(1)
-                  const y1 = (Math.sin(a1r) * R).toFixed(1)
-                  const x2 = (Math.cos(a2r) * R).toFixed(1)
-                  const y2 = (Math.sin(a2r) * R).toFixed(1)
-                  return (
-                    <path
-                      key={i}
-                      d={`M 0 0 L ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2} Z`}
-                      fill="oklch(0.85 0.13 220)"
-                      opacity={opacity}
-                    />
-                  )
-                })}
-                {/* Bright leading arm */}
-                <line
-                  x1={0}
-                  y1={0}
-                  x2={0}
-                  y2={-R}
-                  stroke="oklch(0.95 0.16 220)"
-                  strokeWidth="2"
-                  opacity={0.75}
-                  filter={`url(#glow-${uid})`}
-                />
-              </g>
-            </g>
+            <RadarSweep
+              R={R}
+              clipPathId={`sphere-clip-${uid}`}
+              glowFilter={glowFilter}
+              reducedMotion={reducedMotion}
+            />
           )}
 
           {/* 2 — Back orbit ghost */}
@@ -579,7 +257,7 @@ export function Globe({
 
           {/* 4 — Equator accent */}
           <path
-            d={penPath(LAT_LINES[2] ?? [], rotation, R)}
+            d={equatorPath}
             fill="none"
             stroke={continentColor}
             strokeWidth="0.6"
@@ -588,16 +266,12 @@ export function Globe({
           />
 
           {/* 5 — Real coastlines */}
-          <g stroke={continentColor} strokeWidth="0.5" opacity="0.95">
-            {coastData.map((item, i) => (
-              <path
-                key={`land${i}`}
-                d={item.d}
-                fill={item.full ? continentFill : 'none'}
-                strokeWidth={item.full ? '0.4' : '0.8'}
-              />
-            ))}
-          </g>
+          <Coastlines
+            rotation={rotation}
+            R={R}
+            strokeColor={continentColor}
+            fillColor={continentFill}
+          />
 
           {/* 5b — Day/night terminator: blurred twilight band + crisp boundary */}
           {showTerminator && terminatorPath && (
@@ -608,7 +282,7 @@ export function Globe({
                 stroke="oklch(0.10 0.02 250)"
                 strokeWidth="16"
                 opacity="0.32"
-                filter={`url(#glow-${uid})`}
+                filter={glowFilter}
               />
               <path
                 d={terminatorPath}
@@ -622,7 +296,7 @@ export function Globe({
           )}
           {subsolarDot?.visible && (
             <g transform={`translate(${subsolarDot.x} ${subsolarDot.y})`} pointerEvents="none">
-              <circle r={5} fill="oklch(0.92 0.13 90)" opacity="0.9" filter={`url(#glow-${uid})`} />
+              <circle r={5} fill="oklch(0.92 0.13 90)" opacity="0.9" filter={glowFilter} />
               <circle r={2.5} fill="oklch(0.98 0.06 90)" />
             </g>
           )}
@@ -636,244 +310,30 @@ export function Globe({
           <circle r={R + 15} stroke="oklch(0.45 0.10 220 / 0.18)" strokeWidth={0.5} fill="none" />
 
           {/* 7b — FIRMS active fires (hot dots, background layer) */}
-          {fires.map((f, i) => {
-            const p = project(f.lat, f.lon, rotation, R)
-            if (!p.visible) return null
-            return (
-              <circle
-                key={`fire${i}`}
-                cx={p.x}
-                cy={p.y}
-                r={f.frp >= 50 ? 1.8 : 1.2}
-                fill={fireColor(f.frp)}
-                opacity={0.85}
-                pointerEvents="none"
-              />
-            )
-          })}
+          <FireMarkers fires={fires} rotation={rotation} R={R} />
 
           {/* 8 — EONET event markers */}
-          {events.map((e, i) => {
-            const p = project(e.lat, e.lon, rotation, R)
-            if (!p.visible) return null
-            const c = EVENT_COLORS[e.kind] ?? 'var(--amber)'
-            const letter = EVENT_LETTER[e.kind] ?? '?'
-            const delayS = ((i * 0.19) % 2.6).toFixed(2)
-            return (
-              <g
-                key={i}
-                style={{ cursor: 'pointer' }}
-                tabIndex={0}
-                role="button"
-                aria-label={`${EVENT_NAME[e.kind] ?? e.kind} at ${e.lat.toFixed(1)}°, ${e.lon.toFixed(1)}°`}
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
-                onFocus={() => setHoveredIdx(i)}
-                onBlur={() => setHoveredIdx(null)}
-              >
-                <title>
-                  {EVENT_NAME[e.kind] ?? e.kind} — {e.lat.toFixed(1)}° {e.lon.toFixed(1)}°
-                </title>
-                <circle cx={p.x} cy={p.y} r="16" fill="transparent" pointerEvents="all" />
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r="7"
-                  fill="none"
-                  stroke={c}
-                  strokeWidth="0.8"
-                  opacity="0"
-                >
-                  <animate
-                    attributeName="r"
-                    values="5;18;5"
-                    dur="2.6s"
-                    begin={`${delayS}s`}
-                    repeatCount="indefinite"
-                  />
-                  <animate
-                    attributeName="opacity"
-                    values="0.85;0;0.85"
-                    dur="2.6s"
-                    begin={`${delayS}s`}
-                    repeatCount="indefinite"
-                  />
-                </circle>
-                <circle cx={p.x} cy={p.y} r="4" fill={c} opacity="0.95" />
-                <text
-                  x={p.x}
-                  y={p.y + 3.5}
-                  textAnchor="middle"
-                  fill="oklch(0.08 0.01 50)"
-                  fontSize="5"
-                  fontFamily="var(--font-stencil)"
-                  fontWeight="700"
-                  pointerEvents="none"
-                  aria-hidden="true"
-                >
-                  {letter}
-                </text>
-              </g>
-            )
-          })}
+          <EventMarkers events={events} rotation={rotation} R={R} onHover={setHoveredIdx} />
 
-          {/* 8b — Seismic markers (hollow rings, sized/colored by magnitude) */}
-          {quakes.map((q, i) => {
-            const p = project(q.lat, q.lon, rotation, R)
-            if (!p.visible) return null
-            const c = quakeColor(q.mag)
-            const r = quakeRadius(q.mag)
-            return (
-              <g key={`q${i}`} pointerEvents="none">
-                <title>
-                  M{q.mag?.toFixed(1) ?? '?'} — {q.place}
-                </title>
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={r}
-                  fill="none"
-                  stroke={c}
-                  strokeWidth="1.1"
-                  opacity="0.85"
-                />
-                <circle cx={p.x} cy={p.y} r={0.8} fill={c} opacity="0.9" />
-              </g>
-            )
-          })}
+          {/* 8b — Seismic markers */}
+          <QuakeMarkers quakes={quakes} rotation={rotation} R={R} />
 
-          {/* 8c — GDACS disaster-alert markers (diamonds, colored by alert) */}
-          {disasters.map((dz, i) => {
-            const p = project(dz.lat, dz.lon, rotation, R)
-            if (!p.visible) return null
-            const c = alertColor(dz.alert)
-            const s = 5
-            const letter = DISASTER_LETTER[dz.type] ?? '!'
-            return (
-              <g key={`dz${i}`} pointerEvents="none">
-                <title>
-                  {dz.alert} alert — {dz.name}
-                </title>
-                <path
-                  d={`M${p.x},${(p.y - s).toFixed(1)} L${(p.x + s).toFixed(1)},${p.y} L${p.x},${(p.y + s).toFixed(1)} L${(p.x - s).toFixed(1)},${p.y} Z`}
-                  fill={c}
-                  stroke="oklch(0.08 0.01 50)"
-                  strokeWidth="0.5"
-                  opacity="0.95"
-                />
-                <text
-                  x={p.x}
-                  y={p.y + 2}
-                  textAnchor="middle"
-                  fill="oklch(0.08 0.01 50)"
-                  fontSize="4.5"
-                  fontFamily="var(--font-stencil)"
-                  fontWeight="700"
-                  aria-hidden="true"
-                >
-                  {letter}
-                </text>
-              </g>
-            )
-          })}
+          {/* 8c — GDACS disaster-alert markers */}
+          <DisasterMarkers disasters={disasters} rotation={rotation} R={R} />
 
           {/* 8d — DSN ground stations (ORBIT tracking mode) */}
-          {tracking &&
-            DSN_STATIONS.map((st, i) => {
-              const p = project(st.lat, st.lon, rotation, R)
-              if (!p.visible) return null
-              return (
-                <g key={`dsn${i}`} pointerEvents="none">
-                  <title>DSN · {st.name}</title>
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={6}
-                    fill="none"
-                    stroke={issColor}
-                    strokeWidth="0.7"
-                    opacity="0.5"
-                  >
-                    <animate
-                      attributeName="r"
-                      values="4;11;4"
-                      dur="3s"
-                      begin={`${i * 0.7}s`}
-                      repeatCount="indefinite"
-                    />
-                    <animate
-                      attributeName="opacity"
-                      values="0.7;0;0.7"
-                      dur="3s"
-                      begin={`${i * 0.7}s`}
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                  <path
-                    d={`M${p.x},${(p.y - 5).toFixed(1)} L${(p.x + 4).toFixed(1)},${(p.y + 3).toFixed(1)} L${(p.x - 4).toFixed(1)},${(p.y + 3).toFixed(1)} Z`}
-                    fill={issColor}
-                    opacity="0.9"
-                  />
-                  <text
-                    x={p.x + 8}
-                    y={p.y + 2.5}
-                    fill={issColor}
-                    fontSize="6"
-                    fontFamily="var(--font-stencil)"
-                    letterSpacing="0.1em"
-                    opacity="0.8"
-                    aria-hidden="true"
-                  >
-                    {st.name}
-                  </text>
-                </g>
-              )
-            })}
+          {tracking && <StationMarkers rotation={rotation} R={R} color={issColor} />}
 
           {/* 9 — Launch pad markers */}
-          {launches.map((lp, i) => {
-            const p = project(lp.lat, lp.lon, rotation, R)
-            if (!p.visible) return null
-            const h = 9
-            const w = 6
-            return (
-              <g key={i}>
-                <title>Launch pad: {lp.name}</title>
-                <polygon
-                  points={`${p.x},${p.y - h} ${p.x - w},${p.y + 4} ${p.x + w},${p.y + 4}`}
-                  fill={LAUNCH_COLOR}
-                  stroke="oklch(0.08 0.01 50)"
-                  strokeWidth="0.6"
-                  opacity="0.9"
-                />
-              </g>
-            )
-          })}
+          <LaunchPadMarkers launches={launches} rotation={rotation} R={R} />
 
-          {/* 9b — Fireball markers (gold sparkles, sized by energy) */}
-          {fireballs.map((fb, i) => {
-            const p = project(fb.lat, fb.lon, rotation, R)
-            if (!p.visible) return null
-            const r = Math.min(8, Math.max(3, 3 + Math.sqrt(Math.max(0, fb.energy)) * 1.1))
-            return (
-              <g key={`fb${i}`} pointerEvents="none">
-                <title>
-                  Fireball — {fb.energy.toFixed(1)} kt · {fb.lat.toFixed(1)}° {fb.lon.toFixed(1)}°
-                </title>
-                <path
-                  d={sparklePath(p.x, p.y, r)}
-                  fill={FIREBALL_COLOR}
-                  opacity="0.9"
-                  filter={`url(#glow-${uid})`}
-                />
-                <path
-                  d={sparklePath(p.x, p.y, r * 0.5)}
-                  fill="oklch(0.98 0.04 90)"
-                  opacity="0.95"
-                />
-              </g>
-            )
-          })}
+          {/* 9b — Fireball markers */}
+          <FireballMarkers
+            fireballs={fireballs}
+            rotation={rotation}
+            R={R}
+            glowFilter={glowFilter}
+          />
 
           {/* 9c — ISS visibility footprint */}
           {hasIss && footprintPath && (
@@ -903,69 +363,10 @@ export function Globe({
           )}
 
           {/* 9d — Other tracked satellites (Hubble, Tiangong) */}
-          {satellites.map((sat, i) => {
-            const p = project(sat.lat, sat.lon, rotation, R)
-            if (!p.visible) return null
-            return (
-              <g key={`sat${i}`} pointerEvents="none">
-                <title>{sat.name}</title>
-                <circle cx={p.x} cy={p.y} r={3.4} fill="none" stroke={SAT_COLOR} strokeWidth="1" />
-                <circle cx={p.x} cy={p.y} r={1.4} fill={SAT_COLOR} />
-                <text
-                  x={p.x + 5}
-                  y={p.y + 2.5}
-                  fill={SAT_COLOR}
-                  fontSize="6.5"
-                  fontFamily="var(--font-stencil)"
-                  letterSpacing="0.06em"
-                  opacity="0.85"
-                  aria-hidden="true"
-                >
-                  {sat.name}
-                </text>
-              </g>
-            )
-          })}
+          <SatelliteMarkers satellites={satellites} rotation={rotation} R={R} />
 
           {/* 10 — ISS tactical crosshair marker + label */}
-          {hasIss && issDot?.visible && (
-            <g transform={`translate(${issDot.x} ${issDot.y})`} filter="url(#iss-glow)">
-              {/* Outer ring */}
-              <circle r={9} fill="none" stroke={issColor} strokeWidth="1.5" />
-              {/* Gap crosshair — 4 lines not touching center */}
-              <line x1={-16} y1={0} x2={-11} y2={0} stroke={issColor} strokeWidth="1.2" />
-              <line x1={11} y1={0} x2={16} y2={0} stroke={issColor} strokeWidth="1.2" />
-              <line x1={0} y1={-16} x2={0} y2={-11} stroke={issColor} strokeWidth="1.2" />
-              <line x1={0} y1={11} x2={0} y2={16} stroke={issColor} strokeWidth="1.2" />
-              {/* Center dot */}
-              <circle r={2.5} fill={issColor} />
-              {/* Pulsing acquisition ring */}
-              <circle r="14" fill="none" stroke={issColor} strokeWidth="0.6" opacity="0">
-                <animate attributeName="r" values="12;24;12" dur="2.4s" repeatCount="indefinite" />
-                <animate
-                  attributeName="opacity"
-                  values="0.75;0;0.75"
-                  dur="2.4s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-            </g>
-          )}
-          {hasIss && issDot?.visible && (
-            <text
-              x={(issDot?.x ?? 0) + 18}
-              y={(issDot?.y ?? 0) - 10}
-              fill={issColor}
-              fontSize="10"
-              fontFamily="var(--font-stencil)"
-              letterSpacing="0.12em"
-              opacity="0.9"
-              pointerEvents="none"
-              aria-hidden="true"
-            >
-              ISS-1
-            </text>
-          )}
+          {hasIss && <IssMarker dot={issDot} color={issColor} />}
 
           {/* 11 — Tactical reticle */}
           <g stroke={continentColor} strokeWidth="0.6" fill="none" opacity="0.45">
@@ -978,43 +379,7 @@ export function Globe({
       </svg>
 
       {/* Hover tooltip — HTML overlay, positioned from SVG coords */}
-      {hoveredPos?.visible && hoveredEvent !== null && hoveredEvent !== undefined && (
-        <div
-          style={{
-            position: 'absolute',
-            left: hoveredPos.x + center + 10,
-            top: hoveredPos.y + center - 28,
-            pointerEvents: 'none',
-            background: 'oklch(0.10 0.02 50 / 0.92)',
-            border: '1px solid var(--plate-edge)',
-            borderRadius: 2,
-            padding: '4px 8px',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'var(--font-stencil)',
-              fontSize: 9,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: EVENT_COLORS[hoveredEvent.kind] ?? 'var(--amber)',
-            }}
-          >
-            {EVENT_NAME[hoveredEvent.kind] ?? hoveredEvent.kind}
-          </div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              color: 'var(--bone-faint)',
-              marginTop: 2,
-            }}
-          >
-            {hoveredEvent.lat.toFixed(2)}° {hoveredEvent.lon.toFixed(2)}°
-          </div>
-        </div>
-      )}
+      <EventTooltip event={hoveredEvent} pos={hoveredPos} center={center} />
     </div>
   )
 }
