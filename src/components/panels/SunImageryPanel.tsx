@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { useImageBucket } from '@/hooks/useImageBucket'
+
 import styles from './sun-imagery-panel.module.css'
 
 interface SunView {
@@ -11,19 +14,9 @@ interface SunView {
 
 // SDO updates ~every 10-12 min; SOHO LASCO ~every 20-30 min. Direct images
 // (CSP img-src allows these domains). No hotlink protection on either.
+// AIA 171Å/193Å are already shown on the SunStage disc — this panel covers
+// the views the stage doesn't: the HMI magnetogram and LASCO coronagraphs.
 const VIEWS: SunView[] = [
-  {
-    key: 'aia0171',
-    label: 'Corona',
-    sub: 'SDO AIA 171Å',
-    url: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg',
-  },
-  {
-    key: 'aia0193',
-    label: 'Hot Corona',
-    sub: 'SDO AIA 193Å',
-    url: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg',
-  },
   {
     key: 'hmib',
     label: 'Magnetogram',
@@ -48,14 +41,8 @@ const REFRESH_MS = 10 * 60 * 1000
 
 export function SunImageryPanel() {
   const [active, setActive] = useState(0)
-  const [bucket, setBucket] = useState(() => Math.floor(Date.now() / REFRESH_MS))
+  const bucket = useImageBucket(REFRESH_MS)
   const [errored, setErrored] = useState(false)
-
-  // Bump a 10-min cache-busting bucket so the latest frame is pulled.
-  useEffect(() => {
-    const id = setInterval(() => setBucket(Math.floor(Date.now() / REFRESH_MS)), 60_000)
-    return () => clearInterval(id)
-  }, [])
 
   const view = VIEWS[active] ?? VIEWS[0]
   if (!view) return null
@@ -75,8 +62,12 @@ export function SunImageryPanel() {
               className={styles.image ?? ''}
               loading="lazy"
               decoding="async"
-              onError={() => setErrored(true)}
-              onLoad={() => setErrored(false)}
+              onError={() => {
+                setErrored(true)
+              }}
+              onLoad={() => {
+                setErrored(false)
+              }}
             />
           )}
           <div className={styles.caption ?? ''}>

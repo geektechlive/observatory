@@ -1,11 +1,13 @@
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { CmePanel } from '@/components/panels/CmePanel'
+import { GeomagPanel } from '@/components/panels/GeomagPanel'
 import { SolarActivityPanel } from '@/components/panels/SolarActivityPanel'
+import { SolarCyclePanel } from '@/components/panels/SolarCyclePanel'
 import { SolarWindPanel } from '@/components/panels/SolarWindPanel'
 import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
-import { SolarCyclePanel } from '@/components/panels/SolarCyclePanel'
-import { GeomagPanel } from '@/components/panels/GeomagPanel'
-import { CmePanel } from '@/components/panels/CmePanel'
+import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
 import { SwpcAlertsPanel } from '@/components/panels/SwpcAlertsPanel'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+
 import styles from './console.module.css'
 
 export function SunConsole() {
@@ -26,6 +28,9 @@ export function SunConsole() {
       </ErrorBoundary>
       <ErrorBoundary label="CME Watch">
         <CmePanel />
+      </ErrorBoundary>
+      <ErrorBoundary label="Solar Imagery">
+        <SunImageryPanel />
       </ErrorBoundary>
       <ErrorBoundary label="Space Weather">
         <SpaceWeatherStrip />

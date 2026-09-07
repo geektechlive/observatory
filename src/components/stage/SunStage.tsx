@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+
+import { useImageBucket } from '@/hooks/useImageBucket'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
+
 import styles from './sun-stage.module.css'
 
 interface Wavelength {
@@ -28,14 +31,9 @@ function flareColor(cls: string | null): string {
 
 export function SunStage({ size = 460 }: { size?: number }) {
   const [wl, setWl] = useState('0171')
-  const [bucket, setBucket] = useState(() => Math.floor(Date.now() / REFRESH_MS))
+  const bucket = useImageBucket(REFRESH_MS)
   const [errored, setErrored] = useState(false)
   const { data: sa } = useSolarActivity()
-
-  useEffect(() => {
-    const id = setInterval(() => setBucket(Math.floor(Date.now() / REFRESH_MS)), 60_000)
-    return () => clearInterval(id)
-  }, [])
 
   const flare = sa?.xray.currentClass ?? null
   const flaring = flare ? flare[0] === 'M' || flare[0] === 'X' : false
@@ -58,8 +56,12 @@ export function SunStage({ size = 460 }: { size?: number }) {
             alt={`Sun at ${wl}`}
             className={styles.discImg ?? ''}
             decoding="async"
-            onError={() => setErrored(true)}
-            onLoad={() => setErrored(false)}
+            onError={() => {
+              setErrored(true)
+            }}
+            onLoad={() => {
+              setErrored(false)
+            }}
           />
         )}
         <div className={styles.limb ?? ''} aria-hidden="true" />
