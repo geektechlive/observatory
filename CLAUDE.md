@@ -71,7 +71,7 @@ OPENAQ_API_KEY=your_key_here
 
 ## GitHub Actions secrets
 
-`.github/workflows/data-refresh.yml` needs `CLOUDFLARE_API_TOKEN` (scoped to Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID`, and optionally `SLACK_WEBHOOK_URL` for health-check alerts.
+`.github/workflows/data-refresh.yml` needs `CLOUDFLARE_API_TOKEN` (scoped to Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID`, and `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID` for failure alerts.
 
 ## Attribution
 

@@ -69,7 +69,7 @@ OPENAQ_API_KEY=your_key_here
 `.github/workflows/data-refresh.yml` writes TLE and launch snapshots into Workers KV
 twice a day, and probes the live endpoints every six hours. It needs three repository
 secrets: `CLOUDFLARE_API_TOKEN` (scoped to Workers KV Storage: Edit),
-`CLOUDFLARE_ACCOUNT_ID`, and optionally `SLACK_WEBHOOK_URL` for health alerts.
+`CLOUDFLARE_ACCOUNT_ID`, and `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID` for failure alerts.
 
 ## Commands
 

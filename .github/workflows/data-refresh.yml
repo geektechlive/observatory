@@ -25,6 +25,9 @@ jobs:
     if: github.event_name != 'schedule' || github.event.schedule == '17 */12 * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +41,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # A silent refresh failure is the dangerous one: KV quietly ages out and the
+      # ISS falls back to a hardcoded TLE three days later.
+      - name: Notify Discord
+        if: failure() && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/notify-discord.mjs "observatory KV refresh failed" "$RUN_URL"
+
   # Probe the live site's headline endpoints. Fails on non-200, missing fields, or an
   # X-Data-Degraded marker, which is how a silent fallback gets caught.
   health:
@@ -48,7 +59,8 @@ jobs:
     # Job-level env so the failure step's `if:` can read it. A step-level env is not
     # visible to that expression.
     env:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,12 +69,13 @@ jobs:
           node-version: '22'
 
       - name: Check endpoints
+        id: health
         run: node scripts/check-health.mjs
 
-      - name: Notify Slack
-        if: failure() && env.SLACK_WEBHOOK_URL != ''
+      # Posts as a bot rather than a webhook so the alert can be moved between
+      # channels by changing one secret. Skipped silently when unconfigured.
+      - name: Notify Discord
+        if: failure() && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          payload=$(node -e 'process.stdout.write(JSON.stringify({ text: "observatory health check failed: " + process.env.RUN_URL }))')
-          curl -sS -X POST -H 'Content-Type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
+        run: node scripts/notify-discord.mjs "observatory health check failed" "$RUN_URL"
