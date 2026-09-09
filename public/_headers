@@ -4,7 +4,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self)
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apod.nasa.gov https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://sdo.gsfc.nasa.gov https://soho.nascom.nasa.gov https://gibs.earthdata.nasa.gov https://epic.gsfc.nasa.gov; font-src 'self'; connect-src 'self' https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://gibs.earthdata.nasa.gov https://eyes.nasa.gov; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'none';
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://apod.nasa.gov https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://sdo.gsfc.nasa.gov https://soho.nascom.nasa.gov https://gibs.earthdata.nasa.gov https://epic.gsfc.nasa.gov; font-src 'self'; connect-src 'self' https://cloudflareinsights.com https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://gibs.earthdata.nasa.gov https://eyes.nasa.gov; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'none';
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

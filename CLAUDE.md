@@ -57,7 +57,7 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 - Standalone `tsc` on individual files needs `--ignoreConfig` under TypeScript 6, or it refuses to run because `tsconfig.json` exists
 - `_cache.ts` lookup order is the positive key then `${key}:neg`, so a 60 s negative entry can never shadow fresh data. A non-ok producer `Response` is an error; a 2xx one is an intentional uncached passthrough (the launches KV STALE path)
 - Never proxy an upstream status code: `upstreamError()` maps 0 and >= 520 to 503 and everything else to 502, so a NASA 429 is not mistaken for ours
-- The CSP blocks Cloudflare's auto-injected Web Analytics beacon unless `https://static.cloudflareinsights.com` is in `script-src` (`connect-src` stays `'self'`; the beacon posts to `/cdn-cgi/rum`)
+- Cloudflare's auto-injected Web Analytics beacon needs BOTH `https://static.cloudflareinsights.com` in `script-src` (to load) and `https://cloudflareinsights.com` in `connect-src` (to report). It posts to the absolute URL `https://cloudflareinsights.com/cdn-cgi/rum`, not to our own origin, so allowing only the script host loads the beacon and then silently blocks every beacon it sends. Verified in a browser, 2026-09-08
 
 ## Local secrets
 
