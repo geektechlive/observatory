@@ -8,15 +8,27 @@ updates:
       day: "monday"
     open-pull-requests-limit: 5
     groups:
-      minor-and-patch:
+      # Majors are grouped too, deliberately. With majors ungrouped, the
+      # per-ecosystem PR limit filled with one-bump-per-PR majors and then
+      # hid the rest: in Sept 2026 ten PRs were open while six further majors
+      # sat invisible behind the cap, including the maplibre-gl upgrade that
+      # was the only fix for a critical XSS. One grouped PR a week surfaces
+      # everything and costs one Cloudflare Pages preview build instead of ten.
+      all-updates:
         update-types:
           - "minor"
           - "patch"
+          - "major"
     ignore:
       # v7 ships a WASM/pthreads build with top-level await that Vite/rolldown
       # cannot bundle as iife; v5 pure-JS is sufficient for 5Hz SGP4 propagation.
       # See CLAUDE.md "Gotchas".
       - dependency-name: "satellite.js"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint declares peerDependencies.typescript ">=4.8.4 <6.1.0".
+      # TypeScript 7 is therefore unusable here until typescript-eslint widens
+      # that range — the bump is not a judgement call, the peer range forbids it.
+      - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
@@ -24,3 +36,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      actions:
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
