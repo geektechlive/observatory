@@ -5,6 +5,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { defaultRetry } from '@/hooks/useSourceQuery'
+import { GlobeCompare } from '@/spike/GlobeCompare'
 
 import { App } from './App'
 
@@ -28,7 +29,11 @@ if (!root) throw new Error('Root element not found')
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      {new URLSearchParams(window.location.search).get('spike') === 'globe' ? (
+        <GlobeCompare />
+      ) : (
+        <App />
+      )}
     </QueryClientProvider>
   </StrictMode>,
 )
