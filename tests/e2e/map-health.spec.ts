@@ -23,6 +23,13 @@ import { expect, test } from '@playwright/test'
  * every GeoJSON source (ISS, quakes, fires, EONET, NWS, aircraft, buoys)
  * silently dead while the raster basemap still drew. Only the content type
  * gave it away.
+ *
+ * Known limit: the worker check fetches the URL with page.request.get, which
+ * runs outside the page's CSP context, and Playwright serves these specs from
+ * `vite preview`, which does not apply public/_headers at all. So this proves
+ * the asset exists and is JavaScript — it cannot prove the browser was allowed
+ * to start it. Anyone tightening `worker-src` must verify against a real Pages
+ * deploy; this spec will stay green either way.
  */
 
 /**
