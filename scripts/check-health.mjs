@@ -17,6 +17,10 @@ import { resolve } from 'node:path'
 const DEFAULT_BASE_URL = 'https://observatory.geektechlive.com'
 const TIMEOUT_MS = 15_000
 const CONCURRENCY = 3
+/** Total attempts per endpoint, including the first. */
+const ATTEMPTS = 3
+/** Backoff before attempt N. Upstreams that blip usually recover in seconds. */
+const backoffMs = (attempt) => (attempt === 2 ? 2_000 : 5_000)
 
 const nonNull = (value) => value !== null && value !== undefined
 
@@ -47,6 +51,51 @@ const CHECKS = [
   { path: '/api/quakes', requires: '200 + JSON', check: () => true },
   { path: '/api/eonet', requires: '200 + JSON', check: () => true },
 ]
+
+/**
+ * Is this failure worth another try?
+ *
+ * Only infrastructure-shaped failures are: a timeout or network error
+ * (status 0), an upstream 5xx — our handlers normalize upstream trouble to
+ * 502/503 — or rate limiting.
+ *
+ * Content-contract failures are deliberately excluded. A 200 that is missing
+ * required fields, or is flagged degraded, means the upstream changed shape;
+ * that will not fix itself in five seconds, and retrying it would only delay a
+ * real alert. Those are exactly the silent-drift failures this check exists to
+ * catch, so they fail fast.
+ */
+export function isTransient(result) {
+  if (result.ok) return false
+  const { status } = result
+  return status === 0 || status === 429 || status >= 500
+}
+
+/**
+ * Run one check, retrying transient failures.
+ *
+ * Without this a single slow upstream fails the workflow and pages Discord. On
+ * 2026-09-10 EONET took longer than the Function's own 8s fetch deadline, so
+ * /api/eonet returned 503 once; it was serving normally before and after, and
+ * that was the only failure in thirty runs. A monitor that cries wolf on one
+ * blip is a monitor people learn to ignore.
+ */
+export async function runWithRetry(runOnce, opts = {}) {
+  const attempts = opts.attempts ?? ATTEMPTS
+  const delayMs = opts.delayMs ?? backoffMs
+
+  let attempt = 1
+  let result = await runOnce(attempt)
+
+  while (!result.ok && isTransient(result) && attempt < attempts) {
+    attempt += 1
+    const wait = delayMs(attempt)
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    result = await runOnce(attempt)
+  }
+
+  return { ...result, attempts: attempt }
+}
 
 async function runCheck(baseUrl, spec) {
   const url = `${baseUrl}${spec.path}`
@@ -108,7 +157,8 @@ async function runAll(baseUrl, specs, concurrency) {
     while (true) {
       const index = next++
       if (index >= specs.length) return
-      results[index] = await runCheck(baseUrl, specs[index])
+      const spec = specs[index]
+      results[index] = await runWithRetry(() => runCheck(baseUrl, spec))
     }
   }
 
@@ -123,8 +173,10 @@ function printTable(results) {
   )
   for (const r of results) {
     const status = r.ok ? 'PASS' : 'FAIL'
+    // A check that only passed on retry is still a signal worth seeing.
+    const retries = r.attempts > 1 ? ` (after ${String(r.attempts)} attempts)` : ''
     console.log(
-      `${status.padEnd(7)}${r.path.padEnd(pathWidth + 2)}${String(r.status).padEnd(6)}${String(r.ms).padEnd(7)}${r.note}`,
+      `${status.padEnd(7)}${r.path.padEnd(pathWidth + 2)}${String(r.status).padEnd(6)}${String(r.ms).padEnd(7)}${r.note}${retries}`,
     )
   }
 }
@@ -137,7 +189,11 @@ async function main() {
   printTable(results)
 
   const failed = results.filter((r) => !r.ok)
+  const flaky = results.filter((r) => r.ok && r.attempts > 1)
   console.log(`\n${results.length - failed.length}/${results.length} passed`)
+  if (flaky.length > 0) {
+    console.log(`recovered on retry: ${flaky.map((r) => r.path).join(', ')}`)
+  }
   if (failed.length > 0) {
     console.error(`failing endpoints: ${failed.map((r) => r.path).join(', ')}`)
     return 1

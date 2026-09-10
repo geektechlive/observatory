@@ -31,6 +31,13 @@ updates:
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
 
+  # Dependabot invokes its pnpm helper with --config.minimumReleaseAge=4320
+  # (a 3-day supply-chain cooldown). pnpm enforces that across the entire
+  # dependency graph, so one freshly-published transitive platform binary
+  # aborts the whole update and the failure gets reported against whichever
+  # dependency was being processed at the time. See pnpm-workspace.yaml for
+  # the exclusion list that keeps this from failing every run.
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
