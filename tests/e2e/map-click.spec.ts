@@ -1,7 +1,9 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 
 const MINIMAL_STYLE = {
   version: 8,
+  glyphs: 'https://basemaps.cartocdn.com/gl/fonts/{fontstack}/{range}.pbf',
   sources: {},
   layers: [],
 }
@@ -22,6 +24,22 @@ const MOCK_EONET = {
       geometry: [{ type: 'Point', date: '2026-04-30T00:00:00Z', coordinates: [0, 20] }],
     },
   ],
+}
+
+/**
+ * Wait for the mocked EONET event to be rendered rather than sleeping a fixed
+ * two seconds. MapLibre sets a pointer cursor from WorldMap's `mouseenter`
+ * handler on `eonet-dots`, so a hover that changes the cursor is proof the
+ * feature is present and hit-testable at the map centre.
+ */
+async function waitForEventDot(page: Page): Promise<void> {
+  const canvas = page.locator('.maplibregl-canvas')
+  await expect(async () => {
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('Map canvas not found')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(canvas).toHaveCSS('cursor', 'pointer', { timeout: 500 })
+  }).toPass({ timeout: 15_000 })
 }
 
 test.describe('Map event dot click', () => {
@@ -60,8 +78,7 @@ test.describe('Map event dot click', () => {
     // Wait for map canvas to be present
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 15_000 })
 
-    // Give MapLibre time to process the EONET data and render the dot
-    await page.waitForTimeout(2_000)
+    await waitForEventDot(page)
 
     const mapBox = await page.locator('.maplibregl-canvas').boundingBox()
     if (!mapBox) throw new Error('Map canvas not found')
@@ -82,10 +99,11 @@ test.describe('Map event dot click', () => {
   })
 
   test('the popup contains a source link, not the raw API URL', async ({ page }) => {
+    await page.goto('/')
     // Globe is the default — switch to flat map to get the MapLibre canvas
     await page.getByRole('button', { name: 'Map' }).click()
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 15_000 })
-    await page.waitForTimeout(2_000)
+    await waitForEventDot(page)
 
     const mapBox = await page.locator('.maplibregl-canvas').boundingBox()
     if (!mapBox) throw new Error('Map canvas not found')
