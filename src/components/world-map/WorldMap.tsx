@@ -1,7 +1,13 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+// v6 is ESM-only and resolves its worker at runtime from `import.meta.url`,
+// a form no bundler can detect statically — so the worker asset is never
+// emitted and every GeoJSON source silently fails to load. Let Vite bundle
+// the worker (which pulls in maplibre-gl-shared.mjs) and hand MapLibre the
+// real URL. See setWorkerUrl below.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useRef, useState } from 'react'
 
 import { useAircraft } from '@/hooks/useAircraft'
@@ -57,6 +63,8 @@ interface EventFeatureProperties {
   sourceUrl: string
   eventDate: string
 }
+
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 function eventsToGeoJson(
   events: EonetEvent[],
@@ -633,52 +641,52 @@ export function WorldMap() {
     const src = mapRef.current.getSource<GeoJSONSource>('eonet-events')
     if (!src) return
     const data = eventsToGeoJson(events?.events ?? [])
-    src.setData(data)
+    void src.setData(data)
   }, [mapLoaded, events])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('quakes')
     if (!src) return
-    src.setData(quakesToGeoJson(quakeData?.quakes ?? []))
+    void src.setData(quakesToGeoJson(quakeData?.quakes ?? []))
   }, [mapLoaded, quakeData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('gdacs')
     if (!src) return
-    src.setData(gdacsToGeoJson(gdacsData?.events ?? []))
+    void src.setData(gdacsToGeoJson(gdacsData?.events ?? []))
   }, [mapLoaded, gdacsData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('fires')
     if (!src) return
-    src.setData(firesToGeoJson(firesData?.fires ?? []))
+    void src.setData(firesToGeoJson(firesData?.fires ?? []))
   }, [mapLoaded, firesData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('air-quality')
-    if (src) src.setData(airToGeoJson(airData?.stations ?? []))
+    if (src) void src.setData(airToGeoJson(airData?.stations ?? []))
   }, [mapLoaded, airData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('nws')
-    if (src) src.setData(nwsToGeoJson(nwsData?.features ?? []))
+    if (src) void src.setData(nwsToGeoJson(nwsData?.features ?? []))
   }, [mapLoaded, nwsData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('aircraft')
-    if (src) src.setData(aircraftToGeoJson(aircraftData?.aircraft ?? []))
+    if (src) void src.setData(aircraftToGeoJson(aircraftData?.aircraft ?? []))
   }, [mapLoaded, aircraftData])
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('buoys')
-    if (src) src.setData(buoysToGeoJson(buoysData?.buoys ?? []))
+    if (src) void src.setData(buoysToGeoJson(buoysData?.buoys ?? []))
   }, [mapLoaded, buoysData])
 
   // Layer visibility driven by the shared LayerControl (store).
@@ -711,7 +719,7 @@ export function WorldMap() {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('iss-trail')
     if (!src) return
-    src.setData({
+    void src.setData({
       type: 'Feature',
       geometry: { type: 'LineString', coordinates: trail },
       properties: {},
@@ -722,7 +730,7 @@ export function WorldMap() {
     if (!mapLoaded || !mapRef.current) return
     const src = mapRef.current.getSource<GeoJSONSource>('iss-position')
     if (!src) return
-    src.setData({
+    void src.setData({
       type: 'FeatureCollection',
       features: position
         ? [
