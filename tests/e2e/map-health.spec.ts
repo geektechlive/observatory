@@ -15,6 +15,14 @@ import { expect, test } from '@playwright/test'
  *
  * Verified to have teeth: adding a layer that references a non-existent source
  * to MINIMAL_STYLE makes this test fail.
+ *
+ * It also asserts the worker script is real JavaScript. That is not paranoia:
+ * v6 resolves its worker at runtime from `import.meta.url`, which no bundler
+ * detects statically, so the asset went unemitted and the dev server answered
+ * the request with the SPA's index.html — HTTP 200, no console error, and
+ * every GeoJSON source (ISS, quakes, fires, EONET, NWS, aircraft, buoys)
+ * silently dead while the raster basemap still drew. Only the content type
+ * gave it away.
  */
 
 /**
@@ -32,11 +40,13 @@ const MINIMAL_STYLE = {
 test.describe('Map health', () => {
   test('loads the map without emitting an error or console failure', async ({ page }) => {
     const errors: string[] = []
+    const workerUrls: string[] = []
 
     page.on('console', (msg) => {
       if (msg.type() === 'error') errors.push(msg.text())
     })
     page.on('pageerror', (err) => errors.push(err.message))
+    page.on('worker', (worker) => workerUrls.push(worker.url()))
 
     await page.route('**/dark-matter-nolabels-gl-style/style.json', (route) =>
       route.fulfill({
@@ -60,5 +70,20 @@ test.describe('Map health', () => {
     const mapErrors = errors.filter((e) => !/Failed to (load|fetch)|ERR_|net::/i.test(e))
 
     expect(mapErrors, 'MapLibre reported errors while loading the style').toEqual([])
+
+    const mapWorkers = workerUrls.filter((u) => /maplibre/.test(u))
+    expect(mapWorkers, 'MapLibre never started its worker').not.toEqual([])
+
+    // A worker served as index.html still returns 200, so the status alone
+    // proves nothing — the content type is what distinguishes a real module
+    // from the SPA fallback.
+    for (const url of mapWorkers) {
+      const res = await page.request.get(url)
+      expect(res.status(), `worker ${url} was not served`).toBe(200)
+      expect(
+        res.headers()['content-type'] ?? '',
+        `worker ${url} was not served as JavaScript`,
+      ).toMatch(/javascript/)
+    }
   })
 })

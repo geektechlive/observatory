@@ -8,7 +8,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', '.wrangler', 'coverage', 'worker-configuration.d.ts']),
+  globalIgnores(['dist', '.wrangler', 'coverage', '.playwright-browsers', 'worker-configuration.d.ts']),
   {
     files: ['**/*.{js,mjs,ts,tsx}'],
     extends: [js.configs.recommended],
