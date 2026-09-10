@@ -126,8 +126,12 @@ jobs:
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
-    # TODO: drop continue-on-error once the Dependabot backlog (see .github/dependabot.yml)
-    # has cleared and the tree is free of high/critical advisories.
+    # The lockfile refresh took the tree from 30 advisories to 2: the critical
+    # maplibre-gl XSS (GHSA-jrc7-96c5-q579, fixed by the separate v6 upgrade),
+    # and sharp GHSA-rgj7-g3m4-5g8c, which miniflare 5-alpha pins to an exact
+    # 0.35.2 via wrangler. The latter is not resolvable from here without
+    # overriding a native transitive dep, and is dev-only — it never ships.
+    # TODO: drop continue-on-error once wrangler/miniflare moves off 0.35.2.
     continue-on-error: true
 
     steps:
