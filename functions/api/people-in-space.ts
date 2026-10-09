@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // Community-maintained crew roster (open-notify is dead). Public, no key.
 const SOURCE =
@@ -31,7 +31,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[people-in-space] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid people-in-space response')
+      return contractError('Invalid people-in-space response')
     }
 
     return {

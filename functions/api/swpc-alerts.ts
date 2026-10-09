@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA SWPC space-weather alerts/watches/warnings feed. Public, no key.
 const SOURCE = 'https://services.swpc.noaa.gov/products/alerts.json'
@@ -32,7 +32,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[swpc-alerts] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid SWPC alerts response')
+      return contractError('Invalid SWPC alerts response')
     }
 
     const alerts = parsed.data

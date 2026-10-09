@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   cachedJson,
+  contractError,
   fetchUpstream,
   UpstreamError,
   upstreamError,
@@ -209,9 +210,170 @@ describe('cachedJson', () => {
     expect(hit.headers.get('Cache-Control')).toBe('public, max-age=70')
     expect(hit.headers.get('X-Data-Age')).toBe('30')
 
-    now.mockReturnValue(t0 + 500_000)
-    const old = await cachedJson(ctx, 'k', 100, async () => ({ body: '{}' }))
-    expect(old.headers.get('Cache-Control')).toBe('public, max-age=0')
+    now.mockReturnValue(t0 + 100_000)
+    const edge = await cachedJson(ctx, 'k', 100, async () => ({ body: '{}' }))
+    expect(edge.headers.get('Cache-Control')).toBe('public, max-age=0')
+  })
+})
+
+describe('cachedJson stale-if-error', () => {
+  const t0 = 1_700_000_000_000
+  const failing = async (): Promise<Response> => upstreamError(500, 'EONET upstream error')
+
+  beforeEach(() => {
+    installFakeCache()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  async function seed({ ctx, settle }: TestCtx): Promise<void> {
+    await cachedJson(ctx, 'k', 100, async () => ({ body: '{"good":1}' }))
+    await settle()
+  }
+
+  it('keeps the positive entry past its ttl so it can serve as a stale fallback', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const store = installFakeCache()
+    await seed(makeCtx())
+    const stored = store.get('https://example.test/__cache/k')
+    expect(stored?.headers).toContainEqual([
+      'cache-control',
+      `public, max-age=${String(100 + 86_400)}`,
+    ])
+  })
+
+  it('refetches once the entry is older than its ttl', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 101_000)
+    const produce = vi.fn(async () => ({ body: '{"fresh":1}' }))
+    const res = await cachedJson(tc.ctx, 'k', 100, produce)
+    expect(res.headers.get('X-Cache')).toBe('MISS')
+    expect(await res.text()).toBe('{"fresh":1}')
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('serves the last good body as STALE when the producer fails past ttl', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 400_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, failing)
+    await tc.settle()
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('{"good":1}')
+    expect(res.headers.get('X-Cache')).toBe('STALE')
+    expect(res.headers.get('X-Data-Age')).toBe('400')
+    expect(res.headers.get('X-Stale-Status')).toBe('502')
+    expect(res.headers.get('X-Error-Kind')).toBe('upstream')
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=60')
+  })
+
+  it('serves stale on a thrown producer too', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, async () => {
+      throw new UpstreamError('boom')
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('X-Cache')).toBe('STALE')
+    expect(res.headers.get('X-Stale-Status')).toBe('503')
+  })
+
+  it('serves stale instead of a neg hit, without re-running the producer', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 200_000)
+    const produce = vi.fn(failing)
+    await cachedJson(tc.ctx, 'k', 100, produce)
+    await tc.settle()
+    const second = await cachedJson(tc.ctx, 'k', 100, produce)
+    expect(second.status).toBe(200)
+    expect(second.headers.get('X-Cache')).toBe('STALE')
+    expect(second.headers.get('X-Error-Kind')).toBe('upstream')
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a stale fallback caused by a contract failure as contract', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, async () =>
+      contractError('Invalid EONET response'),
+    )
+    expect(res.headers.get('X-Cache')).toBe('STALE')
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
+  })
+
+  it('treats an unparseable upstream body (thrown SyntaxError) as a contract failure', async () => {
+    // ~20 handlers call upstream.json() unguarded: an HTML 200 throws a SyntaxError.
+    // That is shape drift and must not be laundered into a retried/STALE upstream blip.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, async () => {
+      JSON.parse('<html>maintenance</html>')
+      return { body: '{}' }
+    })
+    expect(res.headers.get('X-Cache')).toBe('STALE')
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
+    expect(res.headers.get('X-Stale-Status')).toBe('502')
+  })
+
+  it('can opt out of stale-if-error, for inner raw-feed caches', async () => {
+    // _swpc.ts and geomag.ts nest a raw-feed cache inside a handler's cache. A STALE
+    // raw body there would be parsed and re-cached by the outer layer as a fresh MISS.
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await cachedJson(tc.ctx, 'k', 100, async () => ({ body: '{"good":1}' }), {
+      staleIfError: false,
+    })
+    await tc.settle()
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, failing, { staleIfError: false })
+    expect(res.status).toBe(502)
+    expect(res.headers.get('X-Cache')).toBe('NEG')
+  })
+
+  it('replays the error kind on a neg hit when there is no stale body', async () => {
+    const tc = makeCtx()
+    await cachedJson(tc.ctx, 'k', 100, async () => contractError('Invalid EONET response'))
+    await tc.settle()
+    const res = await cachedJson(tc.ctx, 'k', 100, async () => ({ body: '{}' }))
+    expect(res.status).toBe(502)
+    expect(res.headers.get('X-Cache')).toBe('NEG')
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
+  })
+})
+
+describe('contractError', () => {
+  it('is a 502 marked as a contract failure, with our own message', async () => {
+    const res = contractError('Invalid EONET response')
+    expect(res.status).toBe(502)
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
+    expect(await res.json()).toEqual({ error: 'Invalid EONET response' })
+  })
+
+  it('marks upstreamError as an upstream failure', () => {
+    expect(upstreamError(500, 'x').headers.get('X-Error-Kind')).toBe('upstream')
   })
 })
 

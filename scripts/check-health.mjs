@@ -11,6 +11,7 @@
 //
 // Exits 1 if any check fails.
 
+import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
@@ -21,6 +22,21 @@ const CONCURRENCY = 3
 const ATTEMPTS = 3
 /** Backoff before attempt N. Upstreams that blip usually recover in seconds. */
 const backoffMs = (attempt) => (attempt === 2 ? 2_000 : 5_000)
+/**
+ * Wait before retrying a NEG replay. The Function negative-caches a failure for 60 s
+ * (NEG_TTL_SECONDS in functions/api/_cache.ts), so a retry inside that window only
+ * replays the same cached error. Until 2026-10-09 every "after 3 attempts" failure was
+ * three reads of one cache entry (69 ms), never the upstream.
+ */
+export const NEG_RETRY_DELAY_MS = 65_000
+/**
+ * How old a STALE fallback may be and still pass. The site is serving real data, so a
+ * short upstream outage is not worth a page; past this it is, because visitors are
+ * looking at hours-old data. Contract-caused STALE fails at any age.
+ */
+export const STALE_GRACE_SECONDS = 2 * 60 * 60
+/** Where the per-endpoint results go for scripts/report-incidents.mjs. */
+const REPORT_PATH = process.env.INCIDENT_REPORT ?? 'incident-report.json'
 
 const nonNull = (value) => value !== null && value !== undefined
 
@@ -67,8 +83,37 @@ const CHECKS = [
  */
 export function isTransient(result) {
   if (result.ok) return false
+  // The handler said the payload broke its schema: drift wearing a 502.
+  if (result.errorKind === 'contract') return false
   const { status } = result
   return status === 0 || status === 429 || status >= 500
+}
+
+/** Delay before attempt N, given the failure that prompted it. */
+export function retryDelayMs(attempt, failed) {
+  return failed?.cache === 'NEG' ? NEG_RETRY_DELAY_MS : backoffMs(attempt)
+}
+
+/**
+ * Decide whether a response served from the stale-if-error fallback is acceptable.
+ * Returns { ok: true } for anything not STALE; { ok: true, warning } for a recent
+ * upstream-caused STALE; { ok: false, note } otherwise.
+ */
+export function judgeStale({ cache, errorKind, dataAge, staleStatus }) {
+  if (cache !== 'STALE') return { ok: true }
+  // Number(null) and Number('') are 0: an absent age is unknown, not brand-new.
+  const age = dataAge === null || dataAge === undefined || dataAge === '' ? NaN : Number(dataAge)
+  const why = `${errorKind ?? 'unknown'}: HTTP ${staleStatus ?? '?'}`
+  if (errorKind === 'contract') {
+    return { ok: false, note: `stale ${String(age)}s (${why})` }
+  }
+  if (!Number.isFinite(age) || age > STALE_GRACE_SECONDS) {
+    return {
+      ok: false,
+      note: `stale ${String(age)}s, past ${String(STALE_GRACE_SECONDS)}s grace (${why})`,
+    }
+  }
+  return { ok: true, warning: `stale ${String(age)}s (${why})` }
 }
 
 /**
@@ -82,14 +127,14 @@ export function isTransient(result) {
  */
 export async function runWithRetry(runOnce, opts = {}) {
   const attempts = opts.attempts ?? ATTEMPTS
-  const delayMs = opts.delayMs ?? backoffMs
+  const delayMs = opts.delayMs ?? retryDelayMs
 
   let attempt = 1
   let result = await runOnce(attempt)
 
   while (!result.ok && isTransient(result) && attempt < attempts) {
     attempt += 1
-    const wait = delayMs(attempt)
+    const wait = delayMs(attempt, result)
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))
     result = await runOnce(attempt)
   }
@@ -109,36 +154,41 @@ async function runCheck(baseUrl, spec) {
       signal: controller.signal,
     })
     const ms = Date.now() - started
+    const cache = res.headers.get('x-cache')
+    const errorKind = res.headers.get('x-error-kind')
+    const base = { path: spec.path, status: res.status, ms, cache, errorKind }
 
     if (!res.ok) {
-      return { path: spec.path, ok: false, status: res.status, ms, note: `HTTP ${res.status}` }
+      const kind = errorKind ? ` ${errorKind}` : ''
+      return { ...base, ok: false, note: `HTTP ${res.status}${kind}${cache ? ` (${cache})` : ''}` }
     }
     if (res.headers.get('x-data-degraded') === '1') {
       const source = res.headers.get('x-data-source') ?? 'unknown'
-      return { path: spec.path, ok: false, status: res.status, ms, note: `degraded (${source})` }
+      return { ...base, ok: false, note: `degraded (${source})` }
     }
+
+    const stale = judgeStale({
+      cache,
+      errorKind,
+      dataAge: res.headers.get('x-data-age'),
+      staleStatus: res.headers.get('x-stale-status'),
+    })
+    if (!stale.ok) return { ...base, ok: false, note: stale.note }
 
     let body
     try {
       body = await res.json()
     } catch {
-      return { path: spec.path, ok: false, status: res.status, ms, note: 'invalid JSON' }
+      return { ...base, ok: false, note: 'invalid JSON' }
     }
 
     if (!spec.check(body)) {
-      return {
-        path: spec.path,
-        ok: false,
-        status: res.status,
-        ms,
-        note: `missing ${spec.requires}`,
-      }
+      return { ...base, ok: false, note: `missing ${spec.requires}` }
     }
 
     const source = res.headers.get('x-data-source')
-    const cache = res.headers.get('x-cache')
-    const note = [source, cache].filter(Boolean).join(' / ') || 'ok'
-    return { path: spec.path, ok: true, status: res.status, ms, note }
+    const note = [source, cache, stale.warning].filter(Boolean).join(' / ') || 'ok'
+    return { ...base, ok: true, note, warning: stale.warning }
   } catch (err) {
     const ms = Date.now() - started
     const message = err?.name === 'AbortError' ? `timeout after ${TIMEOUT_MS} ms` : err.message
@@ -166,14 +216,31 @@ async function runAll(baseUrl, specs, concurrency) {
   return results
 }
 
+/** One human-readable line for a result; also the detail carried into an incident issue. */
+function describe(r) {
+  // A check that only passed on retry is still a signal worth seeing.
+  const retries = r.attempts > 1 ? ` (after ${String(r.attempts)} attempts)` : ''
+  return `${r.ok ? 'PASS' : 'FAIL'} ${r.path} HTTP ${String(r.status)} ${String(r.ms)}ms ${r.note}${retries}`
+}
+
+/** The incident report scripts/report-incidents.mjs consumes: one entry per endpoint. */
+export function toReport(results) {
+  return results.map((r) => ({
+    signature: `health:${r.path}`,
+    ok: r.ok,
+    detail: describe(r),
+    // Passing on a STALE fallback is tolerated, not recovered: an open issue stays open.
+    ...(r.ok && r.warning ? { warning: true } : {}),
+  }))
+}
+
 function printTable(results) {
   const pathWidth = Math.max(...results.map((r) => r.path.length))
   console.log(
     `${'STATUS'.padEnd(7)}${'ENDPOINT'.padEnd(pathWidth + 2)}${'HTTP'.padEnd(6)}${'MS'.padEnd(7)}NOTE`,
   )
   for (const r of results) {
-    const status = r.ok ? 'PASS' : 'FAIL'
-    // A check that only passed on retry is still a signal worth seeing.
+    const status = r.ok ? (r.warning ? 'WARN' : 'PASS') : 'FAIL'
     const retries = r.attempts > 1 ? ` (after ${String(r.attempts)} attempts)` : ''
     console.log(
       `${status.padEnd(7)}${r.path.padEnd(pathWidth + 2)}${String(r.status).padEnd(6)}${String(r.ms).padEnd(7)}${r.note}${retries}`,
@@ -187,6 +254,7 @@ async function main() {
 
   const results = await runAll(baseUrl, CHECKS, CONCURRENCY)
   printTable(results)
+  await writeFile(REPORT_PATH, JSON.stringify(toReport(results), null, 2))
 
   const failed = results.filter((r) => !r.ok)
   const flaky = results.filter((r) => r.ok && r.attempts > 1)

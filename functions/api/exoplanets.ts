@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // NASA Exoplanet Archive confirmed-planet count (TAP). Public, no key.
 const TAP =
@@ -18,7 +18,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[exoplanets] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid Exoplanet Archive response')
+      return contractError('Invalid Exoplanet Archive response')
     }
 
     return {

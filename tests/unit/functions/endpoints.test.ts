@@ -17,9 +17,16 @@ vi.mock('../../../functions/api/_cache', () => {
       const normalized = status === 0 || status >= 520 ? 503 : 502
       return new Response(JSON.stringify({ error: message }), {
         status: normalized,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Error-Kind': 'upstream' },
       })
     }),
+    contractError: vi.fn(
+      (message: string) =>
+        new Response(JSON.stringify({ error: message }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', 'X-Error-Kind': 'contract' },
+        }),
+    ),
   }
 })
 
@@ -232,5 +239,18 @@ describe('quakes upstream error', () => {
     const json = await res.json()
     expect(json).toHaveProperty('error')
     expect(json).not.toHaveProperty('details')
+  })
+
+  it('marks a non-2xx USGS answer as an upstream failure', async () => {
+    mockFetchUpstream.mockResolvedValue(fakeResponse(500, { error: 'upstream said no' }))
+    const res = await callQuakes(makeCtx('https://observatory.test/api/quakes'))
+    expect(res.headers.get('X-Error-Kind')).toBe('upstream')
+  })
+
+  it('marks a USGS payload that fails the schema as a contract failure', async () => {
+    mockFetchUpstream.mockResolvedValue(fakeResponse(200, { unexpected: 'shape' }))
+    const res = await callQuakes(makeCtx('https://observatory.test/api/quakes'))
+    expect(res.status).toBe(502)
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
   })
 })

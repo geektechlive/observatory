@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // USNO sun/moon rise-set-twilight + moon phase. Public, no key. Proxied so we
 // can cache by rounded location and avoid CORS/CSP on the client.
@@ -75,7 +75,7 @@ export const onRequest: PagesFunction = (ctx) => {
     const parsed = UsnoRawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[sun-moon] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid USNO response')
+      return contractError('Invalid USNO response')
     }
 
     const d = parsed.data.properties.data

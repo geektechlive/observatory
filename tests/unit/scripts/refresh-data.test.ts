@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-// @ts-expect-error plain ESM script, no type declarations
-import { isValidLaunchesPayload, parseTle, tleChecksumOk } from '../../../scripts/refresh-data.mjs'
+import {
+  classifyFailure,
+  describePayload,
+  fetchWithRetry,
+  isValidLaunchesPayload,
+  parseTle,
+  tleChecksumOk,
+  // @ts-expect-error plain ESM script, no type declarations
+} from '../../../scripts/refresh-data.mjs'
+
+const HOUR = 3_600_000
 
 // Real ISS TLE fetched from CelesTrak on 2026-09-07.
 const LINE1 = '1 25544U 98067A   26250.17589239  .00004561  00000+0  90859-4 0  9999'
@@ -76,5 +85,104 @@ describe('isValidLaunchesPayload', () => {
     expect(isValidLaunchesPayload({ result: [] })).toBe(false)
     expect(isValidLaunchesPayload(null)).toBe(false)
     expect(isValidLaunchesPayload('nope')).toBe(false)
+  })
+})
+
+describe('describePayload', () => {
+  it('names the keys of a JSON object and quotes the start of the body', () => {
+    const out = describePayload('{"error":"rate limited","retry":30}')
+    expect(out).toContain('keys=[error,retry]')
+    expect(out).toContain('rate limited')
+  })
+
+  it('handles a non-JSON body and caps the excerpt at 300 characters', () => {
+    const out = describePayload(`<html>${'x'.repeat(1000)}</html>`)
+    expect(out).toContain('not JSON')
+    expect(out.length).toBeLessThan(400)
+  })
+})
+
+describe('fetchWithRetry', () => {
+  const noDelay = () => 0
+  const ok = (body: string) => new Response(body, { status: 200 })
+
+  it('retries when the payload fails validation, then returns the validated value', async () => {
+    // 2026-10-09: RLL answered 200 with an unexpected shape once, and was fine
+    // within the hour. A shape failure gets the same retries as a network one.
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(ok('{"error":"busy"}'))
+      .mockResolvedValueOnce(ok('{"count":1,"result":[]}'))
+    const validate = (text: string) => {
+      const json = JSON.parse(text) as unknown
+      if (!isValidLaunchesPayload(json)) throw new Error('unexpected RLL payload shape')
+      return json
+    }
+
+    const out = await fetchWithRetry(
+      'https://x.test',
+      {},
+      { validate, fetchImpl, delayMs: noDelay },
+    )
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(out).toEqual({ count: 1, result: [] })
+  })
+
+  it('reports what came back when every attempt fails validation', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async () => ok('{"error":"busy"}'))
+    const validate = () => {
+      throw new Error('unexpected RLL payload shape')
+    }
+
+    await expect(
+      fetchWithRetry('https://x.test', {}, { validate, fetchImpl, delayMs: noDelay }),
+    ).rejects.toThrow(/unexpected RLL payload shape.*keys=\[error\]/)
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+  })
+
+  it('retries a non-2xx status', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 522 }))
+      .mockResolvedValueOnce(ok('fine'))
+
+    const out = await fetchWithRetry('https://x.test', {}, { fetchImpl, delayMs: noDelay })
+
+    expect(out).toBe('fine')
+  })
+})
+
+describe('classifyFailure', () => {
+  const now = Date.parse('2026-10-09T12:00:00Z')
+  const envelope = (hoursOld: number) =>
+    JSON.stringify({ fetchedAt: new Date(now - hoursOld * HOUR).toISOString(), data: {} })
+  const err = new Error('fetch failed')
+
+  it('tolerates a failure while the KV copy is younger than its max age', () => {
+    const out = classifyFailure({ err, envelopeText: envelope(12), maxAgeMs: 36 * HOUR, now })
+    expect(out.ok).toBe(true)
+    // Tolerated, not recovered: report-incidents keeps an open issue open.
+    expect(out.warning).toBe(true)
+    expect(out.detail).toMatch(/WARN.*fetch failed.*12h old/)
+  })
+
+  it('is an incident once the KV copy is older than its max age', () => {
+    const out = classifyFailure({ err, envelopeText: envelope(40), maxAgeMs: 36 * HOUR, now })
+    expect(out.ok).toBe(false)
+    expect(out.detail).toMatch(/FAIL.*40h old/)
+  })
+
+  it('is an incident when there is no usable KV copy', () => {
+    expect(classifyFailure({ err, envelopeText: null, maxAgeMs: 36 * HOUR, now }).ok).toBe(false)
+    expect(classifyFailure({ err, envelopeText: 'garbage', maxAgeMs: 36 * HOUR, now }).ok).toBe(
+      false,
+    )
+  })
+
+  it('is an incident when the KV age could not be checked (dry run, KV read failed)', () => {
+    const out = classifyFailure({ err, envelopeText: undefined, maxAgeMs: 36 * HOUR, now })
+    expect(out.ok).toBe(false)
+    expect(out.detail).toMatch(/age unknown/)
   })
 })

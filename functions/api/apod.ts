@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { ApodSchema } from '../../src/schemas/apod'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 const NASA_API_BASE = 'https://api.nasa.gov'
 const CACHE_TTL_SECONDS = 86400 // 24h — APOD changes once per UTC day
@@ -44,7 +44,7 @@ export const onRequest: PagesFunction<Env> = (ctx) => {
     const parsed = ApodSchema.safeParse(raw)
     if (!parsed.success) {
       console.warn('[apod] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid APOD response')
+      return contractError('Invalid APOD response')
     }
 
     // Note: accurate only on a cache MISS — a HIT serves the header value that

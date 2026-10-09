@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA GML global CO2 trend (Mauna Loa). Public, no key.
 // CSV columns: year, month, day, smoothed, trend
@@ -21,7 +21,7 @@ export const onRequest: PagesFunction = (ctx) =>
       .filter((c) => c.length >= 5 && /^\d{4}$/.test(c[0] ?? ''))
 
     const last = rows[rows.length - 1]
-    if (!last) return upstreamError(502, 'No CO2 data parsed')
+    if (!last) return contractError('No CO2 data parsed')
 
     const ppm = parseFloat(last[4] ?? '') // trend (deseasonalized)
     const date = `${last[0]}-${String(last[1]).padStart(2, '0')}-${String(last[2]).padStart(2, '0')}`

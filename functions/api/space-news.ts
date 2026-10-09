@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // Spaceflight News API — aggregated space headlines. Public, no key.
 const SOURCE = 'https://api.spaceflightnewsapi.net/v4/articles/?limit=8&ordering=-published_at'
@@ -26,7 +26,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[space-news] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid Spaceflight News response')
+      return contractError('Invalid Spaceflight News response')
     }
 
     const articles = parsed.data.results.map((a) => ({

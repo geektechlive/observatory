@@ -51,7 +51,23 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 - **`@keyframes` blocks**: always put an empty line between each keyframe selector (`0%`, `50%`, `from`, `to`) — CI Linux stylelint enforces `rule-empty-line-before` more strictly than macOS; the pre-commit hook may not catch it locally
 - **maplibre-gl 6 needs `setWorkerUrl` wired by hand.** v6 is ESM-only and resolves its worker at runtime via `new URL('./maplibre-gl-worker.mjs', import.meta.url)` — a form no bundler detects statically, so Vite emits no worker asset and the request falls through to the SPA's `index.html`: **HTTP 200, no console error**. GeoJSON sources are parsed in that worker, so every vector layer (ISS, quakes, fires, EONET, NWS, aircraft, buoys, GDACS) goes silently dead while the raster basemap still draws. `WorldMap.tsx` imports the worker with `?worker&url` and passes it to `maplibregl.setWorkerUrl()`. `tests/e2e/map-health.spec.ts` guards it by asserting the worker URL is served as JavaScript, not as the SPA fallback — a status check alone cannot catch this
 - **Dependabot's cooldown collides with pnpm's graph-wide maturity check.** Dependabot runs its helper with `--config.minimumReleaseAge=4320` (3 days) and pnpm enforces that across the _entire_ dependency graph, so one freshly-published transitive platform binary aborts the whole update with `ERR_PNPM_NO_MATURE_MATCHING_VERSION`. The failure is reported against whichever dependency was being processed, which is misleading — the 2026-09-10 run blamed `@types/node` when the culprit was a rolldown binary published 35 hours earlier. `pnpm-workspace.yaml` carries the exclusion list. That setting **must** live there; pnpm does not read it from `package.json`'s `pnpm` field, and puts up no error when you try
-- **`scripts/check-health.mjs` retries transient failures only.** Status 0, 5xx and 429 get 3 attempts with 2s/5s backoff, because a single slow upstream used to fail the workflow and page Discord — `fetchUpstream`'s deadline is 8 s, so an upstream slower than that becomes our 503. Content-contract failures (missing fields, `X-Data-Degraded`) are never retried: they mean upstream shape drift, which is the thing the check exists to catch, and retrying would only delay the alert
+- **`scripts/check-health.mjs` retries transient failures only.** Status 0, 5xx and 429 get 3 attempts with 2s/5s backoff, because a single slow upstream used to fail the workflow and page Discord — `fetchUpstream`'s deadline is 8 s, so an upstream slower than that becomes our 503. Content-contract failures (missing fields, `X-Data-Degraded`, `X-Error-Kind: contract`) are never retried: they mean upstream shape drift, which is the thing the check exists to catch, and retrying would only delay the alert
+- **A retry inside the negative cache is not a retry.** `_cache.ts` negative-caches a failure for 60 s, so the 2 s / 5 s backoff above only replayed one cached error. From #16 until #21, every "after 3 attempts" failure took about 70 ms and never reached the upstream. A response with `X-Cache: NEG` now waits 65 s before the next attempt. Retry any cached endpoint past its cache window
+- **`X-Error-Kind` says why a handler failed.**
+  - `contractError()` (502, `contract`) is for a payload that broke our schema or parsed to nothing. It means shape drift.
+  - `upstreamError()` (`upstream`) is for an unavailable upstream.
+  - Never return `upstreamError(502, …)`. `tests/unit/error-kind-contract.test.ts` scans every handler for it, because that would make drift look like an outage.
+- **Stale-if-error.**
+  - `cachedJson` stores positive entries for TTL + 24 h and decides freshness from `X-Cached-At`.
+  - When the producer fails (or a neg entry is live), the last good body goes out as a 200 with `X-Cache: STALE`, `X-Data-Age`, `X-Stale-Status` and `X-Error-Kind`.
+  - The health check passes an upstream-caused STALE with a WARN for up to 2 h. It fails a STALE caused by a contract failure, or one older than 2 h.
+  - Per-colo and evictable like the rest of the Cache API, so this is best effort, not a guarantee.
+- **Alerts are GitHub issues.** Both data-refresh jobs write `incident-report.json`, and `scripts/report-incidents.mjs` keeps one `incident`-labelled issue per source (`[observatory] health:/api/eonet`).
+  - Open on failure, comment while still failing, auto-close on recovery, reopen on recurrence.
+  - Discord pings on open, reopen and close, with the issue link.
+  - A WARN entry (tolerated: STALE inside grace, a young KV copy) comments but does not close.
+  - The label listing lags issue creation by seconds, so back-to-back manual runs can open a duplicate.
+- **The KV refresh pages on staleness, not on one missed fetch.** A failed source counts only once its KV copy is past its max age: ISS and satellites 36 h, launches backup 48 h. The refresh runs every 6 h. Rejected payloads are logged with their keys plus a 300-character excerpt
 - **`pnpm/action-setup` needs `packageManager` in package.json.** Without it (or an explicit `version:`) it fails with `No pnpm version is specified` before any dependency installs — every job, every branch. `tests/unit/ci-contract.test.ts` asserts the field exists, and that every `pnpm <script>` a workflow invokes is a real package script
 - `satellite.js` pinned to v5 — v7 ships a WASM/pthreads build with top-level await that Vite/rolldown cannot bundle as iife; v5 pure-JS is more than sufficient for 5Hz SGP4 propagation
 - KV bindings in wrangler.toml are auto-wired by Cloudflare Pages — no manual dashboard step needed
@@ -63,6 +79,16 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 - `_cache.ts` lookup order is the positive key then `${key}:neg`, so a 60 s negative entry can never shadow fresh data. A non-ok producer `Response` is an error; a 2xx one is an intentional uncached passthrough (the launches KV STALE path)
 - Never proxy an upstream status code: `upstreamError()` maps 0 and >= 520 to 503 and everything else to 502, so a NASA 429 is not mistaken for ours
 - Cloudflare's auto-injected Web Analytics beacon needs BOTH `https://static.cloudflareinsights.com` in `script-src` (to load) and `https://cloudflareinsights.com` in `connect-src` (to report). It posts to the absolute URL `https://cloudflareinsights.com/cdn-cgi/rum`, not to our own origin, so allowing only the script host loads the beacon and then silently blocks every beacon it sends. Verified in a browser, 2026-09-08
+
+## Workflow
+
+The same standard as Endless Noir (see the global `CLAUDE.md`):
+
+- Material work starts as a GitHub issue labelled with an area (`infra`, …) and a priority `P0`–`P3`.
+- It is done in a worktree under `.claude/worktrees/<name>` (gitignored), with `pnpm install --frozen-lockfile` first.
+- Tests come first (RED, then GREEN), with one commit per unit that references its issue.
+- It lands through a PR that says `Closes #N, closes #M` (one keyword per issue).
+- Merge only on green CI. As of 2026-10-09, `main` is protected but enforces **no** required status checks, so a red PR can be merged by mistake.
 
 ## Local secrets
 

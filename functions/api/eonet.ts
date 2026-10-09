@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { EonetResponseSchema } from '../../src/schemas/eonet'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 const EONET_API = 'https://eonet.gsfc.nasa.gov/api/v3/events'
 const CACHE_TTL_SECONDS = 300 // 5 min
@@ -16,7 +16,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = EonetResponseSchema.safeParse(raw)
     if (!parsed.success) {
       console.warn('[eonet] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid EONET response')
+      return contractError('Invalid EONET response')
     }
 
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
