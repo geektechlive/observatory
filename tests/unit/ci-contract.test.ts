@@ -73,10 +73,26 @@ function pnpmInvocations(): { file: string; script: string }[] {
   return found
 }
 
-describe('CI configuration contract', () => {
-  it('pins the pnpm version in package.json so pnpm/action-setup can resolve it', () => {
-    // Without this, pnpm/action-setup fails with "No pnpm version is specified"
-    // before a single dependency installs — every job, every branch.
+describe('local verify gate', () => {
+  // There is no CI (#33): `pnpm verify` is the only gate before a merge to main,
+  // so it must run every check CI used to run. Dropping one here drops it entirely.
+  // test:coverage, not test:unit: vitest.config.ts enforces coverage thresholds.
+  it.each(['lint', 'typecheck', 'test:coverage', 'test:e2e', 'build', 'audit'])(
+    'verify runs %s',
+    (gate) => {
+      const verify = pkg.scripts?.verify ?? ''
+      expect(verify).toMatch(new RegExp(`pnpm (run )?${gate.replace(':', '\\:')}\\b`))
+    },
+  )
+
+  it('audits at the high level, so the accepted advisories in pnpm-workspace.yaml apply', () => {
+    expect(pkg.scripts?.verify ?? '').toContain('pnpm audit --audit-level=high')
+  })
+})
+
+describe('workflow contract', () => {
+  it('pins the pnpm version in package.json', () => {
+    // One pnpm version for every checkout and worktree (corepack reads this).
     expect(pkg.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+/)
   })
 
