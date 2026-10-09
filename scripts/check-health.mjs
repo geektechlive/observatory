@@ -224,7 +224,13 @@ function describe(r) {
 
 /** The incident report scripts/report-incidents.mjs consumes: one entry per endpoint. */
 export function toReport(results) {
-  return results.map((r) => ({ signature: `health:${r.path}`, ok: r.ok, detail: describe(r) }))
+  return results.map((r) => ({
+    signature: `health:${r.path}`,
+    ok: r.ok,
+    detail: describe(r),
+    // Passing on a STALE fallback is tolerated, not recovered: an open issue stays open.
+    ...(r.ok && r.warning ? { warning: true } : {}),
+  }))
 }
 
 function printTable(results) {

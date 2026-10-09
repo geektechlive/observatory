@@ -162,6 +162,8 @@ describe('classifyFailure', () => {
   it('tolerates a failure while the KV copy is younger than its max age', () => {
     const out = classifyFailure({ err, envelopeText: envelope(12), maxAgeMs: 36 * HOUR, now })
     expect(out.ok).toBe(true)
+    // Tolerated, not recovered: report-incidents keeps an open issue open.
+    expect(out.warning).toBe(true)
     expect(out.detail).toMatch(/WARN.*fetch failed.*12h old/)
   })
 

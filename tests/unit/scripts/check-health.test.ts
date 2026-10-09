@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 
-// @ts-expect-error plain ESM script, no type declarations
 import {
   isTransient,
   judgeStale,
@@ -9,6 +8,7 @@ import {
   runWithRetry,
   STALE_GRACE_SECONDS,
   toReport,
+  // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/check-health.mjs'
 
 /** Shape of a single check result, as runCheck produces it. */
@@ -190,5 +190,20 @@ describe('toReport', () => {
       { signature: 'health:/api/eonet', ok: false, detail: expect.stringContaining('HTTP 502') },
       { signature: 'health:/api/neo', ok: true, detail: expect.any(String) },
     ])
+  })
+
+  it('flags a pass that rode on a STALE fallback as a warning, not a recovery', () => {
+    const [entry] = toReport([
+      {
+        path: '/api/eonet',
+        ok: true,
+        status: 200,
+        ms: 40,
+        note: 'STALE / stale 600s (upstream: HTTP 503)',
+        warning: 'stale 600s (upstream: HTTP 503)',
+        attempts: 1,
+      },
+    ])
+    expect(entry).toMatchObject({ ok: true, warning: true })
   })
 })

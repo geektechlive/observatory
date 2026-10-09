@@ -156,7 +156,7 @@ export function classifyFailure({ err, envelopeText, maxAgeMs, now = Date.now() 
   const age = now - fetchedAt
   const ageText = `${String(Math.round(age / HOUR_MS))}h old`
   return age <= maxAgeMs
-    ? { ok: true, detail: `WARN ${reason}; KV copy ${ageText}, limit ${limit}` }
+    ? { ok: true, warning: true, detail: `WARN ${reason}; KV copy ${ageText}, limit ${limit}` }
     : { ok: false, detail: `FAIL ${reason}; KV copy ${ageText}, past ${limit} limit` }
 }
 
@@ -367,7 +367,7 @@ async function refreshSource(spec, config) {
     const verdict = classifyFailure({ err, envelopeText, maxAgeMs: spec.maxAgeMs })
     const detail = `${spec.signature} ${verdict.detail}`
     ;(verdict.ok ? console.warn : console.error)(detail)
-    return { entry: { signature: spec.signature, ok: verdict.ok, detail } }
+    return { entry: { ...verdict, signature: spec.signature, detail } }
   }
 }
 

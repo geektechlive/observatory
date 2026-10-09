@@ -3,15 +3,21 @@ name: data-refresh
 # Two scheduled jobs in one workflow. GitHub has no per-job schedule, so both crons
 # are declared here and each job filters on github.event.schedule to claim its own.
 # On workflow_dispatch neither filter matches "schedule", so both jobs run.
+#
+# Alerting: each check writes incident-report.json and scripts/report-incidents.mjs
+# turns it into one GitHub issue per failing source (opened, commented, reopened,
+# auto-closed on recovery) and pings Discord with the issue link on open/reopen/close.
 on:
   schedule:
-    - cron: '17 */12 * * *' # refresh: twice a day
+    - cron: '17 */6 * * *' # refresh: four times a day, so one missed run never matters
     - cron: '41 */6 * * *' # health: four times a day
   workflow_dispatch:
 
 permissions:
   contents: read
+  issues: write
 
+# Also serializes the incident reporter, so two runs never race on the same issue.
 concurrency:
   group: data-refresh-${{ github.ref }}
   cancel-in-progress: false
@@ -22,12 +28,13 @@ jobs:
   # only read KV, so this is the sole writer.
   refresh:
     name: Refresh KV snapshots
-    if: github.event_name != 'schedule' || github.event.schedule == '17 */12 * * *'
+    if: github.event_name != 'schedule' || github.event.schedule == '17 */6 * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
       DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@v7
 
@@ -35,22 +42,30 @@ jobs:
         with:
           node-version: '22'
 
+      # Fails only when a source's KV copy is past its max age, not on one missed fetch.
       - name: Refresh KV snapshots
+        id: check
         run: node scripts/refresh-data.mjs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # A silent refresh failure is the dangerous one: KV quietly ages out and the
-      # ISS falls back to a hardcoded TLE three days later.
-      - name: Notify Discord
-        if: failure() && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
+      - name: Report incidents
+        id: report
+        if: always() && steps.check.outcome != 'skipped'
+        run: node scripts/report-incidents.mjs
         env:
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/notify-discord.mjs "observatory KV refresh failed" "$RUN_URL"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Probe the live site's headline endpoints. Fails on non-200, missing fields, or an
-  # X-Data-Degraded marker, which is how a silent fallback gets caught.
+      # Fallback: the reporter itself broke (or the check crashed before writing its
+      # report). A silent refresh failure is the dangerous one: KV quietly ages out and
+      # the ISS falls back to a hardcoded TLE three days later.
+      - name: Notify Discord (reporter failed)
+        if: failure() && steps.report.outcome == 'failure' && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
+        run: node scripts/notify-discord.mjs "observatory KV refresh failed (incident reporter also failed)" "$RUN_URL"
+
+  # Probe the live site's headline endpoints. Fails on non-200, missing fields, an
+  # X-Data-Degraded marker, a contract-caused STALE, or a STALE past its grace window.
   health:
     name: Endpoint health check
     if: github.event_name != 'schedule' || github.event.schedule == '41 */6 * * *'
@@ -61,6 +76,7 @@ jobs:
     env:
       DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
       DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@v7
 
@@ -69,13 +85,18 @@ jobs:
           node-version: '22'
 
       - name: Check endpoints
-        id: health
+        id: check
         run: node scripts/check-health.mjs
 
-      # Posts as a bot rather than a webhook so the alert can be moved between
-      # channels by changing one secret. Skipped silently when unconfigured.
-      - name: Notify Discord
-        if: failure() && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
+      - name: Report incidents
+        id: report
+        if: always() && steps.check.outcome != 'skipped'
+        run: node scripts/report-incidents.mjs
         env:
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/notify-discord.mjs "observatory health check failed" "$RUN_URL"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Posts as a bot rather than a webhook so the alert can be moved between
+      # channels by changing one secret. Only runs if the reporter itself failed.
+      - name: Notify Discord (reporter failed)
+        if: failure() && steps.report.outcome == 'failure' && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
+        run: node scripts/notify-discord.mjs "observatory health check failed (incident reporter also failed)" "$RUN_URL"
