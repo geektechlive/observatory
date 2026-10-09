@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { LaunchesResponseSchema } from '../../src/schemas/launches'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 const CACHE_TTL_SECONDS = 1800 // 30 min
 const UPSTREAM_TIMEOUT_MS = 10_000
@@ -95,14 +95,12 @@ export const onRequest: PagesFunction<Env> = (ctx) =>
     try {
       raw = await upstream.json()
     } catch {
-      return (
-        (await readBackup(kv)) ?? upstreamError(502, 'Launch data upstream returned invalid JSON')
-      )
+      return (await readBackup(kv)) ?? contractError('Launch data upstream returned invalid JSON')
     }
 
     const parsed = LaunchesResponseSchema.safeParse(raw)
     if (!parsed.success) {
-      return (await readBackup(kv)) ?? upstreamError(502, 'Invalid upstream response')
+      return (await readBackup(kv)) ?? contractError('Invalid upstream response')
     }
 
     return { body: JSON.stringify(parsed.data) }

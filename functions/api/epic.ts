@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { RawEpicArraySchema } from '../../src/schemas/epic'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 const EPIC_API_BASE = 'https://epic.gsfc.nasa.gov'
 const CACHE_TTL_SECONDS = 3600 // 1 hour — EPIC images update ~daily
@@ -16,11 +16,11 @@ export const onRequest: PagesFunction = (ctx) => {
     const parsed = RawEpicArraySchema.safeParse(raw)
     if (!parsed.success || parsed.data.length === 0) {
       if (!parsed.success) console.warn('[epic] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid or empty EPIC response')
+      return contractError('Invalid or empty EPIC response')
     }
 
     const latest = parsed.data[0]
-    if (!latest) return upstreamError(502, 'Empty EPIC response')
+    if (!latest) return contractError('Empty EPIC response')
     // date format: "2025-04-28 00:30:49"
     const [datePart] = latest.date.split(' ')
     const [year, month, day] = (datePart ?? '').split('-')

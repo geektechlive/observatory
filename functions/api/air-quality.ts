@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // OpenAQ v3 latest PM2.5 across stations (one call). Needs a free API key, kept
 // server-side. Cached so we hit OpenAQ at most once per TTL (well under 60/min).
@@ -47,7 +47,7 @@ export const onRequest: PagesFunction<Env> = (ctx) => {
     const parsed = OpenAqRawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[air-quality] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid OpenAQ response')
+      return contractError('Invalid OpenAQ response')
     }
 
     const stations = parsed.data.results

@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { NeoResponseSchema } from '../../src/schemas/neo'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 const NASA_API_BASE = 'https://api.nasa.gov'
 const CACHE_TTL_SECONDS = 900 // 15 min
@@ -32,7 +32,7 @@ export const onRequest: PagesFunction<Env> = (ctx) => {
     const parsed = NeoResponseSchema.safeParse(raw)
     if (!parsed.success) {
       console.warn('[neo] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid NeoWs response')
+      return contractError('Invalid NeoWs response')
     }
 
     // Note: accurate only on a cache MISS — a HIT serves the header value that

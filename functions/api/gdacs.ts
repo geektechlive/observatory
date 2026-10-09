@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // GDACS global disaster alerts (Orange/Red = active). Public, no key.
 const GDACS_API =
@@ -33,7 +33,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = GdacsRawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[gdacs] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid GDACS response')
+      return contractError('Invalid GDACS response')
     }
 
     const events = parsed.data.features

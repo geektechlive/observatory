@@ -2,7 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
 import { type Fireball, FireballResponseSchema } from '../../src/schemas/fireball'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 const FIREBALL_API = 'https://ssd-api.jpl.nasa.gov/fireball.api'
 const CACHE_TTL_SECONDS = 3600 // 1 h
@@ -38,7 +38,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const rawParsed = FireballRawSchema.safeParse(await upstream.json())
     if (!rawParsed.success) {
       console.warn('[fireball] invalid upstream response', rawParsed.error.issues)
-      return upstreamError(502, 'Invalid JPL Fireball response')
+      return contractError('Invalid JPL Fireball response')
     }
     const raw = rawParsed.data
 
@@ -48,7 +48,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = FireballResponseSchema.safeParse(normalized)
     if (!parsed.success) {
       console.warn('[fireball] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid Fireball response')
+      return contractError('Invalid Fireball response')
     }
 
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }

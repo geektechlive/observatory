@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA WSA-ENLIL solar wind model time series. Public, no key.
 // `cloud` is non-null for time steps inside a modeled (Earth-directed) CME.
@@ -25,7 +25,7 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[cme] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid ENLIL response')
+      return contractError('Invalid ENLIL response')
     }
 
     const rows = parsed.data

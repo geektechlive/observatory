@@ -62,7 +62,7 @@ export const onRequest: PagesFunction<Env> = (ctx) => {
     ])
 
     const allFailed = !flaresResult.ok && !cmesResult.ok && !stormsResult.ok && !sepsResult.ok
-    if (allFailed) return upstreamError(502, 'All DONKI endpoints unavailable')
+    if (allFailed) return upstreamError(0, 'All DONKI endpoints unavailable')
 
     const data: DonkiResponse = {
       flares: flaresResult.data,

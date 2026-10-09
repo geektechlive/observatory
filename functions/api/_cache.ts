@@ -13,6 +13,19 @@
 
 const NEG_TTL_SECONDS = 60
 const DEFAULT_TIMEOUT_MS = 8000
+// A positive entry outlives its TTL by this much so it can be served, marked STALE,
+// when the upstream fails. Freshness is decided in code from X-Cached-At, not by eviction.
+const STALE_WINDOW_SECONDS = 86_400
+// Browsers should come back soon for a STALE answer: the upstream may be back already.
+const STALE_CLIENT_MAX_AGE_SECONDS = 60
+
+/**
+ * Why a producer failed. `contract` means the upstream answered but its payload broke our
+ * schema (shape drift: retrying will not fix it, so monitors must fail fast). `upstream`
+ * means it was unavailable (timeouts, 5xx: worth a retry). Sent as `X-Error-Kind`.
+ */
+export type ErrorKind = 'contract' | 'upstream'
+const ERROR_KIND_HEADER = 'X-Error-Kind'
 
 interface CacheCtx {
   // The Pages Function EventContext: we need the request (for an on-zone cache key)
@@ -64,15 +77,31 @@ export async function fetchUpstream(
  * everything else becomes 502. `message` must be our own text, never upstream body text.
  */
 export function upstreamError(status: number, message: string): Response {
-  const normalized = status === 0 || status >= 520 ? 503 : 502
+  return errorResponse(normalizeStatus(status), message, 'upstream')
+}
+
+/**
+ * The upstream answered, but its payload failed our schema or parsed to nothing usable.
+ * Always a 502, marked `X-Error-Kind: contract` so the health check never retries it and
+ * never accepts a STALE fallback for it: shape drift has to alert.
+ */
+export function contractError(message: string): Response {
+  return errorResponse(502, message, 'contract')
+}
+
+function errorResponse(status: number, message: string, kind: ErrorKind): Response {
   return new Response(JSON.stringify({ error: message }), {
-    status: normalized,
-    headers: { 'Content-Type': 'application/json' },
+    status,
+    headers: { 'Content-Type': 'application/json', [ERROR_KIND_HEADER]: kind },
   })
 }
 
 function normalizeStatus(status: number): number {
   return status === 0 || status >= 520 ? 503 : 502
+}
+
+function errorKindOf(res: Response): ErrorKind {
+  return res.headers.get(ERROR_KIND_HEADER) === 'contract' ? 'contract' : 'upstream'
 }
 
 // The Cache API only caches when the cache-key URL is on a hostname the zone serves.
@@ -83,26 +112,55 @@ function keyToRequest(origin: string, key: string): Request {
   return new Request(`${origin}/__cache/${encodeURIComponent(key)}`, { method: 'GET' })
 }
 
-/** Replay a stored positive entry, ageing its Cache-Control rather than resetting it. */
-async function replayHit(hit: Response): Promise<Response> {
-  const body = await hit.text()
-  const headers = new Headers(hit.headers)
-  headers.set('X-Cache', 'HIT')
-
-  const ttl = Number(headers.get('X-Cache-TTL'))
-  const effectiveTtl = Number.isFinite(ttl) && ttl > 0 ? ttl : 0
-  const cachedAt = Number(headers.get('X-Cached-At'))
+/** Age in whole seconds and the stored TTL of a positive entry. */
+function entryTiming(entry: Response): { age: number; ttl: number } {
+  const ttl = Number(entry.headers.get('X-Cache-TTL'))
+  const cachedAt = Number(entry.headers.get('X-Cached-At'))
   // Entries written before X-Cached-At existed report age 0 and replay the full TTL,
   // rather than clamping every pre-rollout entry to max-age=0.
   const age =
     Number.isFinite(cachedAt) && cachedAt > 0
       ? Math.max(0, Math.floor((Date.now() - cachedAt) / 1000))
       : 0
+  return { age, ttl: Number.isFinite(ttl) && ttl > 0 ? ttl : 0 }
+}
 
-  headers.set('Cache-Control', `public, max-age=${Math.max(0, effectiveTtl - age)}`)
+/** Replay a stored positive entry, ageing its Cache-Control rather than resetting it. */
+async function replayHit(hit: Response, age: number, ttl: number): Promise<Response> {
+  const body = await hit.text()
+  const headers = new Headers(hit.headers)
+  headers.set('X-Cache', 'HIT')
+  headers.set('Cache-Control', `public, max-age=${Math.max(0, ttl - age)}`)
   headers.set('X-Data-Age', String(age))
   // X-Data-Degraded, if the producer set it, rides along in the stored headers.
   return new Response(body, { status: 200, headers })
+}
+
+/**
+ * Serve an expired positive entry because the upstream just failed. It is real data,
+ * only old, so it goes out as a 200 marked STALE with why (`X-Stale-Status`,
+ * `X-Error-Kind`) and how old (`X-Data-Age`), and the monitor decides whether that is OK.
+ */
+async function serveStale(
+  stale: Response,
+  age: number,
+  status: number,
+  kind: ErrorKind,
+): Promise<Response> {
+  const body = await stale.text()
+  const headers = new Headers(stale.headers)
+  headers.set('X-Cache', 'STALE')
+  headers.set('Cache-Control', `public, max-age=${STALE_CLIENT_MAX_AGE_SECONDS}`)
+  headers.set('X-Data-Age', String(age))
+  headers.set('X-Stale-Status', String(status))
+  headers.set(ERROR_KIND_HEADER, kind)
+  return new Response(body, { status: 200, headers })
+}
+
+/** Status of a stored negative entry, clamped to a real error status. */
+function negStatus(negHit: Response): number {
+  const raw = Number(negHit.headers.get('X-Neg-Status'))
+  return Number.isFinite(raw) && raw >= 400 && raw <= 599 ? raw : 503
 }
 
 /** Replay a stored negative entry at its real status. */
@@ -110,9 +168,7 @@ async function replayNeg(negHit: Response): Promise<Response> {
   const body = await negHit.text()
   const headers = new Headers(negHit.headers)
   headers.set('X-Cache', 'NEG')
-  const raw = Number(headers.get('X-Neg-Status'))
-  const status = Number.isFinite(raw) && raw >= 400 && raw <= 599 ? raw : 503
-  return new Response(body, { status, headers })
+  return new Response(body, { status: negStatus(negHit), headers })
 }
 
 /**
@@ -126,12 +182,14 @@ function storeNegative(
   negReq: Request,
   status: number,
   body: string,
+  kind: ErrorKind,
 ): Response {
   const headers = new Headers({
     'Content-Type': 'application/json',
     'Cache-Control': `public, max-age=${NEG_TTL_SECONDS}`,
     'X-Cache-TTL': String(NEG_TTL_SECONDS),
     'X-Neg-Status': String(status),
+    [ERROR_KIND_HEADER]: kind,
   })
   ctx.waitUntil(cache.put(negReq, new Response(body, { status: 200, headers })))
 
@@ -141,23 +199,26 @@ function storeNegative(
 }
 
 /**
- * Cache-first JSON wrapper.
+ * Cache-first JSON wrapper with stale-if-error.
  *
  * Lookup order is positive key, then `${key}:neg`, so a negative entry can never shadow
- * a fresh good entry. On a positive hit the body replays with `X-Cache: HIT`, an aged
- * `Cache-Control: max-age` derived from the stored `X-Cached-At`, and `X-Data-Age`. On a
- * negative hit it replays with `X-Cache: NEG` at its stored status.
+ * a fresh good entry. A positive entry younger than its TTL replays with `X-Cache: HIT`,
+ * an aged `Cache-Control: max-age` derived from the stored `X-Cached-At`, and
+ * `X-Data-Age`. Positive entries are stored for TTL + 24 h; past the TTL they are not
+ * served as fresh, but are held as the stale fallback.
  *
- * On a miss `produce()` runs. A `{ body }` result is stored for its TTL and returned with
+ * On a miss `produce()` runs. A `{ body }` result is stored and returned with
  * `X-Cache: MISS`; `degraded: true` adds `X-Data-Degraded: 1` to both the stored and the
- * returned headers and is cached for the FULL TTL (a degraded payload is still a real
- * answer, and re-fetching it sooner just multiplies upstream load). A 2xx `Response`
- * passes through uncached. A non-2xx `Response` or a thrown error is negative-cached
- * for 60s.
+ * returned headers (a degraded payload is still a real answer). A 2xx `Response` passes
+ * through uncached. A non-2xx `Response` or a thrown error is negative-cached for 60 s,
+ * keeping its `X-Error-Kind`.
+ *
+ * When the producer fails, or a negative entry is live, and an expired positive entry
+ * exists, that entry is served as `X-Cache: STALE` (see `serveStale`) instead of the error.
  *
  * @param ctx          context exposing `request` + `waitUntil` (the EventContext)
  * @param key          stable cache key (mirrors the old KV key)
- * @param ttlSeconds   default max-age; a producer may override via `result.ttl`
+ * @param ttlSeconds   default freshness; a producer may override via `result.ttl`
  * @param produce      builds the fresh payload on a cache miss
  */
 export async function cachedJson(
@@ -172,30 +233,40 @@ export async function cachedJson(
   const negReq = keyToRequest(origin, `${key}:neg`)
 
   const hit = await cache.match(cacheReq)
-  if (hit) return replayHit(hit)
+  const timing = hit ? entryTiming(hit) : undefined
+  if (hit && timing && timing.age <= timing.ttl) return replayHit(hit, timing.age, timing.ttl)
+  const stale = hit && timing ? { entry: hit, age: timing.age } : undefined
 
   const negHit = await cache.match(negReq)
-  if (negHit) return replayNeg(negHit)
+  if (negHit) {
+    return stale
+      ? serveStale(stale.entry, stale.age, negStatus(negHit), errorKindOf(negHit))
+      : replayNeg(negHit)
+  }
 
   let result: CacheableResult
   try {
     result = await produce()
   } catch (err) {
     console.warn(`[cache] producer threw for ${key}:`, err)
-    return storeNegative(ctx, cache, negReq, 503, JSON.stringify({ error: 'Upstream unavailable' }))
+    const body = JSON.stringify({ error: 'Upstream unavailable' })
+    const neg = storeNegative(ctx, cache, negReq, 503, body, 'upstream')
+    return stale ? serveStale(stale.entry, stale.age, 503, 'upstream') : neg
   }
 
   if (result instanceof Response) {
     // 2xx: a producer-supplied pass-through (launches.ts's KV STALE body). Uncached, as before.
     if (result.ok) return result
+    const status = normalizeStatus(result.status)
+    const kind = errorKindOf(result)
     const body = (await result.text()) || JSON.stringify({ error: 'Upstream error' })
-    return storeNegative(ctx, cache, negReq, normalizeStatus(result.status), body)
+    const neg = storeNegative(ctx, cache, negReq, status, body, kind)
+    return stale ? serveStale(stale.entry, stale.age, status, kind) : neg
   }
 
   const effectiveTtl = result.ttl ?? ttlSeconds
   const baseHeaders = new Headers({
     'Content-Type': 'application/json',
-    // Cache-Control drives Cache API eviction (max-age) just like KV's expirationTtl.
     'Cache-Control': `public, max-age=${effectiveTtl}`,
     'X-Cache-TTL': String(effectiveTtl),
     // Stored so a HIT can report real age instead of replaying the full TTL.
@@ -204,9 +275,13 @@ export async function cachedJson(
   })
   if (result.degraded === true) baseHeaders.set('X-Data-Degraded', '1')
 
+  // The stored copy lives past its TTL (Cache-Control drives Cache API eviction) so it
+  // can back a STALE answer; the copy returned to the client keeps the plain TTL.
+  const storedHeaders = new Headers(baseHeaders)
+  storedHeaders.set('Cache-Control', `public, max-age=${effectiveTtl + STALE_WINDOW_SECONDS}`)
   // The body is a string, so a fresh Response per consumer is enough; no clone needed.
   ctx.waitUntil(
-    cache.put(cacheReq, new Response(result.body, { status: 200, headers: baseHeaders })),
+    cache.put(cacheReq, new Response(result.body, { status: 200, headers: storedHeaders })),
   )
 
   const missHeaders = new Headers(baseHeaders)

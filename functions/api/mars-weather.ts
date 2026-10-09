@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // Curiosity REMS weather (latest sol). Public, no key.
 const SOURCE = 'https://mars.nasa.gov/rss/api/?feed=weather&category=msl&feedtype=json'
@@ -40,11 +40,11 @@ export const onRequest: PagesFunction = (ctx) =>
     const parsed = RawSchema.safeParse(await upstream.json())
     if (!parsed.success) {
       console.warn('[mars-weather] invalid upstream response', parsed.error.issues)
-      return upstreamError(502, 'Invalid Mars weather response')
+      return contractError('Invalid Mars weather response')
     }
 
     const s = parsed.data.soles[0]
-    if (!s) return upstreamError(502, 'Mars weather upstream returned no soles')
+    if (!s) return contractError('Mars weather upstream returned no soles')
     return {
       body: JSON.stringify({
         sol: parseInt(s.sol, 10) || 0,

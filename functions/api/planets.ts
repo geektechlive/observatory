@@ -82,7 +82,7 @@ export const onRequest: PagesFunction = (ctx) => {
     const bodies = results.filter((b): b is NonNullable<typeof b> => b !== null)
     const degraded = bodies.length < BODIES.length
 
-    if (bodies.length === 0) return upstreamError(502, 'JPL Horizons unavailable')
+    if (bodies.length === 0) return upstreamError(0, 'JPL Horizons unavailable')
 
     return {
       body: JSON.stringify({ bodies, updatedAt: new Date().toISOString() }),
