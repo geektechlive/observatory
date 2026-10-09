@@ -31,3 +31,15 @@ minimumReleaseAgeExclude:
   - esbuild
   - lightningcss
   - workerd
+
+# Advisories accepted on purpose. Each entry needs: why it cannot be fixed, why it
+# does not reach us, and when to look again. Everything else still fails CI.
+auditConfig:
+  ignoreGhsas:
+    # braces <=3.0.3 stack overflow on deeply nested ATTACKER-SUPPLIED brace
+    # patterns (#28). No patched braces exists (3.0.3 is the latest; micromatch
+    # 4.0.8 and stylelint 17.16.0 are latest too). Reached only via
+    # stylelint > micromatch at lint time, on glob patterns from this repo's own
+    # config and scripts: dev-only, never shipped, never fed outside input.
+    # Re-check when braces or micromatch publishes a new version.
+    - GHSA-vfj7-8cjw-p6xm
