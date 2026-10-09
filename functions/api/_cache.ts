@@ -7,7 +7,7 @@
 //   - per-colo, not global → more upstream fetches (free, and well within source
 //     rate limits at this traffic);
 //   - entries are evictable at any time → not durable storage. Anything that needs a
-//     durable fallback (e.g. launches.ts's 7-day backup) must stay on KV.
+//     durable fallback (e.g. the launches and TLE snapshots) must stay on KV.
 //
 // Underscore-prefixed filename so Pages does not route it as an endpoint.
 
@@ -35,8 +35,8 @@ interface CacheCtx {
 }
 
 // A producer either yields a cacheable JSON body, or returns a raw Response.
-// A 2xx Response is a producer-supplied pass-through (e.g. launches.ts's KV STALE
-// fallback) returned uncached; a non-2xx Response is an error and gets negative-cached.
+// A 2xx Response is a producer-supplied pass-through returned uncached (no producer
+// uses it today); a non-2xx Response is an error and gets negative-cached.
 export type CacheableResult =
   | { body: string; ttl?: number; extraHeaders?: Record<string, string>; degraded?: boolean }
   | Response
@@ -266,7 +266,7 @@ export async function cachedJson(
   }
 
   if (result instanceof Response) {
-    // 2xx: a producer-supplied pass-through (launches.ts's KV STALE body). Uncached, as before.
+    // 2xx: a producer-supplied pass-through, returned uncached.
     if (result.ok) return result
     const status = normalizeStatus(result.status)
     const kind = errorKindOf(result)

@@ -153,7 +153,7 @@ describe('cachedJson', () => {
     expect(produce).toHaveBeenCalledTimes(1)
   })
 
-  it('passes an ok producer Response through uncached (launches.ts STALE fallback)', async () => {
+  it('passes an ok producer Response through uncached', async () => {
     const { ctx, settle } = makeCtx()
     const produce = vi.fn(
       async () =>

@@ -40,6 +40,7 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 ## Data feeds
 
 - **CelesTrak is unreachable from Cloudflare Workers egress** (522 since ~2026-09-03) though it works from anywhere else. `/api/iss-tle` and `/api/satellites` are KV-first: a GitHub Action fetches and validates TLEs from a normal network and writes `tle:iss:v1` / `tle:satellites:v1`. The handlers fall back to live CelesTrak, then a hardcoded `FALLBACK_TLE`.
+- **RocketLaunch.live is unreachable from Workers egress too** (seen 2026-10-09, #30), though it answers laptops and GitHub runners. `/api/launches` is KV-first: it serves `rll:launches:next:v1:backup` (written every 6 h by the refresh job) while it is ≤ 12 h old. After that it tries live RLL and logs why it failed, then falls back to the older KV copy marked degraded.
 - **NOAA SWPC feed drift (2026-09):** `noaa-planetary-k-index.json` became an array of objects, and `solar-wind/{plasma,mag}-7-day.json` returned 404. Solar wind and Bz now come from `products/geospace/propagated-solar-wind-1-hour.json` via the shared `functions/api/_swpc.ts`. Its cells are numbers, not numeric strings.
 - **Upstream drift is silent by default.** A feed that changes shape yields an empty-but-HTTP-200 payload. `src/lib/health.ts` gives every source a content contract so this reads as an error, and `scripts/check-health.mjs` probes the headline endpoints on a schedule.
 
@@ -76,7 +77,7 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 - **Verify a downloaded font is actually a font**: `special-elite-latin.woff2` shipped for months as a 1.6 KB Google 404 HTML page. Check the magic bytes are `wOF2` (`head -c 4 file | xxd -p` = `774f4632`)
 - `functions/` is typechecked via `tsconfig.functions.json` with `lib: ["ES2022"]` and **no DOM lib** — workers-types `Response`/`Request` collide with `lib.dom`
 - Standalone `tsc` on individual files needs `--ignoreConfig` under TypeScript 6, or it refuses to run because `tsconfig.json` exists
-- `_cache.ts` lookup order is the positive key then `${key}:neg`, so a 60 s negative entry can never shadow fresh data. A non-ok producer `Response` is an error; a 2xx one is an intentional uncached passthrough (the launches KV STALE path)
+- `_cache.ts` lookup order is the positive key then `${key}:neg`, so a 60 s negative entry can never shadow fresh data. A non-ok producer `Response` is an error; a 2xx one is an uncached passthrough (unused since launches went KV-first in #30)
 - Never proxy an upstream status code: `upstreamError()` maps 0 and >= 520 to 503 and everything else to 502, so a NASA 429 is not mistaken for ours
 - Cloudflare's auto-injected Web Analytics beacon needs BOTH `https://static.cloudflareinsights.com` in `script-src` (to load) and `https://cloudflareinsights.com` in `connect-src` (to report). It posts to the absolute URL `https://cloudflareinsights.com/cdn-cgi/rum`, not to our own origin, so allowing only the script host loads the beacon and then silently blocks every beacon it sends. Verified in a browser, 2026-09-08
 
