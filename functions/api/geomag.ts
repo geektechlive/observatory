@@ -36,18 +36,27 @@ function downsample(values: number[], target: number): number[] {
 async function fetchDst(
   ctx: GeomagCacheCtx,
 ): Promise<{ series: number[]; current: number | null }> {
-  const res = await cachedJson(ctx, 'noaa:dst:raw', CACHE_TTL_SECONDS, async () => {
-    try {
-      const upstream = await fetchUpstream(DST_FEED, undefined, { timeoutMs: UPSTREAM_TIMEOUT_MS })
-      if (!upstream.ok) {
-        return upstreamError(upstream.status, `SWPC upstream ${upstream.status} for ${DST_FEED}`)
+  // Inner raw-feed cache: no stale-if-error (see _swpc.ts fetchAndParse).
+  const res = await cachedJson(
+    ctx,
+    'noaa:dst:raw',
+    CACHE_TTL_SECONDS,
+    async () => {
+      try {
+        const upstream = await fetchUpstream(DST_FEED, undefined, {
+          timeoutMs: UPSTREAM_TIMEOUT_MS,
+        })
+        if (!upstream.ok) {
+          return upstreamError(upstream.status, `SWPC upstream ${upstream.status} for ${DST_FEED}`)
+        }
+        const body = await upstream.text()
+        return { body }
+      } catch (err) {
+        return upstreamError(503, `SWPC fetch failed for ${DST_FEED}: ${String(err)}`)
       }
-      const body = await upstream.text()
-      return { body }
-    } catch (err) {
-      return upstreamError(503, `SWPC fetch failed for ${DST_FEED}: ${String(err)}`)
-    }
-  })
+    },
+    { staleIfError: false },
+  )
   if (!res.ok) return { series: [], current: null }
   const parsed = DstSchema.safeParse(await res.json())
   if (!parsed.success) return { series: [], current: null }

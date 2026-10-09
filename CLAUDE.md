@@ -87,7 +87,8 @@ The same standard as Endless Noir (see the global `CLAUDE.md`):
 - Material work starts as a GitHub issue labelled with an area (`infra`, …) and a priority `P0`–`P3`.
 - It is done in a worktree under `.claude/worktrees/<name>` (gitignored), with `pnpm install --frozen-lockfile` first.
 - Tests come first (RED, then GREEN), with one commit per unit that references its issue.
-- It lands through a PR that says `Closes #N`. `main` requires green CI.
+- It lands through a PR that says `Closes #N, closes #M` (one keyword per issue).
+- Merge only on green CI. As of 2026-10-09, `main` is protected but enforces **no** required status checks, so a red PR can be merged by mistake.
 
 ## Local secrets
 

@@ -17,11 +17,6 @@ permissions:
   contents: read
   issues: write
 
-# Also serializes the incident reporter, so two runs never race on the same issue.
-concurrency:
-  group: data-refresh-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   # Fetch TLEs and launch data from an ordinary network (CelesTrak returns 522 to
   # Cloudflare Workers egress) and write them into Workers KV. The Pages Functions
@@ -30,6 +25,11 @@ jobs:
     name: Refresh KV snapshots
     if: github.event_name != 'schedule' || github.event.schedule == '17 */6 * * *'
     runs-on: ubuntu-latest
+    # Per job, so a queued health run never cancels a pending refresh (a group keeps
+    # only one pending run). Serializes this job's reporter against itself.
+    concurrency:
+      group: data-refresh-${{ github.ref }}-refresh
+      cancel-in-progress: false
     timeout-minutes: 10
     env:
       DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
@@ -70,6 +70,9 @@ jobs:
     name: Endpoint health check
     if: github.event_name != 'schedule' || github.event.schedule == '41 */6 * * *'
     runs-on: ubuntu-latest
+    concurrency:
+      group: data-refresh-${{ github.ref }}-health
+      cancel-in-progress: false
     # A failing endpoint replays a 60 s negative-cache entry, so each retry waits 65 s.
     # With the whole site down that is ~8 min of checks; a timeout writes no report.
     timeout-minutes: 15

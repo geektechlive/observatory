@@ -319,6 +319,40 @@ describe('cachedJson stale-if-error', () => {
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
   })
 
+  it('treats an unparseable upstream body (thrown SyntaxError) as a contract failure', async () => {
+    // ~20 handlers call upstream.json() unguarded: an HTML 200 throws a SyntaxError.
+    // That is shape drift and must not be laundered into a retried/STALE upstream blip.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, async () => {
+      JSON.parse('<html>maintenance</html>')
+      return { body: '{}' }
+    })
+    expect(res.headers.get('X-Cache')).toBe('STALE')
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
+    expect(res.headers.get('X-Stale-Status')).toBe('502')
+  })
+
+  it('can opt out of stale-if-error, for inner raw-feed caches', async () => {
+    // _swpc.ts and geomag.ts nest a raw-feed cache inside a handler's cache. A STALE
+    // raw body there would be parsed and re-cached by the outer layer as a fresh MISS.
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await cachedJson(tc.ctx, 'k', 100, async () => ({ body: '{"good":1}' }), {
+      staleIfError: false,
+    })
+    await tc.settle()
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, failing, { staleIfError: false })
+    expect(res.status).toBe(502)
+    expect(res.headers.get('X-Cache')).toBe('NEG')
+  })
+
   it('replays the error kind on a neg hit when there is no stale body', async () => {
     const tc = makeCtx()
     await cachedJson(tc.ctx, 'k', 100, async () => contractError('Invalid EONET response'))

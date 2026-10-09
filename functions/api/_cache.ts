@@ -220,12 +220,16 @@ function storeNegative(
  * @param key          stable cache key (mirrors the old KV key)
  * @param ttlSeconds   default freshness; a producer may override via `result.ttl`
  * @param produce      builds the fresh payload on a cache miss
+ * @param opts.staleIfError  false for an inner raw-feed cache nested in a handler's own
+ *                     cache: a STALE raw body would be parsed and re-cached by the outer
+ *                     layer as a fresh MISS, hiding its age. Failures then surface as before.
  */
 export async function cachedJson(
   ctx: CacheCtx,
   key: string,
   ttlSeconds: number,
   produce: () => Promise<CacheableResult>,
+  opts: { staleIfError?: boolean } = {},
 ): Promise<Response> {
   const cache = caches.default
   const origin = new URL(ctx.request.url).origin
@@ -235,7 +239,8 @@ export async function cachedJson(
   const hit = await cache.match(cacheReq)
   const timing = hit ? entryTiming(hit) : undefined
   if (hit && timing && timing.age <= timing.ttl) return replayHit(hit, timing.age, timing.ttl)
-  const stale = hit && timing ? { entry: hit, age: timing.age } : undefined
+  const stale =
+    hit && timing && opts.staleIfError !== false ? { entry: hit, age: timing.age } : undefined
 
   const negHit = await cache.match(negReq)
   if (negHit) {
@@ -249,9 +254,15 @@ export async function cachedJson(
     result = await produce()
   } catch (err) {
     console.warn(`[cache] producer threw for ${key}:`, err)
-    const body = JSON.stringify({ error: 'Upstream unavailable' })
-    const neg = storeNegative(ctx, cache, negReq, 503, body, 'upstream')
-    return stale ? serveStale(stale.entry, stale.age, 503, 'upstream') : neg
+    // An unparseable body (upstream.json() on an HTML 200) is shape drift, not an outage.
+    const isContract = err instanceof SyntaxError
+    const status = isContract ? 502 : 503
+    const kind: ErrorKind = isContract ? 'contract' : 'upstream'
+    const body = JSON.stringify({
+      error: isContract ? 'Invalid upstream response' : 'Upstream unavailable',
+    })
+    const neg = storeNegative(ctx, cache, negReq, status, body, kind)
+    return stale ? serveStale(stale.entry, stale.age, status, kind) : neg
   }
 
   if (result instanceof Response) {

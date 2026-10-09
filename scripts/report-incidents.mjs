@@ -10,6 +10,8 @@
 //   - passes, issue open   -> comment + close    + Discord "recovered"
 //   - warning, issue open  -> comment only (tolerated, not yet recovered)
 // So an issue's comment log is that source's incident history (Chris's call, 2026-10-09).
+// An issue only closes when its signature reports a pass: if a check is removed or
+// renamed while its issue is open, close that issue by hand.
 //
 // Usage: node scripts/report-incidents.mjs [report.json]
 // Env: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), RUN_URL; DISCORD_* optional.
@@ -194,7 +196,15 @@ async function main(argv) {
 
   let failures = 0
   for (const action of actions) {
-    const url = await apply(gh, repo, action)
+    let url
+    try {
+      url = await apply(gh, repo, action)
+    } catch (err) {
+      // One flaky GitHub call must not skip the other sources' updates and pings.
+      console.error(`${action.type} ${action.signature} failed: ${err.message}`)
+      failures++
+      continue
+    }
     console.log(`${action.type.padEnd(7)} ${action.signature} ${url}`)
     if (!action.notify || !discordConfigured()) continue
     try {

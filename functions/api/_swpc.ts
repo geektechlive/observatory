@@ -98,18 +98,26 @@ async function fetchAndParse<T>(
   url: string,
   parse: (json: unknown) => T[],
 ): Promise<T[]> {
-  const res = await cachedJson(ctx, key, SWPC_CACHE_TTL_SECONDS, async () => {
-    try {
-      const upstream = await fetchUpstream(url, undefined, { timeoutMs: UPSTREAM_TIMEOUT_MS })
-      if (!upstream.ok) {
-        return upstreamError(upstream.status, `SWPC upstream ${upstream.status} for ${url}`)
+  // Inner raw-feed cache: no stale-if-error, or old rows would be re-cached by the
+  // handler's own cachedJson as a fresh MISS. A failure here yields [] (degraded).
+  const res = await cachedJson(
+    ctx,
+    key,
+    SWPC_CACHE_TTL_SECONDS,
+    async () => {
+      try {
+        const upstream = await fetchUpstream(url, undefined, { timeoutMs: UPSTREAM_TIMEOUT_MS })
+        if (!upstream.ok) {
+          return upstreamError(upstream.status, `SWPC upstream ${upstream.status} for ${url}`)
+        }
+        const body = await upstream.text()
+        return { body }
+      } catch (err) {
+        return upstreamError(503, `SWPC fetch failed for ${url}: ${String(err)}`)
       }
-      const body = await upstream.text()
-      return { body }
-    } catch (err) {
-      return upstreamError(503, `SWPC fetch failed for ${url}: ${String(err)}`)
-    }
-  })
+    },
+    { staleIfError: false },
+  )
   if (!res.ok) return []
   const json: unknown = await res.json()
   return parse(json)
