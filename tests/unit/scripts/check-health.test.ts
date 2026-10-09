@@ -168,6 +168,12 @@ describe('judgeStale', () => {
     expect(out.ok).toBe(false)
   })
 
+  it('fails a STALE response whose age is missing rather than reading it as 0 s', () => {
+    // Number(null) === 0: an absent X-Data-Age must not pass as brand-new data.
+    expect(judgeStale({ cache: 'STALE', errorKind: 'upstream', dataAge: null }).ok).toBe(false)
+    expect(judgeStale({ cache: 'STALE', errorKind: 'upstream', dataAge: '' }).ok).toBe(false)
+  })
+
   it('fails a STALE response caused by a contract failure at any age', () => {
     const out = judgeStale({
       cache: 'STALE',

@@ -101,7 +101,8 @@ export function retryDelayMs(attempt, failed) {
  */
 export function judgeStale({ cache, errorKind, dataAge, staleStatus }) {
   if (cache !== 'STALE') return { ok: true }
-  const age = Number(dataAge)
+  // Number(null) and Number('') are 0: an absent age is unknown, not brand-new.
+  const age = dataAge === null || dataAge === undefined || dataAge === '' ? NaN : Number(dataAge)
   const why = `${errorKind ?? 'unknown'}: HTTP ${staleStatus ?? '?'}`
   if (errorKind === 'contract') {
     return { ok: false, note: `stale ${String(age)}s (${why})` }

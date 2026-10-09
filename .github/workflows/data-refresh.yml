@@ -62,7 +62,7 @@ jobs:
       # the ISS falls back to a hardcoded TLE three days later.
       - name: Notify Discord (reporter failed)
         if: failure() && steps.report.outcome == 'failure' && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
-        run: node scripts/notify-discord.mjs "observatory KV refresh failed (incident reporter also failed)" "$RUN_URL"
+        run: node scripts/notify-discord.mjs "observatory incident reporter failed (KV refresh job); check the run" "$RUN_URL"
 
   # Probe the live site's headline endpoints. Fails on non-200, missing fields, an
   # X-Data-Degraded marker, a contract-caused STALE, or a STALE past its grace window.
@@ -70,7 +70,9 @@ jobs:
     name: Endpoint health check
     if: github.event_name != 'schedule' || github.event.schedule == '41 */6 * * *'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # A failing endpoint replays a 60 s negative-cache entry, so each retry waits 65 s.
+    # With the whole site down that is ~8 min of checks; a timeout writes no report.
+    timeout-minutes: 15
     # Job-level env so the failure step's `if:` can read it. A step-level env is not
     # visible to that expression.
     env:
@@ -99,4 +101,4 @@ jobs:
       # channels by changing one secret. Only runs if the reporter itself failed.
       - name: Notify Discord (reporter failed)
         if: failure() && steps.report.outcome == 'failure' && env.DISCORD_BOT_TOKEN != '' && env.DISCORD_CHANNEL_ID != ''
-        run: node scripts/notify-discord.mjs "observatory health check failed (incident reporter also failed)" "$RUN_URL"
+        run: node scripts/notify-discord.mjs "observatory incident reporter failed (health job); check the run" "$RUN_URL"
