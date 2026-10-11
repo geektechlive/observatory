@@ -76,8 +76,8 @@ export interface LayerPlan {
 const SURFACE = 1.008
 const AURORA_SHELL = 1.012
 const DEFAULT_SAT_ALT_KM = 550
-/** OVATION is a dense grid, so per-point alpha stays low or additive overlap saturates to white. */
-const AURORA_ALPHA = 0.14
+/** OVATION is a dense grid: normal blending converges on the aurora green instead of climbing to white. */
+const AURORA_ALPHA = 0.35
 
 /** Quake spike height, globe radii: M4 is a stub, M8 stands tall; unknown is a stub. */
 export function spikeHeight(mag: number | null): number {

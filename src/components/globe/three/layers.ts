@@ -238,7 +238,7 @@ export class GlobeLayerObjects {
     return mesh
   }
 
-  private buildPoints(pts: readonly PlannedPoint[], additive: boolean): Points {
+  private buildPoints(pts: readonly PlannedPoint[], field: boolean): Points {
     const geometry = new BufferGeometry()
     const color = new Color()
     geometry.setAttribute(
@@ -274,13 +274,14 @@ export class GlobeLayerObjects {
         scale: { value: this.pixelScale },
         halo: { value: new Color(VOID_HEX) },
         // A field (aurora) has no halo; discrete markers keep theirs for contrast.
-        haloAmount: { value: additive ? 0 : 1 },
+        haloAmount: { value: field ? 0 : 1 },
       },
       vertexShader: pointVertex,
       fragmentShader: pointFragment,
       transparent: true,
       depthWrite: false,
-      blending: additive ? AdditiveBlending : NormalBlending,
+      // Normal blending even for the aurora field: additive overlap of a dense grid climbs to white.
+      blending: NormalBlending,
     })
     return new Points(geometry, material)
   }
