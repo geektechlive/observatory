@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 
+import { Swatch } from '@/components/ui/Swatch'
 import { LAYER_SWATCH, swatchColor } from '@/lib/palette'
 import { type LayerKey, useUiStore } from '@/store/ui'
 
@@ -47,11 +48,9 @@ function Toggle({ def }: { def: LayerDef }) {
       <span className={styles.mark ?? ''} aria-hidden="true">
         {on ? '◉' : '○'}
       </span>
-      <span
-        className={styles.dot ?? ''}
-        style={{ background: swatchColor(LAYER_SWATCH[def.key]) }}
-        aria-hidden="true"
-      />
+      <span className={styles.swatch ?? ''}>
+        <Swatch color={swatchColor(LAYER_SWATCH[def.key])} />
+      </span>
       <span className={styles.label ?? ''}>{def.label}</span>
     </button>
   )

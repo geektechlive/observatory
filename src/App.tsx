@@ -241,7 +241,6 @@ export function App() {
                     warm={!tracking}
                     tracking={tracking}
                     autoRotate={true}
-                    radarSweep={true}
                     census={census}
                   />
                 ) : (

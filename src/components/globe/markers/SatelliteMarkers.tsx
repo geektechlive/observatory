@@ -1,5 +1,7 @@
 import { memo } from 'react'
 
+import { LAYER_SWATCH, swatchColor } from '@/lib/palette'
+
 import { useProjected } from '../useGlobeProjection'
 
 export interface GlobeSatellite {
@@ -10,7 +12,7 @@ export interface GlobeSatellite {
   alt?: number | undefined
 }
 
-const SAT_COLOR = 'oklch(0.78 0.18 145)'
+const SAT_COLOR = swatchColor(LAYER_SWATCH.satellites)
 
 interface SatelliteMarkersProps {
   satellites: readonly GlobeSatellite[]

@@ -1,8 +1,11 @@
 import { useState } from 'react'
 
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useImageBucket } from '@/hooks/useImageBucket'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
-import { flareStatus, statusVar } from '@/lib/severity'
+import { flareStatus } from '@/lib/severity'
 
 import styles from './sun-stage.module.css'
 
@@ -21,8 +24,6 @@ const WAVELENGTHS: Wavelength[] = [
 
 const REFRESH_MS = 10 * 60 * 1000
 
-const flareColor = (cls: string | null): string => statusVar(flareStatus(cls))
-
 export function SunStage({ size = 460 }: { size?: number }) {
   const [wl, setWl] = useState('0171')
   const bucket = useImageBucket(REFRESH_MS)
@@ -35,14 +36,19 @@ export function SunStage({ size = 460 }: { size?: number }) {
   const src = `https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_${wl}.jpg?t=${bucket}`
 
   return (
-    <div className={styles.stage ?? ''} style={{ width: size, height: size }}>
+    <div
+      className={styles.stage ?? ''}
+      style={{ width: '100%', maxWidth: size, aspectRatio: '1 / 1' }}
+    >
       <div className={styles.coronaField ?? ''} aria-hidden="true" />
       <div
         className={`${styles.disc ?? ''} ${flaring ? (styles.flaring ?? '') : ''}`}
-        style={{ width: disc, height: disc }}
+        style={{ width: `${String((disc / size) * 100)}%`, aspectRatio: '1 / 1' }}
       >
         {errored ? (
-          <div className={styles.unavailable ?? ''}>Solar imagery unavailable</div>
+          <div className={styles.unavailable ?? ''}>
+            <PanelState kind="unavailable" detail="SDO imagery did not load" />
+          </div>
         ) : (
           <img
             key={wl}
@@ -63,20 +69,21 @@ export function SunStage({ size = 460 }: { size?: number }) {
       </div>
 
       <div className={styles.readout ?? ''}>
-        <span className={styles.readoutClass ?? ''} style={{ color: flareColor(flare) }}>
-          {flare ?? '—'}
-        </span>
-        <span className={styles.readoutLabel ?? ''}>GOES X-RAY · SDO/AIA</span>
+        <Readout
+          value={flare ?? '—'}
+          tone={flareStatus(flare) ?? undefined}
+          className={styles.readoutClass ?? ''}
+        />
+        <Label>GOES X-ray · SDO/AIA</Label>
       </div>
 
-      <div className={styles.waves ?? ''} role="tablist" aria-label="Wavelength">
+      <div className={styles.waves ?? ''} role="group" aria-label="Wavelength">
         {WAVELENGTHS.map((w) => (
           <button
             key={w.key}
             type="button"
-            role="tab"
-            aria-selected={w.key === wl}
-            className={`${styles.wave ?? ''} ${w.key === wl ? (styles.waveActive ?? '') : ''}`}
+            aria-pressed={w.key === wl}
+            className={styles.wave ?? ''}
             onClick={() => {
               setWl(w.key)
               setErrored(false)

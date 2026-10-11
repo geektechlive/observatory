@@ -364,7 +364,7 @@ export class GlobeLayerObjects {
     const geometry = new ConeGeometry(0.009, 1, 6).translate(0, 0.5, 0)
     const mesh = new InstancedMesh(
       geometry,
-      new MeshBasicMaterial({ color: '#ffffff' }),
+      new MeshBasicMaterial({ color: 0xffffff }), // identity multiplier: colour is per instance
       plan.spikes.length,
     )
     const up = new Vector3(0, 1, 0)

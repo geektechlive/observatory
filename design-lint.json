@@ -1,16 +1,6 @@
 {
-  "$comment": "ROCI v2 rules 4 and 6 (#40): no colour literals and nothing under 11px outside the token sources. Add a directory to `enforced` when its Phase 3 reskin lands; read by stylelint.config.js and eslint.config.js.",
-  "enforced": [
-    "src",
-    "src/styles/**",
-    "src/components/ui/**",
-    "src/components/world-map/**",
-    "src/components/starfield/**",
-    "src/components/status-bar/**",
-    "src/components/status/**",
-    "src/components/nav/**",
-    "src/lib/**"
-  ],
+  "$comment": "ROCI v2 rules 4 and 6 (#40): no colour literals and nothing under 11px outside the token sources. Every directory under src is enforced since Phase 3 landed (#52 to #58); read by stylelint.config.js and eslint.config.js.",
+  "enforced": ["src", "src/**", "src/components/ui/**"],
   "exempt": [
     "src/styles/tokens.css",
     "src/styles/palette.css",

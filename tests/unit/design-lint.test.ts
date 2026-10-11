@@ -49,7 +49,9 @@ const ENFORCED_CSS = 'src/components/ui/__probe__.module.css'
 // Typed linting only resolves files the TS project knows, so lint probe text as an
 // existing enforced file; the colour rule is purely syntactic.
 const ENFORCED_TS = 'src/components/ui/Swatch.tsx'
-const UNENFORCED_CSS = 'src/components/panels/__probe__.module.css'
+// A path that is in no `enforced` glob. Every directory under src is enforced since Phase 3
+// landed (#52 to #58), so the probe lives outside src.
+const UNENFORCED_CSS = 'scripts/__not-listed__/__probe__.module.css'
 
 describe('design-lint.json', () => {
   it('enforces at least the primitives and exempts the token sources', () => {
@@ -77,7 +79,7 @@ describe('stylelint colour literals', () => {
     expect(await cssErrors(code, ENFORCED_CSS)).toEqual([])
   })
 
-  it('leaves directories that are not reskinned yet alone', async () => {
+  it('leaves a directory that is not listed alone', async () => {
     expect(await cssErrors('.a { color: #ff0000; }', UNENFORCED_CSS)).toEqual([])
   })
 })

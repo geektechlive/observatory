@@ -3,7 +3,7 @@ import { memo } from 'react'
 import { Overlay } from '@/components/ui/Overlay'
 import { Readout } from '@/components/ui/Readout'
 import { Swatch } from '@/components/ui/Swatch'
-import { eonetKind, LANES } from '@/lib/palette'
+import { eonetKind, LANES, VOID_HEX } from '@/lib/palette'
 
 import { useProjected } from '../useGlobeProjection'
 
@@ -85,7 +85,7 @@ export const EventMarkers = memo(function EventMarkers({
               x={x}
               y={y + 3.5}
               textAnchor="middle"
-              fill="oklch(0.08 0.01 50)"
+              fill={VOID_HEX}
               fontSize="5"
               fontFamily="var(--font-stencil)"
               fontWeight="700"

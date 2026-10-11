@@ -1,5 +1,7 @@
 import { memo } from 'react'
 
+import { BONE_HEX, LANES } from '@/lib/palette'
+
 import { useProjected } from '../useGlobeProjection'
 
 export interface GlobeFireball {
@@ -9,7 +11,7 @@ export interface GlobeFireball {
   energy: number
 }
 
-const FIREBALL_COLOR = 'oklch(0.88 0.18 60)'
+const FIREBALL_COLOR = LANES.space.emit
 
 /** 4-point sparkle path centered at (cx, cy), radius r. */
 function sparklePath(cx: number, cy: number, r: number): string {
@@ -51,7 +53,7 @@ export const FireballMarkers = memo(function FireballMarkers({
               opacity="0.9"
               filter={glowFilter}
             />
-            <path d={sparklePath(x, y, r * 0.5)} fill="oklch(0.98 0.04 90)" opacity="0.95" />
+            <path d={sparklePath(x, y, r * 0.5)} fill={BONE_HEX} opacity="0.95" />
           </g>
         )
       })}
