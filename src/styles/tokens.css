@@ -1,112 +1,150 @@
-/* ROCI RETROFIT — Belter Station design tokens
-   Two color worlds: warm copper hull + cool cyan telemetry.
-   MCRN-red is hazard-only. Bone for ink, void for background. */
+/* ROCI RETROFIT v2: the Instrument. Design tokens.
+   Spec: docs/design-history/roci-retrofit-v2.md. Every shared value lives here;
+   component CSS consumes tokens and never redefines them.
+
+   Rules (enforced, not aspirational):
+   1. Copper is reflective, data is emissive. Nothing is both.
+   2. Cyan means spacecraft and telemetry only. Structure is never cool.
+   3. MCRN red means hazard only.
+   4. Data colours come from src/lib/palette.ts only; never graded, never server-assigned.
+   5. One radius (4px); circles are exempt.
+   6. Nothing under 11px. Text ink is solid and measured (ratios below are on void / hull / hull-2).
+   7. One Fraunces line per view. 8. Engraved caps only on hull plates.
+   9. Everything stops under reduced motion (block at the end of this file). */
 
 :root {
-  /* VOID + HULL */
+  /* VOID + HULL: reflective */
   --void: oklch(0.08 0.01 50);
   --hull: oklch(0.13 0.01 60);
   --hull-2: oklch(0.18 0.02 60);
   --plate-edge: oklch(0.28 0.03 60 / 0.6);
   --plate-seam: oklch(0.4 0.02 60 / 0.35);
+  --plate-highlight: oklch(1 0 0 / 0.07);
+  --plate-bg: linear-gradient(170deg, var(--hull-2), var(--hull) 70%);
 
-  /* INK */
-  --bone: oklch(0.94 0.01 80);
-  --bone-dim: oklch(0.94 0.01 80 / 0.66);
-  --bone-faint: oklch(0.94 0.01 80 / 0.4);
+  /* INK: solid; WCAG ratio on void / hull / hull-2 */
+  --bone: oklch(0.94 0.01 80); /* 17.4 / 16.9 / 15.8 */
+  --bone-dim: oklch(0.72 0.012 78); /* 8.4 / 8.1 / 7.6 */
+  --bone-faint: oklch(0.62 0.012 75); /* 5.7 / 5.5 / 5.2 (v1 was alpha .40 = 3.25, failed AA) */
 
-  /* WARM WORLD — copper hull, brass fittings */
-  --copper: oklch(0.62 0.13 48);
-  --copper-2: oklch(0.55 0.14 45);
-  --copper-glow: oklch(0.78 0.14 55);
-  --brass: oklch(0.82 0.14 80);
+  /* WARM WORLD: reflective copper and brass */
+  --copper: oklch(0.62 0.13 48); /* 5.5 / 5.3 / 5.0 */
+  --copper-2: oklch(0.55 0.14 45); /* MARK-ONLY: 4.0 on void, borders and rivets, never text */
+  --copper-glow: oklch(0.78 0.14 55); /* 10.0 / 9.7 / 9.1 */
+  --brass: oklch(0.82 0.14 80); /* night-side city lights, fittings */
 
-  /* COOL WORLD — cyan telemetry */
-  --signal: oklch(0.85 0.13 220);
+  /* EMISSIVE: telemetry + status */
+  --signal: oklch(0.85 0.13 220); /* ISS and telemetry. 13.5 / 13.1 / 12.2 */
   --signal-2: oklch(0.72 0.13 220);
-  --terminal: oklch(0.78 0.18 145);
+  --terminal: oklch(0.78 0.18 145); /* status: nominal. 11.1 / 10.7 / 10.0 */
+  --amber: oklch(0.84 0.16 80); /* status: watch. 12.5 / 12.1 / 11.3 */
+  --mcrn: oklch(0.64 0.2 27); /* status: hazard. 5.6 / 5.4 / 5.1 */
+  --mcrn-2: oklch(0.5 0.22 25); /* MARK-ONLY: 3.3 on void, rivets and hazard stripes */
 
-  /* HAZARD */
-  --mcrn: oklch(0.62 0.2 25);
-  --mcrn-2: oklch(0.5 0.22 25);
-  --amber: oklch(0.84 0.16 80);
-
-  /* Legacy aliases — preserve component references */
-  --bg: var(--void);
+  /* Legacy aliases: kept for one release, removed by codemod in Phase 3 */
   --ink: var(--bone);
   --ink-dim: var(--bone-dim);
   --ink-faint: var(--bone-faint);
   --cyan: var(--signal);
   --magenta: var(--mcrn);
   --green: var(--terminal);
+  --gold: var(--amber);
   --warm: oklch(0.62 0.2 30);
   --orange: oklch(0.72 0.15 50);
-  --gold: var(--amber);
 
   /* TYPOGRAPHY */
   --font-display: 'Fraunces', georgia, serif;
+  --font-editorial: var(--font-display);
   --font-body: 'Inter Tight', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-
-  /* Stencil → IBM Plex Mono 500 for all functional ops labels */
-  --font-stencil: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-stencil: var(--font-mono);
   --font-stencil-weight: 500;
   --font-stencil-tracking: 0.18em;
+  --font-paint:
+    'Special Elite', 'Courier New', monospace; /* hull markings only, never information */
 
-  /* Paint → Special Elite retained for decorative painted elements only */
-  --font-paint: 'Special Elite', 'Courier New', monospace;
-  --font-editorial: 'Fraunces', georgia, serif;
-
-  --text-base: clamp(0.9375rem, 0.85rem + 0.4vw, 1.0625rem);
+  --text-xs: 0.6875rem; /* 11px: the floor */
   --text-sm: 0.8125rem;
-  --text-xs: 0.6875rem;
+  --text-base: clamp(0.9375rem, 0.85rem + 0.4vw, 1.0625rem);
+  --text-lg: 1.375rem;
   --text-display: clamp(2rem, 1rem + 4vw, 4rem);
+  --track-engrave: 0.18em;
+  --track-label: 0.06em;
 
-  /* STRUCTURAL PANEL BORDERS */
-  --panel-border: oklch(0.28 0.06 200 / 0.48);
-  --panel-border-strong: oklch(0.34 0.08 200 / 0.65);
-
-  /* GLASS + DEPTH */
+  /* SURFACES. Plates are tier 1 (hull); glass is tier 2, only over live viewports */
   --glass-blur: 10px;
   --glass-saturate: 1.35;
   --glass-alpha-near: 0.68;
   --glass-alpha-mid: 0.58;
   --glass-alpha-far: 0.48;
+  --glass-bg: oklch(0.14 0.02 55 / var(--glass-alpha-near)); /* warm: owner pick A, 2026-10-10 */
+  --glass-border: var(--plate-edge);
+  --panel-border: oklch(0.32 0.04 55 / 0.5);
+  --panel-border-strong: oklch(0.4 0.05 55 / 0.65);
+  --scrim: oklch(0.1 0.02 50 / 0.92);
+  --hud-line: oklch(0.85 0.13 220 / 0.55);
+  --hud-faint: oklch(0.94 0.01 80 / 0.08);
 
   --depth-shadow-near:
     inset 0 1px 0 oklch(1 0 0 / 0.08), inset 0 -1px 0 oklch(0 0 0 / 0.45),
     0 2px 4px oklch(0 0 0 / 0.35), 0 8px 18px oklch(0 0 0 / 0.45), 0 24px 60px oklch(0 0 0 / 0.55);
-
   --depth-shadow-mid:
     inset 0 1px 0 oklch(1 0 0 / 0.06), inset 0 -1px 0 oklch(0 0 0 / 0.35),
     0 2px 3px oklch(0 0 0 / 0.3), 0 6px 14px oklch(0 0 0 / 0.38), 0 16px 40px oklch(0 0 0 / 0.45);
-
   --depth-shadow-far:
     inset 0 1px 0 oklch(1 0 0 / 0.04), 0 1px 2px oklch(0 0 0 / 0.25), 0 4px 8px oklch(0 0 0 / 0.3),
     0 10px 24px oklch(0 0 0 / 0.35);
-
-  /* PANEL MATERIAL — hull plate (replaces glass tokens) */
-  --glass-bg: oklch(0.13 0.02 220 / var(--glass-alpha-near));
-  --glass-border: var(--plate-edge);
   --glass-shadow: var(--depth-shadow-near);
 
   /* LAYOUT */
-  --status-bar-bg: oklch(0.1 0.02 50 / 0.95);
-  --status-bar-border: var(--plate-edge);
-  --status-bar-h: 0px;
   --ticker-h: 56px;
   --gutter: clamp(24px, 4vw, 48px);
-
-  /* SPACING + SHAPE */
-  --radius-tile: 4px;
-  --radius-panel: 4px;
-  --radius-hero: 4px;
-  --space-section: clamp(20px, 2vw, 28px);
   --space-gap: 18px;
+
+  /* SCALES */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 36px;
+  --radius: 4px;
+  --radius-tile: var(--radius);
+  --radius-panel: var(--radius);
+  --radius-hero: var(--radius);
+  --z-base: 0;
+  --z-hud: 10;
+  --z-overlay: 100;
+  --z-popover: 200;
+  --z-modal: 500;
+  --z-skip: 1000;
 
   /* MOTION */
   --duration-fast: 200ms;
   --duration-normal: 350ms;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
   --pulse-duration: 1.6s;
+
+  /* GLOBE GRADE: read once by the WebGL shader through src/lib/palette.ts constants */
+  --globe-grade-shadow: var(--void);
+  --globe-grade-deep: oklch(0.3 0.06 48); /* sea, and low land */
+  --globe-grade-mid: var(--copper-2);
+  --globe-grade-high: var(--copper-glow);
+  --globe-grade-mix: 0.94;
+  --globe-night: var(--brass);
+}
+
+/* Rule 9. SMIL and rAF loops are gated separately in code (useReducedMotion);
+   CSS can only stop CSS. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

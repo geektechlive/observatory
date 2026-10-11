@@ -162,17 +162,6 @@ body::after {
   text-transform: uppercase;
 }
 
-.belter {
-  display: block;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 13px;
-  letter-spacing: 0.005em;
-  margin-top: 4px;
-  color: var(--copper);
-  opacity: 0.85;
-}
-
 /* Skip link */
 .skip-link {
   position: absolute;
