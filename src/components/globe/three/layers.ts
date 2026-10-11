@@ -114,12 +114,13 @@ const pointVertex = /* glsl */ `
 /** Round points with a soft void rim, so a cluster of fires still reads as separate dots. */
 const pointFragment = /* glsl */ `
   uniform vec3 halo;
+  uniform float haloAmount;
   varying vec3 vColor;
   varying float vAlpha;
   void main() {
     float d = length(gl_PointCoord - 0.5) * 2.0;
     if (d > 1.0) discard;
-    vec3 c = mix(vColor, halo, smoothstep(0.62, 0.9, d));
+    vec3 c = mix(vColor, halo, smoothstep(0.62, 0.9, d) * haloAmount);
     gl_FragColor = vec4(c, vAlpha * (1.0 - smoothstep(0.9, 1.0, d)));
     #include <colorspace_fragment>
   }
@@ -269,7 +270,12 @@ export class GlobeLayerObjects {
       ),
     )
     const material = new ShaderMaterial({
-      uniforms: { scale: { value: this.pixelScale }, halo: { value: new Color(VOID_HEX) } },
+      uniforms: {
+        scale: { value: this.pixelScale },
+        halo: { value: new Color(VOID_HEX) },
+        // A field (aurora) has no halo; discrete markers keep theirs for contrast.
+        haloAmount: { value: additive ? 0 : 1 },
+      },
       vertexShader: pointVertex,
       fragmentShader: pointFragment,
       transparent: true,
