@@ -5,7 +5,7 @@ import { OrbitConsole } from '@/components/consoles/OrbitConsole'
 import { SkyConsole } from '@/components/consoles/SkyConsole'
 import { SunConsole } from '@/components/consoles/SunConsole'
 import { Footer } from '@/components/footer/Footer'
-import { Globe } from '@/components/globe/Globe'
+import { GlobeHost } from '@/components/globe/GlobeHost'
 import { LayerControl } from '@/components/globe/LayerControl'
 import { OrbitalDial } from '@/components/nav/OrbitalDial'
 import { SkyStage } from '@/components/stage/SkyStage'
@@ -172,7 +172,7 @@ export function App() {
                 ) : stageKind === 'sky' ? (
                   <SkyStage size={460} />
                 ) : mapMode === 'globe' ? (
-                  <Globe
+                  <GlobeHost
                     size={460}
                     issLat={issLat}
                     issLon={issLon}

@@ -16,11 +16,12 @@ import { gzipSync } from 'node:zlib'
 /**
  * Measured 2026-10-11 after Phase 1: entry 180.4 kB gzip, WorldMap 279.7 kB gzip.
  * The entry gets about 10 kB of headroom for the GlobeHost shell; WorldMap gets +5%.
- * lazyThreeGzip is provisional until #46 measures the real renderer chunk, then locked.
+ * The lazy three.js renderer measured 131.2 kB gzip with the Earth shader (#46, entry
+ * grew only 1.4 kB); 160 kB leaves room for the data layers and bloom (#49, #50).
  */
 export const BUDGETS = {
   entryGzip: 190_000,
-  lazyThreeGzip: 200_000,
+  lazyThreeGzip: 160_000,
   worldMapGzip: 294_000,
   textureBytes: 1_500_000,
 }

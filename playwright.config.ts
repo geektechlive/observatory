@@ -14,6 +14,10 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      // Headless Chromium already gets WebGL through SwiftShader. Don't pin
+      // --use-angle=swiftshader: it forces software rendering for every page and
+      // slowed the suite 2.5x, enough to time out instrument.spec. If Chrome drops
+      // the fallback, globe-webgl.spec fails loudly on data-globe-mode (#46).
       use: { ...devices['Desktop Chrome'] },
       testIgnore: '**/mobile.spec.ts',
     },
