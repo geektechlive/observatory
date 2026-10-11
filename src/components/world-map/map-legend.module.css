@@ -1,7 +1,7 @@
 .legend {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   background: var(--scrim);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius-panel);
