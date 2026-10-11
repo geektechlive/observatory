@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import clockStyles from './dual-clock.module.css'
 
@@ -20,21 +20,23 @@ function getTzAbbr(date: Date, timeZone: string) {
 
 export function DualClock() {
   const [now, setNow] = useState(() => new Date())
-  const rafRef = useRef<number | null>(null)
-  const lastSecRef = useRef(-1)
 
+  // Tick on the second boundary. The old version polled every animation frame
+  // (60 Hz) just to notice the second had changed.
   useEffect(() => {
-    function tick() {
-      const d = new Date()
-      if (d.getSeconds() !== lastSecRef.current) {
-        lastSecRef.current = d.getSeconds()
-        setNow(d)
-      }
-      rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
+    let interval: ReturnType<typeof setInterval> | undefined
+    const align = setTimeout(
+      () => {
+        setNow(new Date())
+        interval = setInterval(() => {
+          setNow(new Date())
+        }, 1000)
+      },
+      1000 - (Date.now() % 1000),
+    )
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      clearTimeout(align)
+      if (interval) clearInterval(interval)
     }
   }, [])
 
@@ -44,7 +46,11 @@ export function DualClock() {
   const isoLabel = now.toISOString()
 
   return (
-    <div className={clockStyles.root} aria-label={`Clocks: UTC ${utc}, local ${local}`}>
+    <div
+      className={clockStyles.root}
+      role="group"
+      aria-label={`Clocks: UTC ${utc}, local ${local}`}
+    >
       <time dateTime={isoLabel} className={clockStyles.clock}>
         <span className={clockStyles.tz}>UTC</span>
         <span className={clockStyles.time}>{utc}</span>

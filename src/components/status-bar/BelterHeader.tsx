@@ -31,14 +31,14 @@ export function BelterHeader() {
         <path
           d="M 0 18 Q 40 10 80 18 T 160 18"
           fill="none"
-          stroke="oklch(0.55 0.13 45)"
+          stroke="var(--copper-2)"
           strokeWidth="1.2"
           strokeDasharray="4 3"
         />
         <path
           d="M 0 22 Q 40 14 80 22 T 160 22"
           fill="none"
-          stroke="oklch(0.42 0.10 45)"
+          stroke="var(--plate-seam)"
           strokeWidth="0.8"
           strokeDasharray="3 4"
         />

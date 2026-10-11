@@ -70,6 +70,7 @@ export function AboutPopover({ onClose }: AboutPopoverProps) {
       ref={ref}
       id="about-popover"
       role="dialog"
+      aria-modal="true"
       aria-label="About observatory"
       className={styles.popover ?? ''}
     >

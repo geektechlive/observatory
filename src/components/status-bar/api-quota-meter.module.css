@@ -1,3 +1,4 @@
+/* NASA API quota: telemetry (signal) while healthy, then the status scale. */
 .meter {
   display: flex;
   align-items: center;
@@ -11,7 +12,8 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   line-height: 1;
-  color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+  color: var(--signal);
 }
 
 .label.caution {
@@ -19,27 +21,27 @@
 }
 
 .label.low {
-  color: var(--warm);
+  color: var(--mcrn);
 }
 
 .unit {
-  font-size: 0.6rem;
-  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  color: var(--bone-faint);
   margin-left: 1px;
 }
 
 .track {
   width: 36px;
   height: 3px;
-  border-radius: 99px;
-  background: var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--plate-seam);
   overflow: hidden;
 }
 
 .fill {
   height: 100%;
-  border-radius: 99px;
-  background: var(--cyan);
+  border-radius: var(--radius);
+  background: var(--signal);
   transition: width var(--duration-normal) var(--ease-out-expo);
 }
 
@@ -48,5 +50,5 @@
 }
 
 .fill.low {
-  background: var(--warm);
+  background: var(--mcrn);
 }
