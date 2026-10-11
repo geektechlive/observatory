@@ -15,13 +15,13 @@ const hex = (literal: string): string => {
   return oklchToHex(parsed)
 }
 
-// Same family as the globe grade: dark bronze sea, hull land, copper borders.
-const VOID = hex('oklch(0.08 0.01 50)')
-const SEA = hex('oklch(0.1 0.015 50)')
-const LAND = hex('oklch(0.17 0.025 55)')
-const LAND_DETAIL = hex('oklch(0.19 0.03 55)')
-const BORDER = hex('oklch(0.45 0.09 50)')
-const SEAM = hex('oklch(0.26 0.03 55)')
+// Same family as the globe grade: dark bronze sea, hull land, quiet copper seams.
+// In dark-matter the background layer is the land; water is a fill drawn over it.
+const SEA = hex('oklch(0.09 0.012 50)')
+const LAND = hex('oklch(0.24 0.035 55)')
+const LAND_DETAIL = hex('oklch(0.26 0.037 55)')
+const BORDER = hex('oklch(0.4 0.07 50)')
+const SEAM = hex('oklch(0.3 0.03 55)')
 
 export interface PaintOverride {
   readonly property: 'background-color' | 'fill-color' | 'line-color'
@@ -34,7 +34,7 @@ export function warmBasemapPaint(layer: { id: string; type: string }): PaintOver
   const isWater = id.includes('water') || id.includes('ocean') || id.includes('lake')
   switch (layer.type) {
     case 'background':
-      return [{ property: 'background-color', value: VOID }]
+      return [{ property: 'background-color', value: LAND }]
     case 'fill':
       if (isWater) return [{ property: 'fill-color', value: SEA }]
       if (id.includes('building') || id.includes('park') || id.includes('landuse'))

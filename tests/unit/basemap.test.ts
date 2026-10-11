@@ -6,18 +6,25 @@ import { contrastRatio } from '@/lib/color'
 const HEX = /^#[0-9a-f]{6}$/
 
 describe('warmBasemapPaint (#41: CARTO is a vector style, so retheme it, do not filter it)', () => {
-  it('paints the background void', () => {
-    expect(warmBasemapPaint({ id: 'background', type: 'background' })).toEqual([
-      { property: 'background-color', value: expect.stringMatching(HEX) },
-    ])
+  it('paints the background as land: in dark-matter the background IS the land', () => {
+    const background = warmBasemapPaint({ id: 'background', type: 'background' })[0]?.value ?? ''
+    const landcover = warmBasemapPaint({ id: 'landcover', type: 'fill' })[0]?.value ?? ''
+    expect(background).toMatch(HEX)
+    expect(background).toBe(landcover)
   })
 
-  it('makes water darker than land, like the globe grade', () => {
+  it('makes water clearly darker than land, like the globe grade', () => {
     const water = warmBasemapPaint({ id: 'water', type: 'fill' })[0]?.value ?? ''
-    const land = warmBasemapPaint({ id: 'landcover', type: 'fill' })[0]?.value ?? ''
-    expect(water).toMatch(HEX)
-    expect(land).toMatch(HEX)
-    expect(contrastRatio(land, '#000000')).toBeGreaterThan(contrastRatio(water, '#000000'))
+    const land = warmBasemapPaint({ id: 'background', type: 'background' })[0]?.value ?? ''
+    expect(contrastRatio(land, water)).toBeGreaterThan(1.25)
+  })
+
+  it('keeps borders quiet: a seam, not a copper web (under 3:1 against land)', () => {
+    const land = warmBasemapPaint({ id: 'background', type: 'background' })[0]?.value ?? ''
+    const border =
+      warmBasemapPaint({ id: 'boundary_country_outline', type: 'line' })[0]?.value ?? ''
+    expect(contrastRatio(border, land)).toBeLessThan(3)
+    expect(contrastRatio(border, land)).toBeGreaterThan(1.3)
   })
 
   it('draws boundaries in copper and roads as faint seams', () => {
