@@ -1,0 +1,274 @@
+/**
+ * The three.js globe (ROCI v2, #46/#47). Imperative, not React: the frame loop never
+ * touches React state. Loaded only through a dynamic import from GlobeHost, so
+ * three.js stays out of the entry chunk (scripts/check-bundle.mjs enforces it).
+ *
+ * Lifecycle: create() loads textures and builds the scene; attach()/detach() move
+ * the canvas without losing the GPU context (so Earth/Sun/Sky switches don't churn
+ * contexts); dispose() releases everything the spike leaked.
+ */
+import {
+  AdditiveBlending,
+  BackSide,
+  type BufferGeometry,
+  Group,
+  type Material,
+  Mesh,
+  PerspectiveCamera,
+  Scene,
+  ShaderMaterial,
+  SphereGeometry,
+  SRGBColorSpace,
+  type Texture,
+  TextureLoader,
+  Vector3,
+  WebGLRenderer,
+} from 'three'
+
+import { facingLongitude, rotationForFacing, sunDirection } from '@/lib/globe3d'
+import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
+
+import { atmosphereFragment, atmosphereVertex, earthFragment, earthVertex } from './shaders'
+
+/** The slice of WebGLRenderer the globe uses; tests pass a fake. */
+export interface WebGLRendererLike {
+  domElement: HTMLCanvasElement
+  setPixelRatio(ratio: number): void
+  setSize(width: number, height: number, updateStyle?: boolean): void
+  render(scene: Scene, camera: PerspectiveCamera): void
+  dispose(): void
+  forceContextLoss(): void
+  capabilities: { getMaxAnisotropy(): number }
+}
+
+export interface RendererDeps {
+  createRenderer: () => WebGLRendererLike
+  loadTexture: (url: string) => Promise<Texture>
+  requestFrame: (cb: (t: number) => void) => number
+  cancelFrame: (id: number) => void
+}
+
+export interface GlobeRendererOptions {
+  size: number
+  textures: { day: string; night: string }
+  dprCap: number
+  reducedMotion: boolean
+  /** Copper grade on; the ORBIT tracking view turns it off. */
+  warm: boolean
+  showTerminator?: boolean | undefined
+  onContextLost?: (() => void) | undefined
+}
+
+/** The SVG globe turns 0.6 degrees every 100 ms; match it so the crossfade doesn't jump. */
+const DEGREES_PER_MS = 0.006
+/** The SVG globe starts facing 12 degrees east. */
+const START_FACING = 12
+const CAMERA_DISTANCE = 4.1
+const SUN_REFRESH_MS = 60_000
+
+const defaultDeps: RendererDeps = {
+  createRenderer: () => new WebGLRenderer({ antialias: true, alpha: true }),
+  loadTexture: (url) => new TextureLoader().loadAsync(url),
+  requestFrame: (cb) => requestAnimationFrame(cb),
+  cancelFrame: (id) => {
+    cancelAnimationFrame(id)
+  },
+}
+
+const vec = (rgb: readonly number[]): Vector3 => new Vector3(rgb[0], rgb[1], rgb[2])
+
+export class GlobeRenderer {
+  readonly canvas: HTMLCanvasElement
+  private readonly scene = new Scene()
+  private readonly camera = new PerspectiveCamera(30, 1, 0.1, 100)
+  private readonly globe = new Group()
+  private readonly sun = new Vector3()
+  private readonly meshes: Mesh[] = []
+  private rotation = rotationForFacing(START_FACING)
+  private frameId = 0
+  private lastFrame: number | null = null
+  private lastSun = 0
+  private rotationPaused = false
+  private attached = false
+  private disposed = false
+
+  private readonly renderer: WebGLRendererLike
+  private readonly textures: readonly Texture[]
+  private readonly options: GlobeRendererOptions
+  private readonly deps: RendererDeps
+
+  private constructor(
+    renderer: WebGLRendererLike,
+    textures: readonly Texture[],
+    options: GlobeRendererOptions,
+    deps: RendererDeps,
+  ) {
+    this.renderer = renderer
+    this.textures = textures
+    this.options = options
+    this.deps = deps
+    this.canvas = renderer.domElement
+    this.canvas.setAttribute('aria-hidden', 'true')
+    // Tests and the host find this canvas by name; the SVG globe and starfield have canvases too.
+    this.canvas.dataset['globeWebgl'] = ''
+    renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, options.dprCap))
+    renderer.setSize(options.size, options.size, false)
+    this.camera.position.set(0, 0, CAMERA_DISTANCE)
+    this.camera.lookAt(0, 0, 0)
+    this.buildScene()
+    this.canvas.addEventListener('webglcontextlost', this.handleContextLost)
+    document.addEventListener('visibilitychange', this.handleVisibility)
+  }
+
+  /** Builds the renderer and resolves once both Earth textures are on the GPU. */
+  static async create(
+    options: GlobeRendererOptions,
+    deps: RendererDeps = defaultDeps,
+  ): Promise<GlobeRenderer> {
+    const renderer = deps.createRenderer()
+    try {
+      const [day, night] = await Promise.all([
+        deps.loadTexture(options.textures.day),
+        deps.loadTexture(options.textures.night),
+      ])
+      const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy())
+      for (const t of [day, night]) {
+        t.colorSpace = SRGBColorSpace
+        t.anisotropy = anisotropy
+      }
+      return new GlobeRenderer(renderer, [day, night], options, deps)
+    } catch (error) {
+      renderer.dispose()
+      renderer.forceContextLoss()
+      throw error
+    }
+  }
+
+  private buildScene(): void {
+    const [day, night] = this.textures
+    this.sun.fromArray(sunDirection(new Date()))
+    const earth = new Mesh(
+      new SphereGeometry(1, 128, 96),
+      new ShaderMaterial({
+        uniforms: {
+          dayTex: { value: day },
+          nightTex: { value: night },
+          sunDir: { value: this.sun },
+          gShadow: { value: vec(GLOBE_GRADE.shadow) },
+          gDeep: { value: vec(GLOBE_GRADE.deep) },
+          gMid: { value: vec(GLOBE_GRADE.mid) },
+          gHigh: { value: vec(GLOBE_GRADE.high) },
+          gNight: { value: vec(GLOBE_GRADE.night) },
+          gMix: { value: this.options.warm ? GLOBE_GRADE.mix : 0 },
+          showTerminator: { value: this.options.showTerminator === false ? 0 : 1 },
+        },
+        vertexShader: earthVertex,
+        fragmentShader: earthFragment,
+      }),
+    )
+    const atmosphere = new Mesh(
+      new SphereGeometry(1.055, 96, 64),
+      new ShaderMaterial({
+        uniforms: {
+          sunDir: { value: this.sun },
+          dayCol: { value: vec(GLOBE_GRADE.high) },
+          nightCol: { value: vec(hexToLinear(ISS_HEX)) },
+        },
+        vertexShader: atmosphereVertex,
+        fragmentShader: atmosphereFragment,
+        side: BackSide,
+        blending: AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      }),
+    )
+    this.meshes.push(earth, atmosphere)
+    this.globe.add(earth, atmosphere)
+    this.globe.rotation.y = this.rotation
+    this.scene.add(this.globe)
+  }
+
+  /** Longitude currently facing the camera, in degrees. */
+  facing(): number {
+    return facingLongitude(this.rotation)
+  }
+
+  attach(parent: HTMLElement): void {
+    if (this.disposed) return
+    parent.appendChild(this.canvas)
+    this.attached = true
+    this.renderOnce()
+    this.schedule()
+  }
+
+  detach(): void {
+    this.stopLoop()
+    this.attached = false
+    this.canvas.remove()
+  }
+
+  setRotationPaused(paused: boolean): void {
+    this.rotationPaused = paused
+    this.lastFrame = null
+  }
+
+  /** For lifecycle tests: the meshes whose geometry and material dispose() must free. */
+  debugMeshes(): readonly Mesh<BufferGeometry, Material>[] {
+    return this.meshes as Mesh<BufferGeometry, Material>[]
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    this.detach()
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost)
+    document.removeEventListener('visibilitychange', this.handleVisibility)
+    for (const mesh of this.meshes) {
+      mesh.geometry.dispose()
+      ;(mesh.material as Material).dispose()
+    }
+    for (const t of this.textures) t.dispose()
+    this.renderer.dispose()
+    this.renderer.forceContextLoss()
+  }
+
+  private schedule(): void {
+    if (!this.attached || this.disposed || this.options.reducedMotion || document.hidden) return
+    this.frameId = this.deps.requestFrame(this.frame)
+  }
+
+  private stopLoop(): void {
+    this.deps.cancelFrame(this.frameId)
+    this.frameId = 0
+    this.lastFrame = null
+  }
+
+  private readonly frame = (now: number): void => {
+    if (!this.rotationPaused && this.lastFrame !== null) {
+      this.rotation += (now - this.lastFrame) * DEGREES_PER_MS * (Math.PI / 180)
+      this.globe.rotation.y = this.rotation
+    }
+    this.lastFrame = now
+    if (now - this.lastSun > SUN_REFRESH_MS) {
+      this.sun.fromArray(sunDirection(new Date()))
+      this.lastSun = now
+    }
+    this.renderer.render(this.scene, this.camera)
+    this.schedule()
+  }
+
+  private renderOnce(): void {
+    this.renderer.render(this.scene, this.camera)
+  }
+
+  private readonly handleVisibility = (): void => {
+    if (document.hidden) this.stopLoop()
+    else this.schedule()
+  }
+
+  private readonly handleContextLost = (event: Event): void => {
+    event.preventDefault()
+    this.stopLoop()
+    this.options.onContextLost?.()
+  }
+}
