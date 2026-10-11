@@ -195,6 +195,17 @@ describe('useTicker', () => {
     expect(result.current.find((i) => i.type === 'sentry')?.color).toBe('var(--terminal)')
   })
 
+  it('treats a Palermo of exactly 0 as a hazard, not as missing', () => {
+    setupMocks({
+      sentry: {
+        count: '1',
+        data: [{ des: '0', fullname: 'Zero', ps_cum: '0', ip: '0.01', n_imp: 1 }],
+      },
+    })
+    const { result } = renderHook(() => useTicker())
+    expect(result.current.find((i) => i.type === 'sentry')?.color).toBe('var(--mcrn)')
+  })
+
   it('uses DEFAULT_EVENT_META for unknown category', () => {
     setupMocks({
       events: [

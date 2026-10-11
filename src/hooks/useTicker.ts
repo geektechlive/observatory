@@ -26,6 +26,12 @@ function eonetMeta(categoryId: string): { label: string; color: string } {
   return { label: kind.label.toUpperCase(), color: LANES[kind.lane].emit }
 }
 
+/** Palermo as a number; missing or unparseable sorts last. 0 is a real (serious) value. */
+function palermoOf(raw: string | null | undefined): number {
+  const ps = parseFloat(raw ?? '')
+  return Number.isNaN(ps) ? -Infinity : ps
+}
+
 export function useTicker(): TickerItem[] {
   const eventsQuery = useEvents()
   const { data: donki } = useDonki()
@@ -87,8 +93,8 @@ export function useTicker(): TickerItem[] {
     const sentryData = sentry?.data ?? []
     const topSentry = [...sentryData]
       .sort((a, b) => {
-        const aPs = parseFloat(a.ps_cum ?? '') || -Infinity
-        const bPs = parseFloat(b.ps_cum ?? '') || -Infinity
+        const aPs = palermoOf(a.ps_cum)
+        const bPs = palermoOf(b.ps_cum)
         return bPs - aPs
       })
       .slice(0, 3)
@@ -99,7 +105,7 @@ export function useTicker(): TickerItem[] {
         type: 'sentry',
         label: 'IMPACT RISK',
         description: `${s.fullname ?? s.name ?? s.des} · Palermo ${ps}`,
-        color: statusVar(palermoStatus(parseFloat(s.ps_cum ?? '') || -Infinity)),
+        color: statusVar(palermoStatus(palermoOf(s.ps_cum))),
         time: new Date(0),
       })
     })
