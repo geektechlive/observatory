@@ -15,7 +15,7 @@
 import type { LayerKey } from '@/store/ui'
 
 import { oklchToHex, parseOklch } from './color'
-import { nwsStatus, type Status } from './severity'
+import { gdacsStatus, nwsStatus, type Status } from './severity'
 
 export type Lane = 'orbital' | 'thermal' | 'space' | 'geo' | 'hydro'
 
@@ -115,6 +115,64 @@ export function swatchColor(swatch: Swatch): string {
  */
 export function nwsColor(severity: string): string {
   return STATUS_HEX[nwsStatus(severity).status]
+}
+
+/** No reading (null magnitude, unknown altitude or temperature): faint ink, not a data colour. */
+export const MUTED_HEX = hexOf(TOKEN_OKLCH.boneFaint)
+/** Marker halo so glyphs hold contrast over copper land and city lights (Codex finding 13). */
+export const VOID_HEX = hexOf('oklch(0.08 0.01 50)')
+
+/** Quakes sit in the geophysical lane; magnitude is drawn as size, never as colour. */
+export function quakeMapColor(mag: number | null): string {
+  return mag === null ? MUTED_HEX : LANES.geo.emit
+}
+
+export function gdacsColor(level: string): string {
+  return STATUS_HEX[gdacsStatus(level)]
+}
+
+/** Fires sit in the thermal lane; radiative power is drawn as size. */
+export function fireMapColor(): string {
+  return LANES.thermal.emit
+}
+
+/**
+ * US-EPA PM2.5 (µg/m³) bands. A recognised standard, so all six bands stay, redrawn
+ * on the site's status family (owner pick: status scale) with the band label always shown.
+ */
+const AQI_BANDS: readonly (readonly [number, string])[] = [
+  [12, STATUS_HEX.nominal],
+  [35.4, hexOf('oklch(0.88 0.15 95)')],
+  [55.4, STATUS_HEX.watch],
+  [150.4, hexOf('oklch(0.72 0.17 50)')],
+  [250.4, STATUS_HEX.hazard],
+]
+const AQI_HAZARDOUS = hexOf('oklch(0.5 0.2 18)')
+
+export function aqiColor(pm25: number): string {
+  return AQI_BANDS.find(([max]) => pm25 <= max)?.[1] ?? AQI_HAZARDOUS
+}
+
+/** Aircraft are not spacecraft, so altitude is a neutral bone lightness ramp. */
+const ALT_STEPS = [
+  hexOf('oklch(0.62 0.012 75)'),
+  hexOf('oklch(0.78 0.012 78)'),
+  hexOf('oklch(0.94 0.01 80)'),
+]
+export function altitudeColor(altM: number | null): string {
+  if (altM === null) return MUTED_HEX
+  if (altM < 3000) return ALT_STEPS[0] ?? MUTED_HEX
+  if (altM < 9000) return ALT_STEPS[1] ?? MUTED_HEX
+  return ALT_STEPS[2] ?? MUTED_HEX
+}
+
+/** Sea temperature diverges: hydro lane (cold), neutral bone midpoint, thermal lane (warm). */
+const SST_MID = hexOf('oklch(0.86 0.01 80)')
+export function sstColor(t: number | null): string {
+  if (t === null) return MUTED_HEX
+  if (t <= 10) return LANES.hydro.emit
+  if (t <= 24) return SST_MID
+  return LANES.thermal.emit
 }
 
 export interface EonetKindDef {

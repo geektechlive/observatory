@@ -4,17 +4,6 @@
   height: 100%;
 }
 
-/* Copper warmth overlay — tints the basemap without breaking MapLibre interactions */
-.mapWrap::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-panel);
-  background: oklch(0.55 0.15 45 / 0.22);
-  pointer-events: none;
-  z-index: 5;
-}
-
 .container {
   position: relative;
   width: 100%;
@@ -23,8 +12,7 @@
   border-radius: var(--radius-panel);
   overflow: hidden;
 
-  /* Warm the cold CARTO dark-matter tiles toward the copper palette */
-  filter: sepia(0.55) brightness(0.82) saturate(1.2);
+  /* No filter: the basemap is rethemed layer by layer (src/lib/basemap.ts), so data keeps its colours. */
 }
 
 .eonetBadge {
@@ -32,9 +20,9 @@
   bottom: 36px;
   left: 12px;
   padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(4, 6, 15, 0.75);
-  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: var(--radius);
+  background: var(--scrim);
+  border: 1px solid color-mix(in oklch, var(--amber) 35%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--amber);
@@ -48,8 +36,8 @@
   position: absolute;
   right: 12px;
   padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(4, 6, 15, 0.75);
+  border-radius: var(--radius);
+  background: var(--scrim);
   border: 1px solid var(--glass-border);
   font-family: var(--font-mono);
   font-size: var(--text-xs);

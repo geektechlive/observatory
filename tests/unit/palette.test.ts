@@ -4,16 +4,23 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  altitudeColor,
+  aqiColor,
   AURORA_HEX,
   EONET_KINDS,
   eonetKind,
+  fireMapColor,
+  gdacsColor,
   hexToLinear,
   ISS_HEX,
   LANES,
   LAYER_SWATCH,
+  MUTED_HEX,
   nwsColor,
   primaryCategoryCounts,
+  quakeMapColor,
   renderPaletteCss,
+  sstColor,
   STATUS_HEX,
   swatchColor,
   TOKEN_OKLCH,
@@ -120,6 +127,44 @@ describe('nwsColor (client-side, two-phase move off the server, #38)', () => {
     const base = { geometry: null, event: 'Tornado Warning', severity: 'Extreme', headline: 'h' }
     expect(NwsFeatureSchema.safeParse(base).success).toBe(true)
     expect(NwsFeatureSchema.safeParse({ ...base, color: '#d000ff' }).success).toBe(true)
+  })
+})
+
+describe('map ramps (#41)', () => {
+  it('quakes take the geophysical lane; magnitude is size, not colour', () => {
+    expect(quakeMapColor(6.5)).toBe(LANES.geo.emit)
+    expect(quakeMapColor(3)).toBe(LANES.geo.emit)
+    expect(quakeMapColor(null)).toBe(MUTED_HEX)
+  })
+
+  it('GDACS alerts use the status scale', () => {
+    expect(gdacsColor('Red')).toBe(STATUS_HEX.hazard)
+    expect(gdacsColor('Orange')).toBe(STATUS_HEX.watch)
+  })
+
+  it('fires take the thermal lane; radiative power is drawn as size, so colour takes no input', () => {
+    expect(fireMapColor()).toBe(LANES.thermal.emit)
+  })
+
+  it('AQI keeps the six EPA bands, in order, on the site palette', () => {
+    const bands = [5, 20, 45, 100, 200, 300].map(aqiColor)
+    expect(new Set(bands).size).toBe(6)
+    expect(bands[0]).toBe(STATUS_HEX.nominal)
+    expect(bands[4]).toBe(STATUS_HEX.hazard)
+    for (const b of bands) expect(b).toMatch(HEX)
+  })
+
+  it('aircraft altitude is a neutral lightness ramp (aircraft are not spacecraft)', () => {
+    const [low, mid, high] = [1000, 6000, 11000].map(altitudeColor)
+    expect(new Set([low, mid, high]).size).toBe(3)
+    expect(altitudeColor(null)).toBe(MUTED_HEX)
+  })
+
+  it('sea temperature diverges from the hydro lane (cold) to the thermal lane (warm)', () => {
+    expect(sstColor(2)).toBe(LANES.hydro.emit)
+    expect(sstColor(29)).toBe(LANES.thermal.emit)
+    expect(sstColor(18)).not.toBe(LANES.hydro.emit)
+    expect(sstColor(null)).toBe(MUTED_HEX)
   })
 })
 
