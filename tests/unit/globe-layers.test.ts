@@ -74,14 +74,24 @@ describe('planLayers', () => {
     expect(plan.spikes.map((s) => s.focusIndex)).toEqual([0, 1, 2])
   })
 
-  it('puts satellites in their altitude shells in the orbital lane', () => {
+  it('draws satellites as named spacecraft markers at altitude, in the orbital lane', () => {
+    // The feed tracks a couple of named spacecraft, not a constellation: a point cloud
+    // made Hubble and Tiangong 3px dots nobody could see. They get the ISS treatment.
     const plan = planLayers({
       ...EMPTY,
-      satellites: [{ name: 'NOAA 19', lat: 0, lon: 0, alt: 850 }],
+      satellites: [{ name: 'Hubble', lat: 0, lon: 0, alt: 540 }],
     })
-    const sat = plan.points.find((p) => p.layer === 'satellites')
+    expect(plan.points).toEqual([])
+    const sat = plan.markers.find((m) => m.layer === 'satellites')
     expect(sat?.color).toBe(LANES.orbital.emit)
-    expect(radius(sat?.position ?? [])).toBeCloseTo(altToRadius(850), 9)
+    expect(sat?.glyph).toEqual({ shape: 'spacecraft', name: 'Hubble' })
+    expect(sat?.label).toBe('Hubble, 540 km')
+    expect(radius(sat?.position ?? [])).toBeCloseTo(altToRadius(540), 9)
+  })
+
+  it('labels the ISS by name, as the SVG globe does', () => {
+    const plan = planLayers({ ...EMPTY, iss: { lat: 10, lon: 20, alt: 420 } })
+    expect(plan.iss?.name).toBe('ISS')
   })
 
   it('sizes fires by radiative power and keeps them in the thermal lane', () => {

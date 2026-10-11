@@ -41,6 +41,7 @@ export const TOKEN_OKLCH = {
   amber: 'oklch(0.84 0.16 80)',
   mcrn: 'oklch(0.64 0.2 27)',
   signal: 'oklch(0.85 0.13 220)',
+  bone: 'oklch(0.94 0.01 80)',
   boneDim: 'oklch(0.72 0.012 78)',
   boneFaint: 'oklch(0.62 0.012 75)',
   void: 'oklch(0.08 0.01 50)',
@@ -63,6 +64,8 @@ export const STATUS_HEX: Readonly<Record<Status, string>> = {
 }
 
 export const ISS_HEX = hexOf(TOKEN_OKLCH.signal)
+/** Label ink for canvas-drawn nameplates on the globe (text wears ink, never the series colour). */
+export const BONE_HEX = hexOf(TOKEN_OKLCH.bone)
 /** Aurora is a field with a single-hue ramp, not a marker lane. */
 export const AURORA_HEX = hexOf('oklch(0.8 0.17 150)')
 const HUD_HEX = hexOf(TOKEN_OKLCH.boneFaint)

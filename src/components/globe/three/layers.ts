@@ -34,14 +34,66 @@ import {
 } from 'three'
 
 import type { Glyph, LayerPlan, PlannedPoint } from '@/lib/globeLayers'
-import { VOID_HEX } from '@/lib/palette'
+import { BONE_HEX, VOID_HEX } from '@/lib/palette'
 
 const GLYPH_PX = 64
 const MARKER_SCALE = 0.055
 const ISS_SCALE = 0.11
+/** Nameplate canvas: ring and dot on the left, the name beside it. */
+const PLATE_W = 256
+const PLATE_H = 64
+const PLATE_DOT_X = 32
+/** Nameplate height in globe units; the name's 26px canvas text lands near 11px on screen. */
+const PLATE_SCALE = 0.12
+
+interface GlyphTexture {
+  map: Texture
+  /** width / height of the sprite that shows it */
+  aspect: number
+  /** where, across the texture, the marker's point sits (sprite.center.x) */
+  anchorX: number
+}
+
+/** Ring + dot + name, the treatment the SVG globe gives named spacecraft. */
+function drawNameplate(name: string, color: string): GlyphTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = PLATE_W
+  canvas.height = PLATE_H
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    const cy = PLATE_H / 2
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    ctx.arc(PLATE_DOT_X, cy, 14, 0, Math.PI * 2)
+    ctx.lineWidth = 7
+    ctx.strokeStyle = VOID_HEX
+    ctx.stroke()
+    ctx.lineWidth = 3
+    ctx.strokeStyle = color
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(PLATE_DOT_X, cy, 5, 0, Math.PI * 2)
+    ctx.fillStyle = color
+    ctx.fill()
+    ctx.font = '600 26px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = 6
+    ctx.strokeStyle = VOID_HEX
+    ctx.strokeText(name, PLATE_DOT_X + 26, cy + 1, PLATE_W - PLATE_DOT_X - 30)
+    ctx.fillStyle = BONE_HEX
+    ctx.fillText(name, PLATE_DOT_X + 26, cy + 1, PLATE_W - PLATE_DOT_X - 30)
+  }
+  return {
+    map: new CanvasTexture(canvas),
+    aspect: PLATE_W / PLATE_H,
+    anchorX: PLATE_DOT_X / PLATE_W,
+  }
+}
 
 /** Draws a glyph with a void halo; returns a blank texture where 2D canvas is unavailable (tests). */
-function drawGlyph(glyph: Glyph, color: string): Texture {
+function drawGlyph(glyph: Glyph, color: string): GlyphTexture {
+  if (glyph.shape === 'spacecraft') return drawNameplate(glyph.name, color)
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = GLYPH_PX
   const ctx = canvas.getContext('2d')
@@ -92,7 +144,7 @@ function drawGlyph(glyph: Glyph, color: string): Texture {
       ctx.fillText(glyph.letter, c, c + 1)
     }
   }
-  return new CanvasTexture(canvas)
+  return { map: new CanvasTexture(canvas), aspect: 1, anchorX: 0.5 }
 }
 
 const pointVertex = /* glsl */ `
@@ -129,7 +181,7 @@ const pointFragment = /* glsl */ `
 export class GlobeLayerObjects {
   readonly group = new Group()
   private readonly staticGroup = new Group()
-  private readonly glyphCache = new Map<string, Texture>()
+  private readonly glyphCache = new Map<string, GlyphTexture>()
   private issGroup: Group | null = null
   private trailLine: Line | null = null
   private pixelScale = 460
@@ -150,18 +202,17 @@ export class GlobeLayerObjects {
     this.clear(this.staticGroup)
     for (const m of plan.markers) {
       const key = `${JSON.stringify(m.glyph)}:${m.color}`
-      let map = this.glyphCache.get(key)
-      if (!map) {
-        map = drawGlyph(m.glyph, m.color)
-        this.glyphCache.set(key, map)
+      let glyph = this.glyphCache.get(key)
+      if (!glyph) {
+        glyph = drawGlyph(m.glyph, m.color)
+        this.glyphCache.set(key, glyph)
       }
-      const sprite = new Sprite(new SpriteMaterial({ map, depthWrite: false }))
-      sprite.position.fromArray(m.position)
-      sprite.scale.setScalar(MARKER_SCALE)
-      this.staticGroup.add(sprite)
+      this.staticGroup.add(
+        this.nameplateOrGlyph(glyph, m.position, m.color, m.glyph.shape === 'spacecraft'),
+      )
     }
     if (plan.spikes.length) this.staticGroup.add(this.buildSpikes(plan))
-    for (const layer of ['fires', 'satellites', 'aurora'] as const) {
+    for (const layer of ['fires', 'aurora'] as const) {
       const pts = plan.points.filter((p) => p.layer === layer)
       if (pts.length) this.staticGroup.add(this.buildPoints(pts, layer === 'aurora'))
     }
@@ -190,7 +241,14 @@ export class GlobeLayerObjects {
         }),
       )
       glow.scale.setScalar(ISS_SCALE)
-      this.issGroup.add(core, glow)
+      const plate = drawNameplate(plan.iss.name, plan.iss.color)
+      this.glyphCache.set(`plate:${plan.iss.name}:${plan.iss.color}`, plate)
+      const label = new Sprite(
+        new SpriteMaterial({ map: plate.map, depthWrite: false, transparent: true }),
+      )
+      label.center.set(plate.anchorX, 0.5)
+      label.scale.set(PLATE_SCALE * plate.aspect, PLATE_SCALE, 1)
+      this.issGroup.add(core, glow, label)
       this.group.add(this.issGroup)
     }
     this.issGroup.position.fromArray(plan.iss.position)
@@ -210,9 +268,39 @@ export class GlobeLayerObjects {
     this.trailLine.geometry.setFromPoints(plan.trail.map((p) => new Vector3().fromArray(p)))
   }
 
+  /** A plain glyph sprite, or a spacecraft nameplate with its glow, anchored on the marker point. */
+  private nameplateOrGlyph(
+    glyph: GlyphTexture,
+    position: readonly number[],
+    color: string,
+    spacecraft: boolean,
+  ): Object3D {
+    const sprite = new Sprite(
+      new SpriteMaterial({ map: glyph.map, depthWrite: false, transparent: true }),
+    )
+    sprite.position.fromArray(position)
+    sprite.center.set(glyph.anchorX, 0.5)
+    const h = spacecraft ? PLATE_SCALE : MARKER_SCALE
+    sprite.scale.set(h * glyph.aspect, h, 1)
+    if (!spacecraft) return sprite
+    const group = new Group()
+    const glow = new Sprite(
+      new SpriteMaterial({
+        map: this.glow(color),
+        blending: AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+      }),
+    )
+    glow.position.fromArray(position)
+    glow.scale.setScalar(ISS_SCALE * 0.8)
+    group.add(glow, sprite)
+    return group
+  }
+
   dispose(): void {
     this.clear(this.group)
-    for (const t of this.glyphCache.values()) t.dispose()
+    for (const t of this.glyphCache.values()) t.map.dispose()
     this.glyphCache.clear()
   }
 
@@ -289,7 +377,7 @@ export class GlobeLayerObjects {
   private glow(color: string): Texture {
     const key = `glow:${color}`
     const cached = this.glyphCache.get(key)
-    if (cached) return cached
+    if (cached) return cached.map
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = GLYPH_PX
     const ctx = canvas.getContext('2d')
@@ -302,7 +390,7 @@ export class GlobeLayerObjects {
       ctx.fillRect(0, 0, GLYPH_PX, GLYPH_PX)
     }
     const texture = new CanvasTexture(canvas)
-    this.glyphCache.set(key, texture)
+    this.glyphCache.set(key, { map: texture, aspect: 1, anchorX: 0.5 })
     return texture
   }
 

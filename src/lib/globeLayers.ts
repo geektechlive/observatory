@@ -37,9 +37,10 @@ export type Glyph =
   | { shape: 'chevron' }
   | { shape: 'diamond' }
   | { shape: 'station' }
+  | { shape: 'spacecraft'; name: string }
 
 export interface PlannedMarker {
-  layer: 'events' | 'fireballs' | 'launches' | 'disasters' | 'stations'
+  layer: 'events' | 'fireballs' | 'launches' | 'disasters' | 'stations' | 'satellites'
   position: Vec3
   color: string
   glyph: Glyph
@@ -57,7 +58,7 @@ export interface PlannedSpike {
 }
 
 export interface PlannedPoint {
-  layer: 'fires' | 'satellites' | 'aurora'
+  layer: 'fires' | 'aurora'
   position: Vec3
   color: string
   size: number
@@ -65,7 +66,7 @@ export interface PlannedPoint {
 }
 
 export interface LayerPlan {
-  iss: { position: Vec3; color: string } | null
+  iss: { position: Vec3; color: string; name: string } | null
   trail: Vec3[]
   markers: PlannedMarker[]
   spikes: PlannedSpike[]
@@ -177,13 +178,16 @@ export function planLayers(input: LayerInput): LayerPlan {
       alpha: 0.9,
     })
   }
+  // The feed tracks a few named spacecraft (Hubble, Tiangong), not a constellation,
+  // so each is a labelled marker like the ISS rather than a point in a cloud.
   for (const s of input.satellites) {
-    points.push({
+    const alt = s.alt ?? DEFAULT_SAT_ALT_KM
+    markers.push({
       layer: 'satellites',
-      position: latLonToVec3(s.lat, s.lon, altToRadius(s.alt ?? DEFAULT_SAT_ALT_KM)),
+      position: latLonToVec3(s.lat, s.lon, altToRadius(alt)),
       color: LANES.orbital.emit,
-      size: 0.018,
-      alpha: 0.9,
+      glyph: { shape: 'spacecraft', name: s.name },
+      label: `${s.name}, ${String(Math.round(alt))} km`,
     })
   }
   for (const [lon, lat, intensity] of input.aurora) {
@@ -199,7 +203,11 @@ export function planLayers(input: LayerInput): LayerPlan {
   const issRadius = altToRadius(input.iss?.alt ?? 0)
   return {
     iss: input.iss
-      ? { position: latLonToVec3(input.iss.lat, input.iss.lon, issRadius), color: ISS_HEX }
+      ? {
+          position: latLonToVec3(input.iss.lat, input.iss.lon, issRadius),
+          color: ISS_HEX,
+          name: 'ISS',
+        }
       : null,
     trail: input.iss ? input.trail.map(([lon, lat]) => latLonToVec3(lat, lon, issRadius)) : [],
     markers,

@@ -60,6 +60,7 @@ describe('status, ISS and neutral inks mirror tokens.css exactly', () => {
     ['--amber', TOKEN_OKLCH.amber],
     ['--mcrn', TOKEN_OKLCH.mcrn],
     ['--signal', TOKEN_OKLCH.signal],
+    ['--bone', TOKEN_OKLCH.bone],
     ['--bone-dim', TOKEN_OKLCH.boneDim],
     ['--bone-faint', TOKEN_OKLCH.boneFaint],
   ])('%s is declared as %s', (name, literal) => {

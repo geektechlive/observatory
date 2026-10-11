@@ -119,6 +119,21 @@ async function mockFeeds(page: Page): Promise<void> {
       }),
     ),
   )
+  // A real Hubble TLE (2026-10-10); the hook propagates it with satellite.js in the browser.
+  await page.route('/api/satellites', (r) =>
+    r.fulfill(
+      json({
+        satellites: [
+          {
+            name: 'Hubble',
+            line1: '1 20580U 90037B   26283.95144126  .00008494  00000+0  26031-3 0  9996',
+            line2: '2 20580  28.4737   8.6621 0001735  14.6522 345.4124 15.31895111806335',
+          },
+        ],
+        updatedAt: '2026-10-10T00:00:00Z',
+      }),
+    ),
+  )
   await page.route('/api/aurora', (r) =>
     r.fulfill(
       json({
@@ -147,13 +162,21 @@ test.describe('Globe parity (#44)', () => {
     await expect(page.locator('[data-globe-mode]')).toHaveAttribute('data-globe-mode', 'webgl', {
       timeout: 15_000,
     })
-    for (const name of ['Fires', 'Alerts', 'Fireballs', 'Aurora']) {
+    for (const name of ['Fires', 'Alerts', 'Fireballs', 'Aurora', 'Satellites']) {
       await page.getByRole('switch', { name: new RegExp(name) }).click()
     }
 
     await expect
       .poll(() => drawn(page), { timeout: 15_000 })
-      .toMatchObject({ events: 1, quakes: 1, fires: 2, fireballs: 1, disasters: 1, aurora: 3 })
+      .toMatchObject({
+        events: 1,
+        quakes: 1,
+        fires: 2,
+        fireballs: 1,
+        disasters: 1,
+        aurora: 3,
+        satellites: 1,
+      })
   })
 
   test('switching a layer off removes it, and the census lane follows', async ({ page }) => {
