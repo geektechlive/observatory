@@ -1,0 +1,11 @@
+{
+  "$comment": "ROCI v2 rules 4 and 6 (#40): no colour literals and nothing under 11px outside the token sources. Add a directory to `enforced` when its Phase 3 reskin lands; read by stylelint.config.js and eslint.config.js.",
+  "enforced": ["src/components/ui/**", "src/components/world-map/**", "src/lib/**"],
+  "exempt": [
+    "src/styles/tokens.css",
+    "src/styles/palette.css",
+    "src/lib/palette.ts",
+    "src/lib/basemap.ts",
+    "src/lib/color.ts"
+  ]
+}

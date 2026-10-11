@@ -2,7 +2,7 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  background: oklch(0.1 0.02 50 / 0.9);
+  background: var(--scrim);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius-panel);
   padding: 10px 12px;
@@ -25,7 +25,7 @@
 
 .heading {
   font-family: var(--font-stencil);
-  font-size: 8px;
+  font-size: var(--text-xs);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--copper-glow);
@@ -49,7 +49,7 @@
 .label {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: var(--bone-dim);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -57,7 +57,7 @@
 
 .count {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: var(--bone-faint);
   letter-spacing: 0.04em;
 }
@@ -70,7 +70,7 @@
 
 .sectionLabel {
   font-family: var(--font-stencil);
-  font-size: 8px;
+  font-size: var(--text-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--copper-glow);

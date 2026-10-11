@@ -10,7 +10,7 @@ export function HazardChevron({ height = 10, color = 'amber' }: HazardChevronPro
       style={{
         height,
         flexShrink: 0,
-        background: `repeating-linear-gradient(45deg, ${stripe} 0 14px, oklch(0.10 0.01 60) 14px 28px)`,
+        background: `repeating-linear-gradient(45deg, ${stripe} 0 14px, var(--void) 14px 28px)`,
       }}
     />
   )
