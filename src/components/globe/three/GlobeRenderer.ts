@@ -377,11 +377,12 @@ export class GlobeRenderer {
 
   private emitFrame(): void {
     this.onRotate?.(this.facing())
-    if (!this.onFrame || this.focusables.length === 0) return
     // A real render updates these; update them here too so the projection never lags a frame.
     this.globe.updateMatrixWorld()
     this.camera.updateMatrixWorld()
     const cam = this.camera.position.toArray()
+    this.layers.updateOcclusion(this.globe.matrixWorld, cam)
+    if (!this.onFrame || this.focusables.length === 0) return
     const size = this.options.size
     this.focusables.forEach((f, i) => {
       const item = this.projected[i]

@@ -33,6 +33,7 @@ import {
   Vector3,
 } from 'three'
 
+import { isOccluded, type Vec3 } from '@/lib/globe3d'
 import type { Glyph, LayerPlan, PlannedPoint } from '@/lib/globeLayers'
 import { BONE_HEX, VOID_HEX } from '@/lib/palette'
 
@@ -178,13 +179,28 @@ const pointFragment = /* glsl */ `
   }
 `
 
+/**
+ * A labelled spacecraft. Its sprites skip the depth test (a billboard at the craft's depth
+ * was clipped by the nearer Earth surface wherever the name overlapped the globe), so
+ * updateOcclusion() hides it instead whenever its anchor is behind the Earth.
+ */
+interface Nameplate {
+  name: string
+  object: Object3D
+  local: Vector3
+  depthTest: boolean
+}
+
 export class GlobeLayerObjects {
   readonly group = new Group()
   private readonly staticGroup = new Group()
   private readonly glyphCache = new Map<string, GlyphTexture>()
   private issGroup: Group | null = null
+  private issPlate: Nameplate | null = null
+  private staticPlates: Nameplate[] = []
   private trailLine: Line | null = null
   private pixelScale = 460
+  private readonly scratch = new Vector3()
 
   constructor() {
     this.group.add(this.staticGroup)
@@ -200,6 +216,7 @@ export class GlobeLayerObjects {
 
   buildStatic(plan: LayerPlan): void {
     this.clear(this.staticGroup)
+    this.staticPlates = []
     for (const m of plan.markers) {
       const key = `${JSON.stringify(m.glyph)}:${m.color}`
       let glyph = this.glyphCache.get(key)
@@ -207,9 +224,7 @@ export class GlobeLayerObjects {
         glyph = drawGlyph(m.glyph, m.color)
         this.glyphCache.set(key, glyph)
       }
-      this.staticGroup.add(
-        this.nameplateOrGlyph(glyph, m.position, m.color, m.glyph.shape === 'spacecraft'),
-      )
+      this.staticGroup.add(this.nameplateOrGlyph(glyph, m.position, m.color, m.glyph))
     }
     if (plan.spikes.length) this.staticGroup.add(this.buildSpikes(plan))
     for (const layer of ['fires', 'aurora'] as const) {
@@ -222,6 +237,7 @@ export class GlobeLayerObjects {
     if (!plan.iss) {
       if (this.issGroup) this.disposeObject(this.issGroup)
       this.issGroup = null
+      this.issPlate = null
       if (this.trailLine) this.disposeObject(this.trailLine)
       this.trailLine = null
       return
@@ -237,6 +253,7 @@ export class GlobeLayerObjects {
           map: this.glow(plan.iss.color),
           blending: AdditiveBlending,
           depthWrite: false,
+          depthTest: false,
           transparent: true,
         }),
       )
@@ -244,14 +261,26 @@ export class GlobeLayerObjects {
       const plate = drawNameplate(plan.iss.name, plan.iss.color)
       this.glyphCache.set(`plate:${plan.iss.name}:${plan.iss.color}`, plate)
       const label = new Sprite(
-        new SpriteMaterial({ map: plate.map, depthWrite: false, transparent: true }),
+        new SpriteMaterial({
+          map: plate.map,
+          depthWrite: false,
+          depthTest: false,
+          transparent: true,
+        }),
       )
       label.center.set(plate.anchorX, 0.5)
       label.scale.set(PLATE_SCALE * plate.aspect, PLATE_SCALE, 1)
       this.issGroup.add(core, glow, label)
       this.group.add(this.issGroup)
+      this.issPlate = {
+        name: plan.iss.name,
+        object: this.issGroup,
+        local: new Vector3(),
+        depthTest: false,
+      }
     }
     this.issGroup.position.fromArray(plan.iss.position)
+    this.issPlate?.local.fromArray(plan.iss.position)
 
     if (!this.trailLine) {
       this.trailLine = new Line(
@@ -268,33 +297,59 @@ export class GlobeLayerObjects {
     this.trailLine.geometry.setFromPoints(plan.trail.map((p) => new Vector3().fromArray(p)))
   }
 
+  /** Hide every nameplate whose anchor is behind the Earth from this camera. */
+  updateOcclusion(globeMatrixWorld: Matrix4, camera: Vec3): void {
+    for (const plate of this.issPlate ? [this.issPlate, ...this.staticPlates] : this.staticPlates) {
+      this.scratch.copy(plate.local).applyMatrix4(globeMatrixWorld)
+      plate.object.visible = !isOccluded(this.scratch.toArray(), camera)
+    }
+  }
+
+  /** For tests: every nameplate, the ISS first. */
+  debugNameplates(): readonly Nameplate[] {
+    return this.issPlate ? [this.issPlate, ...this.staticPlates] : this.staticPlates
+  }
+
   /** A plain glyph sprite, or a spacecraft nameplate with its glow, anchored on the marker point. */
   private nameplateOrGlyph(
     glyph: GlyphTexture,
     position: readonly number[],
     color: string,
-    spacecraft: boolean,
+    shape: Glyph,
   ): Object3D {
+    const spacecraft = shape.shape === 'spacecraft'
     const sprite = new Sprite(
-      new SpriteMaterial({ map: glyph.map, depthWrite: false, transparent: true }),
+      new SpriteMaterial({
+        map: glyph.map,
+        depthWrite: false,
+        depthTest: !spacecraft,
+        transparent: true,
+      }),
     )
     sprite.position.fromArray(position)
     sprite.center.set(glyph.anchorX, 0.5)
     const h = spacecraft ? PLATE_SCALE : MARKER_SCALE
     sprite.scale.set(h * glyph.aspect, h, 1)
-    if (!spacecraft) return sprite
+    if (shape.shape !== 'spacecraft') return sprite
     const group = new Group()
     const glow = new Sprite(
       new SpriteMaterial({
         map: this.glow(color),
         blending: AdditiveBlending,
         depthWrite: false,
+        depthTest: false,
         transparent: true,
       }),
     )
     glow.position.fromArray(position)
     glow.scale.setScalar(ISS_SCALE * 0.8)
     group.add(glow, sprite)
+    this.staticPlates.push({
+      name: shape.name,
+      object: group,
+      local: new Vector3().fromArray(position),
+      depthTest: false,
+    })
     return group
   }
 
