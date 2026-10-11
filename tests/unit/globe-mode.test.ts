@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { chooseGlobeMode } from '@/lib/globeMode'
+import { chooseGlobeMode, WEBGL_DEFAULT } from '@/lib/globeMode'
 
 const base = { param: null, hasWebGL: true, saveData: false, webglDefault: false }
 
 describe('chooseGlobeMode', () => {
-  it('stays on SVG by default until the WebGL globe reaches parity (#44)', () => {
+  it('stays on SVG while the WebGL globe is not the default', () => {
     expect(chooseGlobeMode(base)).toBe('svg')
+  })
+
+  it('ships WebGL as the default now that parity (#44) is green', () => {
+    expect(WEBGL_DEFAULT).toBe(true)
   })
 
   it('tries WebGL when asked with ?globe=webgl, or once it is the default', () => {

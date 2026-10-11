@@ -57,8 +57,8 @@ function releaseAfterFailure(): void {
 
 /**
  * The globe. The SVG globe is the first paint and the fallback; the three.js globe is
- * a lazy upgrade that crossfades in on its first frame (#46). WebGL is opt-in
- * (?globe=webgl) until the parity matrix (#44) is complete; see src/lib/globeMode.ts.
+ * a lazy upgrade that crossfades in on its first frame (#46). See src/lib/globeMode.ts
+ * for when it falls back (no WebGL, save-data, ?globe=svg).
  * `data-globe-mode` says which one is live, so e2e can't pass silently on the fallback.
  */
 export function GlobeHost({ census, ...props }: GlobeProps) {

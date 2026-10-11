@@ -16,9 +16,14 @@ const sharp = require('sharp') as (input: Buffer) => {
 const host = (page: Page) => page.locator('[data-globe-mode]')
 
 test.describe('Globe host', () => {
-  test('stays on the SVG globe by default until parity (#44)', async ({ page }) => {
+  test('upgrades to WebGL by default, after the SVG first paint', async ({ page }) => {
     await page.goto('/')
-    await expect(host(page)).toHaveAttribute('data-globe-mode', 'svg')
+    await expect(host(page)).toHaveAttribute('data-globe-mode', 'svg') // first paint
+    await expect(host(page)).toHaveAttribute('data-globe-mode', 'webgl', { timeout: 15_000 })
+  })
+
+  test('?globe=svg keeps the SVG globe', async ({ page }) => {
+    await page.goto('/?globe=svg')
     await page.waitForTimeout(2500) // past the idle upgrade window
     await expect(host(page)).toHaveAttribute('data-globe-mode', 'svg')
     await expect(page.locator('canvas[data-globe-webgl]')).toHaveCount(0)
