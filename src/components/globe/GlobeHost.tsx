@@ -10,6 +10,10 @@ import type { GlobeRenderer } from './three/GlobeRenderer'
 
 type GlobeProps = ComponentProps<typeof Globe>
 
+const NONE: readonly never[] = []
+/** Matches the SVG globe's default when the ISS feed has no altitude yet. */
+const DEFAULT_ISS_ALT_KM = 420
+
 /**
  * One renderer for the page's lifetime: Earth/Sun/Sky switches unmount this host, and
  * re-creating a WebGL context on every switch would churn GPU memory and eventually
@@ -52,10 +56,70 @@ function releaseAfterFailure(): void {
  */
 export function GlobeHost(props: GlobeProps) {
   const [mode, setMode] = useState<GlobeMode>('svg')
+  const [renderer, setRenderer] = useState<GlobeRenderer | null>(null)
   const slot = useRef<HTMLDivElement>(null)
   const reducedMotion = useReducedMotion()
   const size = props.size ?? 460
   const warm = props.warm ?? true
+  // Read at creation only; later changes go through setWarm so the renderer isn't rebuilt.
+  const initialWarm = useRef(warm)
+
+  // Feed the live renderer whenever the globe's data or modes change (#49).
+  const {
+    issLat,
+    issLon,
+    issAlt,
+    trail,
+    events,
+    quakes,
+    fires,
+    fireballs,
+    launches,
+    disasters,
+    satellites,
+    aurora,
+  } = props
+  const tracking = props.tracking ?? false
+  const showTerminator = props.showTerminator ?? true
+  useEffect(() => {
+    if (!renderer) return
+    renderer.setLayers({
+      iss:
+        issLat !== undefined && issLon !== undefined
+          ? { lat: issLat, lon: issLon, alt: issAlt ?? DEFAULT_ISS_ALT_KM }
+          : null,
+      trail: trail ?? NONE,
+      events: events ?? NONE,
+      quakes: quakes ?? NONE,
+      fires: fires ?? NONE,
+      fireballs: fireballs ?? NONE,
+      launches: launches ?? NONE,
+      disasters: disasters ?? NONE,
+      satellites: satellites ?? NONE,
+      aurora: aurora ?? NONE,
+      tracking,
+    })
+  }, [
+    renderer,
+    issLat,
+    issLon,
+    issAlt,
+    trail,
+    events,
+    quakes,
+    fires,
+    fireballs,
+    launches,
+    disasters,
+    satellites,
+    aurora,
+    tracking,
+  ])
+
+  useEffect(() => {
+    renderer?.setWarm(warm)
+    renderer?.setShowTerminator(showTerminator)
+  }, [renderer, warm, showTerminator])
 
   useEffect(() => {
     if (failed || chooseGlobeMode(readGlobeModeInput()) !== 'webgl') return
@@ -65,17 +129,21 @@ export function GlobeHost(props: GlobeProps) {
     const fallBack = (reason: unknown) => {
       console.warn('[globe] staying on the SVG globe:', reason)
       releaseAfterFailure()
-      if (!cancelled) setMode('svg')
+      if (!cancelled) {
+        setRenderer(null)
+        setMode('svg')
+      }
     }
 
     const start = () => {
-      acquireRenderer(size, reducedMotion, warm, () => {
+      acquireRenderer(size, reducedMotion, initialWarm.current, () => {
         fallBack('WebGL context lost')
       })
-        .then((renderer) => {
+        .then((created) => {
           if (cancelled || !slot.current) return
-          renderer.attach(slot.current)
-          attached = renderer
+          created.attach(slot.current)
+          attached = created
+          setRenderer(created)
           setMode('webgl')
         })
         .catch(fallBack)
@@ -94,7 +162,7 @@ export function GlobeHost(props: GlobeProps) {
       else window.clearTimeout(idle)
       attached?.detach()
     }
-  }, [size, reducedMotion, warm])
+  }, [size, reducedMotion])
 
   const webgl = mode === 'webgl'
   return (

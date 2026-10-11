@@ -1,0 +1,154 @@
+/**
+ * planLayers (#49): the pure half of the WebGL data layers. Every parity-matrix layer
+ * (#44) becomes plain positions, colours, sizes and glyphs, tested here; the three.js
+ * half only turns the plan into scene objects.
+ */
+import { describe, expect, it } from 'vitest'
+
+import { altToRadius, latLonToVec3 } from '@/lib/globe3d'
+import { planLayers } from '@/lib/globeLayers'
+import { eonetKind, ISS_HEX, LANES, STATUS_HEX } from '@/lib/palette'
+
+const EMPTY = {
+  iss: null,
+  trail: [],
+  events: [],
+  quakes: [],
+  fires: [],
+  fireballs: [],
+  launches: [],
+  disasters: [],
+  satellites: [],
+  aurora: [],
+  tracking: false,
+}
+
+const radius = (p: readonly number[]) => Math.hypot(p[0] ?? 0, p[1] ?? 0, p[2] ?? 0)
+
+describe('planLayers', () => {
+  it('plans nothing for empty data', () => {
+    const plan = planLayers(EMPTY)
+    expect(plan.iss).toBeNull()
+    expect(plan.markers).toEqual([])
+    expect(plan.spikes).toEqual([])
+    expect(plan.points).toEqual([])
+  })
+
+  it('places the ISS at exaggerated LEO altitude in signal cyan, with its trail at the same radius', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      iss: { lat: 10, lon: 20, alt: 420 },
+      trail: [
+        [20, 10],
+        [25, 12],
+      ],
+    })
+    expect(plan.iss?.color).toBe(ISS_HEX)
+    expect(radius(plan.iss?.position ?? [])).toBeCloseTo(altToRadius(420), 9)
+    expect(plan.trail).toHaveLength(2)
+    for (const p of plan.trail) expect(radius(p)).toBeCloseTo(altToRadius(420), 9)
+  })
+
+  it('colours EONET events by their lane and labels them with the kind letter', () => {
+    const plan = planLayers({ ...EMPTY, events: [{ lat: 1, lon: 2, kind: 'severeStorms' }] })
+    const marker = plan.markers.find((m) => m.layer === 'events')
+    expect(marker?.color).toBe(LANES[eonetKind('severeStorms').lane].emit)
+    expect(marker?.glyph).toEqual({ shape: 'letter', letter: 'S' })
+    expect(marker?.focusIndex).toBe(0)
+  })
+
+  it('draws quakes as geophysical spikes whose height grows with magnitude, not colour', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      quakes: [
+        { lat: 0, lon: 0, mag: 4.5, place: 'a' },
+        { lat: 0, lon: 10, mag: 6.5, place: 'b' },
+        { lat: 0, lon: 20, mag: null, place: 'c' },
+      ],
+    })
+    const [small, big, unknown] = plan.spikes
+    expect(small?.color).toBe(LANES.geo.emit)
+    expect(big?.color).toBe(LANES.geo.emit)
+    expect(big?.height ?? 0).toBeGreaterThan(small?.height ?? 0)
+    expect(unknown?.height ?? 0).toBeLessThan(small?.height ?? 0)
+    expect(plan.spikes.map((s) => s.focusIndex)).toEqual([0, 1, 2])
+  })
+
+  it('puts satellites in their altitude shells in the orbital lane', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      satellites: [{ name: 'NOAA 19', lat: 0, lon: 0, alt: 850 }],
+    })
+    const sat = plan.points.find((p) => p.layer === 'satellites')
+    expect(sat?.color).toBe(LANES.orbital.emit)
+    expect(radius(sat?.position ?? [])).toBeCloseTo(altToRadius(850), 9)
+  })
+
+  it('sizes fires by radiative power and keeps them in the thermal lane', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      fires: [
+        { lat: 0, lon: 0, frp: 5 },
+        { lat: 0, lon: 1, frp: 400 },
+      ],
+    })
+    const [weak, strong] = plan.points.filter((p) => p.layer === 'fires')
+    expect(weak?.color).toBe(LANES.thermal.emit)
+    expect(strong?.size ?? 0).toBeGreaterThan(weak?.size ?? 0)
+  })
+
+  it('draws GDACS alerts on the status scale with the hazard diamond', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      disasters: [
+        { lat: 0, lon: 0, type: 'EQ', alert: 'Red', name: 'x' },
+        { lat: 0, lon: 5, type: 'TC', alert: 'Orange', name: 'y' },
+      ],
+    })
+    const [red, orange] = plan.markers.filter((m) => m.layer === 'disasters')
+    expect(red?.color).toBe(STATUS_HEX.hazard)
+    expect(orange?.color).toBe(STATUS_HEX.watch)
+    expect(red?.glyph).toEqual({ shape: 'diamond' })
+  })
+
+  it('gives fireballs the space-objects star and launches the orbital chevron', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      fireballs: [{ lat: 0, lon: 0, energy: 2 }],
+      launches: [{ lat: 28.5, lon: -80.6, name: 'LC-39A' }],
+    })
+    expect(plan.markers.find((m) => m.layer === 'fireballs')).toMatchObject({
+      color: LANES.space.emit,
+      glyph: { shape: 'star' },
+    })
+    expect(plan.markers.find((m) => m.layer === 'launches')).toMatchObject({
+      color: LANES.orbital.emit,
+      glyph: { shape: 'chevron' },
+    })
+  })
+
+  it('shows DSN stations only in tracking mode', () => {
+    expect(planLayers(EMPTY).markers.filter((m) => m.layer === 'stations')).toEqual([])
+    const stations = planLayers({ ...EMPTY, tracking: true }).markers.filter(
+      (m) => m.layer === 'stations',
+    )
+    expect(stations.length).toBe(3)
+    for (const s of stations) expect(s.color).toBe(ISS_HEX)
+  })
+
+  it('turns aurora triplets into a single-hue field just above the surface, intensity as alpha', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      aurora: [
+        [0, 70, 0.8],
+        [10, 70, 0.1],
+      ],
+    })
+    const field = plan.points.filter((p) => p.layer === 'aurora')
+    expect(field).toHaveLength(2)
+    expect(new Set(field.map((f) => f.color)).size).toBe(1)
+    expect(field[0]?.alpha ?? 0).toBeGreaterThan(field[1]?.alpha ?? 0)
+    expect(radius(field[0]?.position ?? [])).toBeGreaterThan(1)
+    expect(field[0]?.position).not.toEqual(latLonToVec3(70, 0, 1))
+  })
+})

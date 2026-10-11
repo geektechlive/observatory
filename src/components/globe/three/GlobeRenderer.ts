@@ -26,9 +26,22 @@ import {
 } from 'three'
 
 import { facingLongitude, rotationForFacing, sunDirection } from '@/lib/globe3d'
+import { type LayerInput, planLayers } from '@/lib/globeLayers'
 import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 
+import { GlobeLayerObjects } from './layers'
 import { atmosphereFragment, atmosphereVertex, earthFragment, earthVertex } from './shaders'
+
+const STATIC_KEYS = [
+  'events',
+  'quakes',
+  'fires',
+  'fireballs',
+  'launches',
+  'disasters',
+  'satellites',
+  'aurora',
+] as const
 
 /** The slice of WebGLRenderer the globe uses; tests pass a fake. */
 export interface WebGLRendererLike {
@@ -84,6 +97,9 @@ export class GlobeRenderer {
   private readonly globe = new Group()
   private readonly sun = new Vector3()
   private readonly meshes: Mesh[] = []
+  private readonly layers = new GlobeLayerObjects()
+  private lastInput: LayerInput | null = null
+  private earthUniforms: Record<string, { value: unknown }> | null = null
   private rotation = rotationForFacing(START_FACING)
   private frameId = 0
   private lastFrame: number | null = null
@@ -186,6 +202,43 @@ export class GlobeRenderer {
     this.globe.add(earth, atmosphere)
     this.globe.rotation.y = this.rotation
     this.scene.add(this.globe)
+    this.globe.add(this.layers.group)
+    // Point sprites are sized in globe units; convert at the camera's focal length.
+    const pixels =
+      this.options.size * Math.min(globalThis.devicePixelRatio || 1, this.options.dprCap)
+    this.layers.setPixelScale(pixels / (2 * Math.tan((this.camera.fov * Math.PI) / 360)))
+    this.earthUniforms = earth.material.uniforms
+  }
+
+  /**
+   * Data layers (#49). Static layers rebuild only when one of their arrays changes
+   * (they poll every few minutes); the ISS and its trail move in place (5 Hz).
+   */
+  setLayers(input: LayerInput): void {
+    if (this.disposed) return
+    const plan = planLayers(input)
+    const last = this.lastInput
+    const staticChanged =
+      !last ||
+      STATIC_KEYS.some((key) => last[key] !== input[key]) ||
+      last.tracking !== input.tracking
+    if (staticChanged) this.layers.buildStatic(plan)
+    this.layers.updateIss(plan)
+    this.lastInput = input
+    if (this.frameId === 0 && this.attached) this.renderOnce()
+  }
+
+  /** Copper grade on or off (the ORBIT tracking view is cool). */
+  setWarm(warm: boolean): void {
+    const mix = this.earthUniforms?.['gMix']
+    if (mix) mix.value = warm ? GLOBE_GRADE.mix : 0
+    if (this.frameId === 0 && this.attached) this.renderOnce()
+  }
+
+  setShowTerminator(show: boolean): void {
+    const uniform = this.earthUniforms?.['showTerminator']
+    if (uniform) uniform.value = show ? 1 : 0
+    if (this.frameId === 0 && this.attached) this.renderOnce()
   }
 
   /** Longitude currently facing the camera, in degrees. */
@@ -228,6 +281,7 @@ export class GlobeRenderer {
       ;(mesh.material as Material).dispose()
     }
     for (const t of this.textures) t.dispose()
+    this.layers.dispose()
     this.renderer.dispose()
     this.renderer.forceContextLoss()
   }
