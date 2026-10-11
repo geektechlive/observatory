@@ -26,7 +26,7 @@ import {
 } from 'three'
 
 import { facingLongitude, rotationForFacing, sunDirection } from '@/lib/globe3d'
-import { type LayerInput, planLayers } from '@/lib/globeLayers'
+import { layerCounts, type LayerInput, planLayers } from '@/lib/globeLayers'
 import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 
 import { GlobeLayerObjects } from './layers'
@@ -225,6 +225,8 @@ export class GlobeRenderer {
     if (staticChanged) this.layers.buildStatic(plan)
     this.layers.updateIss(plan)
     this.lastInput = input
+    // What is drawn, per layer: e2e asserts parity (#44) on this, not on props.
+    this.canvas.dataset['globeLayers'] = JSON.stringify(layerCounts(plan))
     if (this.frameId === 0 && this.attached) this.renderOnce()
   }
 

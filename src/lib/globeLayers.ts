@@ -83,6 +83,18 @@ export function spikeHeight(mag: number | null): number {
   return 0.02 + 0.13 * Math.min(Math.max((mag - 4) / 4, 0), 1)
 }
 
+/** How many objects each layer draws; published on the canvas for e2e parity checks. */
+export function layerCounts(plan: LayerPlan): Record<string, number> {
+  const counts: Record<string, number> = {
+    iss: plan.iss ? 1 : 0,
+    trail: plan.trail.length,
+    quakes: plan.spikes.length,
+  }
+  for (const m of plan.markers) counts[m.layer] = (counts[m.layer] ?? 0) + 1
+  for (const p of plan.points) counts[p.layer] = (counts[p.layer] ?? 0) + 1
+  return counts
+}
+
 export function planLayers(input: LayerInput): LayerPlan {
   const markers: PlannedMarker[] = []
   const points: PlannedPoint[] = []
