@@ -23,10 +23,7 @@ body::before {
   pointer-events: none;
   z-index: 0;
   opacity: 0.65;
-  background-image:
-    repeating-linear-gradient(0deg, transparent 0 3px, oklch(1 0 0 / 0.012) 3px 4px),
-    repeating-linear-gradient(90deg, transparent 0 200px, oklch(0 0 0 / 0.15) 200px 201px),
-    repeating-linear-gradient(0deg, transparent 0 160px, oklch(0 0 0 / 0.18) 160px 161px);
+  background-image: var(--texture-scanlines);
 }
 
 /* Grease stain / paint splotch overlays */
@@ -38,11 +35,7 @@ body::after {
   z-index: 0;
   opacity: 0.5;
   mix-blend-mode: multiply;
-  background-image:
-    radial-gradient(ellipse 280px 90px at 18% 22%, oklch(0.18 0.04 60 / 0.6) 0%, transparent 70%),
-    radial-gradient(ellipse 200px 70px at 78% 48%, oklch(0.15 0.03 50 / 0.5) 0%, transparent 60%),
-    radial-gradient(ellipse 340px 110px at 45% 76%, oklch(0.2 0.04 60 / 0.45) 0%, transparent 65%),
-    radial-gradient(circle 60px at 88% 12%, oklch(0.55 0.15 45 / 0.18) 0%, transparent 70%);
+  background-image: var(--texture-stains);
 }
 
 #root {
@@ -68,37 +61,6 @@ body::after {
   }
 }
 
-@keyframes roci-breathe {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes roci-marquee {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@keyframes roci-sweep {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes panel-enter {
   from {
     opacity: 0;
@@ -110,45 +72,6 @@ body::after {
     opacity: 1;
     transform: translateY(0);
     filter: brightness(1);
-  }
-}
-
-@keyframes roci-telemetry-glow {
-  0%,
-  100% {
-    filter: brightness(1);
-    text-shadow:
-      0 0 6px oklch(0.78 0.1 60 / 0.35),
-      0 0 14px oklch(0.78 0.1 60 / 0.15);
-  }
-
-  50% {
-    filter: brightness(1.15);
-    text-shadow:
-      0 0 10px oklch(0.78 0.1 60 / 0.55),
-      0 0 22px oklch(0.78 0.1 60 / 0.3);
-  }
-}
-
-@keyframes roci-needle {
-  0%,
-  100% {
-    transform: rotate(-32deg);
-  }
-
-  50% {
-    transform: rotate(34deg);
-  }
-}
-
-@keyframes roci-blink-slow {
-  0%,
-  100% {
-    opacity: 0.85;
-  }
-
-  50% {
-    opacity: 0.25;
   }
 }
 
@@ -197,7 +120,7 @@ body::after {
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius);
   padding: 10px 12px;
-  box-shadow: 0 8px 32px oklch(0 0 0 / 0.6);
+  box-shadow: var(--shadow-overlay);
   max-width: 220px;
 }
 
@@ -253,10 +176,10 @@ body::after {
 
 /* MapLibre attribution — hull style */
 .maplibregl-ctrl-attrib {
-  background: oklch(0.1 0.02 50 / 0.8) !important;
-  border-radius: 4px !important;
+  background: var(--scrim) !important;
+  border-radius: var(--radius) !important;
   font-family: var(--font-mono) !important;
-  font-size: 10px !important;
+  font-size: var(--text-xs) !important;
   color: var(--bone-faint) !important;
 }
 

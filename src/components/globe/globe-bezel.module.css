@@ -6,6 +6,22 @@
   height: 100%;
   overflow: visible;
   pointer-events: none;
+  transform-origin: center;
+  animation: bezel-settle 700ms var(--ease-out-expo) both;
+}
+
+/* The one orchestrated entrance (spec section 6): the bezel settles into place.
+   Nothing else on the page animates in. The global reduced-motion block stops it. */
+@keyframes bezel-settle {
+  from {
+    opacity: 0;
+    transform: rotate(-8deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
 }
 
 .ringLight {

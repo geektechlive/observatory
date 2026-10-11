@@ -66,6 +66,8 @@ export const STATUS_HEX: Readonly<Record<Status, string>> = {
 export const ISS_HEX = hexOf(TOKEN_OKLCH.signal)
 /** Label ink for canvas-drawn nameplates on the globe (text wears ink, never the series colour). */
 export const BONE_HEX = hexOf(TOKEN_OKLCH.bone)
+/** StarField canvas: emissive points in the void, so a cool star is fine (they aren't structure). */
+export const STAR_HEX = { warm: hexOf('oklch(0.82 0.1 70)'), cool: hexOf('oklch(0.85 0.08 220)') }
 /** Aurora is a field with a single-hue ramp, not a marker lane. */
 export const AURORA_HEX = hexOf('oklch(0.8 0.17 150)')
 const HUD_HEX = hexOf(TOKEN_OKLCH.boneFaint)

@@ -211,12 +211,12 @@ export function App() {
 
       <main id="main-content" className={appStyles.main ?? ''}>
         {/* Stage — the persistent transforming instrument */}
-        <section
-          className={`${appStyles.globeSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '120ms' }}
-        >
+        <section className={appStyles.globeSection ?? ''}>
           <div className={appStyles.globeFrame ?? ''}>
-            <div className={appStyles.globeCenter ?? ''}>
+            <div
+              className={appStyles.globeCenter ?? ''}
+              data-stage={stageKind === 'globe' ? mapMode : stageKind}
+            >
               <div className={appStyles.stageMorph ?? ''} key={stageKind}>
                 {stageKind === 'sun' ? (
                   <SunStage size={460} />
