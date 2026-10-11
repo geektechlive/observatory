@@ -110,6 +110,7 @@ export class GlobeRenderer {
   private readonly layers = new GlobeLayerObjects()
   private lastInput: LayerInput | null = null
   private onFrame: ((items: readonly ProjectedItem[]) => void) | null = null
+  private onRotate: ((facingLon: number) => void) | null = null
   private focusables: { layer: 'events' | 'quakes'; index: number; local: Vector3 }[] = []
   private projected: ProjectedItem[] = []
   private readonly scratch = new Vector3()
@@ -311,6 +312,12 @@ export class GlobeRenderer {
     if (callback && this.attached) this.emitFrame()
   }
 
+  /** Called after every render with the facing longitude, for the bezel's bearing scale. */
+  setOnRotate(callback: ((facingLon: number) => void) | null): void {
+    this.onRotate = callback
+    callback?.(this.facing())
+  }
+
   setRotationPaused(paused: boolean): void {
     this.rotationPaused = paused
     this.lastFrame = null
@@ -369,6 +376,7 @@ export class GlobeRenderer {
   }
 
   private emitFrame(): void {
+    this.onRotate?.(this.facing())
     if (!this.onFrame || this.focusables.length === 0) return
     // A real render updates these; update them here too so the projection never lags a frame.
     this.globe.updateMatrixWorld()

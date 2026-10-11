@@ -34,6 +34,9 @@ const MOCK_EONET = {
  */
 async function waitForEventDot(page: Page): Promise<void> {
   const canvas = page.locator('.maplibregl-canvas')
+  // Clicking "Map" can scroll the page (the bezel made the globe section taller),
+  // leaving the map partly above the viewport where a hover can't reach its centre.
+  await canvas.scrollIntoViewIfNeeded()
   await expect(async () => {
     const box = await canvas.boundingBox()
     if (!box) throw new Error('Map canvas not found')

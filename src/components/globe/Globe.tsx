@@ -59,6 +59,8 @@ interface GlobeProps {
   tracking?: boolean | undefined
   /** OVATION aurora oval — [lon, lat, intensity] triplets, drawn on a canvas overlay. */
   aurora?: readonly [number, number, number][] | undefined
+  /** Facing longitude (degrees) whenever the globe turns; drives the bezel's bearing scale. */
+  onFacingChange?: ((facingLon: number) => void) | undefined
 }
 
 export function Globe({
@@ -80,11 +82,16 @@ export function Globe({
   showTerminator = true,
   tracking = false,
   aurora = NO_AURORA,
+  onFacingChange,
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
   const visible = useVisible()
   const [rotation, setRotation] = useState(-12)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  // The projection centres longitude -rotation, so that is the facing longitude.
+  useEffect(() => {
+    onFacingChange?.(((((-rotation + 180) % 360) + 360) % 360) - 180)
+  }, [rotation, onFacingChange])
   // Real-world subsolar point — recomputed each minute (the globe's visual spin
   // is a separate `rotation` offset, so the terminator is painted in lat/lon).
   const [subsolar, setSubsolar] = useState(() => subsolarPoint(new Date()))

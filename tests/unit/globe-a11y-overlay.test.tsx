@@ -32,7 +32,13 @@ describe('GlobeA11yOverlay', () => {
   it('renders a labelled list of focusable events and quakes', () => {
     const r = fakeRenderer()
     render(
-      <GlobeA11yOverlay renderer={r} events={EVENTS} quakes={QUAKES} onFocusChange={vi.fn()} />,
+      <GlobeA11yOverlay
+        renderer={r}
+        size={400}
+        events={EVENTS}
+        quakes={QUAKES}
+        onFocusChange={vi.fn()}
+      />,
     )
     expect(screen.getByRole('list', { name: /Earth events and earthquakes/ })).toBeTruthy()
     const items = screen.getAllByRole('listitem')
@@ -47,7 +53,13 @@ describe('GlobeA11yOverlay', () => {
   it('positions items from each frame and hides those behind the limb (out of the tab order)', () => {
     const r = fakeRenderer()
     render(
-      <GlobeA11yOverlay renderer={r} events={EVENTS} quakes={QUAKES} onFocusChange={vi.fn()} />,
+      <GlobeA11yOverlay
+        renderer={r}
+        size={400}
+        events={EVENTS}
+        quakes={QUAKES}
+        onFocusChange={vi.fn()}
+      />,
     )
     r.emit([
       { layer: 'events', index: 0, x: 100, y: 120, visible: true },
@@ -55,10 +67,11 @@ describe('GlobeA11yOverlay', () => {
       { layer: 'quakes', index: 0, x: 210, y: 90, visible: true },
     ])
     const [front, back, quake] = screen.getAllByRole('listitem', { hidden: true })
-    expect(front?.style.transform).toBe('translate(100px, 120px)')
+    expect(front?.style.left).toBe('25%')
+    expect(front?.style.top).toBe('30%')
     expect(front?.hidden).toBe(false)
     expect(back?.hidden).toBe(true)
-    expect(quake?.style.transform).toBe('translate(210px, 90px)')
+    expect(quake?.style.left).toBe('52.5%')
   })
 
   it('reports focus so the host can pause rotation, and shows the label as a tooltip', () => {
@@ -67,6 +80,7 @@ describe('GlobeA11yOverlay', () => {
     render(
       <GlobeA11yOverlay
         renderer={r}
+        size={400}
         events={EVENTS}
         quakes={QUAKES}
         onFocusChange={onFocusChange}
@@ -86,7 +100,13 @@ describe('GlobeA11yOverlay', () => {
   it('keeps a focused item reachable even if a frame reports it behind the limb', () => {
     const r = fakeRenderer()
     render(
-      <GlobeA11yOverlay renderer={r} events={EVENTS} quakes={QUAKES} onFocusChange={vi.fn()} />,
+      <GlobeA11yOverlay
+        renderer={r}
+        size={400}
+        events={EVENTS}
+        quakes={QUAKES}
+        onFocusChange={vi.fn()}
+      />,
     )
     const [first] = screen.getAllByRole('listitem')
     if (!first) throw new Error('no items')
@@ -98,7 +118,13 @@ describe('GlobeA11yOverlay', () => {
   it('unsubscribes from the renderer on unmount', () => {
     const r = fakeRenderer()
     const { unmount } = render(
-      <GlobeA11yOverlay renderer={r} events={EVENTS} quakes={QUAKES} onFocusChange={vi.fn()} />,
+      <GlobeA11yOverlay
+        renderer={r}
+        size={400}
+        events={EVENTS}
+        quakes={QUAKES}
+        onFocusChange={vi.fn()}
+      />,
     )
     unmount()
     expect(r.setOnFrame).toHaveBeenLastCalledWith(null)

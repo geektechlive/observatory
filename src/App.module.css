@@ -120,6 +120,10 @@
 .globeCenter {
   position: relative;
   display: grid;
+
+  /* minmax(0, 1fr), not the implicit auto column: auto grows to the instrument's
+     536px, so its max-width: 100% never shrinks it on a phone. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   min-height: 400px;
 }
@@ -130,6 +134,7 @@
 .stageMorph {
   width: 100%;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   animation: stage-enter 520ms var(--ease-out-expo);
 }

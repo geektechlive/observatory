@@ -12,6 +12,8 @@ interface OverlayRenderer {
 
 interface GlobeA11yOverlayProps {
   renderer: OverlayRenderer
+  /** The canvas design size in px; positions convert to percentages of it. */
+  size: number
   events: readonly { lat: number; lon: number; kind: string }[]
   quakes: readonly { lat: number; lon: number; mag: number | null; place: string }[]
   /** True while an item has focus, so the host pauses rotation and the target holds still. */
@@ -30,6 +32,7 @@ const TOOLTIP_OFFSET = { x: 14, y: -30 }
  */
 export function GlobeA11yOverlay({
   renderer,
+  size,
   events,
   quakes,
   onFocusChange,
@@ -46,14 +49,16 @@ export function GlobeA11yOverlay({
         positions.current.set(key, { x: item.x, y: item.y })
         const node = nodes.current.get(key)
         if (!node) continue
-        node.style.transform = `translate(${String(item.x)}px, ${String(item.y)}px)`
+        // Percentages of the lens, so items stay on their markers when CSS scales the globe.
+        node.style.left = `${String((item.x / size) * 100)}%`
+        node.style.top = `${String((item.y / size) * 100)}%`
         node.hidden = !item.visible && focusedKey.current !== key
       }
     })
     return () => {
       renderer.setOnFrame(null)
     }
-  }, [renderer])
+  }, [renderer, size])
 
   const focusHandlers = (key: string, label: string) => ({
     onFocus: () => {

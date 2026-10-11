@@ -1,15 +1,21 @@
-import { type ComponentProps, useEffect, useRef, useState } from 'react'
+import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react'
 
+import { Chip } from '@/components/ui/Chip'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import type { LaneCensus } from '@/lib/census'
 import { gpuTier } from '@/lib/globe3d'
 import { chooseGlobeMode, type GlobeMode, readGlobeModeInput, readGpuInfo } from '@/lib/globeMode'
 
 import { Globe } from './Globe'
 import styles from './globe-host.module.css'
 import { GlobeA11yOverlay } from './GlobeA11yOverlay'
+import { BEZEL_WIDTH, GlobeBezel, type GlobeBezelHandle } from './GlobeBezel'
 import type { GlobeRenderer } from './three/GlobeRenderer'
 
-type GlobeProps = ComponentProps<typeof Globe>
+type GlobeProps = ComponentProps<typeof Globe> & {
+  /** Live lane census for the bezel (#51); the bezel is drawn only when it is given. */
+  census?: readonly LaneCensus[] | undefined
+}
 
 const NONE: readonly never[] = []
 /** Matches the SVG globe's default when the ISS feed has no altitude yet. */
@@ -55,7 +61,7 @@ function releaseAfterFailure(): void {
  * (?globe=webgl) until the parity matrix (#44) is complete; see src/lib/globeMode.ts.
  * `data-globe-mode` says which one is live, so e2e can't pass silently on the fallback.
  */
-export function GlobeHost(props: GlobeProps) {
+export function GlobeHost({ census, ...props }: GlobeProps) {
   const [mode, setMode] = useState<GlobeMode>('svg')
   const [renderer, setRenderer] = useState<GlobeRenderer | null>(null)
   const slot = useRef<HTMLDivElement>(null)
@@ -126,10 +132,22 @@ export function GlobeHost(props: GlobeProps) {
   // so a target never moves out from under the person aiming at it.
   const [focusWithin, setFocusWithin] = useState(false)
   const [hovering, setHovering] = useState(false)
-  const autoRotate = props.autoRotate ?? true
+  // WCAG 2.2.2: anything that moves for more than 5 s gets a visible way to stop it.
+  const [userPaused, setUserPaused] = useState(false)
+  const autoRotate = (props.autoRotate ?? true) && !userPaused
   useEffect(() => {
     renderer?.setRotationPaused(!autoRotate || focusWithin || hovering)
   }, [renderer, autoRotate, focusWithin, hovering])
+
+  // The bezel's bearing scale follows whichever globe is live.
+  const bezel = useRef<GlobeBezelHandle>(null)
+  const onFacingChange = useCallback((lon: number) => {
+    bezel.current?.setFacing(lon)
+  }, [])
+  useEffect(() => {
+    renderer?.setOnRotate(onFacingChange)
+    return () => renderer?.setOnRotate(null)
+  }, [renderer, onFacingChange])
 
   useEffect(() => {
     if (failed || chooseGlobeMode(readGlobeModeInput()) !== 'webgl') return
@@ -175,36 +193,63 @@ export function GlobeHost(props: GlobeProps) {
   }, [size, reducedMotion])
 
   const webgl = mode === 'webgl'
+  const box = size + 2 * BEZEL_WIDTH
   return (
-    <div
-      className={styles.host ?? ''}
-      data-globe-mode={mode}
-      role={webgl ? 'group' : undefined}
-      aria-label={webgl ? 'Orthographic globe — Earth, ISS position, EONET events' : undefined}
-      style={{ width: size, height: size }}
-      onPointerEnter={() => {
-        setHovering(true)
-      }}
-      onPointerLeave={() => {
-        setHovering(false)
-      }}
-    >
+    <div className={styles.instrument ?? ''} style={{ width: box }}>
       <div
-        className={styles.svg ?? ''}
-        data-hidden={webgl ? 'true' : undefined}
-        aria-hidden={webgl ? true : undefined}
+        className={styles.host ?? ''}
+        data-globe-mode={mode}
+        role={webgl ? 'group' : undefined}
+        aria-label={webgl ? 'Orthographic globe — Earth, ISS position, EONET events' : undefined}
+        onPointerEnter={() => {
+          setHovering(true)
+        }}
+        onPointerLeave={() => {
+          setHovering(false)
+        }}
       >
-        <Globe {...props} />
+        {census && <GlobeBezel ref={bezel} size={size} census={census} />}
+        <div
+          className={styles.lens ?? ''}
+          style={{ inset: `${String((BEZEL_WIDTH / box) * 100)}%` }}
+        >
+          <div
+            className={styles.svg ?? ''}
+            data-hidden={webgl ? 'true' : undefined}
+            aria-hidden={webgl ? true : undefined}
+          >
+            <Globe
+              {...props}
+              autoRotate={autoRotate}
+              onFacingChange={webgl ? undefined : onFacingChange}
+            />
+          </div>
+          <div
+            ref={slot}
+            className={styles.webgl ?? ''}
+            data-visible={webgl ? 'true' : undefined}
+          />
+          {webgl && renderer && (
+            <GlobeA11yOverlay
+              renderer={renderer}
+              size={size}
+              events={events ?? NONE}
+              quakes={quakes ?? NONE}
+              onFocusChange={setFocusWithin}
+            />
+          )}
+        </div>
       </div>
-      <div ref={slot} className={styles.webgl ?? ''} data-visible={webgl ? 'true' : undefined} />
-      {webgl && renderer && (
-        <GlobeA11yOverlay
-          renderer={renderer}
-          events={events ?? NONE}
-          quakes={quakes ?? NONE}
-          onFocusChange={setFocusWithin}
-        />
-      )}
+      <div className={styles.controls ?? ''}>
+        <Chip
+          pressed={userPaused}
+          onClick={() => {
+            setUserPaused((p) => !p)
+          }}
+        >
+          {userPaused ? 'Resume rotation' : 'Pause rotation'}
+        </Chip>
+      </div>
     </div>
   )
 }
