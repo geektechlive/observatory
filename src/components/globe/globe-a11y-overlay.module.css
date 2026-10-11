@@ -1,0 +1,22 @@
+/* Focus targets over the WebGL globe (#48). Invisible until focused; 24px minimum target. */
+.list {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.item {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}

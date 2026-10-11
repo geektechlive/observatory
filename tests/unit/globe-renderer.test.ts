@@ -147,3 +147,64 @@ describe('GlobeRenderer', () => {
     r.dispose()
   })
 })
+
+describe('GlobeRenderer onFrame (#48: one pose source for the a11y overlay)', () => {
+  const LAYERS = {
+    iss: null,
+    trail: [],
+    events: [
+      { lat: 0, lon: 12, kind: 'wildfires' }, // faces the camera at start (12°E)
+      { lat: 0, lon: -168, kind: 'floods' }, // the far side
+    ],
+    quakes: [{ lat: 5, lon: 20, mag: 5.5, place: 'near' }],
+    fires: [],
+    fireballs: [],
+    launches: [],
+    disasters: [],
+    satellites: [],
+    aurora: [],
+    tracking: false,
+  }
+
+  it('reports every focusable item after each render, in canvas pixels, with limb visibility', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const frames: { layer: string; index: number; x: number; y: number; visible: boolean }[][] = []
+    r.setOnFrame((items) => frames.push([...items]))
+    r.setLayers(LAYERS)
+    r.attach(document.createElement('div'))
+    f.tick(16)
+
+    const last = frames.at(-1) ?? []
+    expect(last.map((i) => `${i.layer}:${String(i.index)}`)).toEqual([
+      'events:0',
+      'events:1',
+      'quakes:0',
+    ])
+    const [front, back, quake] = last
+    expect(front?.visible).toBe(true)
+    expect(back?.visible).toBe(false)
+    expect(quake?.visible).toBe(true)
+    // The point facing the camera projects to the canvas centre
+    expect(front?.x).toBeCloseTo(230, 0)
+    expect(front?.y).toBeCloseTo(230, 0)
+    r.dispose()
+  })
+
+  it('moves the reported positions as the globe rotates, and holds them while paused', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const xs: number[] = []
+    r.setOnFrame((items) => xs.push(items[0]?.x ?? NaN))
+    r.setLayers(LAYERS)
+    r.attach(document.createElement('div'))
+    f.tick(0)
+    f.tick(2000)
+    expect(xs.at(-1)).not.toBeCloseTo(xs[0] ?? 0, 0)
+    r.setRotationPaused(true)
+    const held = xs.at(-1)
+    f.tick(4000)
+    expect(xs.at(-1)).toBeCloseTo(held ?? NaN, 6)
+    r.dispose()
+  })
+})

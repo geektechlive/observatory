@@ -25,7 +25,7 @@ import {
   WebGLRenderer,
 } from 'three'
 
-import { facingLongitude, rotationForFacing, sunDirection } from '@/lib/globe3d'
+import { facingLongitude, isSurfaceVisible, rotationForFacing, sunDirection } from '@/lib/globe3d'
 import { layerCounts, type LayerInput, planLayers } from '@/lib/globeLayers'
 import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 
@@ -42,6 +42,16 @@ const STATIC_KEYS = [
   'satellites',
   'aurora',
 ] as const
+
+/** A focusable item's position on the canvas this frame (CSS px from the top left). */
+export interface ProjectedItem {
+  layer: 'events' | 'quakes'
+  index: number
+  x: number
+  y: number
+  /** False when the item is behind the Earth's limb. */
+  visible: boolean
+}
 
 /** The slice of WebGLRenderer the globe uses; tests pass a fake. */
 export interface WebGLRendererLike {
@@ -99,6 +109,10 @@ export class GlobeRenderer {
   private readonly meshes: Mesh[] = []
   private readonly layers = new GlobeLayerObjects()
   private lastInput: LayerInput | null = null
+  private onFrame: ((items: readonly ProjectedItem[]) => void) | null = null
+  private focusables: { layer: 'events' | 'quakes'; index: number; local: Vector3 }[] = []
+  private projected: ProjectedItem[] = []
+  private readonly scratch = new Vector3()
   private earthUniforms: Record<string, { value: unknown }> | null = null
   private rotation = rotationForFacing(START_FACING)
   private frameId = 0
@@ -225,6 +239,31 @@ export class GlobeRenderer {
     if (staticChanged) this.layers.buildStatic(plan)
     this.layers.updateIss(plan)
     this.lastInput = input
+    this.focusables = [
+      ...plan.markers.flatMap((m) =>
+        m.focusIndex === undefined
+          ? []
+          : [
+              {
+                layer: 'events' as const,
+                index: m.focusIndex,
+                local: new Vector3().fromArray(m.position),
+              },
+            ],
+      ),
+      ...plan.spikes.map((s) => ({
+        layer: 'quakes' as const,
+        index: s.focusIndex,
+        local: new Vector3().fromArray(s.base),
+      })),
+    ]
+    this.projected = this.focusables.map((f) => ({
+      layer: f.layer,
+      index: f.index,
+      x: 0,
+      y: 0,
+      visible: false,
+    }))
     // What is drawn, per layer: e2e asserts parity (#44) on this, not on props.
     this.canvas.dataset['globeLayers'] = JSON.stringify(layerCounts(plan))
     if (this.frameId === 0 && this.attached) this.renderOnce()
@@ -260,6 +299,16 @@ export class GlobeRenderer {
     this.stopLoop()
     this.attached = false
     this.canvas.remove()
+  }
+
+  /**
+   * Called after every render with the screen position of each focusable item, from
+   * the same camera and pose that frame was drawn with (#48, Codex finding 1). The
+   * array is reused between frames; copy it to keep it.
+   */
+  setOnFrame(callback: ((items: readonly ProjectedItem[]) => void) | null): void {
+    this.onFrame = callback
+    if (callback && this.attached) this.emitFrame()
   }
 
   setRotationPaused(paused: boolean): void {
@@ -310,11 +359,32 @@ export class GlobeRenderer {
       this.lastSun = now
     }
     this.renderer.render(this.scene, this.camera)
+    this.emitFrame()
     this.schedule()
   }
 
   private renderOnce(): void {
     this.renderer.render(this.scene, this.camera)
+    this.emitFrame()
+  }
+
+  private emitFrame(): void {
+    if (!this.onFrame || this.focusables.length === 0) return
+    // A real render updates these; update them here too so the projection never lags a frame.
+    this.globe.updateMatrixWorld()
+    this.camera.updateMatrixWorld()
+    const cam = this.camera.position.toArray()
+    const size = this.options.size
+    this.focusables.forEach((f, i) => {
+      const item = this.projected[i]
+      if (!item) return
+      this.scratch.copy(f.local).applyMatrix4(this.globe.matrixWorld)
+      item.visible = isSurfaceVisible(this.scratch.toArray(), cam)
+      this.scratch.project(this.camera)
+      item.x = ((this.scratch.x + 1) / 2) * size
+      item.y = ((1 - this.scratch.y) / 2) * size
+    })
+    this.onFrame(this.projected)
   }
 
   private readonly handleVisibility = (): void => {

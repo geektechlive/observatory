@@ -77,12 +77,21 @@ const SURFACE = 1.008
 const AURORA_SHELL = 1.012
 const DEFAULT_SAT_ALT_KM = 550
 /** OVATION is a dense grid: normal blending converges on the aurora green instead of climbing to white. */
-const AURORA_ALPHA = 0.35
+const AURORA_ALPHA = 0.12
 
 /** Quake spike height, globe radii: M4 is a stub, M8 stands tall; unknown is a stub. */
 export function spikeHeight(mag: number | null): number {
   if (mag === null) return 0.01
   return 0.02 + 0.13 * Math.min(Math.max((mag - 4) / 4, 0), 1)
+}
+
+/** Screen-reader labels, shared by the plan and the a11y overlay so they can't drift. */
+export function eventLabel(e: { lat: number; lon: number; kind: string }): string {
+  return `${eonetKind(e.kind).label} at ${e.lat.toFixed(1)}°, ${e.lon.toFixed(1)}°`
+}
+
+export function quakeLabel(q: { mag: number | null; place: string }): string {
+  return `Earthquake M${q.mag?.toFixed(1) ?? '?'}, ${q.place}`
 }
 
 /** How many objects each layer draws; published on the canvas for e2e parity checks. */
@@ -109,7 +118,7 @@ export function planLayers(input: LayerInput): LayerPlan {
       color: LANES[kind.lane].emit,
       glyph: { shape: 'letter', letter: kind.letter },
       focusIndex: i,
-      label: `${kind.label} at ${e.lat.toFixed(1)}°, ${e.lon.toFixed(1)}°`,
+      label: eventLabel(e),
     })
   })
   for (const f of input.fireballs) {
@@ -156,7 +165,7 @@ export function planLayers(input: LayerInput): LayerPlan {
     height: spikeHeight(q.mag),
     color: LANES.geo.emit,
     focusIndex: i,
-    label: `M${q.mag?.toFixed(1) ?? '?'} ${q.place}`,
+    label: quakeLabel(q),
   }))
 
   for (const f of input.fires) {

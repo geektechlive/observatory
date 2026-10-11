@@ -6,6 +6,7 @@ import { chooseGlobeMode, type GlobeMode, readGlobeModeInput, readGpuInfo } from
 
 import { Globe } from './Globe'
 import styles from './globe-host.module.css'
+import { GlobeA11yOverlay } from './GlobeA11yOverlay'
 import type { GlobeRenderer } from './three/GlobeRenderer'
 
 type GlobeProps = ComponentProps<typeof Globe>
@@ -121,6 +122,15 @@ export function GlobeHost(props: GlobeProps) {
     renderer?.setShowTerminator(showTerminator)
   }, [renderer, warm, showTerminator])
 
+  // Rotation holds still while a marker has focus or the pointer is over the globe,
+  // so a target never moves out from under the person aiming at it.
+  const [focusWithin, setFocusWithin] = useState(false)
+  const [hovering, setHovering] = useState(false)
+  const autoRotate = props.autoRotate ?? true
+  useEffect(() => {
+    renderer?.setRotationPaused(!autoRotate || focusWithin || hovering)
+  }, [renderer, autoRotate, focusWithin, hovering])
+
   useEffect(() => {
     if (failed || chooseGlobeMode(readGlobeModeInput()) !== 'webgl') return
     let cancelled = false
@@ -172,6 +182,12 @@ export function GlobeHost(props: GlobeProps) {
       role={webgl ? 'group' : undefined}
       aria-label={webgl ? 'Orthographic globe — Earth, ISS position, EONET events' : undefined}
       style={{ width: size, height: size }}
+      onPointerEnter={() => {
+        setHovering(true)
+      }}
+      onPointerLeave={() => {
+        setHovering(false)
+      }}
     >
       <div
         className={styles.svg ?? ''}
@@ -181,6 +197,14 @@ export function GlobeHost(props: GlobeProps) {
         <Globe {...props} />
       </div>
       <div ref={slot} className={styles.webgl ?? ''} data-visible={webgl ? 'true' : undefined} />
+      {webgl && renderer && (
+        <GlobeA11yOverlay
+          renderer={renderer}
+          events={events ?? NONE}
+          quakes={quakes ?? NONE}
+          onFocusChange={setFocusWithin}
+        />
+      )}
     </div>
   )
 }

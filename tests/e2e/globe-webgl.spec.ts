@@ -60,6 +60,55 @@ test.describe('Globe host', () => {
     await expect(host(page)).toHaveAttribute('data-globe-mode', 'svg')
   })
 
+  test('a11y overlay: drawn events are focusable, and focus holds the globe still (#48)', async ({
+    page,
+  }) => {
+    // One wildfire at 12°E, the longitude the globe faces when it starts.
+    await page.route('/api/eonet', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          title: 'EONET Events',
+          description: 'Natural events',
+          link: 'https://eonet.gsfc.nasa.gov/api/v3/events',
+          events: [
+            {
+              id: 'EONET_front',
+              title: 'Front-facing wildfire',
+              link: 'https://eonet.gsfc.nasa.gov/api/v3/events/EONET_front',
+              closed: null,
+              description: null,
+              categories: [{ id: 'wildfires', title: 'Wildfires' }],
+              sources: [],
+              geometry: [{ type: 'Point', date: '2026-10-10T00:00:00Z', coordinates: [12, 0] }],
+            },
+          ],
+        }),
+      }),
+    )
+    await page.goto('/?globe=webgl')
+    await expect(host(page)).toHaveAttribute('data-globe-mode', 'webgl', { timeout: 15_000 })
+    await expect(page.locator('canvas[data-globe-webgl]')).toHaveAttribute(
+      'data-globe-layers',
+      /"events":1/,
+    )
+
+    const item = page.getByRole('listitem', { name: 'Wildfire at 0.0°, 12.0°' })
+    await expect(item).toBeVisible()
+    // Keep the pointer off the globe: hovering also pauses rotation.
+    await page.mouse.move(0, 0)
+    await item.focus()
+    await expect(page.getByRole('tooltip')).toContainText('Wildfire')
+    const held = await item.getAttribute('style')
+    await page.waitForTimeout(1200)
+    expect(await item.getAttribute('style')).toBe(held)
+
+    await item.blur()
+    await page.waitForTimeout(1200)
+    expect(await item.getAttribute('style')).not.toBe(held)
+  })
+
   test('switching Earth and Sun repeatedly keeps one canvas (no context churn)', async ({
     page,
   }) => {
