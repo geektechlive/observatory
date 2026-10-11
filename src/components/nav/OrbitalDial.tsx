@@ -1,5 +1,6 @@
 import { type ReactNode, useRef } from 'react'
 
+import { TickRing } from '@/components/ui/TickRing'
 import { CONSOLE_VIEWS, type ConsoleView, useUiStore } from '@/store/ui'
 
 import styles from './orbital-dial.module.css'
@@ -98,6 +99,12 @@ export function OrbitalDial() {
       focusAndSetView(
         CONSOLE_VIEWS[(idx - 1 + CONSOLE_VIEWS.length) % CONSOLE_VIEWS.length] as ConsoleView,
       )
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      focusAndSetView(CONSOLE_VIEWS[0] as ConsoleView)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      focusAndSetView(CONSOLE_VIEWS[CONSOLE_VIEWS.length - 1] as ConsoleView)
     }
   }
 
@@ -141,6 +148,10 @@ export function OrbitalDial() {
               }}
             >
               <span className={styles.glyphRing ?? ''} aria-hidden="true">
+                {/* The same machined ring as the globe bezel, so nav and lens match */}
+                <span className={styles.ticks ?? ''}>
+                  <TickRing size={44} step={15} major={90} length={0.14} />
+                </span>
                 <svg viewBox="-12 -12 24 24" className={styles.glyph ?? ''}>
                   {m.glyph}
                 </svg>

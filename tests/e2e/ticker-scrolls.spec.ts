@@ -3,8 +3,9 @@ import { expect, test } from '@playwright/test'
 test.describe('Ticker', () => {
   test('ticker band is present at the bottom of the page', async ({ page }) => {
     await page.goto('/')
-    // The ticker has role="region" and is positioned at the bottom
-    const ticker = page.locator('[role="region"][aria-label*="ive"]')
+    // The ticker has role="region" and is positioned at the bottom. Match its exact
+    // label: the vital-signs spine is a labelled region too ("Live vital signs").
+    const ticker = page.locator('[role="region"][aria-label="Live event feed"]')
     await expect(ticker).toHaveCount(1, { timeout: 10_000 })
   })
 

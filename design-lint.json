@@ -7,6 +7,8 @@
     "src/components/world-map/**",
     "src/components/starfield/**",
     "src/components/status-bar/**",
+    "src/components/status/**",
+    "src/components/nav/**",
     "src/lib/**"
   ],
   "exempt": [

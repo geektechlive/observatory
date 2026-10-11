@@ -24,9 +24,10 @@
   color: var(--signal);
 }
 
+/* Quieter and smaller than the value, but never under the 11px floor (rule 6) */
 .unit {
   margin-left: var(--space-1);
-  font-size: 0.72em;
+  font-size: max(0.72em, var(--text-xs));
   color: var(--bone-dim);
 }
 
