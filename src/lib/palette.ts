@@ -43,6 +43,11 @@ export const TOKEN_OKLCH = {
   signal: 'oklch(0.85 0.13 220)',
   boneDim: 'oklch(0.72 0.012 78)',
   boneFaint: 'oklch(0.62 0.012 75)',
+  void: 'oklch(0.08 0.01 50)',
+  copper2: 'oklch(0.55 0.14 45)',
+  copperGlow: 'oklch(0.78 0.14 55)',
+  brass: 'oklch(0.82 0.14 80)',
+  globeDeep: 'oklch(0.3 0.06 48)',
 } as const
 
 const hexOf = (literal: string): string => {
@@ -221,6 +226,29 @@ const decode = (v: number): number => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) /
 export function hexToLinear(hex: string): [number, number, number] {
   const ch = (i: number): number => decode(parseInt(hex.slice(i, i + 2), 16) / 255)
   return [ch(1), ch(3), ch(5)]
+}
+
+type Linear = readonly [number, number, number]
+
+/**
+ * The Earth shader's copper grade (spec section 5), as linear RGB uniforms. Mirrored
+ * from tokens.css by test; the shader must not read getComputedStyle, which returns
+ * oklch() strings three.js can't parse (Codex finding 6).
+ */
+export const GLOBE_GRADE: {
+  readonly shadow: Linear
+  readonly deep: Linear
+  readonly mid: Linear
+  readonly high: Linear
+  readonly night: Linear
+  readonly mix: number
+} = {
+  shadow: hexToLinear(hexOf(TOKEN_OKLCH.void)),
+  deep: hexToLinear(hexOf(TOKEN_OKLCH.globeDeep)),
+  mid: hexToLinear(hexOf(TOKEN_OKLCH.copper2)),
+  high: hexToLinear(hexOf(TOKEN_OKLCH.copperGlow)),
+  night: hexToLinear(hexOf(TOKEN_OKLCH.brass)),
+  mix: 0.94,
 }
 
 /** The CSS mirror of this module, written to src/styles/palette.css. */

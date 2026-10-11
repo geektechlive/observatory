@@ -11,6 +11,7 @@ import {
   eonetKind,
   fireMapColor,
   gdacsColor,
+  GLOBE_GRADE,
   hexToLinear,
   ISS_HEX,
   LANES,
@@ -165,6 +166,44 @@ describe('map ramps (#41)', () => {
     expect(sstColor(29)).toBe(LANES.thermal.emit)
     expect(sstColor(18)).not.toBe(LANES.hydro.emit)
     expect(sstColor(null)).toBe(MUTED_HEX)
+  })
+})
+
+describe('GLOBE_GRADE (#45: shader uniforms, never getComputedStyle oklch)', () => {
+  it.each([
+    ['--void', TOKEN_OKLCH.void],
+    ['--copper-2', TOKEN_OKLCH.copper2],
+    ['--copper-glow', TOKEN_OKLCH.copperGlow],
+    ['--brass', TOKEN_OKLCH.brass],
+    ['--globe-grade-deep', TOKEN_OKLCH.globeDeep],
+  ])('%s is declared as %s in tokens.css', (name, literal) => {
+    expect(tokens).toContain(`${name}: ${literal};`)
+  })
+
+  it('mirrors the grade mix', () => {
+    expect(tokens).toContain(`--globe-grade-mix: ${String(GLOBE_GRADE.mix)};`)
+  })
+
+  it('carries every stop as linear RGB in [0, 1]', () => {
+    for (const stop of [
+      GLOBE_GRADE.shadow,
+      GLOBE_GRADE.deep,
+      GLOBE_GRADE.mid,
+      GLOBE_GRADE.high,
+      GLOBE_GRADE.night,
+    ]) {
+      expect(stop).toHaveLength(3)
+      for (const c of stop) {
+        expect(c).toBeGreaterThanOrEqual(0)
+        expect(c).toBeLessThanOrEqual(1)
+      }
+    }
+    // the ramp climbs: shadow < deep < mid < high in luminance
+    const lum = ([r, g, b]: readonly number[]) =>
+      0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0)
+    expect(lum(GLOBE_GRADE.shadow)).toBeLessThan(lum(GLOBE_GRADE.deep))
+    expect(lum(GLOBE_GRADE.deep)).toBeLessThan(lum(GLOBE_GRADE.mid))
+    expect(lum(GLOBE_GRADE.mid)).toBeLessThan(lum(GLOBE_GRADE.high))
   })
 })
 
