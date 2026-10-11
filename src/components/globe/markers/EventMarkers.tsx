@@ -1,5 +1,8 @@
 import { memo } from 'react'
 
+import { Overlay } from '@/components/ui/Overlay'
+import { Readout } from '@/components/ui/Readout'
+import { Swatch } from '@/components/ui/Swatch'
 import { eonetKind, LANES } from '@/lib/palette'
 
 import { useProjected } from '../useGlobeProjection'
@@ -105,44 +108,23 @@ interface EventTooltipProps {
   center: number
 }
 
-/** HTML overlay tooltip for the hovered/focused EONET marker. */
+/**
+ * HTML overlay tooltip for the hovered/focused EONET marker. Text wears ink; the
+ * swatch carries the lane colour (identity is never colour-on-text).
+ */
 export const EventTooltip = memo(function EventTooltip({ event, pos, center }: EventTooltipProps) {
   if (event === null || pos === null || !pos.visible) return null
+  const kind = eonetKind(event.kind)
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: pos.x + center + 10,
-        top: pos.y + center - 28,
-        pointerEvents: 'none',
-        background: 'oklch(0.10 0.02 50 / 0.92)',
-        border: '1px solid var(--plate-edge)',
-        borderRadius: 2,
-        padding: '4px 8px',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <div
-        style={{
-          fontFamily: 'var(--font-stencil)',
-          fontSize: 9,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          color: LANES[eonetKind(event.kind).lane].emit,
-        }}
-      >
-        {eonetKind(event.kind).label}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9,
-          color: 'var(--bone-faint)',
-          marginTop: 2,
-        }}
-      >
-        {event.lat.toFixed(2)}° {event.lon.toFixed(2)}°
-      </div>
-    </div>
+    <Overlay kind="tooltip" x={pos.x + center + 10} y={pos.y + center - 28}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <Swatch color={LANES[kind.lane].emit} />
+        {kind.label}
+      </span>
+      <Readout
+        value={`${event.lat.toFixed(2)}° ${event.lon.toFixed(2)}°`}
+        style={{ color: 'var(--bone-faint)' }}
+      />
+    </Overlay>
   )
 })

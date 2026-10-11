@@ -78,6 +78,13 @@
   --glass-alpha-mid: 0.58;
   --glass-alpha-far: 0.48;
   --glass-bg: oklch(0.14 0.02 55 / var(--glass-alpha-near)); /* warm: owner pick A, 2026-10-10 */
+  --glass-bg-mid: oklch(0.14 0.02 55 / var(--glass-alpha-mid));
+  --glass-bg-far: oklch(0.14 0.02 55 / var(--glass-alpha-far));
+  --plate-label-bg: linear-gradient(
+    180deg,
+    oklch(0.2 0.045 56 / 0.92) 0%,
+    oklch(0.14 0.03 52 / 0.78) 100%
+  );
   --glass-border: var(--plate-edge);
   --panel-border: oklch(0.32 0.04 55 / 0.5);
   --panel-border-strong: oklch(0.4 0.05 55 / 0.65);
