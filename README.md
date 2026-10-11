@@ -31,8 +31,13 @@ header reads DEGRADED rather than LIVE.
 
 ## Design
 
-The Phase 1 visual-direction mockup (Glass / Luxury Futurist) is kept as design
-history at [docs/design-history/mockups.html](docs/design-history/mockups.html).
+The current direction is **ROCI Retrofit v2, "the Instrument"**: a copper-graded
+three.js globe behind a machined bezel, with reflective copper housing and emissive data.
+The spec is [docs/design-history/roci-retrofit-v2.md](docs/design-history/roci-retrofit-v2.md),
+the audit it builds on is [roci-audit-2026-10.md](docs/design-history/roci-audit-2026-10.md),
+and the prototype is [mockups-v2.html](docs/design-history/mockups-v2.html).
+The original Phase 1 mockup (Glass / Luxury Futurist) is kept as history at
+[docs/design-history/mockups.html](docs/design-history/mockups.html).
 
 ## Stack
 

@@ -2,7 +2,7 @@
 
 > See /Users/chrisfavero/Source/CLAUDE.md for global conventions
 
-NASA live-data dashboard — port of cosmo-tui. Glass / Luxury Futurist aesthetic, ops-grade density.
+NASA live-data dashboard — port of cosmo-tui. **ROCI Retrofit v2 "the Instrument"** (locked 2026-10-10): reflective copper housing, emissive data, ops-grade density. The spec is `docs/design-history/roci-retrofit-v2.md`; read it before any visual change. The old "Glass / Luxury Futurist" direction is history only.
 
 ## Stack
 
