@@ -4,34 +4,32 @@
   align-items: center;
   justify-content: center;
   padding: 14px var(--space-gap);
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--plate-edge);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
+  color: var(--bone-faint);
   letter-spacing: 0.04em;
   text-align: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-2);
 }
 
+/* Inline links in running text: underlined, and the global focus ring applies */
 .link {
-  color: var(--ink-faint);
+  color: var(--bone-faint);
   text-decoration: underline;
-  text-decoration-color: rgba(243, 246, 251, 0.2);
+  text-decoration-color: color-mix(in oklch, var(--bone-faint) 40%, transparent);
   text-underline-offset: 3px;
   transition: color var(--duration-fast) ease;
 }
 
 .link:hover,
 .link:focus-visible {
-  color: var(--ink-dim);
-  outline: 2px solid var(--ink-dim);
-  outline-offset: 2px;
-  border-radius: 2px;
+  color: var(--bone-dim);
 }
 
 .sep {
-  color: var(--glass-border);
-  margin: 0 4px;
+  color: var(--plate-edge);
+  margin: 0 var(--space-2);
   user-select: none;
 }

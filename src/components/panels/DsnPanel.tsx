@@ -1,14 +1,20 @@
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { StencilLabel } from '@/components/ui/StencilLabel'
+import { Swatch } from '@/components/ui/Swatch'
 import { useDsn } from '@/hooks/useDsn'
 import type { DsnContact, DsnStation } from '@/lib/dsn'
+import { ISS_HEX, LANES, STATUS_HEX } from '@/lib/palette'
 
 import styles from './dsn-panel.module.css'
 
+/** Radio band identity: Ka is telemetry cyan, X the orbital lane, S nominal green. */
 function bandColor(band: string): string {
-  if (band === 'Ka') return 'var(--signal)'
-  if (band === 'X') return 'var(--amber)'
-  if (band === 'S') return 'var(--terminal)'
-  return 'var(--copper-glow)'
+  if (band === 'Ka') return ISS_HEX
+  if (band === 'X') return LANES.orbital.emit
+  if (band === 'S') return STATUS_HEX.nominal
+  return LANES.space.emit
 }
 
 /** Format one-way light time (rtlt/2, seconds) compactly. */
@@ -32,7 +38,8 @@ function ContactRow({ c }: { c: DsnContact }) {
         {c.hasDown && <span className={styles.down ?? ''}>▼</span>}
       </span>
       {c.bands.map((b) => (
-        <span key={b} className={styles.band ?? ''} style={{ color: bandColor(b) }}>
+        <span key={b} className={styles.band ?? ''}>
+          <Swatch color={bandColor(b)} />
           {b}
         </span>
       ))}
@@ -46,12 +53,12 @@ function StationBlock({ station }: { station: DsnStation }) {
   return (
     <div className={styles.station ?? ''}>
       <div className={styles.stationHead ?? ''}>
-        <span className={styles.stationName ?? ''}>{station.friendlyName}</span>
-        <span className={styles.stationCount ?? ''}>
+        <StencilLabel>{station.friendlyName}</StencilLabel>
+        <Label>
           {contacts.length > 0
             ? `${contacts.length} link${contacts.length > 1 ? 's' : ''}`
             : 'idle'}
-        </span>
+        </Label>
       </div>
       {contacts.length > 0 && (
         <ul className={styles.contactList ?? ''}>
@@ -70,7 +77,7 @@ export function DsnPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Deep Space Network">
-        <div className={styles.loading ?? ''}>Acquiring signal...</div>
+        <PanelState kind="loading" detail="Acquiring signal" />
       </GlassPanel>
     )
   }
@@ -78,7 +85,7 @@ export function DsnPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Deep Space Network">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="NASA's DSN Now feed did not answer" />
       </GlassPanel>
     )
   }

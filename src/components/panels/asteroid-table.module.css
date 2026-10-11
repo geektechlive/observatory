@@ -1,5 +1,5 @@
 .asteroidTable {
-  padding: 36px 16px 16px;
+  padding: var(--panel-body-pad);
   overflow-x: auto;
 }
 
@@ -13,10 +13,10 @@
 .caption {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
-  letter-spacing: 0.06em;
+  color: var(--bone-faint);
+  letter-spacing: var(--track-label);
   text-align: left;
-  padding-bottom: 8px;
+  padding-bottom: var(--space-3);
   text-transform: uppercase;
 }
 
@@ -24,48 +24,66 @@
   padding: 6px 8px;
   font-weight: 600;
   text-align: left;
-  color: var(--ink-faint);
-  letter-spacing: 0.06em;
+  color: var(--bone-faint);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
   border-bottom: 1px solid var(--panel-border);
   white-space: nowrap;
 }
 
 .thSortable {
+  padding: 0;
+}
+
+/* The real control inside a sortable header: a button, so it is announced as one */
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 24px;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
   cursor: pointer;
   user-select: none;
   transition: color var(--duration-fast);
 }
 
-.thSortable:hover {
-  color: var(--ink-dim);
+.sortBtn:hover {
+  color: var(--bone-dim);
 }
 
-.thActive {
-  color: var(--cyan);
+.thRight,
+.thRight .sortBtn {
+  text-align: right;
+  justify-content: flex-end;
 }
 
-.thActive:hover {
-  color: var(--cyan);
+.thCenter,
+.thCenter .sortBtn {
+  text-align: center;
+  justify-content: center;
+}
+
+.thActive .sortBtn,
+.thActive .sortBtn:hover {
+  color: var(--signal);
 }
 
 .sortIcon {
-  font-size: 0.7em;
+  font-size: var(--text-xs);
   opacity: 0.6;
-}
-
-.thRight {
-  text-align: right;
-}
-
-.thCenter {
-  text-align: center;
 }
 
 .td {
   padding: 6px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  color: var(--ink-dim);
+  border-bottom: 1px solid var(--hud-faint);
+  color: var(--bone-dim);
   vertical-align: middle;
 }
 
@@ -78,22 +96,23 @@
 }
 
 .nameNormal {
-  color: var(--ink);
+  color: var(--bone);
   white-space: nowrap;
 }
 
+/* Potentially hazardous: the watch step of the status scale, plus the icon column */
 .nameHazard {
   color: var(--amber);
   white-space: nowrap;
 }
 
 .missKm {
-  color: var(--cyan);
+  color: var(--signal);
 }
 
 .missLd {
-  color: var(--ink-faint);
-  font-size: 0.6em;
+  color: var(--bone-faint);
+  font-size: var(--text-xs);
   margin-left: 4px;
 }
 
@@ -109,30 +128,4 @@
 .hazardIcon {
   color: var(--amber);
   font-size: 0.75rem;
-}
-
-.unavailable {
-  padding: 24px 16px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--amber);
-  letter-spacing: 0.05em;
-}
-
-.loading {
-  padding: 24px 16px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-}
-
-.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-  letter-spacing: 0.05em;
 }

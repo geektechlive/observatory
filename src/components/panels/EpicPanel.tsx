@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useEpic } from '@/hooks/useEpic'
 import { epicImageUrl } from '@/lib/epicUrl'
 
@@ -54,7 +55,7 @@ export function EpicPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="panel" label="Earth Now">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -62,7 +63,7 @@ export function EpicPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="panel" label="Earth Now">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="NASA's EPIC camera feed did not answer" />
       </GlassPanel>
     )
   }
@@ -73,7 +74,7 @@ export function EpicPanel() {
   if (imgFailed || imgSrc === null) {
     return (
       <GlassPanel variant="panel" label="Earth Now">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="NASA's EPIC camera feed did not answer" />
       </GlassPanel>
     )
   }

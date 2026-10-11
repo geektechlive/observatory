@@ -1,3 +1,5 @@
+import { Label } from '@/components/ui/Label'
+import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { kpStatus, statusVar } from '@/lib/severity'
 
@@ -26,10 +28,8 @@ export function KpSparkline({ readings }: Props) {
   return (
     <div className={styles.section ?? ''}>
       <div className={styles.header ?? ''}>
-        <span className={styles.label ?? ''}>Kp Index</span>
-        <span className={styles.maxValue ?? ''} style={{ color: barColor(maxKp) }}>
-          {maxKp}
-        </span>
+        <Label>Kp Index</Label>
+        <Readout value={String(maxKp)} tone={kpStatus(maxKp)} className={styles.maxValue ?? ''} />
       </div>
       <Sparkline
         values={sorted.map((r) => r.kpIndex)}

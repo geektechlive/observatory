@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useImageBucket } from '@/hooks/useImageBucket'
 
 import styles from './sun-imagery-panel.module.css'
@@ -53,7 +54,7 @@ export function SunImageryPanel() {
       <div className={styles.panel ?? ''}>
         <div className={styles.imageWrap ?? ''}>
           {errored ? (
-            <div className={styles.unavailable ?? ''}>Imagery unavailable</div>
+            <PanelState kind="unavailable" detail={`${view.sub} did not return an image`} />
           ) : (
             <img
               key={view.key}
@@ -75,14 +76,14 @@ export function SunImageryPanel() {
             <span className={styles.capSub ?? ''}>{view.sub}</span>
           </div>
         </div>
-        <div className={styles.tabs ?? ''} role="tablist" aria-label="Solar imagery view">
+        {/* A pressed-button group, not tabs: there is one image, not a panel per button */}
+        <div className={styles.views ?? ''} role="group" aria-label="Solar imagery view">
           {VIEWS.map((v, i) => (
             <button
               key={v.key}
               type="button"
-              role="tab"
-              aria-selected={i === active}
-              className={`${styles.tab ?? ''} ${i === active ? (styles.tabActive ?? '') : ''}`}
+              aria-pressed={i === active}
+              className={styles.view ?? ''}
               onClick={() => {
                 setActive(i)
                 setErrored(false)

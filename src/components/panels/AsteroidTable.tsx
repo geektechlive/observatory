@@ -3,8 +3,10 @@ import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useNeo } from '@/hooks/useNeo'
 import { formatDiameter, formatKm, formatLunarDistance, formatVelocity } from '@/lib/format'
+import { STATUS_HEX } from '@/lib/palette'
 import type { NeoObject } from '@/schemas/neo'
 
 import styles from './asteroid-table.module.css'
@@ -76,7 +78,8 @@ function LunarScale({ missLd, maxLd, hazard }: LunarScaleProps) {
   const moonX = Math.min(1, 1 / maxLd) * W
   const beyond = missLd > maxLd
   const astX = Math.min(1, missLd / maxLd) * W
-  const dotColor = hazard ? 'var(--magenta)' : 'var(--cyan)'
+  // Hazard is the watch step of the status scale; a plain approach is telemetry.
+  const dotColor = hazard ? STATUS_HEX.watch : 'var(--signal)'
 
   return (
     <svg
@@ -86,9 +89,16 @@ function LunarScale({ missLd, maxLd, hazard }: LunarScaleProps) {
       aria-label={`${missLd.toFixed(1)} lunar distances`}
       preserveAspectRatio="none"
     >
-      <line x1={0} x2={W} y1={y} y2={y} stroke="var(--glass-border)" strokeWidth={1} />
+      <line x1={0} x2={W} y1={y} y2={y} stroke="var(--plate-edge)" strokeWidth={1} />
       <circle cx={2} cy={y} r={2.5} fill="var(--signal-2)" />
-      <line x1={moonX} x2={moonX} y1={y - 3} y2={y + 3} stroke="var(--ink-faint)" strokeWidth={1} />
+      <line
+        x1={moonX}
+        x2={moonX}
+        y1={y - 3}
+        y2={y + 3}
+        stroke="var(--bone-faint)"
+        strokeWidth={1}
+      />
       <circle
         cx={beyond ? W - 1 : astX}
         cy={y}
@@ -122,26 +132,22 @@ function SortableTh({ label, sortKey, current, dir, align = 'left', onSort }: So
     .filter(Boolean)
     .join(' ')
 
+  // A real button inside the header: a focusable th has no role, so screen readers
+  // never announced it as actionable. aria-sort stays on the th, where it belongs.
   return (
-    <th
-      scope="col"
-      className={thClass}
-      aria-sort={ariaSort}
-      onClick={() => {
-        onSort(sortKey)
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
+    <th scope="col" className={thClass} aria-sort={ariaSort}>
+      <button
+        type="button"
+        className={styles.sortBtn ?? ''}
+        onClick={() => {
           onSort(sortKey)
-        }
-      }}
-      tabIndex={0}
-    >
-      {label}
-      <span className={styles.sortIcon ?? ''} aria-hidden="true">
-        {active ? (dir === 'asc' ? ' ↑' : ' ↓') : ' ↕'}
-      </span>
+        }}
+      >
+        {label}
+        <span className={styles.sortIcon ?? ''} aria-hidden="true">
+          {active ? (dir === 'asc' ? ' ↑' : ' ↓') : ' ↕'}
+        </span>
+      </button>
     </th>
   )
 }
@@ -163,18 +169,18 @@ export function AsteroidTable() {
 
   const renderContent = () => {
     if (isLoading && !data) {
-      return <div className={styles.loading ?? ''}>Loading...</div>
+      return <PanelState kind="loading" />
     }
 
     if (error || !data) {
-      return <div className={styles.unavailable ?? ''}>Data unavailable</div>
+      return <PanelState kind="unavailable" detail="NASA NeoWs is not answering" />
     }
 
     const raw = flattenNeos(data.near_earth_objects)
     const neos = sortNeos(raw, sortKey, sortDir).slice(0, 12)
 
     if (neos.length === 0) {
-      return <div className={styles.empty ?? ''}>No close approaches in the next 7 days</div>
+      return <PanelState kind="empty" detail="No close approaches in the next 7 days" />
     }
 
     // Shared domain for the lunar-distance rails: at least 5 LD, capped at 40.

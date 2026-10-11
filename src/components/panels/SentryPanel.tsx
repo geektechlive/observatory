@@ -2,8 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useSentry } from '@/hooks/useSentry'
 import { formatImpactProbability, formatPalermo } from '@/lib/format'
+import { palermoStatus, type Status, statusVar } from '@/lib/severity'
 
 import styles from './sentry-panel.module.css'
 
@@ -12,26 +15,27 @@ import styles from './sentry-panel.module.css'
 const PALERMO_MIN = -4
 const PALERMO_MAX = 1
 
-function palermoColor(ps: number): string {
-  if (ps >= -1) return 'var(--magenta)'
-  if (ps >= -2.5) return 'var(--amber)'
-  return 'var(--cyan)'
+/** Palermo as a number; missing or unparseable is NaN. 0 is a real (serious) value. */
+function palermoOf(raw: string | null | undefined): number {
+  return raw != null ? parseFloat(raw) : NaN
 }
 
 function PalermoGauge({ value }: { value: string | null | undefined }) {
-  const ps = value != null ? parseFloat(value) : NaN
+  const ps = palermoOf(value)
   const valid = isFinite(ps)
   const t = valid ? Math.min(1, Math.max(0, (ps - PALERMO_MIN) / (PALERMO_MAX - PALERMO_MIN))) : 0
-  const color = valid ? palermoColor(ps) : 'var(--ink-faint)'
+  const status: Status | null = valid ? palermoStatus(ps) : null
   return (
     <div className={styles.gauge ?? ''}>
-      <span className={styles.gaugeValue ?? ''} style={{ color }}>
-        {formatPalermo(value ?? undefined)}
-      </span>
+      <Readout
+        value={formatPalermo(value ?? undefined)}
+        tone={status ?? undefined}
+        className={styles.gaugeValue ?? ''}
+      />
       <span className={styles.gaugeTrack ?? ''} aria-hidden="true">
         <span
           className={styles.gaugeFill ?? ''}
-          style={{ width: `${t * 100}%`, background: color }}
+          style={{ width: `${t * 100}%`, background: statusVar(status) }}
         />
       </span>
     </div>
@@ -44,23 +48,23 @@ export function SentryPanel() {
 
   const sorted = [...(data?.data ?? [])]
     .sort((a, b) => {
-      const aPs = parseFloat(a.ps_cum ?? '') || -Infinity
-      const bPs = parseFloat(b.ps_cum ?? '') || -Infinity
-      return bPs - aPs
+      const aPs = palermoOf(a.ps_cum)
+      const bPs = palermoOf(b.ps_cum)
+      return (isNaN(bPs) ? -Infinity : bPs) - (isNaN(aPs) ? -Infinity : aPs)
     })
     .slice(0, 8)
 
   const renderContent = () => {
     if (isLoading && !data) {
-      return <div className={styles.loading ?? ''}>Loading...</div>
+      return <PanelState kind="loading" />
     }
 
     if (error || !data) {
-      return <div className={styles.unavailable ?? ''}>Data unavailable</div>
+      return <PanelState kind="unavailable" detail="JPL Sentry is not answering" />
     }
 
     if (sorted.length === 0) {
-      return <div className={styles.empty ?? ''}>No objects in catalog</div>
+      return <PanelState kind="empty" detail="No objects in the Sentry catalog" />
     }
 
     return (

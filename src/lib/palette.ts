@@ -66,11 +66,34 @@ export const STATUS_HEX: Readonly<Record<Status, string>> = {
 export const ISS_HEX = hexOf(TOKEN_OKLCH.signal)
 /** Label ink for canvas-drawn nameplates on the globe (text wears ink, never the series colour). */
 export const BONE_HEX = hexOf(TOKEN_OKLCH.bone)
+/**
+ * Sky bodies, shared by PlanetsPanel, SunMoonPanel and SkyStage so the three can't drift.
+ * Mars is rust, not --mcrn: hazard red means hazard only (rule 3).
+ */
+export const BODY_HEX: Readonly<Record<string, string>> = {
+  Sun: hexOf('oklch(0.9 0.16 90)'),
+  Moon: hexOf('oklch(0.9 0.02 250)'),
+  Mercury: hexOf('oklch(0.72 0.03 70)'),
+  Venus: hexOf('oklch(0.92 0.08 95)'),
+  Mars: hexOf('oklch(0.68 0.17 40)'),
+  Jupiter: hexOf('oklch(0.78 0.09 70)'),
+  Saturn: hexOf('oklch(0.85 0.08 95)'),
+  Uranus: hexOf('oklch(0.82 0.1 200)'),
+  Neptune: hexOf('oklch(0.65 0.15 250)'),
+}
+
+/** The moon disc: its dark side and its lit limb. */
+export const MOON_DISC_HEX = {
+  dark: hexOf('oklch(0.18 0.01 250)'),
+  lit: hexOf('oklch(0.92 0.03 95)'),
+}
+
 /** StarField canvas: emissive points in the void, so a cool star is fine (they aren't structure). */
 export const STAR_HEX = { warm: hexOf('oklch(0.82 0.1 70)'), cool: hexOf('oklch(0.85 0.08 220)') }
 /** Aurora is a field with a single-hue ramp, not a marker lane. */
 export const AURORA_HEX = hexOf('oklch(0.8 0.17 150)')
-const HUD_HEX = hexOf(TOKEN_OKLCH.boneFaint)
+/** HUD lines: the terminator swatch and the SVG globe's tracking-mode outlines. */
+export const HUD_HEX = hexOf(TOKEN_OKLCH.boneFaint)
 const NEUTRAL_HEX = hexOf(TOKEN_OKLCH.boneDim)
 
 export type Swatch =
@@ -131,6 +154,36 @@ export function nwsColor(severity: string): string {
 export const MUTED_HEX = hexOf(TOKEN_OKLCH.boneFaint)
 /** Marker halo so glyphs hold contrast over copper land and city lights (Codex finding 13). */
 export const VOID_HEX = hexOf('oklch(0.08 0.01 50)')
+
+/** `#rrggbb` plus an alpha in [0, 1] as `#rrggbbaa`, for SVG attributes and canvas fills. */
+export function withAlpha(hex: string, alpha: number): string {
+  const a = Math.round(Math.min(1, Math.max(0, alpha)) * 255)
+  return `${hex}${a.toString(16).padStart(2, '0')}`
+}
+
+/**
+ * The SVG fallback globe's housing (#57). SVG attributes can't take color-mix(), so the
+ * sphere, graticule and terminator come from here. Land is copper; in tracking mode the
+ * outlines go HUD-neutral. Data layers never read from this block.
+ */
+export const SVG_GLOBE_HEX = {
+  land: hexOf(TOKEN_OKLCH.copper2),
+  landTracking: HUD_HEX,
+  sphereHigh: hexOf('oklch(0.22 0.05 50)'),
+  sphereMid: hexOf('oklch(0.12 0.025 50)'),
+  sphereLow: hexOf('oklch(0.05 0.005 50)'),
+  twilight: hexOf('oklch(0.10 0.02 250)'),
+  terminator: hexOf('oklch(0.75 0.08 250)'),
+  sunGlow: hexOf('oklch(0.92 0.13 90)'),
+  sunCore: hexOf('oklch(0.98 0.06 90)'),
+} as const
+
+/** The Sky stage's chart background, a deep blue well, as gradient stops. */
+export const SKY_WELL_HEX = {
+  centre: hexOf('oklch(0.16 0.04 250)'),
+  mid: hexOf('oklch(0.09 0.03 255)'),
+  rim: hexOf('oklch(0.05 0.02 260)'),
+} as const
 
 /** Quakes sit in the geophysical lane; magnitude is drawn as size, never as colour. */
 export function quakeMapColor(mag: number | null): string {

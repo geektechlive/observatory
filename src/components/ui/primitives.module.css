@@ -31,6 +31,19 @@
   color: var(--bone-dim);
 }
 
+/* Micro label: captions, row labels, sub-lines. The audit found this recipe copied 8+ times. */
+.microLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--bone-faint);
+}
+
+.microLabel[data-tone='dim'] {
+  color: var(--bone-dim);
+}
+
 /* Engraving: caps stamped into a hull plate. Only ever on plates (rule 8). */
 .stencil {
   font-family: var(--font-mono);

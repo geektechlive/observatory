@@ -2,16 +2,19 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useSwpcAlerts } from '@/hooks/useSwpcAlerts'
 import { formatRelativeTime } from '@/lib/format'
+import { statusVar } from '@/lib/severity'
 
 import styles from './swpc-alerts-panel.module.css'
 
-// First letter of the NOAA product code maps to a rough severity hue.
+// NOAA product codes: warnings and X-class are hazards, watches and alerts a watch,
+// everything else telemetry.
 function codeColor(productId: string): string {
   const p = productId.toUpperCase()
-  if (p.startsWith('WAR') || p.includes('X') || p.startsWith('ALTX')) return 'var(--magenta)'
-  if (p.startsWith('WAT') || p.startsWith('ALT')) return 'var(--amber)'
+  if (p.startsWith('WAR') || p.includes('X') || p.startsWith('ALTX')) return statusVar('hazard')
+  if (p.startsWith('WAT') || p.startsWith('ALT')) return statusVar('watch')
   return 'var(--signal)'
 }
 
@@ -22,15 +25,23 @@ export function SwpcAlertsPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="SWPC Alerts">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
 
-  if (error || !data || data.alerts.length === 0) {
+  if (error || !data) {
     return (
       <GlassPanel variant="tile" label="SWPC Alerts">
-        <div className={styles.unavailable ?? ''}>No active alerts</div>
+        <PanelState kind="unavailable" detail="The NOAA SWPC alerts feed did not answer" />
+      </GlassPanel>
+    )
+  }
+
+  if (data.alerts.length === 0) {
+    return (
+      <GlassPanel variant="tile" label="SWPC Alerts">
+        <PanelState kind="empty" detail="No active SWPC alerts" />
       </GlassPanel>
     )
   }

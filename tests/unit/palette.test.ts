@@ -7,6 +7,7 @@ import {
   altitudeColor,
   aqiColor,
   AURORA_HEX,
+  BODY_HEX,
   EONET_KINDS,
   eonetKind,
   fireMapColor,
@@ -21,10 +22,13 @@ import {
   primaryCategoryCounts,
   quakeMapColor,
   renderPaletteCss,
+  SKY_WELL_HEX,
   sstColor,
   STATUS_HEX,
+  SVG_GLOBE_HEX,
   swatchColor,
   TOKEN_OKLCH,
+  withAlpha,
 } from '@/lib/palette'
 import { NwsFeatureSchema } from '@/schemas/nws'
 import { LAYER_KEYS } from '@/store/ui'
@@ -205,6 +209,45 @@ describe('GLOBE_GRADE (#45: shader uniforms, never getComputedStyle oklch)', () 
     expect(lum(GLOBE_GRADE.shadow)).toBeLessThan(lum(GLOBE_GRADE.deep))
     expect(lum(GLOBE_GRADE.deep)).toBeLessThan(lum(GLOBE_GRADE.mid))
     expect(lum(GLOBE_GRADE.mid)).toBeLessThan(lum(GLOBE_GRADE.high))
+  })
+})
+
+describe('BODY_HEX (sky bodies shared by panels and the sky stage)', () => {
+  it('covers the Sun, Moon and the seven planets as hex', () => {
+    for (const name of [
+      'Sun',
+      'Moon',
+      'Mercury',
+      'Venus',
+      'Mars',
+      'Jupiter',
+      'Saturn',
+      'Uranus',
+      'Neptune',
+    ]) {
+      expect(BODY_HEX[name]).toMatch(HEX)
+    }
+  })
+
+  it('Mars is not hazard red (rule 3)', () => {
+    expect(BODY_HEX['Mars']).not.toBe(STATUS_HEX.hazard)
+  })
+})
+
+describe('withAlpha', () => {
+  it('appends a two-digit alpha and clamps', () => {
+    expect(withAlpha('#08a8ab', 0.5)).toBe('#08a8ab80')
+    expect(withAlpha('#08a8ab', 1)).toBe('#08a8abff')
+    expect(withAlpha('#08a8ab', 0)).toBe('#08a8ab00')
+    expect(withAlpha('#08a8ab', 2)).toBe('#08a8abff')
+  })
+})
+
+describe('SVG_GLOBE_HEX and SKY_WELL_HEX (SVG housing colours)', () => {
+  it('are all hex', () => {
+    for (const v of [...Object.values(SVG_GLOBE_HEX), ...Object.values(SKY_WELL_HEX)]) {
+      expect(v).toMatch(HEX)
+    }
   })
 })
 

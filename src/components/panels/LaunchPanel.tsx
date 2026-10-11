@@ -3,8 +3,11 @@ import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
+import { type Status, statusVar } from '@/lib/severity'
 import type { RLLLaunch } from '@/schemas/launches'
 
 import styles from './launch-panel.module.css'
@@ -13,10 +16,11 @@ function launchTime(launch: RLLLaunch): string | null {
   return launch.t0 ?? launch.win_open ?? null
 }
 
-function launchStatus(launch: RLLLaunch): { abbrev: string; color: string } {
-  if (launch.t0) return { abbrev: 'GO', color: 'var(--green)' }
-  if (launch.win_open) return { abbrev: 'TBC', color: 'var(--amber)' }
-  return { abbrev: 'TBD', color: 'var(--ink-dim)' }
+/** Launch readiness on the status scale: a firm T-0 is nominal, a window is a watch. */
+function launchStatus(launch: RLLLaunch): { abbrev: string; status: Status | null } {
+  if (launch.t0) return { abbrev: 'GO', status: 'nominal' }
+  if (launch.win_open) return { abbrev: 'TBC', status: 'watch' }
+  return { abbrev: 'TBD', status: null }
 }
 
 function formatCountdown(net: string | null, now: Date): string {
@@ -108,7 +112,7 @@ export function LaunchPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Launches">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -116,7 +120,7 @@ export function LaunchPanel() {
   if (error || !data || data.result.length === 0) {
     return (
       <GlassPanel variant="tile" label="Launches">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The RocketLaunch.live schedule did not answer" />
       </GlassPanel>
     )
   }
@@ -140,6 +144,7 @@ export function LaunchPanel() {
           const isOpen = effectiveId === launch.id
           const net = launchTime(launch)
           const status = launchStatus(launch)
+          const statusColor = statusVar(status.status)
           const countdown = formatCountdown(net, now)
           const progress = countdownProgress(net, now)
           const url = launchUrl(launch)
@@ -164,7 +169,7 @@ export function LaunchPanel() {
               >
                 <span
                   className={styles.statusDot ?? ''}
-                  style={{ background: status.color }}
+                  style={{ background: statusColor }}
                   aria-hidden="true"
                 />
                 <span className={styles.headerVehicle ?? ''}>{vehicle}</span>
@@ -186,7 +191,7 @@ export function LaunchPanel() {
                 >
                   <div
                     className={styles.progressFill ?? ''}
-                    style={{ width: `${progress * 100}%`, background: status.color }}
+                    style={{ width: `${progress * 100}%`, background: statusColor }}
                   />
                 </div>
               )}
@@ -211,16 +216,10 @@ export function LaunchPanel() {
                   )}
 
                   <div className={styles.bodyFooter ?? ''}>
-                    <span
-                      className={styles.countdown ?? ''}
-                      aria-live="polite"
-                      aria-label={`Launch countdown: ${countdown}`}
-                    >
-                      {countdown}
-                    </span>
+                    <Readout value={countdown} tone="signal" className={styles.countdown ?? ''} />
                     <span
                       className={styles.statusBadge ?? ''}
-                      style={{ color: status.color, borderColor: status.color }}
+                      style={{ color: statusColor, borderColor: statusColor }}
                     >
                       {status.abbrev}
                     </span>

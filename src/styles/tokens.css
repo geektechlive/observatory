@@ -136,6 +136,8 @@
 
   /* LAYOUT */
   --ticker-h: 56px;
+  --panel-label-h: 28px; /* GlassPanel's heading bar */
+  --panel-body-pad: calc(var(--panel-label-h) + var(--space-3)) var(--space-5) var(--space-5);
   --gutter: clamp(24px, 4vw, 48px);
   --space-gap: 18px;
 

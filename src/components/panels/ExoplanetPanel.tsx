@@ -1,4 +1,5 @@
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useCountUp } from '@/hooks/useCountUp'
 import { useExoplanets } from '@/hooks/useExoplanets'
 
@@ -11,7 +12,7 @@ export function ExoplanetPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Exoplanets">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -19,7 +20,7 @@ export function ExoplanetPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Exoplanets">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The NASA Exoplanet Archive is not answering" />
       </GlassPanel>
     )
   }

@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useGeomag } from '@/hooks/useGeomag'
 import { bzStatus, dstStatus, statusVar } from '@/lib/severity'
@@ -20,7 +23,7 @@ export function GeomagPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Geomagnetic">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -28,7 +31,7 @@ export function GeomagPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Geomagnetic">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The NOAA geomagnetic feed did not answer" />
       </GlassPanel>
     )
   }
@@ -42,15 +45,14 @@ export function GeomagPanel() {
       <div className={styles.panel ?? ''}>
         <div className={styles.metric ?? ''}>
           <div className={styles.head ?? ''}>
-            <span
+            <Readout
+              value={dst !== null ? String(dst) : '—'}
+              unit="nT"
+              tone={dst !== null ? dstStatus(dst) : 'default'}
               className={styles.value ?? ''}
-              style={{ color: dst !== null ? dstColor(dst) : undefined }}
-            >
-              {dst !== null ? dst : '—'}
-              <span className={styles.unit ?? ''}>nT</span>
-            </span>
+            />
             <div className={styles.meta ?? ''}>
-              <span className={styles.name ?? ''}>Dst index</span>
+              <Label tone="dim">Dst index</Label>
               {dst !== null && (
                 <span className={styles.tag ?? ''} style={{ color: dstColor(dst) }}>
                   {dstLabel(dst)}
@@ -63,7 +65,7 @@ export function GeomagPanel() {
               values={data.dstSeries}
               mode="line"
               height={28}
-              color={dst !== null ? dstColor(dst) : 'var(--cyan)'}
+              color={dst !== null ? dstColor(dst) : 'var(--signal)'}
               thresholds={[{ value: -50, color: 'var(--amber)' }]}
               ariaLabel="Dst index trend"
             />
@@ -72,16 +74,15 @@ export function GeomagPanel() {
 
         <div className={styles.metric ?? ''}>
           <div className={styles.head ?? ''}>
-            <span
+            <Readout
+              value={bz !== null ? (bz >= 0 ? '+' : '') + bz.toFixed(1) : '—'}
+              unit="nT"
+              tone={bz !== null ? bzStatus(bz) : 'default'}
               className={styles.value ?? ''}
-              style={{ color: bz !== null ? bzColor(bz) : undefined }}
-            >
-              {bz !== null ? (bz >= 0 ? '+' : '') + bz.toFixed(1) : '—'}
-              <span className={styles.unit ?? ''}>nT</span>
-            </span>
+            />
             <div className={styles.meta ?? ''}>
-              <span className={styles.name ?? ''}>IMF Bz · L1</span>
-              <span className={styles.tag ?? ''} style={{ color: 'var(--ink-faint)' }}>
+              <Label tone="dim">IMF Bz · L1</Label>
+              <span className={styles.tag ?? ''}>
                 {bz !== null && bz < 0 ? 'SOUTHWARD' : 'NORTHWARD'}
               </span>
             </div>

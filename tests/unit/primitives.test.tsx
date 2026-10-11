@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Chip } from '@/components/ui/Chip'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
 import { Overlay } from '@/components/ui/Overlay'
 import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
@@ -112,6 +113,17 @@ describe('Swatch', () => {
     const el = container.firstElementChild as HTMLElement
     expect(el.getAttribute('aria-hidden')).toBe('true')
     expect(el.style.background).not.toBe('')
+  })
+})
+
+describe('Label', () => {
+  it('renders a faint micro label by default, dim on request', () => {
+    const { container } = render(<Label>Updated</Label>)
+    expect(screen.getByText('Updated').getAttribute('data-tone')).toBe('faint')
+    cleanup()
+    render(<Label tone="dim">Updated</Label>)
+    expect(screen.getByText('Updated').getAttribute('data-tone')).toBe('dim')
+    expect(container).toBeDefined()
   })
 })
 

@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarCycle } from '@/hooks/useSolarCycle'
 import { kpStatus, statusVar } from '@/lib/severity'
@@ -17,7 +20,7 @@ export function SolarCyclePanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Solar Cycle 25">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -25,7 +28,7 @@ export function SolarCyclePanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Solar Cycle 25">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The NOAA solar cycle feed did not answer" />
       </GlassPanel>
     )
   }
@@ -41,16 +44,18 @@ export function SolarCyclePanel() {
         <div className={styles.cycle ?? ''}>
           <div className={styles.cycleHead ?? ''}>
             <div className={styles.readout ?? ''}>
-              <span className={styles.bigNum ?? ''}>
-                {data.latestSsn !== null ? Math.round(data.latestSsn) : '—'}
-              </span>
-              <span className={styles.bigLabel ?? ''}>Sunspot №</span>
+              <Readout
+                value={data.latestSsn !== null ? String(Math.round(data.latestSsn)) : '—'}
+                className={styles.bigNum ?? ''}
+              />
+              <Label>Sunspot №</Label>
             </div>
             <div className={styles.readout ?? ''}>
-              <span className={styles.bigNum ?? ''}>
-                {data.latestF107 !== null ? Math.round(data.latestF107) : '—'}
-              </span>
-              <span className={styles.bigLabel ?? ''}>F10.7 flux</span>
+              <Readout
+                value={data.latestF107 !== null ? String(Math.round(data.latestF107)) : '—'}
+                className={styles.bigNum ?? ''}
+              />
+              <Label>F10.7 flux</Label>
             </div>
           </div>
           {ssn.length > 1 && (
@@ -85,7 +90,7 @@ export function SolarCyclePanel() {
               ariaLabel="Planetary Kp index 3-day forecast"
             />
           ) : (
-            <div className={styles.noForecast ?? ''}>No forecast</div>
+            <PanelState kind="empty" detail="No Kp forecast yet" />
           )}
           <span className={styles.forecastNote ?? ''}>Amber line = G1 storm (Kp 5)</span>
         </div>
