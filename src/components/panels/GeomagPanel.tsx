@@ -4,24 +4,14 @@ import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useGeomag } from '@/hooks/useGeomag'
+import { bzStatus, dstStatus, statusVar } from '@/lib/severity'
 
 import styles from './geomag-panel.module.css'
 
-function dstColor(dst: number): string {
-  if (dst <= -100) return 'var(--magenta)'
-  if (dst <= -50) return 'var(--amber)'
-  if (dst <= -30) return 'var(--copper-glow)'
-  return 'var(--cyan)'
-}
-function bzColor(bz: number): string {
-  return bz < 0 ? 'var(--amber)' : 'var(--terminal)'
-}
-function dstLabel(dst: number): string {
-  if (dst <= -100) return 'SEVERE STORM'
-  if (dst <= -50) return 'MODERATE STORM'
-  if (dst <= -30) return 'STORM WATCH'
-  return 'QUIET'
-}
+const dstColor = (dst: number): string => statusVar(dstStatus(dst))
+const bzColor = (bz: number): string => statusVar(bzStatus(bz))
+const DST_LABEL = { hazard: 'SEVERE STORM', watch: 'MODERATE STORM', nominal: 'QUIET' } as const
+const dstLabel = (dst: number): string => DST_LABEL[dstStatus(dst)]
 
 export function GeomagPanel() {
   const { data, isLoading, error } = useGeomag()

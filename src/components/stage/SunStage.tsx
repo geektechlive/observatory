@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { useImageBucket } from '@/hooks/useImageBucket'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
+import { flareStatus, statusVar } from '@/lib/severity'
 
 import styles from './sun-stage.module.css'
 
@@ -20,14 +21,7 @@ const WAVELENGTHS: Wavelength[] = [
 
 const REFRESH_MS = 10 * 60 * 1000
 
-function flareColor(cls: string | null): string {
-  if (!cls) return 'var(--ink-dim)'
-  const c = cls[0]
-  if (c === 'X') return 'var(--magenta)'
-  if (c === 'M') return 'var(--amber)'
-  if (c === 'C') return 'var(--terminal)'
-  return 'var(--cyan)'
-}
+const flareColor = (cls: string | null): string => statusVar(flareStatus(cls))
 
 export function SunStage({ size = 460 }: { size?: number }) {
   const [wl, setWl] = useState('0171')

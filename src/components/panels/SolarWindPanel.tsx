@@ -4,17 +4,14 @@ import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarWind } from '@/hooks/useSolarWind'
+import { bzStatus, kpStatus, statusVar } from '@/lib/severity'
 
 import { KpSparkline } from './KpSparkline'
 import styles from './solar-wind-panel.module.css'
 
 const SPARK_H = 22
 
-function kpColor(kp: number): string {
-  if (kp >= 6) return 'var(--magenta)'
-  if (kp >= 4) return 'var(--amber)'
-  return 'var(--cyan)'
-}
+const kpColor = (kp: number): string => statusVar(kpStatus(kp))
 
 function auroraLabel(kp: number): string {
   if (kp <= 1) return 'QUIET'
@@ -26,9 +23,7 @@ function auroraLabel(kp: number): string {
   return 'EXTREME STORM'
 }
 
-function bzColor(bz: number): string {
-  return bz < 0 ? 'var(--amber)' : 'var(--green)'
-}
+const bzColor = (bz: number): string => statusVar(bzStatus(bz))
 
 export function SolarWindPanel() {
   const { data, isLoading, error } = useSolarWind()

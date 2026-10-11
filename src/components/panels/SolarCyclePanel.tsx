@@ -4,15 +4,11 @@ import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarCycle } from '@/hooks/useSolarCycle'
+import { kpStatus, statusVar } from '@/lib/severity'
 
 import styles from './solar-cycle-panel.module.css'
 
-function kpColor(kp: number): string {
-  if (kp >= 6) return 'var(--magenta)'
-  if (kp >= 5) return 'var(--amber)'
-  if (kp >= 4) return 'var(--copper-glow)'
-  return 'var(--cyan)'
-}
+const kpColor = (kp: number): string => statusVar(kpStatus(kp))
 
 export function SolarCyclePanel() {
   const { data, isLoading, error } = useSolarCycle()

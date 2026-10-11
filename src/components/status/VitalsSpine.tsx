@@ -5,6 +5,7 @@ import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
 import { useSolarWind } from '@/hooks/useSolarWind'
+import { dstStatus, flareStatus, kpStatus, quakeStatus, statusVar } from '@/lib/severity'
 
 import styles from './vitals-spine.module.css'
 
@@ -30,29 +31,10 @@ function Cell({
   )
 }
 
-function kpColor(kp: number): string {
-  if (kp >= 6) return 'var(--magenta)'
-  if (kp >= 4) return 'var(--amber)'
-  return 'var(--cyan)'
-}
-function flareColor(cls: string | null): string {
-  if (!cls) return 'var(--ink-dim)'
-  const c = cls[0]
-  if (c === 'X') return 'var(--magenta)'
-  if (c === 'M') return 'var(--amber)'
-  if (c === 'C') return 'var(--terminal)'
-  return 'var(--cyan)'
-}
-function quakeColor(m: number): string {
-  if (m >= 6) return 'var(--magenta)'
-  if (m >= 4.5) return 'var(--amber)'
-  return 'var(--bone)'
-}
-function dstColor(dst: number): string {
-  if (dst <= -50) return 'var(--magenta)'
-  if (dst <= -30) return 'var(--amber)'
-  return 'var(--cyan)'
-}
+const kpColor = (kp: number): string => statusVar(kpStatus(kp))
+const flareColor = (cls: string | null): string => statusVar(flareStatus(cls))
+const quakeColor = (m: number): string => statusVar(quakeStatus(m))
+const dstColor = (dst: number): string => statusVar(dstStatus(dst))
 
 function nextLaunchCountdown(net: string | null, now: Date): string {
   if (!net) return '—'
