@@ -30,6 +30,17 @@ describe('oklchToHex', () => {
   })
 })
 
+describe('oklchToHex gamut mapping', () => {
+  it('reduces chroma rather than clipping, so an out-of-gamut cyan stays cyan', () => {
+    // oklch(0.85 0.13 220) is outside sRGB; per-channel clipping gave #55e1ff (hue drift)
+    const hex = oklchToHex({ l: 0.85, c: 0.13, h: 220, alpha: 1 })
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    expect(hex).not.toBe('#55e1ff')
+    expect(b).toBeGreaterThanOrEqual(g ?? 0)
+    expect(r).toBeGreaterThan(80)
+  })
+})
+
 describe('contrastRatio', () => {
   it('is 21 for black on white and 1 for a colour on itself', () => {
     expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 5)

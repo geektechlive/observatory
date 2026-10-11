@@ -20,6 +20,7 @@ import { useSentry } from '@/hooks/useSentry'
 import { useTicker } from '@/hooks/useTicker'
 import { fetchIssTleEnvelope } from '@/lib/api/iss'
 import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
+import { LANES } from '@/lib/palette'
 
 const mockedUseEvents = vi.mocked(useEvents)
 const mockedUseDonki = vi.mocked(useDonki)
@@ -153,6 +154,45 @@ describe('useTicker', () => {
     const { result } = renderHook(() => useTicker())
     expect(result.current[0]?.label).toBe('WILDFIRE')
     expect(result.current[0]?.description).toBe('Test Wildfire')
+  })
+
+  it('colours EONET items by their palette lane, with the shared label (#38)', () => {
+    setupMocks({
+      events: [
+        {
+          id: 'EONET_3',
+          title: 'Storm',
+          closed: undefined,
+          categories: [{ id: 'severeStorms', title: 'Severe Storms' }],
+          geometry: [{ date: '2025-01-02T00:00:00Z', type: 'Point', coordinates: [0, 0] }],
+        },
+      ],
+    })
+    const { result } = renderHook(() => useTicker())
+    expect(result.current[0]?.label).toBe('SEVERE STORM')
+    expect(result.current[0]?.color).toBe(LANES.hydro.emit)
+  })
+
+  it('grades flares by class and Sentry by Palermo, instead of one colour each (#38)', () => {
+    setupMocks({
+      donki: {
+        flares: [
+          { flrID: 'x', beginTime: '2025-01-01T00:00:00Z', classType: 'X1' },
+          { flrID: 'c', beginTime: '2025-01-01T01:00:00Z', classType: 'C2' },
+        ],
+        cmes: [],
+        geomagneticStorms: [],
+        seps: [],
+      },
+      sentry: {
+        count: '1',
+        data: [{ des: '1', fullname: 'Low risk', ps_cum: '-5', ip: '0', n_imp: 1 }],
+      },
+    })
+    const { result } = renderHook(() => useTicker())
+    expect(result.current.find((i) => i.id === 'flare-x')?.color).toBe('var(--mcrn)')
+    expect(result.current.find((i) => i.id === 'flare-c')?.color).toBe('var(--terminal)')
+    expect(result.current.find((i) => i.type === 'sentry')?.color).toBe('var(--terminal)')
   })
 
   it('uses DEFAULT_EVENT_META for unknown category', () => {

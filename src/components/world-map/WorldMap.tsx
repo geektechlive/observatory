@@ -19,6 +19,7 @@ import { useGdacs } from '@/hooks/useGdacs'
 import { useIss } from '@/hooks/useIss'
 import { useNwsAlerts } from '@/hooks/useNwsAlerts'
 import { useQuakes } from '@/hooks/useQuakes'
+import { EONET_KINDS, eonetKind, LANES, nwsColor } from '@/lib/palette'
 import type { Aircraft } from '@/schemas/aircraft'
 import type { AirStation } from '@/schemas/airQuality'
 import type { Buoy } from '@/schemas/buoys'
@@ -33,27 +34,10 @@ import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
 
-function categoryColor(categoryId: string): string {
-  if (categoryId === 'wildfires') return '#e84020'
-  if (categoryId === 'severeStorms') return '#38d4ff'
-  if (categoryId === 'earthquakes') return '#ffe044'
-  if (categoryId === 'volcanoes') return '#dd44ff'
-  if (categoryId === 'floods') return '#2255dd'
-  if (categoryId === 'landslides') return '#b08040'
-  if (categoryId === 'seaLakeIce') return '#cceeee'
-  return '#c89050'
-}
-
-function categoryLabel(categoryId: string): string {
-  if (categoryId === 'wildfires') return 'Wildfire'
-  if (categoryId === 'severeStorms') return 'Severe Storm'
-  if (categoryId === 'earthquakes') return 'Earthquake'
-  if (categoryId === 'volcanoes') return 'Volcano'
-  if (categoryId === 'floods') return 'Flood'
-  if (categoryId === 'landslides') return 'Landslide'
-  if (categoryId === 'seaLakeIce') return 'Sea/Lake Ice'
-  return 'Event'
-}
+// EONET dots share the legend's lane colours and labels (palette.ts), so the two can't disagree.
+const categoryColor = (categoryId: string): string => LANES[eonetKind(categoryId).lane].emit
+const categoryLabel = (categoryId: string): string =>
+  categoryId in EONET_KINDS ? eonetKind(categoryId).label : 'Event'
 
 interface EventFeatureProperties {
   color: string
@@ -187,7 +171,7 @@ function nwsToGeoJson(features: NwsFeature[]): GeoJSON.FeatureCollection {
     features: features.map((f) => ({
       type: 'Feature',
       geometry: f.geometry as GeoJSON.Geometry,
-      properties: { color: f.color, event: f.event },
+      properties: { color: nwsColor(f.severity), event: f.event },
     })),
   }
 }

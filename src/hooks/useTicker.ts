@@ -5,6 +5,8 @@ import { useEvents } from '@/hooks/useEvents'
 import { useFireball } from '@/hooks/useFireball'
 import { useSentry } from '@/hooks/useSentry'
 import { formatKt, formatPalermo, formatRelativeTime } from '@/lib/format'
+import { EONET_KINDS, eonetKind, LANES } from '@/lib/palette'
+import { flareStatus, palermoStatus, statusVar } from '@/lib/severity'
 
 export interface TickerItem {
   id: string
@@ -15,15 +17,14 @@ export interface TickerItem {
   time: Date
 }
 
-const EONET_CATEGORY_MAP: Record<string, { label: string; color: string }> = {
-  wildfires: { label: 'WILDFIRE', color: 'var(--warm)' },
-  severeStorms: { label: 'STORM', color: 'var(--amber)' },
-  earthquakes: { label: 'EARTHQUAKE', color: 'var(--cyan)' },
-  volcanoes: { label: 'VOLCANO', color: 'var(--orange)' },
-  floods: { label: 'FLOOD', color: 'var(--cyan)' },
-}
+const DEFAULT_EVENT_META = { label: 'EVENT', color: 'var(--bone-dim)' }
 
-const DEFAULT_EVENT_META = { label: 'EVENT', color: 'var(--ink-dim)' }
+/** EONET label and lane colour come from palette.ts, the same source as the globe and map. */
+function eonetMeta(categoryId: string): { label: string; color: string } {
+  if (!(categoryId in EONET_KINDS)) return DEFAULT_EVENT_META
+  const kind = eonetKind(categoryId)
+  return { label: kind.label.toUpperCase(), color: LANES[kind.lane].emit }
+}
 
 export function useTicker(): TickerItem[] {
   const eventsQuery = useEvents()
@@ -41,7 +42,7 @@ export function useTicker(): TickerItem[] {
       .slice(0, 10)
       .forEach((e) => {
         const categoryId = e.categories[0]?.id ?? ''
-        const meta = EONET_CATEGORY_MAP[categoryId] ?? DEFAULT_EVENT_META
+        const meta = eonetMeta(categoryId)
         const latestGeom = e.geometry[e.geometry.length - 1]
         const timeStr = latestGeom?.date ?? ''
         items.push({
@@ -63,7 +64,7 @@ export function useTicker(): TickerItem[] {
         type: 'flare',
         label: 'SOLAR FLARE',
         description: cls,
-        color: 'var(--amber)',
+        color: statusVar(flareStatus(f.classType ?? null)),
         time: new Date(f.beginTime),
       })
     })
@@ -98,7 +99,7 @@ export function useTicker(): TickerItem[] {
         type: 'sentry',
         label: 'IMPACT RISK',
         description: `${s.fullname ?? s.name ?? s.des} · Palermo ${ps}`,
-        color: 'var(--magenta)',
+        color: statusVar(palermoStatus(parseFloat(s.ps_cum ?? '') || -Infinity)),
         time: new Date(0),
       })
     })
@@ -113,7 +114,7 @@ export function useTicker(): TickerItem[] {
         type: 'fireball',
         label: 'FIREBALL',
         description: `${energy} · ${rel}`,
-        color: 'var(--gold)',
+        color: LANES.space.emit,
         time: new Date(fb.date),
       })
     })

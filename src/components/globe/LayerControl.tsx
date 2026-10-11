@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 
+import { LAYER_SWATCH, swatchColor } from '@/lib/palette'
 import { type LayerKey, useUiStore } from '@/store/ui'
 
 import styles from './layer-control.module.css'
@@ -7,28 +8,27 @@ import styles from './layer-control.module.css'
 interface LayerDef {
   key: LayerKey
   label: string
-  dot: string
 }
 
 const GLOBE_LAYERS: LayerDef[] = [
-  { key: 'iss', label: 'ISS', dot: 'var(--signal)' },
-  { key: 'events', label: 'Events', dot: 'oklch(0.72 0.22 32)' },
-  { key: 'quakes', label: 'Quakes', dot: 'oklch(0.8 0.18 55)' },
-  { key: 'terminator', label: 'Day/Night', dot: 'oklch(0.75 0.08 250)' },
-  { key: 'aurora', label: 'Aurora', dot: 'oklch(0.8 0.2 145)' },
-  { key: 'fires', label: 'Fires', dot: 'oklch(0.85 0.2 55)' },
-  { key: 'disasters', label: 'Alerts', dot: 'oklch(0.62 0.22 25)' },
-  { key: 'satellites', label: 'Satellites', dot: 'var(--terminal)' },
-  { key: 'fireballs', label: 'Fireballs', dot: 'oklch(0.88 0.18 60)' },
-  { key: 'launches', label: 'Launch pads', dot: 'oklch(0.84 0.16 80)' },
+  { key: 'iss', label: 'ISS' },
+  { key: 'events', label: 'Events' },
+  { key: 'quakes', label: 'Quakes' },
+  { key: 'terminator', label: 'Day/Night' },
+  { key: 'aurora', label: 'Aurora' },
+  { key: 'fires', label: 'Fires' },
+  { key: 'disasters', label: 'Alerts' },
+  { key: 'satellites', label: 'Satellites' },
+  { key: 'fireballs', label: 'Fireballs' },
+  { key: 'launches', label: 'Launch pads' },
 ]
 
 const MAP_LAYERS: LayerDef[] = [
-  { key: 'gibs', label: 'Imagery', dot: 'oklch(0.7 0.1 150)' },
-  { key: 'air', label: 'Air PM2.5', dot: 'oklch(0.85 0.16 95)' },
-  { key: 'nws', label: 'US Alerts', dot: '#ff3b30' },
-  { key: 'aircraft', label: 'Aircraft', dot: '#4ade80' },
-  { key: 'buoys', label: 'Ocean Buoys', dot: '#38d4ff' },
+  { key: 'gibs', label: 'Imagery' },
+  { key: 'air', label: 'Air PM2.5' },
+  { key: 'nws', label: 'US Alerts' },
+  { key: 'aircraft', label: 'Aircraft' },
+  { key: 'buoys', label: 'Ocean Buoys' },
 ]
 
 function Toggle({ def }: { def: LayerDef }) {
@@ -47,7 +47,11 @@ function Toggle({ def }: { def: LayerDef }) {
       <span className={styles.mark ?? ''} aria-hidden="true">
         {on ? '◉' : '○'}
       </span>
-      <span className={styles.dot ?? ''} style={{ background: def.dot }} aria-hidden="true" />
+      <span
+        className={styles.dot ?? ''}
+        style={{ background: swatchColor(LAYER_SWATCH[def.key]) }}
+        aria-hidden="true"
+      />
       <span className={styles.label ?? ''}>{def.label}</span>
     </button>
   )

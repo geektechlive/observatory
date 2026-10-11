@@ -1,5 +1,7 @@
 import { memo } from 'react'
 
+import { LANES } from '@/lib/palette'
+
 import { useProjected } from '../useGlobeProjection'
 
 export interface GlobeQuake {
@@ -9,12 +11,12 @@ export interface GlobeQuake {
   place: string
 }
 
-/** Hollow rings colored by magnitude tier. */
+/**
+ * Hollow rings in the geophysical lane. Magnitude is shown by size only, never by
+ * colour within a lane (spec section 4); a null magnitude draws faint.
+ */
 function quakeColor(mag: number | null): string {
-  if (mag === null) return 'oklch(0.70 0.04 200)'
-  if (mag >= 6) return 'oklch(0.62 0.22 25)'
-  if (mag >= 4.5) return 'oklch(0.80 0.18 55)'
-  return 'oklch(0.88 0.16 95)'
+  return mag === null ? 'var(--bone-faint)' : LANES.geo.emit
 }
 
 function quakeRadius(mag: number | null): number {

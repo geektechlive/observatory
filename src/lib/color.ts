@@ -46,10 +46,25 @@ const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 const encode = (v: number): number => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)
 const decode = (v: number): number => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
 
+const inGamut = (rgb: readonly number[]): boolean => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4)
+
+/** Pull chroma in until the colour fits sRGB, keeping lightness and hue (clipping shifts hue). */
+function toGamut(color: Oklch): Oklch {
+  if (inGamut(oklchToLinearSrgb(color))) return color
+  let lo = 0
+  let hi = color.c
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (inGamut(oklchToLinearSrgb({ ...color, c: mid }))) lo = mid
+    else hi = mid
+  }
+  return { ...color, c: lo }
+}
+
 export function oklchToHex(color: Oklch): string {
   return (
     '#' +
-    oklchToLinearSrgb(color)
+    oklchToLinearSrgb(toGamut(color))
       .map((v) =>
         Math.round(clamp01(encode(clamp01(v))) * 255)
           .toString(16)
