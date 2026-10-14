@@ -272,11 +272,15 @@ Enforcement:
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 ```
+
+As shipped in #37, the reduced-motion block uses near-zero durations rather than `animation: none`. Animations that end on a `forwards` state (the bezel engraving) still land on their final frame instead of never drawing. CSS can only stop CSS: SMIL elements and rAF loops are gated in code with `useReducedMotion` (Codex finding 9).
 
 The legacy aliases (`--ink*`, `--cyan`, `--magenta`, `--green`, `--gold`, `--warm`, `--orange`, `--bg`) survive for a single release, then get removed by codemod. `--magenta` uses are hand-checked first: any that aren't hazards move to a lane or to bone.
 

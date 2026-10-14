@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { STAR_HEX } from '@/lib/palette'
 
 import styles from './starfield-canvas.module.css'
 
@@ -72,23 +73,18 @@ export function StarField() {
           star.y = (star.y + star.dy + h) % h
         }
         const tw = Math.sin((now * Math.PI * 2) / star.period + star.phase)
-        const alpha = star.baseAlpha * (0.6 + 0.4 * tw)
-        const [r, g, b] = star.warm ? ([220, 170, 110] as const) : ([120, 210, 240] as const)
+        ctx.globalAlpha = star.baseAlpha * (0.6 + 0.4 * tw)
         ctx.beginPath()
         ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`
+        ctx.fillStyle = star.warm ? STAR_HEX.warm : STAR_HEX.cool
         ctx.fill()
       }
-    }
-
-    if (reducedMotion) {
-      draw(0)
-      return
+      ctx.globalAlpha = 1
     }
 
     const TARGET_MS = 1000 / 18
     let lastTs = 0
-    let rafId: number
+    let rafId = 0
 
     const tick = (now: number) => {
       rafId = requestAnimationFrame(tick)
@@ -96,7 +92,9 @@ export function StarField() {
       lastTs = now
       draw(now)
     }
-    rafId = requestAnimationFrame(tick)
+    // Under reduced motion the field is one still frame, redrawn only on resize.
+    if (reducedMotion) draw(0)
+    else rafId = requestAnimationFrame(tick)
 
     let resizeTimer: ReturnType<typeof setTimeout>
     const onResize = () => {
@@ -104,9 +102,11 @@ export function StarField() {
       resizeTimer = setTimeout(() => {
         resize()
         stars = generateStars(500, w, h)
+        if (reducedMotion) draw(0)
       }, 200)
     }
 
+    // Attached in both paths: the reduced-motion frame used to go stale after a resize.
     const ro = new ResizeObserver(onResize)
     ro.observe(document.documentElement)
 

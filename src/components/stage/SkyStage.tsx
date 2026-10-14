@@ -1,19 +1,10 @@
+import { Label } from '@/components/ui/Label'
 import { usePlanets } from '@/hooks/usePlanets'
 import { useSunMoon } from '@/hooks/useSunMoon'
 import { isWaxing, moonLitPath } from '@/lib/moon'
+import { BODY_HEX, MOON_DISC_HEX, SKY_WELL_HEX } from '@/lib/palette'
 
 import styles from './sky-stage.module.css'
-
-const PLANET_COLORS: Record<string, string> = {
-  Moon: 'oklch(0.9 0.02 250)',
-  Mercury: 'oklch(0.72 0.03 70)',
-  Venus: 'oklch(0.92 0.08 95)',
-  Mars: 'oklch(0.62 0.2 25)',
-  Jupiter: 'oklch(0.78 0.09 70)',
-  Saturn: 'oklch(0.85 0.08 95)',
-  Uranus: 'oklch(0.82 0.1 200)',
-  Neptune: 'oklch(0.65 0.15 250)',
-}
 
 // Azimuthal-equidistant from the north celestial pole: Dec +90 → center, −90 → rim.
 function project(raHours: number, decDeg: number, R: number): { x: number; y: number } {
@@ -57,7 +48,10 @@ export function SkyStage({ size = 460 }: { size?: number }) {
   const moonWax = isWaxing(sunMoon?.curPhase ?? 'Waxing')
 
   return (
-    <div className={styles.stage ?? ''} style={{ width: size, height: size }}>
+    <div
+      className={styles.stage ?? ''}
+      style={{ width: '100%', maxWidth: size, aspectRatio: '1 / 1' }}
+    >
       <svg
         viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`}
         className={styles.sky ?? ''}
@@ -66,13 +60,13 @@ export function SkyStage({ size = 460 }: { size?: number }) {
       >
         <defs>
           <radialGradient id="sky-grad" cx="50%" cy="42%">
-            <stop offset="0%" stopColor="oklch(0.16 0.04 250)" />
-            <stop offset="70%" stopColor="oklch(0.09 0.03 255)" />
-            <stop offset="100%" stopColor="oklch(0.05 0.02 260)" />
+            <stop offset="0%" stopColor={SKY_WELL_HEX.centre} />
+            <stop offset="70%" stopColor={SKY_WELL_HEX.mid} />
+            <stop offset="100%" stopColor={SKY_WELL_HEX.rim} />
           </radialGradient>
         </defs>
 
-        <circle r={R} fill="url(#sky-grad)" stroke="var(--glass-border)" strokeWidth={1} />
+        <circle r={R} fill="url(#sky-grad)" stroke="var(--plate-edge)" strokeWidth={1} />
 
         {/* Declination rings */}
         {[60, 30, 0, -30].map((dec) => (
@@ -109,7 +103,7 @@ export function SkyStage({ size = 460 }: { size?: number }) {
                 textAnchor="middle"
                 fontSize={7}
                 fontFamily="var(--font-mono)"
-                fill="var(--ink-faint)"
+                fill="var(--bone-faint)"
               >
                 {h}h
               </text>
@@ -125,7 +119,7 @@ export function SkyStage({ size = 460 }: { size?: number }) {
         {/* Planets */}
         {planets.map((p) => {
           const { x, y } = project(p.raHours, p.decDeg, R)
-          const c = PLANET_COLORS[p.name] ?? 'var(--bone)'
+          const c = BODY_HEX[p.name] ?? 'var(--bone)'
           return (
             <g key={p.name}>
               <title>
@@ -161,15 +155,10 @@ export function SkyStage({ size = 460 }: { size?: number }) {
             transform={`translate(${project(moon.raHours, moon.decDeg, R).x} ${project(moon.raHours, moon.decDeg, R).y})`}
           >
             <title>Moon — {sunMoon?.curPhase ?? ''}</title>
-            <circle
-              r={8}
-              fill="oklch(0.18 0.01 250)"
-              stroke="var(--glass-border)"
-              strokeWidth={0.5}
-            />
+            <circle r={8} fill={MOON_DISC_HEX.dark} stroke="var(--plate-edge)" strokeWidth={0.5} />
             <path
               d={moonLitPath(8, moonIllum / 100, moonWax)}
-              fill="oklch(0.92 0.03 95)"
+              fill={MOON_DISC_HEX.lit}
               opacity={0.95}
             />
           </g>
@@ -177,7 +166,7 @@ export function SkyStage({ size = 460 }: { size?: number }) {
       </svg>
       <div className={styles.caption ?? ''}>
         <span className={styles.capLabel ?? ''}>NIGHT SKY</span>
-        <span className={styles.capSub ?? ''}>Planets &amp; Moon · geocentric RA/Dec</span>
+        <Label>Planets &amp; Moon · geocentric RA/Dec</Label>
       </div>
     </div>
   )

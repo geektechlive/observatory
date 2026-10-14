@@ -1,0 +1,59 @@
+/* GlobeHost: the bezel ring around a lens that holds the SVG first paint and the
+   WebGL crossfade (#46, #51). The whole instrument scales down to fit narrow screens. */
+.instrument {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+}
+
+.host {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.lens {
+  position: absolute;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  transition: opacity var(--duration-normal) var(--ease-out-expo);
+}
+
+/* The SVG globe draws at a fixed design size; let it scale with the lens. */
+.svg > div,
+.svg svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.svg[data-hidden='true'] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.webgl {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-normal) var(--ease-out-expo);
+}
+
+.webgl[data-visible='true'] {
+  opacity: 1;
+}
+
+.webgl canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+}

@@ -5,7 +5,7 @@ import { OrbitConsole } from '@/components/consoles/OrbitConsole'
 import { SkyConsole } from '@/components/consoles/SkyConsole'
 import { SunConsole } from '@/components/consoles/SunConsole'
 import { Footer } from '@/components/footer/Footer'
-import { Globe } from '@/components/globe/Globe'
+import { GlobeHost } from '@/components/globe/GlobeHost'
 import { LayerControl } from '@/components/globe/LayerControl'
 import { OrbitalDial } from '@/components/nav/OrbitalDial'
 import { SkyStage } from '@/components/stage/SkyStage'
@@ -28,6 +28,7 @@ import { useLaunches } from '@/hooks/useLaunches'
 import { useNeo } from '@/hooks/useNeo'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useSatellites } from '@/hooks/useSatellites'
+import { eventsByLane, laneCensus, layerStatus } from '@/lib/census'
 import { isPointGeometry } from '@/schemas/eonet'
 import { type ConsoleView, useUiStore } from '@/store/ui'
 
@@ -63,14 +64,19 @@ export function App() {
   const tracking = view === 'orbit'
 
   const { position: issPos, trail: issTrail, intervalMs: issIntervalMs } = useIss()
-  const { data: eventsData } = useEvents()
-  const { data: launchData } = useLaunches()
+  const eventsQuery = useEvents()
+  const eventsData = eventsQuery.data
+  const launchQuery = useLaunches()
+  const launchData = launchQuery.data
   const { data: neoData } = useNeo()
-  const { data: fireballData } = useFireball(layers.fireballs)
-  const { data: quakeData } = useQuakes()
+  const fireballQuery = useFireball(layers.fireballs)
+  const fireballData = fireballQuery.data
+  const quakeQuery = useQuakes()
+  const quakeData = quakeQuery.data
   const { data: gdacsData } = useGdacs(layers.disasters)
   const satellites = useSatellites(layers.satellites || tracking)
-  const { data: firesData } = useFires(layers.fires)
+  const firesQuery = useFires(layers.fires)
+  const firesData = firesQuery.data
   const { data: auroraData } = useAurora(layers.aurora)
 
   // These feed Globe, which re-renders at the ISS tick rate. Without useMemo every
@@ -132,6 +138,51 @@ export function App() {
     [gdacsData],
   )
 
+  // The bezel's live census (#51): what each lane draws, and whether its feeds are
+  // healthy, so a zero from a failed feed never reads as a quiet Earth.
+  const eventsOn = layers.events && !tracking
+  const census = useMemo(
+    () =>
+      laneCensus({
+        // An empty satellite list always means "not loaded yet"; there is no true zero.
+        satellites: {
+          enabled: layers.satellites || tracking,
+          loading: satellites.length === 0,
+          error: false,
+          hasData: satellites.length > 0,
+          count: satellites.length,
+        },
+        launches: layerStatus(launchQuery, layers.launches || tracking, launchMarkers.length),
+        fires: layerStatus(firesQuery, layers.fires && !tracking, firesData?.fires.length ?? 0),
+        fireballs: layerStatus(
+          fireballQuery,
+          layers.fireballs && !tracking,
+          fireballMarkers.length,
+        ),
+        quakes: layerStatus(quakeQuery, layers.quakes && !tracking, quakeMarkers.length),
+        events: {
+          ...layerStatus(eventsQuery, eventsOn, globeEvents.length),
+          byLane: eventsByLane(globeEvents),
+        },
+      }),
+    [
+      layers,
+      tracking,
+      eventsOn,
+      satellites,
+      launchQuery,
+      launchMarkers,
+      firesQuery,
+      firesData,
+      fireballQuery,
+      fireballMarkers,
+      quakeQuery,
+      quakeMarkers,
+      eventsQuery,
+      globeEvents,
+    ],
+  )
+
   // Globe layer gating: pass data only when the layer is enabled.
   const issOn = layers.iss
   const issLat = issOn ? issPos?.lat : undefined
@@ -160,19 +211,19 @@ export function App() {
 
       <main id="main-content" className={appStyles.main ?? ''}>
         {/* Stage — the persistent transforming instrument */}
-        <section
-          className={`${appStyles.globeSection ?? ''} ${appStyles.panelEnter ?? ''}`}
-          style={{ animationDelay: '120ms' }}
-        >
+        <section className={appStyles.globeSection ?? ''}>
           <div className={appStyles.globeFrame ?? ''}>
-            <div className={appStyles.globeCenter ?? ''}>
+            <div
+              className={appStyles.globeCenter ?? ''}
+              data-stage={stageKind === 'globe' ? mapMode : stageKind}
+            >
               <div className={appStyles.stageMorph ?? ''} key={stageKind}>
                 {stageKind === 'sun' ? (
                   <SunStage size={460} />
                 ) : stageKind === 'sky' ? (
                   <SkyStage size={460} />
                 ) : mapMode === 'globe' ? (
-                  <Globe
+                  <GlobeHost
                     size={460}
                     issLat={issLat}
                     issLon={issLon}
@@ -190,7 +241,7 @@ export function App() {
                     warm={!tracking}
                     tracking={tracking}
                     autoRotate={true}
-                    radarSweep={true}
+                    census={census}
                   />
                 ) : (
                   <Suspense fallback={null}>

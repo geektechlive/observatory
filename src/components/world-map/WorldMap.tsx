@@ -19,6 +19,22 @@ import { useGdacs } from '@/hooks/useGdacs'
 import { useIss } from '@/hooks/useIss'
 import { useNwsAlerts } from '@/hooks/useNwsAlerts'
 import { useQuakes } from '@/hooks/useQuakes'
+import { warmBasemapPaint } from '@/lib/basemap'
+import {
+  altitudeColor,
+  aqiColor,
+  EONET_KINDS,
+  eonetKind,
+  fireMapColor,
+  gdacsColor,
+  ISS_HEX,
+  LANES,
+  MUTED_HEX,
+  nwsColor,
+  quakeMapColor,
+  sstColor,
+  VOID_HEX,
+} from '@/lib/palette'
 import type { Aircraft } from '@/schemas/aircraft'
 import type { AirStation } from '@/schemas/airQuality'
 import type { Buoy } from '@/schemas/buoys'
@@ -33,27 +49,10 @@ import { useUiStore } from '@/store/ui'
 import { MapLegend } from './MapLegend'
 import styles from './world-map.module.css'
 
-function categoryColor(categoryId: string): string {
-  if (categoryId === 'wildfires') return '#e84020'
-  if (categoryId === 'severeStorms') return '#38d4ff'
-  if (categoryId === 'earthquakes') return '#ffe044'
-  if (categoryId === 'volcanoes') return '#dd44ff'
-  if (categoryId === 'floods') return '#2255dd'
-  if (categoryId === 'landslides') return '#b08040'
-  if (categoryId === 'seaLakeIce') return '#cceeee'
-  return '#c89050'
-}
-
-function categoryLabel(categoryId: string): string {
-  if (categoryId === 'wildfires') return 'Wildfire'
-  if (categoryId === 'severeStorms') return 'Severe Storm'
-  if (categoryId === 'earthquakes') return 'Earthquake'
-  if (categoryId === 'volcanoes') return 'Volcano'
-  if (categoryId === 'floods') return 'Flood'
-  if (categoryId === 'landslides') return 'Landslide'
-  if (categoryId === 'seaLakeIce') return 'Sea/Lake Ice'
-  return 'Event'
-}
+// EONET dots share the legend's lane colours and labels (palette.ts), so the two can't disagree.
+const categoryColor = (categoryId: string): string => LANES[eonetKind(categoryId).lane].emit
+const categoryLabel = (categoryId: string): string =>
+  categoryId in EONET_KINDS ? eonetKind(categoryId).label : 'Event'
 
 interface EventFeatureProperties {
   color: string
@@ -93,13 +92,6 @@ function eventsToGeoJson(
   return { type: 'FeatureCollection', features }
 }
 
-function quakeMapColor(mag: number | null): string {
-  if (mag === null) return '#8aa0a8'
-  if (mag >= 6) return '#ff5a3c'
-  if (mag >= 4.5) return '#ffb020'
-  return '#ffe044'
-}
-
 function quakesToGeoJson(
   quakes: Quake[],
 ): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string; radius: number; title: string }> {
@@ -133,39 +125,24 @@ function gdacsToGeoJson(
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [e.lon, e.lat] },
       properties: {
-        color: e.alert === 'Red' ? '#ff5a3c' : '#ffb020',
+        color: gdacsColor(e.alert),
         title: `${e.alert} · ${e.name}`,
       },
     })),
   }
 }
 
-function fireMapColor(frp: number): string {
-  if (frp >= 100) return '#fff0c0'
-  if (frp >= 30) return '#ff9020'
-  return '#e8602a'
-}
-
 function firesToGeoJson(
   fires: Fire[],
-): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
+): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string; radius: number }> {
   return {
     type: 'FeatureCollection',
     features: fires.map((f) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [f.lon, f.lat] },
-      properties: { color: fireMapColor(f.frp) },
+      properties: { color: fireMapColor(), radius: Math.min(6, 2 + Math.sqrt(f.frp) * 0.25) },
     })),
   }
-}
-
-// US-EPA PM2.5 (µg/m³) → AQI color band.
-function aqiColor(pm25: number): string {
-  if (pm25 <= 12) return '#4ade80'
-  if (pm25 <= 35.4) return '#fde047'
-  if (pm25 <= 55.4) return '#fb923c'
-  if (pm25 <= 150.4) return '#ef4444'
-  return '#a855f7'
 }
 
 function airToGeoJson(
@@ -187,17 +164,11 @@ function nwsToGeoJson(features: NwsFeature[]): GeoJSON.FeatureCollection {
     features: features.map((f) => ({
       type: 'Feature',
       geometry: f.geometry as GeoJSON.Geometry,
-      properties: { color: f.color, event: f.event },
+      properties: { color: nwsColor(f.severity), event: f.event },
     })),
   }
 }
 
-function altColor(altM: number | null): string {
-  if (altM === null) return '#8aa0a8'
-  if (altM < 3000) return '#ffb020'
-  if (altM < 9000) return '#4ade80'
-  return '#38d4ff'
-}
 function aircraftToGeoJson(
   list: Aircraft[],
 ): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
@@ -206,18 +177,11 @@ function aircraftToGeoJson(
     features: list.map((a) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
-      properties: { color: altColor(a.altM) },
+      properties: { color: altitudeColor(a.altM) },
     })),
   }
 }
 
-function sstColor(t: number | null): string {
-  if (t === null) return '#6a8090'
-  if (t <= 5) return '#4a6fff'
-  if (t <= 15) return '#38d4ff'
-  if (t <= 24) return '#4ade80'
-  return '#ff9500'
-}
 function buoysToGeoJson(list: Buoy[]): GeoJSON.FeatureCollection<GeoJSON.Point, { color: string }> {
   return {
     type: 'FeatureCollection',
@@ -267,6 +231,14 @@ export function WorldMap() {
     resizeObserver.observe(containerRef.current)
 
     map.on('load', () => {
+      // CARTO is a vector style: repaint its own layers warm instead of filtering the
+      // whole container (which also tinted every data layer). Runs before our layers exist.
+      for (const layer of map.getStyle().layers) {
+        for (const { property, value } of warmBasemapPaint(layer)) {
+          map.setPaintProperty(layer.id, property, value)
+        }
+      }
+
       // NASA GIBS MODIS true-color imagery (bottom layer, hidden until toggled).
       map.addSource('gibs-truecolor', {
         type: 'raster',
@@ -298,7 +270,7 @@ export function WorldMap() {
         type: 'line',
         source: 'iss-trail',
         paint: {
-          'line-color': '#7dd3fc',
+          'line-color': ISS_HEX,
           'line-width': 1.5,
           'line-opacity': 0.35,
           'line-dasharray': [3, 3],
@@ -339,7 +311,7 @@ export function WorldMap() {
           'circle-color': ['get', 'color'],
           'circle-opacity': 0.8,
           'circle-stroke-width': 0.5,
-          'circle-stroke-color': 'rgba(255,255,255,0.3)',
+          'circle-stroke-color': VOID_HEX,
         },
       })
 
@@ -357,7 +329,7 @@ export function WorldMap() {
           'circle-color': ['get', 'color'],
           'circle-opacity': 0.95,
           'circle-stroke-width': 1,
-          'circle-stroke-color': 'rgba(255,255,255,0.35)',
+          'circle-stroke-color': VOID_HEX,
         },
       })
 
@@ -387,7 +359,7 @@ export function WorldMap() {
         type: 'circle',
         source: 'fires',
         paint: {
-          'circle-radius': 2.5,
+          'circle-radius': ['get', 'radius'],
           'circle-color': ['get', 'color'],
           'circle-opacity': 0.85,
           'circle-blur': 0.3,
@@ -404,7 +376,7 @@ export function WorldMap() {
         source: 'quakes',
         paint: {
           'circle-radius': ['get', 'radius'],
-          'circle-color': 'rgba(0,0,0,0)',
+          'circle-opacity': 0,
           'circle-stroke-width': 1.1,
           'circle-stroke-color': ['get', 'color'],
           'circle-stroke-opacity': 0.85,
@@ -435,7 +407,7 @@ export function WorldMap() {
           'circle-color': ['get', 'color'],
           'circle-opacity': 0.9,
           'circle-stroke-width': 1,
-          'circle-stroke-color': 'rgba(255,255,255,0.25)',
+          'circle-stroke-color': VOID_HEX,
         },
       })
 
@@ -452,7 +424,7 @@ export function WorldMap() {
           'circle-color': ['get', 'color'],
           'circle-opacity': 0.85,
           'circle-stroke-width': 1.5,
-          'circle-stroke-color': 'rgba(0,0,0,0.6)',
+          'circle-stroke-color': VOID_HEX,
         },
       })
 
@@ -466,9 +438,11 @@ export function WorldMap() {
         source: 'iss-position',
         paint: {
           'circle-radius': 16,
-          'circle-color': 'rgba(125,211,252,0.12)',
+          'circle-color': ISS_HEX,
+          'circle-opacity': 0.12,
           'circle-stroke-width': 1,
-          'circle-stroke-color': 'rgba(125,211,252,0.3)',
+          'circle-stroke-color': ISS_HEX,
+          'circle-stroke-opacity': 0.3,
         },
       })
       map.addLayer({
@@ -477,9 +451,9 @@ export function WorldMap() {
         source: 'iss-position',
         paint: {
           'circle-radius': 5,
-          'circle-color': '#7dd3fc',
+          'circle-color': ISS_HEX,
           'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(255,255,255,0.8)',
+          'circle-stroke-color': VOID_HEX,
         },
       })
       map.addLayer({
@@ -488,14 +462,14 @@ export function WorldMap() {
         source: 'iss-position',
         layout: {
           'text-field': 'ISS',
-          'text-size': 10,
+          'text-size': 11,
           'text-offset': [0, -1.6],
           'text-anchor': 'bottom',
           'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
         },
         paint: {
-          'text-color': '#7dd3fc',
-          'text-halo-color': 'rgba(4,6,15,0.85)',
+          'text-color': ISS_HEX,
+          'text-halo-color': VOID_HEX,
           'text-halo-width': 1.5,
         },
       })
@@ -510,7 +484,7 @@ export function WorldMap() {
           const coords = geom.coordinates as [number, number]
           const title = (feature.properties['title'] as string | undefined) ?? ''
           const catId = (feature.properties['categoryId'] as string | undefined) ?? ''
-          const color = (feature.properties['color'] as string | undefined) ?? '#cbd5e1'
+          const color = (feature.properties['color'] as string | undefined) ?? MUTED_HEX
           const sourceUrl = (feature.properties['sourceUrl'] as string | undefined) ?? ''
           const eventDate = (feature.properties['eventDate'] as string | undefined) ?? ''
 
@@ -524,8 +498,10 @@ export function WorldMap() {
 
           const labelEl = document.createElement('div')
           labelEl.className = 'eonet-popup-label'
-          labelEl.style.color = color
-          labelEl.textContent = categoryLabel(catId)
+          const swatchEl = document.createElement('span')
+          swatchEl.className = 'eonet-popup-swatch'
+          swatchEl.style.background = color
+          labelEl.append(swatchEl, categoryLabel(catId))
           inner.appendChild(labelEl)
 
           const titleEl = document.createElement('div')
@@ -580,15 +556,17 @@ export function WorldMap() {
           const coords = geom.coordinates as [number, number]
           const title = (feature.properties['title'] as string | undefined) ?? ''
           const catId = (feature.properties['categoryId'] as string | undefined) ?? ''
-          const color = (feature.properties['color'] as string | undefined) ?? '#cbd5e1'
+          const color = (feature.properties['color'] as string | undefined) ?? MUTED_HEX
 
           const inner = document.createElement('div')
           inner.className = 'eonet-popup-inner'
 
           const labelEl = document.createElement('div')
           labelEl.className = 'eonet-popup-label'
-          labelEl.style.color = color
-          labelEl.textContent = categoryLabel(catId)
+          const swatchEl = document.createElement('span')
+          swatchEl.className = 'eonet-popup-swatch'
+          swatchEl.style.background = color
+          labelEl.append(swatchEl, categoryLabel(catId))
           inner.appendChild(labelEl)
 
           const titleEl = document.createElement('div')

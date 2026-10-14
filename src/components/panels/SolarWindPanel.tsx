@@ -2,19 +2,19 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarWind } from '@/hooks/useSolarWind'
+import { bzStatus, kpStatus, statusVar } from '@/lib/severity'
 
 import { KpSparkline } from './KpSparkline'
 import styles from './solar-wind-panel.module.css'
 
 const SPARK_H = 22
 
-function kpColor(kp: number): string {
-  if (kp >= 6) return 'var(--magenta)'
-  if (kp >= 4) return 'var(--amber)'
-  return 'var(--cyan)'
-}
+const kpColor = (kp: number): string => statusVar(kpStatus(kp))
 
 function auroraLabel(kp: number): string {
   if (kp <= 1) return 'QUIET'
@@ -26,9 +26,7 @@ function auroraLabel(kp: number): string {
   return 'EXTREME STORM'
 }
 
-function bzColor(bz: number): string {
-  return bz < 0 ? 'var(--amber)' : 'var(--green)'
-}
+const bzColor = (bz: number): string => statusVar(bzStatus(bz))
 
 export function SolarWindPanel() {
   const { data, isLoading, error } = useSolarWind()
@@ -37,7 +35,7 @@ export function SolarWindPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Solar Wind" breathe>
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -45,7 +43,7 @@ export function SolarWindPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Solar Wind" breathe>
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The NOAA solar wind feed did not answer" />
       </GlassPanel>
     )
   }
@@ -58,52 +56,50 @@ export function SolarWindPanel() {
       <DataAge updatedAt={updatedAt} />
       <div className={styles.solarWindPanel ?? ''}>
         <div className={styles.kpRow ?? ''}>
-          {kp !== null ? (
-            <>
-              <span className={styles.kpValue ?? ''} style={{ color: kpColor(kp) }}>
-                {kp.toFixed(1)}
+          <Readout
+            value={kp !== null ? kp.toFixed(1) : '—'}
+            tone={kp !== null ? kpStatus(kp) : 'default'}
+            className={styles.kpValue ?? ''}
+          />
+          {kp !== null && (
+            <div className={styles.kpMeta ?? ''}>
+              <Label>Kp Index</Label>
+              <span className={styles.auroraLabel ?? ''} style={{ color: kpColor(kp) }}>
+                {auroraLabel(kp)}
               </span>
-              <div className={styles.kpMeta ?? ''}>
-                <span className={styles.kpLabel ?? ''}>Kp Index</span>
-                <span className={styles.auroraLabel ?? ''} style={{ color: kpColor(kp) }}>
-                  {auroraLabel(kp)}
-                </span>
-              </div>
-            </>
-          ) : (
-            <span className={styles.kpValue ?? ''} style={{ color: 'var(--ink-faint)' }}>
-              —
-            </span>
+            </div>
           )}
         </div>
 
         <div className={styles.metricsRow ?? ''}>
           <div className={styles.metric ?? ''}>
-            <span className={styles.metricValue ?? ''}>
-              {data.windSpeed !== null ? Math.round(data.windSpeed) : '—'}
-            </span>
-            <span className={styles.metricLabel ?? ''}>km/s</span>
-            <span className={styles.metricName ?? ''}>Wind Speed</span>
+            <Readout
+              value={data.windSpeed !== null ? String(Math.round(data.windSpeed)) : '—'}
+              unit="km/s"
+              className={styles.metricValue ?? ''}
+            />
+            <Label>Wind Speed</Label>
             {data.windSpeedSeries.length > 1 && (
               <Sparkline
                 values={data.windSpeedSeries}
                 mode="line"
                 height={SPARK_H}
-                color="var(--cyan)"
+                color="var(--signal)"
                 ariaLabel="Wind speed trend, last 24 hours"
                 className={styles.metricSpark ?? ''}
               />
             )}
           </div>
           <div className={styles.metric ?? ''}>
-            <span
+            <Readout
+              value={
+                data.imfBz !== null ? (data.imfBz >= 0 ? '+' : '') + data.imfBz.toFixed(1) : '—'
+              }
+              unit="nT"
+              tone={data.imfBz !== null ? bzStatus(data.imfBz) : 'default'}
               className={styles.metricValue ?? ''}
-              style={{ color: data.imfBz !== null ? bzColor(data.imfBz) : undefined }}
-            >
-              {data.imfBz !== null ? (data.imfBz >= 0 ? '+' : '') + data.imfBz.toFixed(1) : '—'}
-            </span>
-            <span className={styles.metricLabel ?? ''}>nT</span>
-            <span className={styles.metricName ?? ''}>IMF Bz</span>
+            />
+            <Label>IMF Bz</Label>
             {data.imfBzSeries.length > 1 && (
               <Sparkline
                 values={data.imfBzSeries}
@@ -117,11 +113,12 @@ export function SolarWindPanel() {
             )}
           </div>
           <div className={styles.metric ?? ''}>
-            <span className={styles.metricValue ?? ''}>
-              {data.windDensity !== null ? data.windDensity.toFixed(1) : '—'}
-            </span>
-            <span className={styles.metricLabel ?? ''}>p/cc</span>
-            <span className={styles.metricName ?? ''}>Density</span>
+            <Readout
+              value={data.windDensity !== null ? data.windDensity.toFixed(1) : '—'}
+              unit="p/cc"
+              className={styles.metricValue ?? ''}
+            />
+            <Label>Density</Label>
             {data.windDensitySeries.length > 1 && (
               <Sparkline
                 values={data.windDensitySeries}

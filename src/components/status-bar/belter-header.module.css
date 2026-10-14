@@ -1,7 +1,8 @@
+/* The header band: a hull plate with a riveted bottom seam (ROCI v2, #53). */
 .header {
   position: relative;
   padding: 10px var(--gutter) 14px;
-  background: linear-gradient(180deg, oklch(0.13 0.03 50) 0%, oklch(0.1 0.02 50) 100%);
+  background: var(--plate-bg);
   border-bottom: 2px solid var(--copper);
   overflow: hidden;
   z-index: 10;
@@ -45,7 +46,7 @@
 .left {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -55,13 +56,13 @@
   gap: 10px;
 }
 
+/* Engraved on the plate (rule 8): solid copper, no opacity fade */
 .sysId {
   font-family: var(--font-stencil);
-  font-size: 9px;
+  font-size: var(--text-xs);
   letter-spacing: 0.32em;
-  color: var(--copper-glow);
+  color: var(--copper);
   text-transform: uppercase;
-  opacity: 0.7;
 }
 
 .title {
@@ -77,17 +78,16 @@
 
 .subtitle {
   font-family: var(--font-stencil);
-  font-size: 9px;
+  font-size: var(--text-xs);
   letter-spacing: 0.22em;
-  color: var(--copper-glow);
+  color: var(--copper);
   text-transform: uppercase;
-  opacity: 0.72;
 }
 
 .right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-5);
   flex-shrink: 0;
 }
 
@@ -105,7 +105,7 @@
   height: 26px;
   background: transparent;
   border: 1px solid var(--plate-edge);
-  border-radius: 2px;
+  border-radius: var(--radius);
   color: var(--bone-faint);
   font-size: 13px;
   cursor: pointer;
@@ -139,27 +139,41 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, var(--copper-glow), var(--copper-2));
+  background: var(--rivet);
   box-shadow:
-    0 1px 2px oklch(0 0 0 / 0.6),
-    inset 0 -1px 0 oklch(0 0 0 / 0.4);
+    0 1px 2px var(--shade-edge),
+    inset 0 -1px 0 var(--shade-edge);
   flex-shrink: 0;
 }
 
 @media (width <= 899px) {
   .header {
-    padding: 8px 16px 12px;
+    padding: 8px var(--space-5) 12px;
   }
 
   .inner {
-    gap: 16px;
+    gap: var(--space-5);
   }
 
-  .ghostNumber {
-    display: none;
-  }
-
+  .ghostNumber,
+  .weldPatch,
   .subtitle {
     display: none;
+  }
+}
+
+/* The title and the clock/status cluster can't share a row on a phone: the cluster
+   kept its width and the title collapsed under it. Stack them. */
+@media (width <= 640px) {
+  .inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .right {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 }

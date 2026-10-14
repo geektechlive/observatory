@@ -1,3 +1,6 @@
+/* The shell (ROCI v2, #52): section grids, the globe frame, the telemetry plate.
+   Tokens only; every shared value lives in src/styles/tokens.css. */
+
 .main {
   flex: 1;
   display: flex;
@@ -15,7 +18,7 @@
   display: grid;
   grid-template-columns: 1fr 460px;
   gap: var(--space-gap);
-  padding: 24px var(--gutter);
+  padding: var(--space-6) var(--gutter);
 }
 
 /* Section 2: Big news row — 3 equal cards */
@@ -23,7 +26,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: var(--space-gap);
-  padding: 0 var(--gutter) 24px;
+  padding: 0 var(--gutter) var(--space-6);
 }
 
 /* Section 4: Asteroid table + Fireballs */
@@ -31,7 +34,7 @@
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: var(--space-gap);
-  padding: 0 var(--gutter) 24px;
+  padding: 0 var(--gutter) var(--space-6);
 }
 
 /* Section 5: Solar Wind — full width */
@@ -39,41 +42,33 @@
   display: grid;
   grid-template-columns: 1.1fr 1fr 1fr;
   gap: var(--space-gap);
-  padding: 0 var(--gutter) 24px;
+  padding: 0 var(--gutter) var(--space-6);
 }
 
 .deepSpaceSection {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--space-gap);
-  padding: 0 var(--gutter) 24px;
+  padding: 0 var(--gutter) var(--space-6);
 }
 
 .cycleSection {
-  padding: 0 var(--gutter) 24px;
+  padding: 0 var(--gutter) var(--space-6);
 }
 
 /* Section 2: Launches — full width */
 .launchSection {
-  padding: 0 var(--gutter) 24px;
+  padding: 0 var(--gutter) var(--space-6);
 }
 
-/* Globe panel — plate frame */
+/* Globe panel — hull plate */
 .globeFrame {
   position: relative;
   padding: 20px;
-  background: linear-gradient(
-    135deg,
-    oklch(0.16 0.025 60) 0%,
-    oklch(0.11 0.02 50) 60%,
-    oklch(0.13 0.03 60) 100%
-  );
+  background: var(--plate-bg);
   border: 1px solid var(--plate-edge);
-  border-radius: var(--radius-panel);
-  box-shadow:
-    inset 0 1px 0 oklch(0.4 0.02 60 / 0.25),
-    inset 0 -1px 0 oklch(0 0 0 / 0.4),
-    0 8px 24px oklch(0 0 0 / 0.5);
+  border-radius: var(--radius);
+  box-shadow: var(--plate-shadow);
   overflow: hidden;
 }
 
@@ -85,22 +80,19 @@
   border: 1px dashed var(--panel-border-strong);
   border-radius: 2px;
   pointer-events: none;
-  opacity: 1;
 }
 
 /* Telemetry plate — right of globe */
 .telemetryPlate {
   position: relative;
   padding: 28px 24px 22px;
-  background: linear-gradient(180deg, oklch(0.13 0.025 50) 0%, oklch(0.09 0.02 50) 100%);
+  background: var(--plate-bg);
   border: 1px solid var(--plate-edge);
-  border-radius: var(--radius-panel);
-  box-shadow:
-    inset 0 1px 0 oklch(0.4 0.02 60 / 0.22),
-    0 6px 18px oklch(0 0 0 / 0.5);
+  border-radius: var(--radius);
+  box-shadow: var(--plate-shadow);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-5);
   overflow: hidden;
 }
 
@@ -112,16 +104,27 @@
   left: 0;
   right: 0;
   height: 5px;
-  background: repeating-linear-gradient(45deg, var(--copper) 0 12px, oklch(0.1 0.01 60) 12px 24px);
+  background: var(--hazard-stripe);
   opacity: 0.85;
 }
 
-/* Globe center + overlays */
+/* Globe center + layer control. The control sits beside the instrument, not over
+   it (it used to float top-right and cover the bezel). In map mode it floats over the
+   map's corner as before, so the map keeps the frame's full width. */
 .globeCenter {
   position: relative;
   display: grid;
+
+  /* minmax(0, 1fr), not the implicit auto column: auto grows to the instrument's
+     536px, so its max-width: 100% never shrinks it on a phone. */
+  grid-template-columns: minmax(0, 1fr) auto;
   place-items: center;
+  align-items: start;
   min-height: 400px;
+}
+
+.globeCenter[data-stage='map'] {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* width:100% so the MapLibre child doesn't collapse; transform/filter are
@@ -130,6 +133,7 @@
 .stageMorph {
   width: 100%;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   animation: stage-enter 520ms var(--ease-out-expo);
 }
@@ -145,143 +149,56 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .stageMorph {
-    animation: none;
-  }
-}
-
 .layerOverlay {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+  margin: 10px 0 0 var(--space-4);
   z-index: 5;
 }
 
-@media (width <= 560px) {
-  .layerOverlay {
-    top: 6px;
-    right: 6px;
-    transform: scale(0.86);
-    transform-origin: top right;
+.globeCenter[data-stage='map'] .layerOverlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  margin: 0;
+}
+
+@media (width <= 700px) {
+  .globeCenter {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
 
-.globeCenter::before {
-  content: '';
-  position: absolute;
-  inset: -20%;
-  background: radial-gradient(
-    circle at 50% 50%,
-    oklch(0.55 0.12 220 / 0.35) 0%,
-    oklch(0.4 0.1 220 / 0.18) 30%,
-    oklch(0.2 0.05 220 / 0.06) 55%,
-    transparent 75%
-  );
-  filter: blur(24px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Radar sweep overlay on globe */
-.radarSweep {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  opacity: 0.85;
-}
-
-.radarArm {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    oklch(0.85 0.13 220 / 0.008) 20deg,
-    oklch(0.85 0.13 220 / 0.018) 40deg,
-    oklch(0.85 0.13 220 / 0.035) 60deg,
-    oklch(0.85 0.13 220 / 0.065) 78deg,
-    oklch(0.86 0.13 220 / 0.11) 92deg,
-    oklch(0.87 0.14 220 / 0.18) 103deg,
-    oklch(0.89 0.14 220 / 0.32) 110deg,
-    oklch(0.91 0.15 220 / 0.52) 115deg,
-    oklch(0.93 0.16 220 / 0.74) 118deg,
-    oklch(0.96 0.17 220 / 0.92) 119.5deg,
-    oklch(1 0 0 / 1) 120deg,
-    oklch(0.92 0.15 220 / 0.18) 121.5deg,
-    transparent 124deg,
-    transparent 360deg
-  );
-  animation: roci-sweep 6s linear infinite;
-}
-
-/* Globe callouts */
-.globeCallout {
-  position: absolute;
-  font-family: var(--font-stencil);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: var(--copper-glow);
-  pointer-events: none;
-  padding: 2px 6px;
-}
-
-.globeCallout::before,
-.globeCallout::after {
-  content: '';
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-color: var(--panel-border-strong);
-  border-style: solid;
-}
-
-.globeCallout::before {
-  top: 0;
-  left: 0;
-  border-width: 1px 0 0 1px;
-}
-
-.globeCallout::after {
-  bottom: 0;
-  right: 0;
-  border-width: 0 1px 1px 0;
-}
-
-.globeCalloutSignal {
-  color: var(--signal);
+  .layerOverlay {
+    order: -1;
+    justify-self: end;
+    margin: 0 0 var(--space-3);
+  }
 }
 
 /* ISS readout bar below globe */
 .issReadoutBar {
-  margin-top: 14px;
+  margin-top: var(--space-4);
   padding: 10px 14px;
-  background: oklch(0.07 0.01 50);
+  background: var(--void);
   border: 1px solid var(--plate-edge);
-  border-radius: 2px;
+  border-radius: var(--radius);
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 14px;
+  gap: var(--space-4);
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .issReadoutLabel {
   color: var(--copper-glow);
   letter-spacing: 0.12em;
-  font-size: 9px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   font-family: var(--font-stencil);
 }
 
 .issReadoutValues {
   display: flex;
-  gap: 18px;
+  gap: var(--space-2) var(--space-5);
   color: var(--bone-dim);
   flex-wrap: wrap;
 }
@@ -292,23 +209,34 @@
 
 .issReadoutDelta {
   color: var(--bone-faint);
-  font-size: 9px;
   letter-spacing: 0.08em;
+}
+
+/* At phone width the three columns squeezed the values into a stack between the
+   label and the toggle: the values take their own full row instead. */
+@media (width <= 640px) {
+  .issReadoutBar {
+    grid-template-columns: auto 1fr;
+  }
+
+  .issReadoutValues {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Brass plate header (engraved nameplate) */
 .brassPlate {
   padding: 8px 12px;
-  background: linear-gradient(180deg, oklch(0.55 0.12 60), oklch(0.42 0.1 50));
-  color: oklch(0.08 0.02 50);
-  border: 1px solid oklch(0.3 0.06 60);
+  background: var(--brass-plate-bg);
+  color: var(--void);
+  border: 1px solid var(--plate-edge);
   font-family: var(--font-stencil);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 0.24em;
   text-transform: uppercase;
   box-shadow:
-    inset 0 1px 0 oklch(0.85 0.1 60 / 0.5),
-    inset 0 -1px 0 oklch(0 0 0 / 0.4);
+    inset 0 1px 0 var(--sheen-line),
+    inset 0 -1px 0 var(--shade-edge);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -328,7 +256,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-4);
   padding: 14px 4px;
   border-bottom: 1px solid var(--plate-seam);
 }
@@ -339,7 +267,7 @@
 
 .salvageLabel {
   font-family: var(--font-stencil);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.2em;
   color: var(--bone-faint);
   text-transform: uppercase;
@@ -347,50 +275,33 @@
 
 .salvageSub {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: var(--bone-faint);
   letter-spacing: 0.1em;
-  margin-top: 4px;
+  margin-top: var(--space-2);
   text-transform: uppercase;
 }
 
+/* A live number is a readout: mono, tabular, no glow (rule 7 keeps Fraunces for the
+   console's one line; copper housing never emits light, and these don't need to). */
 .salvageValue {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: clamp(36px, 4vw, 52px);
-  font-weight: 300;
-  line-height: 0.92;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  font-size: clamp(30px, 3.4vw, 42px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums slashed-zero;
   text-align: right;
-  animation: roci-telemetry-glow 4s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .salvageValue {
-    animation: none;
-  }
 }
 
 .salvageChalk {
   font-family: var(--font-stencil);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.1em;
   color: var(--copper-glow);
-  opacity: 0.7;
-  margin-top: 4px;
-  transform: rotate(-1deg) translateX(-4px);
+  margin-top: var(--space-2);
   text-transform: lowercase;
   text-align: right;
-}
-
-/* Dual gauges */
-.gaugeRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  padding-top: 4px;
-  flex-shrink: 0;
 }
 
 /* Map mode toggle row */
@@ -403,34 +314,27 @@
   flex-shrink: 0;
 }
 
-.mapToggleLabel {
-  font-family: var(--font-stencil);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  color: var(--copper-glow);
-  text-transform: uppercase;
-}
-
-/* Map mode pill */
+/* Map mode toggle: a segmented control on a small plate */
 .mapToggle {
   display: inline-flex;
   border: 1px solid var(--plate-edge);
-  border-radius: 2px;
+  border-radius: var(--radius);
   padding: 2px;
-  background: oklch(0.07 0.005 60 / 0.7);
+  background: var(--scrim);
 }
 
 .mapToggleBtn {
   padding: 5px 12px;
+  min-height: 24px;
   background: transparent;
   color: var(--bone-dim);
   border: none;
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  border-radius: 1px;
+  border-radius: calc(var(--radius) - 2px);
   transition:
     background var(--duration-fast),
     color var(--duration-fast);
@@ -447,8 +351,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, oklch(0.78 0.14 55), oklch(0.42 0.1 45));
-  box-shadow: 0 1px 2px oklch(0 0 0 / 0.7);
+  background: var(--rivet);
+  box-shadow: 0 1px 2px var(--shade-edge);
   pointer-events: none;
   z-index: 1;
 }
@@ -480,25 +384,25 @@
   .newsSection,
   .asteroidSection {
     grid-template-columns: 1fr;
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
   }
 
   .solarSection,
   .deepSpaceSection {
     grid-template-columns: 1fr;
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
   }
 
   .cycleSection {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
   }
 
   .launchSection {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
   }
 
   .globeCenter {
@@ -512,15 +416,5 @@
      a little extra breathing room here rather than a hard cutoff. */
   .main {
     padding-bottom: calc(var(--ticker-h) + 108px + env(safe-area-inset-bottom));
-  }
-}
-
-.panelEnter {
-  animation: panel-enter var(--duration-normal) var(--ease-out-expo) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panelEnter {
-    animation: none;
   }
 }

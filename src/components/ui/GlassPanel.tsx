@@ -5,6 +5,7 @@ import styles from './GlassPanel.module.css'
 type Variant = 'tile' | 'panel' | 'hero'
 type Tone = 'copper' | 'mcrn' | 'signal'
 type Depth = 'near' | 'mid' | 'far'
+type HeadingLevel = 2 | 3 | 4
 
 interface GlassPanelProps {
   variant?: Variant | undefined
@@ -12,6 +13,8 @@ interface GlassPanelProps {
   depth?: Depth | undefined
   breathe?: boolean | undefined
   label?: string | undefined
+  /** The label is the panel's heading; nested panels pass 3 or 4. */
+  headingLevel?: HeadingLevel | undefined
   className?: string | undefined
   children?: ReactNode
 }
@@ -40,6 +43,7 @@ export function GlassPanel({
   depth = 'near',
   breathe,
   label,
+  headingLevel = 2,
   className,
   children,
 }: GlassPanelProps) {
@@ -52,10 +56,11 @@ export function GlassPanel({
   ]
     .filter(Boolean)
     .join(' ')
+  const Heading = `h${String(headingLevel)}` as 'h2' | 'h3' | 'h4'
 
   return (
     <div className={cls} data-breathe={breathe ? 'true' : undefined}>
-      {label && <span className={styles.label ?? ''}>{label}</span>}
+      {label && <Heading className={styles.label ?? ''}>{label}</Heading>}
       {children}
     </div>
   )

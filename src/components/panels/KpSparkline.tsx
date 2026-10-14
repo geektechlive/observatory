@@ -1,4 +1,7 @@
+import { Label } from '@/components/ui/Label'
+import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { kpStatus, statusVar } from '@/lib/severity'
 
 import styles from './kp-sparkline.module.css'
 
@@ -11,11 +14,7 @@ interface Props {
   readings: Reading[]
 }
 
-function barColor(kp: number): string {
-  if (kp >= 6) return 'var(--magenta)'
-  if (kp >= 4) return 'var(--amber)'
-  return 'var(--cyan)'
-}
+const barColor = (kp: number): string => statusVar(kpStatus(kp))
 
 export function KpSparkline({ readings }: Props) {
   if (readings.length === 0) return null
@@ -29,10 +28,8 @@ export function KpSparkline({ readings }: Props) {
   return (
     <div className={styles.section ?? ''}>
       <div className={styles.header ?? ''}>
-        <span className={styles.label ?? ''}>Kp Index</span>
-        <span className={styles.maxValue ?? ''} style={{ color: barColor(maxKp) }}>
-          {maxKp}
-        </span>
+        <Label>Kp Index</Label>
+        <Readout value={String(maxKp)} tone={kpStatus(maxKp)} className={styles.maxValue ?? ''} />
       </div>
       <Sparkline
         values={sorted.map((r) => r.kpIndex)}

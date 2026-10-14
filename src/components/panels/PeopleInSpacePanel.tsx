@@ -2,6 +2,10 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
+import { StencilLabel } from '@/components/ui/StencilLabel'
 import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
 import type { Astronaut } from '@/schemas/peopleInSpace'
 
@@ -30,7 +34,7 @@ export function PeopleInSpacePanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Humans in Orbit">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -38,7 +42,7 @@ export function PeopleInSpacePanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Humans in Orbit">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The crew roster feed did not answer" />
       </GlassPanel>
     )
   }
@@ -50,7 +54,7 @@ export function PeopleInSpacePanel() {
       <DataAge updatedAt={updatedAt} />
       <div className={styles.panel ?? ''}>
         <div className={styles.headline ?? ''}>
-          <span className={styles.count ?? ''}>{data.number}</span>
+          <Readout value={String(data.number)} tone="signal" className={styles.count ?? ''} />
           <span className={styles.countLabel ?? ''}>
             people in space
             {data.expedition && <span className={styles.exp ?? ''}> · Exp {data.expedition}</span>}
@@ -61,8 +65,8 @@ export function PeopleInSpacePanel() {
           {groups.map(([craft, crew]) => (
             <div key={craft} className={styles.group ?? ''}>
               <div className={styles.craftHead ?? ''}>
-                <span className={styles.craftName ?? ''}>{craft}</span>
-                <span className={styles.craftCount ?? ''}>{crew.length}</span>
+                <StencilLabel>{craft}</StencilLabel>
+                <Label>{crew.length}</Label>
               </div>
               <ul className={styles.crewList ?? ''}>
                 {crew.map((p) => {

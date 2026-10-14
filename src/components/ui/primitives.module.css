@@ -1,0 +1,156 @@
+/* Shared primitives (ROCI v2, #39). Tokens only; rules in docs/design-history/roci-retrofit-v2.md. */
+
+/* Readout: every live number. Tabular, slashed zero, unit quieter. */
+.readout {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--bone);
+}
+
+.readout[data-tone='nominal'] {
+  color: var(--terminal);
+}
+
+.readout[data-tone='watch'] {
+  color: var(--amber);
+}
+
+.readout[data-tone='hazard'] {
+  color: var(--mcrn);
+}
+
+.readout[data-tone='signal'] {
+  color: var(--signal);
+}
+
+/* Quieter and smaller than the value, but never under the 11px floor (rule 6) */
+.unit {
+  margin-left: var(--space-1);
+  font-size: max(0.72em, var(--text-xs));
+  color: var(--bone-dim);
+}
+
+/* Micro label: captions, row labels, sub-lines. The audit found this recipe copied 8+ times. */
+.microLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--bone-faint);
+}
+
+.microLabel[data-tone='dim'] {
+  color: var(--bone-dim);
+}
+
+/* Engraving: caps stamped into a hull plate. Only ever on plates (rule 8). */
+.stencil {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--track-engrave);
+  text-transform: uppercase;
+  color: var(--copper-glow);
+}
+
+/* PanelState: loading / unavailable / empty, one recipe instead of 20+ copies. */
+.state {
+  display: grid;
+  place-content: center;
+  gap: var(--space-2);
+  min-height: 140px;
+  padding: var(--space-5);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-label);
+  color: var(--bone-faint);
+}
+
+.stateTitle {
+  text-transform: uppercase;
+  color: var(--bone-dim);
+}
+
+.state[data-kind='unavailable'] .stateTitle {
+  color: var(--amber);
+}
+
+.stateDetail {
+  color: var(--bone-faint);
+  text-transform: none;
+}
+
+/* Overlay: tooltips and popovers sit on the scrim, never on raw navy. */
+.overlay {
+  position: absolute;
+  z-index: var(--z-popover);
+  pointer-events: none;
+  max-width: 260px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  background: var(--scrim);
+  box-shadow: var(--shadow-overlay);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--bone);
+  white-space: nowrap;
+}
+
+.overlay[data-kind='popover'] {
+  pointer-events: auto;
+  white-space: normal;
+}
+
+/* Chip: a toggle that is a small plate, not a pill. 24px minimum target. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  background: var(--plate-bg);
+  color: var(--bone-dim);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--track-label);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast),
+    border-color var(--duration-fast);
+}
+
+.chip:hover {
+  color: var(--bone);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--copper-2);
+  color: var(--copper-glow);
+}
+
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--void);
+}
+
+.tickRing {
+  display: block;
+  overflow: visible;
+}
+
+.tickMinor {
+  stroke: var(--plate-seam);
+}
+
+.tickMajor {
+  stroke: var(--copper-glow);
+}

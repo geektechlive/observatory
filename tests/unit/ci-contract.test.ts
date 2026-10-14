@@ -85,6 +85,15 @@ describe('local verify gate', () => {
     },
   )
 
+  it('checks the bundle budget after the build and before e2e (#46)', () => {
+    // check-bundle reads dist/, so it must follow build; it runs before the slow e2e suite.
+    const steps = (pkg.scripts?.verify ?? '').split('&&').map((s) => s.trim())
+    const at = (name: string) => steps.findIndex((s) => s === `pnpm ${name}`)
+    expect(at('check:bundle')).toBeGreaterThan(at('build'))
+    expect(at('check:bundle')).toBeLessThan(at('test:e2e'))
+    expect(pkg.scripts?.['check:bundle']).toBe('node scripts/check-bundle.mjs')
+  })
+
   it('audits at the high level, so the accepted advisories in pnpm-workspace.yaml apply', () => {
     expect(pkg.scripts?.verify ?? '').toContain('pnpm audit --audit-level=high')
   })

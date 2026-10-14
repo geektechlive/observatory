@@ -1,3 +1,4 @@
+import { Readout, type ReadoutTone } from '@/components/ui/Readout'
 import { useGeomag } from '@/hooks/useGeomag'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
@@ -5,6 +6,7 @@ import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
 import { useSolarWind } from '@/hooks/useSolarWind'
+import { dstStatus, flareStatus, kpStatus, quakeStatus } from '@/lib/severity'
 
 import styles from './vitals-spine.module.css'
 
@@ -12,46 +14,19 @@ function Cell({
   label,
   value,
   unit,
-  color,
+  tone,
 }: {
   label: string
   value: string
   unit?: string
-  color?: string | undefined
+  tone?: ReadoutTone | undefined
 }) {
   return (
     <div className={styles.cell ?? ''}>
       <span className={styles.label ?? ''}>{label}</span>
-      <span className={styles.value ?? ''} style={color ? { color } : undefined}>
-        {value}
-        {unit && <span className={styles.unit ?? ''}>{unit}</span>}
-      </span>
+      <Readout value={value} unit={unit} tone={tone} className={styles.value ?? ''} />
     </div>
   )
-}
-
-function kpColor(kp: number): string {
-  if (kp >= 6) return 'var(--magenta)'
-  if (kp >= 4) return 'var(--amber)'
-  return 'var(--cyan)'
-}
-function flareColor(cls: string | null): string {
-  if (!cls) return 'var(--ink-dim)'
-  const c = cls[0]
-  if (c === 'X') return 'var(--magenta)'
-  if (c === 'M') return 'var(--amber)'
-  if (c === 'C') return 'var(--terminal)'
-  return 'var(--cyan)'
-}
-function quakeColor(m: number): string {
-  if (m >= 6) return 'var(--magenta)'
-  if (m >= 4.5) return 'var(--amber)'
-  return 'var(--bone)'
-}
-function dstColor(dst: number): string {
-  if (dst <= -50) return 'var(--magenta)'
-  if (dst <= -30) return 'var(--amber)'
-  return 'var(--cyan)'
 }
 
 function nextLaunchCountdown(net: string | null, now: Date): string {
@@ -87,9 +62,13 @@ export function VitalsSpine() {
     (max, q) => (q.mag !== null && (max === null || q.mag > max) ? q.mag : max),
     null,
   )
+  const flareTone = flareStatus(flare) ?? undefined
 
+  // A labelled, focusable region: the strip scrolls sideways, and Safari only lets the
+  // keyboard scroll a container that can take focus.
   return (
-    <div className={styles.spine ?? ''} aria-label="Live vital signs">
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+    <div className={styles.spine ?? ''} role="region" aria-label="Live vital signs" tabIndex={0}>
       <span className={styles.live ?? ''} aria-hidden="true">
         <span className={styles.liveDot ?? ''} />
         LIVE
@@ -98,30 +77,26 @@ export function VitalsSpine() {
         <Cell
           label="Kp"
           value={kp !== null ? kp.toFixed(1) : '—'}
-          color={kp !== null ? kpColor(kp) : undefined}
+          tone={kp !== null ? kpStatus(kp) : undefined}
         />
-        <Cell label="X-RAY" value={flare ?? '—'} color={flareColor(flare)} />
+        <Cell label="X-RAY" value={flare ?? '—'} tone={flareTone} />
         <Cell
           label="DST"
           value={geomag?.currentDst != null ? String(geomag.currentDst) : '—'}
-          unit=" nT"
-          color={geomag?.currentDst != null ? dstColor(geomag.currentDst) : undefined}
+          unit="nT"
+          tone={geomag?.currentDst != null ? dstStatus(geomag.currentDst) : undefined}
         />
         <Cell
           label="WIND"
           value={windSpeed !== null ? String(Math.round(windSpeed)) : '—'}
-          unit=" km/s"
+          unit="km/s"
         />
-        <Cell
-          label="IN SPACE"
-          value={humans !== null ? String(humans) : '—'}
-          color="var(--signal)"
-        />
+        <Cell label="IN SPACE" value={humans !== null ? String(humans) : '—'} tone="signal" />
         <Cell label="NEXT LAUNCH" value={`T- ${nextLaunchCountdown(net, now)}`} />
         <Cell
           label="MAX QUAKE 24H"
           value={strongest !== null ? `M${strongest.toFixed(1)}` : '—'}
-          color={strongest !== null ? quakeColor(strongest) : undefined}
+          tone={strongest !== null ? quakeStatus(strongest) : undefined}
         />
       </div>
     </div>

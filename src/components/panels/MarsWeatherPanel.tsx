@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useMarsWeather } from '@/hooks/useMarsWeather'
 
 import styles from './mars-weather-panel.module.css'
@@ -9,11 +12,8 @@ import styles from './mars-weather-panel.module.css'
 function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div className={styles.stat ?? ''}>
-      <span className={styles.statLabel ?? ''}>{label}</span>
-      <span className={styles.statValue ?? ''}>
-        {value}
-        {unit && <span className={styles.statUnit ?? ''}>{unit}</span>}
-      </span>
+      <Label>{label}</Label>
+      <Readout value={value} unit={unit} className={styles.statValue ?? ''} />
     </div>
   )
 }
@@ -25,7 +25,7 @@ export function MarsWeatherPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Mars Weather">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -33,7 +33,7 @@ export function MarsWeatherPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Mars Weather">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The Curiosity REMS feed is not answering" />
       </GlassPanel>
     )
   }
@@ -44,10 +44,8 @@ export function MarsWeatherPanel() {
       <div className={styles.panel ?? ''}>
         <div className={styles.head ?? ''}>
           <div className={styles.sol ?? ''}>
-            <span className={styles.solNum ?? ''}>SOL {data.sol.toLocaleString()}</span>
-            <span className={styles.solDate ?? ''}>
-              {data.terrestrialDate} · Curiosity · Gale Crater
-            </span>
+            <Readout value={`SOL ${data.sol.toLocaleString()}`} className={styles.solNum ?? ''} />
+            <Label>{data.terrestrialDate} · Curiosity · Gale Crater</Label>
           </div>
         </div>
 
@@ -65,7 +63,7 @@ export function MarsWeatherPanel() {
           <Stat
             label="Pressure"
             value={data.pressure !== null ? String(Math.round(data.pressure)) : '—'}
-            unit=" Pa"
+            unit="Pa"
           />
         </div>
 

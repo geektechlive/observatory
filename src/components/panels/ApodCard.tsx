@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useApod } from '@/hooks/useApod'
 
 import styles from './apod-card.module.css'
@@ -14,7 +15,7 @@ export function ApodCard() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="hero" label="APOD">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -22,7 +23,7 @@ export function ApodCard() {
   if (error || !data) {
     return (
       <GlassPanel variant="hero" label="APOD">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="NASA's APOD service is not answering" />
       </GlassPanel>
     )
   }

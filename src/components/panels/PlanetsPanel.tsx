@@ -2,26 +2,19 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Swatch } from '@/components/ui/Swatch'
 import { usePlanets } from '@/hooks/usePlanets'
+import { BODY_HEX } from '@/lib/palette'
 import type { Planet } from '@/schemas/planets'
 
 import styles from './planets-panel.module.css'
 
-const COLORS: Record<string, string> = {
-  Sun: 'oklch(0.9 0.16 90)',
-  Moon: 'oklch(0.9 0.02 250)',
-  Mercury: 'oklch(0.72 0.03 70)',
-  Venus: 'oklch(0.92 0.08 95)',
-  Mars: 'oklch(0.62 0.2 25)',
-  Jupiter: 'oklch(0.78 0.09 70)',
-  Saturn: 'oklch(0.85 0.08 95)',
-  Uranus: 'oklch(0.82 0.1 200)',
-  Neptune: 'oklch(0.65 0.15 250)',
-}
-
 const STRIP_W = 300
 const STRIP_H = 40
 const ELONG_VISIBLE = 18 // degrees from the Sun to clear twilight glare
+const FALLBACK_BODY = 'var(--bone)'
 
 function dotRadius(mag: number | null): number {
   if (mag === null) return 3
@@ -40,7 +33,7 @@ export function PlanetsPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Planets Tonight">
-        <div className={styles.loading ?? ''}>Plotting ephemerides...</div>
+        <PanelState kind="loading" detail="Plotting ephemerides" />
       </GlassPanel>
     )
   }
@@ -48,7 +41,7 @@ export function PlanetsPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Planets Tonight">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="JPL Horizons is not answering" />
       </GlassPanel>
     )
   }
@@ -74,7 +67,7 @@ export function PlanetsPanel() {
             x2={STRIP_W}
             y1={STRIP_H / 2}
             y2={STRIP_H / 2}
-            stroke="var(--glass-border)"
+            stroke="var(--plate-edge)"
             strokeWidth={0.5}
           />
           {/* Sun glare zone (~±2h RA) */}
@@ -85,10 +78,10 @@ export function PlanetsPanel() {
                 y={0}
                 width={STRIP_W * (4 / 24)}
                 height={STRIP_H}
-                fill="oklch(0.9 0.16 90)"
+                fill={BODY_HEX['Sun']}
                 opacity={0.08}
               />
-              <circle cx={raX(sun.raHours)} cy={STRIP_H / 2} r={4} fill={COLORS.Sun} />
+              <circle cx={raX(sun.raHours)} cy={STRIP_H / 2} r={4} fill={BODY_HEX['Sun']} />
             </>
           )}
           {planets.map((p) => {
@@ -102,7 +95,7 @@ export function PlanetsPanel() {
                   cx={x}
                   cy={STRIP_H / 2}
                   r={dotRadius(p.mag)}
-                  fill={COLORS[p.name] ?? 'var(--bone)'}
+                  fill={BODY_HEX[p.name] ?? FALLBACK_BODY}
                 />
                 <text
                   x={x}
@@ -120,9 +113,9 @@ export function PlanetsPanel() {
           })}
         </svg>
         <div className={styles.axis ?? ''} aria-hidden="true">
-          <span>0h</span>
-          <span>RA</span>
-          <span>24h</span>
+          <Label>0h</Label>
+          <Label>RA</Label>
+          <Label>24h</Label>
         </div>
 
         <ul className={styles.list ?? ''}>
@@ -130,10 +123,7 @@ export function PlanetsPanel() {
             const visible = p.elongation >= ELONG_VISIBLE
             return (
               <li key={p.name} className={styles.row ?? ''}>
-                <span
-                  className={styles.dot ?? ''}
-                  style={{ background: COLORS[p.name] ?? 'var(--bone)' }}
-                />
+                <Swatch color={BODY_HEX[p.name] ?? FALLBACK_BODY} />
                 <span className={styles.name ?? ''}>{p.name}</span>
                 <span className={styles.mag ?? ''}>
                   {p.mag !== null ? `m ${p.mag.toFixed(1)}` : '—'}

@@ -1,12 +1,7 @@
-/* Atmospheric blooms — copper warm and signal-blue accents.
-   Individual star dots are handled by the StarField canvas component. */
+/* Atmosphere: copper blooms over the void (the --atmosphere token). The old signal-blue
+   bloom is gone: cyan is telemetry, never structure. Star dots are the StarField canvas. */
 body {
   background-color: var(--void);
   background-attachment: fixed;
-  background-image:
-    /* copper radial blooms */
-    radial-gradient(ellipse at 80% 0%, oklch(0.55 0.15 45 / 0.2) 0%, transparent 55%),
-    radial-gradient(ellipse at 0% 100%, oklch(0.4 0.1 60 / 0.18) 0%, transparent 50%),
-    /* signal-blue accent glow — bottom right */
-    radial-gradient(ellipse at 100% 85%, oklch(0.85 0.13 220 / 0.07) 0%, transparent 40%);
+  background-image: var(--atmosphere);
 }

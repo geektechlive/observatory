@@ -1,13 +1,8 @@
 import { memo } from 'react'
 
-import { useProjected } from '../useGlobeProjection'
+import { DSN_STATIONS } from '@/lib/globeLayers'
 
-/** NASA Deep Space Network ground stations. */
-const DSN_STATIONS: { name: string; lat: number; lon: number }[] = [
-  { name: 'GOLDSTONE', lat: 35.43, lon: -116.89 },
-  { name: 'MADRID', lat: 40.43, lon: -4.25 },
-  { name: 'CANBERRA', lat: -35.4, lon: 148.98 },
-]
+import { useProjected } from '../useGlobeProjection'
 
 interface StationMarkersProps {
   rotation: number

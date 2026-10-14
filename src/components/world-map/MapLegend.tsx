@@ -1,3 +1,4 @@
+import { eonetKind, ISS_HEX, LANES, primaryCategoryCounts } from '@/lib/palette'
 import type { EonetEvent } from '@/schemas/eonet'
 
 import styles from './map-legend.module.css'
@@ -7,29 +8,25 @@ interface MapLegendProps {
   issVisible: boolean
 }
 
-interface CategoryDef {
-  id: string
-  label: string
-  color: string
-}
+const CATEGORY_IDS = [
+  'wildfires',
+  'volcanoes',
+  'earthquakes',
+  'landslides',
+  'drought',
+  'severeStorms',
+  'floods',
+  'seaLakeIce',
+] as const
 
-const CATEGORIES: CategoryDef[] = [
-  { id: 'wildfires', label: 'Wildfire', color: 'oklch(0.70 0.22 28)' },
-  { id: 'severeStorms', label: 'Storm', color: 'var(--signal)' },
-  { id: 'earthquakes', label: 'Earthquake', color: 'var(--amber)' },
-  { id: 'volcanoes', label: 'Volcano', color: 'var(--copper-glow)' },
-  { id: 'floods', label: 'Flood', color: 'oklch(0.75 0.18 240)' },
-  { id: 'landslides', label: 'Landslide', color: 'var(--copper)' },
-  { id: 'seaLakeIce', label: 'Sea Ice', color: 'oklch(0.88 0.06 200)' },
-]
+const CATEGORIES = CATEGORY_IDS.map((id) => {
+  const kind = eonetKind(id)
+  return { id, label: kind.label, color: LANES[kind.lane].emit }
+})
 
 export function MapLegend({ events, issVisible }: MapLegendProps) {
-  const counts = new Map<string, number>()
-  for (const event of events) {
-    for (const cat of event.categories) {
-      counts.set(cat.id, (counts.get(cat.id) ?? 0) + 1)
-    }
-  }
+  // Count by the category each dot is coloured by, so totals match what is drawn.
+  const counts = primaryCategoryCounts(events)
 
   const activeCategories = CATEGORIES.filter((c) => (counts.get(c.id) ?? 0) > 0)
   const showDivider = activeCategories.length > 0 && issVisible
@@ -50,7 +47,7 @@ export function MapLegend({ events, issVisible }: MapLegendProps) {
       {issVisible && <div className={styles.sectionLabel ?? ''}>Sky</div>}
       {issVisible && (
         <div className={styles.row ?? ''}>
-          <span className={styles.dot ?? ''} style={{ background: 'var(--signal)' }} />
+          <span className={styles.dot ?? ''} style={{ background: ISS_HEX }} />
           <span className={styles.label ?? ''}>ISS</span>
         </div>
       )}

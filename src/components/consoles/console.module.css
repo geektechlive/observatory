@@ -32,8 +32,8 @@
 .introSub {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
-  letter-spacing: 0.06em;
+  color: var(--bone-faint);
+  letter-spacing: var(--track-label);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -45,8 +45,8 @@
 @media (width <= 899px) {
   .console {
     grid-template-columns: 1fr;
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
   }
 
   .wide {

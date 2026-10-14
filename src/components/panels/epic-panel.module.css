@@ -1,17 +1,18 @@
 .epicPanel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 36px 16px 16px;
+  gap: var(--space-4);
+  padding: var(--panel-body-pad);
   height: 100%;
 }
 
+/* The letterbox around the full-disk image is the void, so the Earth sits in space */
 .imageWrap {
   flex: 1;
   min-height: 220px;
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius);
   overflow: hidden;
-  background: #000;
+  background: var(--void);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,54 +34,39 @@
 .metaTop {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 
 .date {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--ink);
+  color: var(--bone);
   letter-spacing: 0.04em;
 }
 
 .coords {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--cyan);
-  letter-spacing: 0.06em;
+  color: var(--signal);
+  letter-spacing: var(--track-label);
 }
 
 .fullResLink {
+  display: inline-block;
+  min-height: 24px;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--cyan);
+  color: var(--signal);
   letter-spacing: 0.04em;
-  text-decoration: none;
-  opacity: 0.8;
-}
-
-.fullResLink:hover {
-  opacity: 1;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .caption {
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
+  color: var(--bone-faint);
   line-height: 1.5;
   margin: 0;
-}
-
-.loading,
-.unavailable {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 280px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-  letter-spacing: 0.05em;
 }

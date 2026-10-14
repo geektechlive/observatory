@@ -1,4 +1,7 @@
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useCme } from '@/hooks/useCme'
 
 import styles from './cme-panel.module.css'
@@ -20,7 +23,7 @@ export function CmePanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="CME Watch">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -28,7 +31,7 @@ export function CmePanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="CME Watch">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The NOAA WSA-ENLIL model feed did not answer" />
       </GlassPanel>
     )
   }
@@ -45,26 +48,32 @@ export function CmePanel() {
 
         {data.inbound && (
           <div className={styles.arrival ?? ''}>
-            <span className={styles.arrivalLabel ?? ''}>Modeled arrival</span>
-            <span className={styles.arrivalValue ?? ''}>{formatArrival(data.arrival)}</span>
+            <Label>Modeled arrival</Label>
+            <Readout
+              value={formatArrival(data.arrival)}
+              tone="watch"
+              className={styles.arrivalValue ?? ''}
+            />
           </div>
         )}
 
         <div className={styles.model ?? ''}>
           <div className={styles.modelStat ?? ''}>
-            <span className={styles.modelValue ?? ''}>
-              {data.earthSpeed !== null ? Math.round(data.earthSpeed) : '—'}
-            </span>
-            <span className={styles.modelLabel ?? ''}>km/s at Earth</span>
+            <Readout
+              value={data.earthSpeed !== null ? String(Math.round(data.earthSpeed)) : '—'}
+              className={styles.modelValue ?? ''}
+            />
+            <Label>km/s at Earth</Label>
           </div>
           <div className={styles.modelStat ?? ''}>
-            <span className={styles.modelValue ?? ''}>
-              {data.earthDensity !== null ? data.earthDensity.toFixed(1) : '—'}
-            </span>
-            <span className={styles.modelLabel ?? ''}>p/cm³</span>
+            <Readout
+              value={data.earthDensity !== null ? data.earthDensity.toFixed(1) : '—'}
+              className={styles.modelValue ?? ''}
+            />
+            <Label>p/cm³</Label>
           </div>
         </div>
-        <span className={styles.source ?? ''}>NOAA WSA-ENLIL model</span>
+        <Label>NOAA WSA-ENLIL model</Label>
       </div>
     </GlassPanel>
   )

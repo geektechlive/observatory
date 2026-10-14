@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { PanelState } from '@/components/ui/PanelState'
 import { useSpaceNews } from '@/hooks/useSpaceNews'
 import { formatRelativeTime } from '@/lib/format'
 
@@ -14,7 +15,7 @@ export function SpaceNewsPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Mission Intel">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -22,7 +23,7 @@ export function SpaceNewsPanel() {
   if (error || !data || data.articles.length === 0) {
     return (
       <GlassPanel variant="tile" label="Mission Intel">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The space news feed did not answer" />
       </GlassPanel>
     )
   }

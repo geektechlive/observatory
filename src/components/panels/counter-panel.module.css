@@ -1,23 +1,23 @@
+/* Counter panel: one big readout and a caption (Co2Panel, ExoplanetPanel). */
 .panel {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 6px;
-  padding: 36px 16px 16px;
+  padding: var(--panel-body-pad);
   height: 100%;
 }
 
+/* A live number is a mono readout (rule 7); sized here, coloured by the Readout tone */
 .value {
-  font-family: var(--font-display);
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
-  font-weight: 700;
+  font-size: clamp(2rem, 4.2vw, 2.8rem);
   line-height: 1;
   letter-spacing: -0.02em;
 }
 
 .unit {
-  font-size: 0.4em;
-  color: var(--ink-dim);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
   font-weight: 400;
   letter-spacing: 0;
   margin-left: 6px;
@@ -26,21 +26,22 @@
 .label {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--ink-dim);
+  color: var(--bone-dim);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-label);
 }
 
 .sub {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
+  color: var(--bone-faint);
 }
 
 .delta {
-  color: var(--amber);
+  color: var(--copper-glow);
 }
 
+/* Kept for ExoplanetPanel until its own batch moves it onto PanelState */
 .loading,
 .unavailable {
   display: flex;
@@ -49,5 +50,5 @@
   min-height: 120px;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--ink-faint);
+  color: var(--bone-faint);
 }

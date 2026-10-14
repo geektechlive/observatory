@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useDonki } from '@/hooks/useDonki'
 import { formatRelativeTime } from '@/lib/format'
 
@@ -22,7 +25,7 @@ export function SpaceWeatherStrip() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Space Weather">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -30,7 +33,7 @@ export function SpaceWeatherStrip() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Space Weather">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="NASA DONKI did not answer" />
       </GlassPanel>
     )
   }
@@ -88,27 +91,24 @@ export function SpaceWeatherStrip() {
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
     .slice(0, 4)
 
+  const counts: [string, number][] = [
+    ['Flares', data.flares.length],
+    ['CMEs', data.cmes.length],
+    ['Storms', data.geomagneticStorms.length],
+    ['SEPs', data.seps.length],
+  ]
+
   return (
     <GlassPanel variant="tile" label="Space Weather">
       <DataAge updatedAt={updatedAt} />
       <div className={styles.strip ?? ''}>
         <div className={styles.countRow ?? ''}>
-          <div className={styles.countChip ?? ''}>
-            <span className={styles.countValue ?? ''}>{data.flares.length}</span>
-            <span className={styles.countLabel ?? ''}>Flares</span>
-          </div>
-          <div className={styles.countChip ?? ''}>
-            <span className={styles.countValue ?? ''}>{data.cmes.length}</span>
-            <span className={styles.countLabel ?? ''}>CMEs</span>
-          </div>
-          <div className={styles.countChip ?? ''}>
-            <span className={styles.countValue ?? ''}>{data.geomagneticStorms.length}</span>
-            <span className={styles.countLabel ?? ''}>Storms</span>
-          </div>
-          <div className={styles.countChip ?? ''}>
-            <span className={styles.countValue ?? ''}>{data.seps.length}</span>
-            <span className={styles.countLabel ?? ''}>SEPs</span>
-          </div>
+          {counts.map(([label, n]) => (
+            <div key={label} className={styles.countChip ?? ''}>
+              <Readout value={String(n)} tone="signal" className={styles.countValue ?? ''} />
+              <Label>{label}</Label>
+            </div>
+          ))}
         </div>
 
         <KpSparkline readings={kpReadings} />
@@ -117,12 +117,12 @@ export function SpaceWeatherStrip() {
 
         <div className={styles.eventList ?? ''}>
           {top4.length === 0 ? (
-            <span className={styles.eventDesc ?? ''}>No recent events</span>
+            <PanelState kind="empty" detail="No recent space weather events" />
           ) : (
             top4.map((ev) => (
               <div key={ev.id} className={styles.eventItem ?? ''}>
                 <span className={styles.eventTime ?? ''}>{formatRelativeTime(ev.time)}</span>
-                <span className={styles.eventType ?? ''}>{ev.type}</span>
+                <Label tone="dim">{ev.type}</Label>
                 <span className={styles.eventDesc ?? ''}>{ev.description}</span>
               </div>
             ))

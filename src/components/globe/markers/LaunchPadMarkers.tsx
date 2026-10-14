@@ -1,5 +1,7 @@
 import { memo } from 'react'
 
+import { LAYER_SWATCH, swatchColor, VOID_HEX } from '@/lib/palette'
+
 import { useProjected } from '../useGlobeProjection'
 
 export interface GlobeLaunch {
@@ -8,7 +10,7 @@ export interface GlobeLaunch {
   name: string
 }
 
-const LAUNCH_COLOR = 'oklch(0.84 0.16 80)'
+const LAUNCH_COLOR = swatchColor(LAYER_SWATCH.launches)
 const PAD_HEIGHT = 9
 const PAD_HALF_WIDTH = 6
 
@@ -32,7 +34,7 @@ export const LaunchPadMarkers = memo(function LaunchPadMarkers({
           <polygon
             points={`${x},${y - PAD_HEIGHT} ${x - PAD_HALF_WIDTH},${y + 4} ${x + PAD_HALF_WIDTH},${y + 4}`}
             fill={LAUNCH_COLOR}
-            stroke="oklch(0.08 0.01 50)"
+            stroke={VOID_HEX}
             strokeWidth="0.6"
             opacity="0.9"
           />

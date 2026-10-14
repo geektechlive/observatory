@@ -1,0 +1,16 @@
+/* GENERATED from src/lib/palette.ts by tests/unit/palette.test.ts. Do not edit.
+   Regenerate with: pnpm exec vitest run tests/unit/palette.test.ts -u */
+:root {
+  --data-orbital: #0a7d87;
+  --data-orbital-emit: #08a8ab;
+  --data-thermal: #bd3701;
+  --data-thermal-emit: #ff8d3e;
+  --data-space: #c94db9;
+  --data-space-emit: #ca6ded;
+  --data-geo: #be8907;
+  --data-geo-emit: #fbc60e;
+  --data-hydro: #0192ff;
+  --data-hydro-emit: #9ea8ff;
+  --data-iss: #72dfff;
+  --data-aurora: #5edb81;
+}

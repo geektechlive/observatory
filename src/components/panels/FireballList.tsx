@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { useFireball } from '@/hooks/useFireball'
 import { formatDateUtc, formatKt, formatRelativeTime } from '@/lib/format'
 
@@ -14,7 +17,7 @@ export function FireballList() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Fireballs">
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -22,7 +25,7 @@ export function FireballList() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Fireballs">
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="JPL's fireball feed is not answering" />
       </GlassPanel>
     )
   }
@@ -36,7 +39,7 @@ export function FireballList() {
   if (recent.length === 0) {
     return (
       <GlassPanel variant="tile" label="Fireballs">
-        <div className={styles.empty ?? ''}>No recent fireballs</div>
+        <PanelState kind="empty" detail="No fireballs reported recently" />
       </GlassPanel>
     )
   }
@@ -59,14 +62,14 @@ export function FireballList() {
               <li key={`${fb.date}-${idx}`} className={styles.item ?? ''}>
                 <div className={styles.itemTop ?? ''}>
                   <span className={styles.relTime ?? ''}>{formatRelativeTime(fb.date)}</span>
-                  <span className={styles.energy ?? ''}>{formatKt(fb.impactE)}</span>
+                  <Readout value={formatKt(fb.impactE)} className={styles.energy ?? ''} />
                 </div>
                 {energyPct > 0 && (
                   <div className={styles.energyTrack ?? ''} aria-hidden="true">
                     <div className={styles.energyFill ?? ''} style={{ width: `${energyPct}%` }} />
                   </div>
                 )}
-                <div className={styles.utcDate ?? ''}>{formatDateUtc(fb.date)}</div>
+                <Label>{formatDateUtc(fb.date)}</Label>
                 <div className={styles.itemBottom ?? ''}>
                   {vel && (
                     <>

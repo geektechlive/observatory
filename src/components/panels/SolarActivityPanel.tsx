@@ -2,8 +2,12 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
+import { flareStatus, noaaScaleStatus, statusVar } from '@/lib/severity'
 
 import styles from './solar-activity-panel.module.css'
 
@@ -14,20 +18,8 @@ const XRAY_THRESHOLDS = [
   { value: 1e-4, color: 'var(--mcrn)' }, // X
 ]
 
-function classColor(cls: string | null): string {
-  if (!cls) return 'var(--ink-faint)'
-  const letter = cls[0]
-  if (letter === 'X') return 'var(--mcrn)'
-  if (letter === 'M') return 'var(--amber)'
-  if (letter === 'C') return 'var(--terminal)'
-  return 'var(--cyan)' // A/B = quiet
-}
-
-function scaleColor(n: number): string {
-  if (n >= 3) return 'var(--mcrn)'
-  if (n >= 1) return 'var(--amber)'
-  return 'var(--ink-faint)'
-}
+const classColor = (cls: string | null): string => statusVar(flareStatus(cls))
+const scaleColor = (n: number): string => statusVar(noaaScaleStatus(n))
 
 const SCALE_ROWS: { key: 'r' | 's' | 'g'; label: string; prefix: string }[] = [
   { key: 'r', label: 'Radio Blackout', prefix: 'R' },
@@ -47,7 +39,7 @@ export function SolarActivityPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Solar Activity" breathe>
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -55,7 +47,7 @@ export function SolarActivityPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Solar Activity" breathe>
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The NOAA GOES X-ray feed did not answer" />
       </GlassPanel>
     )
   }
@@ -69,10 +61,12 @@ export function SolarActivityPanel() {
       <div className={styles.panel ?? ''}>
         <div className={styles.xrayRow ?? ''}>
           <div className={styles.xrayReadout ?? ''}>
-            <span className={styles.xrayClass ?? ''} style={{ color: classColor(cls) }}>
-              {cls ?? '—'}
-            </span>
-            <span className={styles.xrayLabel ?? ''}>GOES X-Ray</span>
+            <Readout
+              value={cls ?? '—'}
+              tone={flareStatus(cls) ?? 'default'}
+              className={styles.xrayClass ?? ''}
+            />
+            <Label>GOES X-Ray</Label>
           </div>
           {xray.series.length > 1 && (
             <div className={styles.xraySpark ?? ''}>

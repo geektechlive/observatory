@@ -2,8 +2,13 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
+import { PanelState } from '@/components/ui/PanelState'
+import { Readout } from '@/components/ui/Readout'
+import { StencilLabel } from '@/components/ui/StencilLabel'
 import { useSunMoon } from '@/hooks/useSunMoon'
 import { isWaxing, moonLitPath } from '@/lib/moon'
+import { MOON_DISC_HEX } from '@/lib/palette'
 
 import styles from './sun-moon-panel.module.css'
 
@@ -19,14 +24,9 @@ function MoonDisc({ phase, illum }: { phase: string; illum: number }) {
       role="img"
       aria-label={`${phase}, ${illum}% illuminated`}
     >
-      <circle
-        r={MOON_R}
-        fill="oklch(0.18 0.01 250)"
-        stroke="var(--glass-border)"
-        strokeWidth={0.5}
-      />
-      <path d={lit} fill="oklch(0.92 0.03 95)" opacity={0.92} />
-      <circle r={MOON_R} fill="none" stroke="var(--glass-border)" strokeWidth={0.6} />
+      <circle r={MOON_R} fill={MOON_DISC_HEX.dark} stroke="var(--plate-edge)" strokeWidth={0.5} />
+      <path d={lit} fill={MOON_DISC_HEX.lit} opacity={0.92} />
+      <circle r={MOON_R} fill="none" stroke="var(--plate-edge)" strokeWidth={0.6} />
     </svg>
   )
 }
@@ -42,8 +42,8 @@ function daysUntil(dateStr: string): number | null {
 function Row({ label, value }: { label: string; value: string | null }) {
   return (
     <div className={styles.row ?? ''}>
-      <span className={styles.rowLabel ?? ''}>{label}</span>
-      <span className={styles.rowValue ?? ''}>{value ?? '—'}</span>
+      <Label>{label}</Label>
+      <Readout value={value ?? '—'} className={styles.rowValue ?? ''} />
     </div>
   )
 }
@@ -55,7 +55,7 @@ export function SunMoonPanel() {
   if (isLoading && !data) {
     return (
       <GlassPanel variant="tile" label="Sun & Moon" breathe>
-        <div className={styles.loading ?? ''}>Loading...</div>
+        <PanelState kind="loading" />
       </GlassPanel>
     )
   }
@@ -63,7 +63,7 @@ export function SunMoonPanel() {
   if (error || !data) {
     return (
       <GlassPanel variant="tile" label="Sun & Moon" breathe>
-        <div className={styles.unavailable ?? ''}>Data unavailable</div>
+        <PanelState kind="unavailable" detail="The USNO rise and set service is not answering" />
       </GlassPanel>
     )
   }
@@ -96,13 +96,13 @@ export function SunMoonPanel() {
 
         <div className={styles.times ?? ''}>
           <div className={styles.timesCol ?? ''}>
-            <span className={styles.colHead ?? ''}>☉ Sun</span>
+            <StencilLabel>☉ Sun</StencilLabel>
             <Row label="Rise" value={data.sun.rise} />
             <Row label="Set" value={data.sun.set} />
             <Row label="Civil" value={data.sun.civilBegin} />
           </div>
           <div className={styles.timesCol ?? ''}>
-            <span className={styles.colHead ?? ''}>☾ Moon</span>
+            <StencilLabel>☾ Moon</StencilLabel>
             <Row label="Rise" value={data.moon.rise} />
             <Row label="Set" value={data.moon.set} />
             <Row label="Phase" value={`${data.fracIllum}%`} />
@@ -119,14 +119,14 @@ export function SunMoonPanel() {
             {geoStatus === 'requesting' ? 'Locating…' : 'Use my location'}
           </button>
         )}
-        {geoStatus === 'denied' && (
-          <span className={styles.locateDenied ?? ''}>Location denied — showing Greenwich</span>
-        )}
+        {geoStatus === 'denied' && <Label>Location denied — showing Greenwich</Label>}
 
         <div className={styles.footer ?? ''}>
-          {isFallbackLocation
-            ? 'Greenwich (location off)'
-            : `${data.lat.toFixed(1)}°, ${data.lon.toFixed(1)}° · local`}
+          <Label>
+            {isFallbackLocation
+              ? 'Greenwich (location off)'
+              : `${data.lat.toFixed(1)}°, ${data.lon.toFixed(1)}° · local`}
+          </Label>
         </div>
       </div>
     </GlassPanel>

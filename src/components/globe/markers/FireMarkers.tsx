@@ -1,5 +1,7 @@
 import { memo, useMemo } from 'react'
 
+import { fireMapColor } from '@/lib/palette'
+
 import { circlePath, projectMany } from '../useGlobeProjection'
 
 export interface GlobeFire {
@@ -9,13 +11,7 @@ export interface GlobeFire {
   frp: number
 }
 
-/** FIRMS active fires: hot-body ramp by Fire Radiative Power (MW). */
-function fireColor(frp: number): string {
-  if (frp >= 100) return 'oklch(0.95 0.06 90)' // white-hot
-  if (frp >= 30) return 'oklch(0.85 0.2 55)' // bright orange
-  return 'oklch(0.72 0.2 35)' // ember
-}
-
+/* Fires are the thermal lane; radiative power is drawn as size, never as colour. */
 const HOT_FRP = 50
 const HOT_RADIUS = 1.8
 const COOL_RADIUS = 1.2
@@ -35,14 +31,13 @@ interface FireMarkersProps {
 /**
  * FIRMS can return well over a thousand hotspots. One `<circle>` each meant
  * React reconciled 1000+ SVG nodes on every rotation tick, so the dots are
- * batched into at most six `<path>` nodes, one per (color, radius) bucket.
- * Same fill, same radius, same z-order as before; only the node count changes.
+ * batched into at most two `<path>` nodes, one per radius bucket.
  */
 export const FireMarkers = memo(function FireMarkers({ fires, rotation, R }: FireMarkersProps) {
   const batches = useMemo<FireBatch[]>(() => {
     const byKey = new Map<string, FireBatch>()
+    const fill = fireMapColor()
     for (const { point: f, x, y } of projectMany(fires, rotation, R)) {
-      const fill = fireColor(f.frp)
       const r = f.frp >= HOT_FRP ? HOT_RADIUS : COOL_RADIUS
       const key = `${fill}|${r}`
       const existing = byKey.get(key)

@@ -78,6 +78,14 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
   - It asserts that `pnpm verify` runs every check, using `test:coverage` because `vitest.config.ts` enforces thresholds.
   - It asserts that `packageManager` pins pnpm, and that every `pnpm <script>` a remaining workflow invokes exists.
   - Dropping a check from `verify` drops it entirely, because nothing else runs it.
+- **Design system (ROCI v2, #36): colours have exactly two sources.**
+  - `src/styles/tokens.css` holds the CSS tokens.
+  - `src/lib/palette.ts` holds the data colours. It emits hex, because MapLibre's parser rejects `oklch()`.
+  - `src/styles/palette.css` is **generated** from `palette.ts`. A unit test fails on drift. Regenerate with `pnpm exec vitest run tests/unit/palette.test.ts -u`, and never hand-edit it.
+  - Severity thresholds live in `src/lib/severity.ts` only.
+- **`design-lint.json` decides where the colour-literal and 11px type-floor lint applies.** Add a directory when its reskin lands. Both stylelint and ESLint read it.
+- **CARTO dark-matter's `background` layer is the land; water is a fill on top of it.** `src/lib/basemap.ts` repaints those vector layers on `style.load`. Never grade the map with a CSS `filter`: it recolours every data layer. `tests/e2e/map-renders.spec.ts` guards this.
+- **Component tests (`*.test.tsx`) must call `afterEach(cleanup)`.** Vitest runs with `globals: false`, so Testing Library's auto-cleanup never registers and renders pile up between tests.
 - `satellite.js` pinned to v5 — v7 ships a WASM/pthreads build with top-level await that Vite/rolldown cannot bundle as iife; v5 pure-JS is more than sufficient for 5Hz SGP4 propagation
 - KV bindings in wrangler.toml are auto-wired by Cloudflare Pages — no manual dashboard step needed
 - Never use `wrangler pages project create` — creates a Direct Upload project with no GitHub integration; always use the Cloudflare dashboard

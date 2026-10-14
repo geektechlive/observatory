@@ -6,6 +6,13 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import { readFileSync } from 'node:fs'
+
+// ROCI v2 rule 4 (#40): colour literals live in palette.ts and tokens.css only.
+// Switched on per directory as each surface is reskinned (design-lint.json).
+const designLint = JSON.parse(readFileSync(new URL('./design-lint.json', import.meta.url), 'utf8'))
+const COLOUR_FN = String.raw`(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(`
+const COLOUR_MESSAGE = 'Colour literal: import it from src/lib/palette.ts or use a CSS token (ROCI v2 rule 4)'
 
 export default defineConfig([
   globalIgnores(['dist', '.wrangler', 'coverage', '.playwright-browsers', 'worker-configuration.d.ts']),
@@ -47,6 +54,18 @@ export default defineConfig([
   {
     files: ['**/*.tsx'],
     extends: [jsxA11y.flatConfigs.recommended],
+  },
+  {
+    files: designLint.enforced.map((glob) => `${glob}/*.{ts,tsx}`),
+    ignores: designLint.exempt,
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: String.raw`Literal[value=/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/]`, message: COLOUR_MESSAGE },
+        { selector: `Literal[value=/^${COLOUR_FN}/]`, message: COLOUR_MESSAGE },
+        { selector: `TemplateElement[value.raw=/${COLOUR_FN}/]`, message: COLOUR_MESSAGE },
+      ],
+    },
   },
   {
     // Pages Functions run in the Workers runtime, using serviceworker-flavored

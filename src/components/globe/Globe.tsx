@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { useVisible } from '@/hooks/useVisible'
+import { HUD_HEX, ISS_HEX, SVG_GLOBE_HEX, withAlpha } from '@/lib/palette'
 import { horizonRadiusDeg, smallCircleRing, subsolarPoint } from '@/lib/solar'
 
 import { AuroraCanvas } from './markers/AuroraCanvas'
@@ -13,7 +14,6 @@ import { FireMarkers, type GlobeFire } from './markers/FireMarkers'
 import { IssMarker } from './markers/IssMarker'
 import { type GlobeLaunch, LaunchPadMarkers } from './markers/LaunchPadMarkers'
 import { type GlobeQuake, QuakeMarkers } from './markers/QuakeMarkers'
-import { RadarSweep } from './markers/RadarSweep'
 import { type GlobeSatellite, SatelliteMarkers } from './markers/SatelliteMarkers'
 import { StationMarkers } from './markers/StationMarkers'
 import { FALLBACK_ORBIT, LAT_LINES, LON_LINES, penPath, project } from './useGlobeProjection'
@@ -52,13 +52,14 @@ interface GlobeProps {
   fires?: readonly GlobeFire[] | undefined
   warm?: boolean | undefined
   autoRotate?: boolean | undefined
-  radarSweep?: boolean | undefined
   /** Day/night terminator overlay. */
   showTerminator?: boolean | undefined
   /** ORBIT "tracking station" mode — shows DSN ground stations + tracking decor. */
   tracking?: boolean | undefined
   /** OVATION aurora oval — [lon, lat, intensity] triplets, drawn on a canvas overlay. */
   aurora?: readonly [number, number, number][] | undefined
+  /** Facing longitude (degrees) whenever the globe turns; drives the bezel's bearing scale. */
+  onFacingChange?: ((facingLon: number) => void) | undefined
 }
 
 export function Globe({
@@ -76,15 +77,19 @@ export function Globe({
   fires = NO_FIRES,
   warm = true,
   autoRotate = true,
-  radarSweep = false,
   showTerminator = true,
   tracking = false,
   aurora = NO_AURORA,
+  onFacingChange,
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
   const visible = useVisible()
   const [rotation, setRotation] = useState(-12)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  // The projection centres longitude -rotation, so that is the facing longitude.
+  useEffect(() => {
+    onFacingChange?.(((((-rotation + 180) % 360) + 360) % 360) - 180)
+  }, [rotation, onFacingChange])
   // Real-world subsolar point — recomputed each minute (the globe's visual spin
   // is a separate `rotation` offset, so the terminator is painted in lat/lon).
   const [subsolar, setSubsolar] = useState(() => subsolarPoint(new Date()))
@@ -93,9 +98,10 @@ export function Globe({
   const center = size / 2
 
   const hasIss = issLat !== undefined && issLon !== undefined
-  const continentColor = warm ? 'oklch(0.62 0.13 48)' : 'oklch(0.82 0.13 220)'
-  const continentFill = warm ? 'oklch(0.62 0.13 48 / 0.62)' : 'oklch(0.82 0.13 220 / 0.55)'
-  const issColor = 'var(--signal)'
+  // Copper land, or HUD-neutral outlines in tracking mode. Data layers keep their own colours.
+  const continentColor = warm ? SVG_GLOBE_HEX.land : SVG_GLOBE_HEX.landTracking
+  const continentFill = withAlpha(continentColor, warm ? 0.62 : 0.55)
+  const issColor = ISS_HEX
   const uid = warm ? 'w' : 'c'
   const glowFilter = `url(#glow-${uid})`
 
@@ -194,17 +200,14 @@ export function Globe({
       >
         <defs>
           <radialGradient id={`grad-${uid}`} cx="35%" cy="30%">
-            <stop offset="0%" stopColor={warm ? 'oklch(0.22 0.05 50)' : 'oklch(0.20 0.04 220)'} />
-            <stop
-              offset="65%"
-              stopColor={warm ? 'oklch(0.12 0.025 50)' : 'oklch(0.10 0.015 220)'}
-            />
-            <stop offset="100%" stopColor="oklch(0.05 0.005 50)" />
+            <stop offset="0%" stopColor={SVG_GLOBE_HEX.sphereHigh} />
+            <stop offset="65%" stopColor={SVG_GLOBE_HEX.sphereMid} />
+            <stop offset="100%" stopColor={SVG_GLOBE_HEX.sphereLow} />
           </radialGradient>
           <radialGradient id={`rim-${uid}`} cx="50%" cy="50%">
             <stop offset="0%" stopColor="transparent" />
             <stop offset="60%" stopColor="transparent" />
-            <stop offset="100%" stopColor="oklch(0.04 0.005 50)" stopOpacity="0.8" />
+            <stop offset="100%" stopColor={SVG_GLOBE_HEX.sphereLow} stopOpacity="0.8" />
           </radialGradient>
           <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
@@ -225,16 +228,6 @@ export function Globe({
         <g transform={`translate(${center} ${center})`}>
           {/* 1 — Sphere */}
           <circle r={R} fill={`url(#grad-${uid})`} />
-
-          {/* 1b — Radar sweep */}
-          {radarSweep && (
-            <RadarSweep
-              R={R}
-              clipPathId={`sphere-clip-${uid}`}
-              glowFilter={glowFilter}
-              reducedMotion={reducedMotion}
-            />
-          )}
 
           {/* 2 — Back orbit ghost */}
           {hasIss && orbitBack && (
@@ -279,7 +272,7 @@ export function Globe({
               <path
                 d={terminatorPath}
                 fill="none"
-                stroke="oklch(0.10 0.02 250)"
+                stroke={SVG_GLOBE_HEX.twilight}
                 strokeWidth="16"
                 opacity="0.32"
                 filter={glowFilter}
@@ -287,7 +280,7 @@ export function Globe({
               <path
                 d={terminatorPath}
                 fill="none"
-                stroke="oklch(0.75 0.08 250)"
+                stroke={SVG_GLOBE_HEX.terminator}
                 strokeWidth="0.6"
                 strokeDasharray="3 4"
                 opacity="0.5"
@@ -296,8 +289,8 @@ export function Globe({
           )}
           {subsolarDot?.visible && (
             <g transform={`translate(${subsolarDot.x} ${subsolarDot.y})`} pointerEvents="none">
-              <circle r={5} fill="oklch(0.92 0.13 90)" opacity="0.9" filter={glowFilter} />
-              <circle r={2.5} fill="oklch(0.98 0.06 90)" />
+              <circle r={5} fill={SVG_GLOBE_HEX.sunGlow} opacity="0.9" filter={glowFilter} />
+              <circle r={2.5} fill={SVG_GLOBE_HEX.sunCore} />
             </g>
           )}
 
@@ -307,7 +300,7 @@ export function Globe({
           {/* 7 — Atmosphere rings */}
           <circle r={R + 1.5} fill="none" stroke={continentColor} strokeWidth="0.5" opacity="0.5" />
           <circle r={R + 7} fill="none" stroke={continentColor} strokeWidth="0.4" opacity="0.10" />
-          <circle r={R + 15} stroke="oklch(0.45 0.10 220 / 0.18)" strokeWidth={0.5} fill="none" />
+          <circle r={R + 15} stroke={HUD_HEX} opacity="0.18" strokeWidth={0.5} fill="none" />
 
           {/* 7b — FIRMS active fires (hot dots, background layer) */}
           <FireMarkers fires={fires} rotation={rotation} R={R} />

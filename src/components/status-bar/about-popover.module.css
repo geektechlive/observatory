@@ -1,46 +1,49 @@
+/* About dialog: an overlay on the scrim (tier 2 glass, over the page). */
 .popover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 200;
+  z-index: var(--z-popover);
   width: 280px;
-  padding: 16px;
-  background: rgba(10, 14, 30, 0.92);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-panel);
+  padding: var(--space-5);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
   box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    var(--shadow-overlay),
+    inset 0 1px 0 var(--plate-highlight);
 }
 
+/* The dialog's one Fraunces line (rule 7); the face ships italic 300-600 only */
 .name {
   font-family: var(--font-display);
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--ink);
+  font-style: italic;
+  font-size: 1.125rem;
+  font-weight: 400;
+  color: var(--bone);
   margin: 0 0 6px;
 }
 
 .description {
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  color: var(--ink-dim);
+  color: var(--bone-dim);
   line-height: 1.5;
   margin: 0;
 }
 
 .rule {
   border: none;
-  border-top: 1px solid var(--glass-border);
-  margin: 12px 0;
+  border-top: 1px solid var(--plate-seam);
+  margin: var(--space-4) 0;
 }
 
 .credit {
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  color: var(--ink-dim);
+  color: var(--bone-dim);
   margin: 0;
   line-height: 1.5;
 }
@@ -48,8 +51,8 @@
 .sectionLabel {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
-  letter-spacing: 0.08em;
+  color: var(--bone-faint);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
   margin: 0 0 6px;
 }
@@ -60,7 +63,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .sourceList li {
@@ -68,18 +71,23 @@
   font-size: var(--text-xs);
 }
 
+/* Links in running text need more than colour (signal vs bone-dim is 1.7:1), so they
+   are always underlined; list links get a 24px target. */
 .link {
-  color: var(--cyan);
-  text-decoration: none;
+  color: var(--signal);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.link:hover {
-  text-decoration: underline;
+.sourceList .link {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
 }
 
 .footer {
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  color: var(--ink-dim);
+  color: var(--bone-dim);
   margin: 0;
 }

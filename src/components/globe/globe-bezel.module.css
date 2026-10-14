@@ -1,0 +1,146 @@
+/* The instrument bezel (#51). Reflective copper ring; the census is the only colour. */
+.bezel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform-origin: center;
+  animation: bezel-settle 700ms var(--ease-out-expo) both;
+}
+
+/* The one orchestrated entrance (spec section 6): the bezel settles into place.
+   Nothing else on the page animates in. The global reduced-motion block stops it. */
+@keyframes bezel-settle {
+  from {
+    opacity: 0;
+    transform: rotate(-8deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+}
+
+.ringLight {
+  stop-color: var(--copper-2);
+  stop-opacity: 0.55;
+}
+
+.ringMid {
+  stop-color: var(--hull-2);
+}
+
+.ringDark {
+  stop-color: var(--hull);
+}
+
+.ring {
+  fill: none;
+  stroke: url('#bezel-ring');
+}
+
+.innerLip {
+  fill: none;
+  stroke: var(--void);
+  stroke-width: 2;
+}
+
+.outerLip {
+  fill: none;
+  stroke: var(--plate-edge);
+  stroke-width: 1.5;
+}
+
+.tickMinor {
+  stroke: var(--plate-seam);
+  stroke-width: 1;
+}
+
+.tickMajor {
+  stroke: var(--copper-glow);
+  stroke-width: 1.4;
+}
+
+.numeral {
+  fill: var(--bone-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.cardinal {
+  fill: var(--copper-glow);
+}
+
+.reticle {
+  stroke: var(--hud-line);
+  stroke-width: 1.5;
+}
+
+.segment path {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: butt;
+  opacity: 0.6;
+}
+
+.count {
+  fill: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke;
+  stroke: var(--void);
+  stroke-width: 3px;
+}
+
+/* The five non-live states must never look alike (Codex finding 12). */
+.segment[data-state='off'] path {
+  stroke: var(--plate-seam) !important;
+  opacity: 1;
+}
+
+.segment[data-state='zero'] path {
+  stroke: var(--bone-faint) !important;
+  stroke-width: 1;
+  opacity: 1;
+}
+
+.segment[data-state='loading'] path {
+  stroke-dasharray: 2 5;
+  opacity: 0.45;
+}
+
+.segment[data-state='stale'] path {
+  opacity: 0.3;
+}
+
+.segment[data-state='stale'] .count {
+  fill: var(--bone-faint);
+}
+
+.segment[data-state='error'] path {
+  stroke: var(--mcrn) !important;
+  stroke-dasharray: 3 2;
+  opacity: 0.9;
+}
+
+.segment[data-state='error'] .count {
+  fill: var(--mcrn);
+}
+
+/* Below this width the bezel scales under 1:1; numerals would drop under 11px, so hide them. */
+@media (width <= 640px) {
+  .numeral:not(.cardinal) {
+    display: none;
+  }
+}

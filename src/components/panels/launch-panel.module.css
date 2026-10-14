@@ -1,7 +1,7 @@
 .accordion {
   display: flex;
   flex-direction: column;
-  padding: 36px 0 8px;
+  padding: calc(var(--panel-label-h) + var(--space-3)) 0 var(--space-3);
 }
 
 .accordionItem {
@@ -15,7 +15,7 @@
 .progressTrack {
   height: 2px;
   width: 100%;
-  background: oklch(1 0 0 / 0.05);
+  background: var(--hud-faint);
   overflow: hidden;
 }
 
@@ -30,8 +30,8 @@
   display: grid;
   grid-template-columns: 12px auto 1fr auto 18px;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -40,17 +40,17 @@
 }
 
 .accordionHeader:hover {
-  background: oklch(1 0 0 / 0.03);
+  background: var(--hud-faint);
 }
 
 .accordionHeader:focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: -2px;
-  border-radius: 2px;
+  border-radius: var(--radius);
 }
 
 .first .accordionHeader {
-  padding-top: 8px;
+  padding-top: var(--space-3);
 }
 
 .statusDot {
@@ -62,10 +62,10 @@
 }
 
 .headerVehicle {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--bone);
   white-space: nowrap;
 }
 
@@ -76,12 +76,12 @@
 .headerMeta {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--ink-faint);
+  color: var(--bone-faint);
   letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0 8px;
+  padding: 0 var(--space-3);
 }
 
 .headerDate {
@@ -93,8 +93,8 @@
 }
 
 .chevron {
-  font-size: 9px;
-  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  color: var(--bone-faint);
   text-align: center;
   transition: color var(--duration-fast);
 }
@@ -106,7 +106,7 @@
 /* ── Expanded body ── */
 
 .accordionBody {
-  padding: 4px 16px 16px 40px;
+  padding: var(--space-2) var(--space-5) var(--space-5) 40px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -129,13 +129,13 @@
 .weatherChip,
 .tagChip {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border-radius: 2px;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius);
   border: 1px solid var(--panel-border);
-  color: var(--ink-faint);
-  background: oklch(1 0 0 / 0.04);
+  color: var(--bone-faint);
+  background: var(--hud-faint);
 }
 
 .weatherChip {
@@ -146,15 +146,13 @@
 .bodyFooter {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .countdown {
-  font-family: var(--font-mono);
   font-size: clamp(1rem, 2vw, 1.25rem);
   font-weight: 700;
-  color: var(--cyan);
   letter-spacing: 0.04em;
 }
 
@@ -162,48 +160,26 @@
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  padding: 2px 8px;
+  letter-spacing: var(--track-label);
+  padding: 2px var(--space-3);
   border: 1px solid;
-  border-radius: 4px;
+  border-radius: var(--radius);
   text-transform: uppercase;
 }
 
 .launchLink {
+  display: inline-block;
+  min-height: 24px;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--copper-glow);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--copper-glow);
-  padding-bottom: 1px;
-  transition:
-    color var(--duration-fast),
-    border-color var(--duration-fast);
+  transition: color var(--duration-fast);
   margin-left: auto;
 }
 
-.launchLink:hover,
-.launchLink:focus-visible {
+.launchLink:hover {
   color: var(--copper);
-  border-color: var(--copper);
-  outline: none;
-}
-
-.launchLink:focus-visible {
-  outline: 2px solid var(--signal);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-.loading,
-.unavailable {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-  letter-spacing: 0.05em;
 }

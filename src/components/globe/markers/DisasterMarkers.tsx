@@ -1,5 +1,7 @@
 import { memo } from 'react'
 
+import { gdacsColor, VOID_HEX } from '@/lib/palette'
+
 import { useProjected } from '../useGlobeProjection'
 
 export interface GlobeDisaster {
@@ -8,12 +10,6 @@ export interface GlobeDisaster {
   type: string
   alert: string
   name: string
-}
-
-/** GDACS disaster alerts: diamond glyphs colored by alert level. */
-function alertColor(alert: string): string {
-  if (alert === 'Red') return 'oklch(0.62 0.22 25)'
-  return 'oklch(0.78 0.18 55)' // Orange
 }
 
 const DISASTER_LETTER: Record<string, string> = {
@@ -33,6 +29,7 @@ interface DisasterMarkersProps {
   R: number
 }
 
+/** GDACS disaster alerts: diamond glyphs on the status scale, lettered by hazard type. */
 export const DisasterMarkers = memo(function DisasterMarkers({
   disasters,
   rotation,
@@ -42,7 +39,7 @@ export const DisasterMarkers = memo(function DisasterMarkers({
   return (
     <>
       {projected.map(({ point: dz, index, x, y }) => {
-        const c = alertColor(dz.alert)
+        const c = gdacsColor(dz.alert)
         const s = DIAMOND_HALF
         const letter = DISASTER_LETTER[dz.type] ?? '!'
         return (
@@ -53,7 +50,7 @@ export const DisasterMarkers = memo(function DisasterMarkers({
             <path
               d={`M${x},${(y - s).toFixed(1)} L${(x + s).toFixed(1)},${y} L${x},${(y + s).toFixed(1)} L${(x - s).toFixed(1)},${y} Z`}
               fill={c}
-              stroke="oklch(0.08 0.01 50)"
+              stroke={VOID_HEX}
               strokeWidth="0.5"
               opacity="0.95"
             />
@@ -61,7 +58,7 @@ export const DisasterMarkers = memo(function DisasterMarkers({
               x={x}
               y={y + 2}
               textAnchor="middle"
-              fill="oklch(0.08 0.01 50)"
+              fill={VOID_HEX}
               fontSize="4.5"
               fontFamily="var(--font-stencil)"
               fontWeight="700"

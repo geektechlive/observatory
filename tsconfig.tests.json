@@ -4,7 +4,7 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "esnext",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
 
     "moduleResolution": "bundler",
@@ -26,6 +26,6 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["playwright.config.ts", "tests/**/*.ts"],
+  "include": ["playwright.config.ts", "tests/**/*.ts", "tests/**/*.tsx"],
   "exclude": ["tests/unit/functions"]
 }
