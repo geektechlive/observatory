@@ -28,6 +28,11 @@
   overflow-x: auto;
   scrollbar-width: none;
   scroll-snap-type: x proximity;
+
+  /* Snap positions honour the strip's own gutter, so the LIVE label's snap
+     point is scrollLeft 0. Without it the cells were the only snap points and
+     a phone loaded the strip parked on the first cell, LIVE hidden (#54). */
+  scroll-padding-inline: var(--gutter);
 }
 
 .spine::-webkit-scrollbar {
@@ -47,6 +52,7 @@
   letter-spacing: var(--track-engrave);
   color: var(--terminal);
   flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 /* One of the three continuous motions the spec allows: the LIVE pulse */
