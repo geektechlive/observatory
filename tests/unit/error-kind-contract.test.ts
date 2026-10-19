@@ -21,4 +21,16 @@ describe('error kind contract', () => {
       .filter((f) => /upstreamError\(\s*502\b/.test(readFileSync(join(API_DIR, f), 'utf8')))
     expect(offenders).toEqual([])
   })
+
+  it('no function answers with 502 or 504, which Cloudflare replaces on the custom domain (#61)', () => {
+    // On observatory.geektechlive.com, Cloudflare swaps any origin 502/504 for its own
+    // "error code: 502" page, dropping our JSON body and X-Error-Kind (non-Enterprise
+    // zones can't turn that off). Upstream failures are 503, contract failures 500.
+    const offenders = readdirSync(API_DIR)
+      .filter((f) => f.endsWith('.ts'))
+      .filter((f) =>
+        /\b(status:\s*|errorResponse\(|\?\s*)50[24]\b/.test(readFileSync(join(API_DIR, f), 'utf8')),
+      )
+    expect(offenders).toEqual([])
+  })
 })

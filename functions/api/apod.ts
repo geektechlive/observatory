@@ -30,9 +30,15 @@ function allowedOrNull(url: string | undefined): string | undefined {
   return ALLOWED_MEDIA_HOSTS.some((host) => url.startsWith(host)) ? url : undefined
 }
 
+/**
+ * One stable key, not one per UTC date (#61). The entry stays fresh until the next UTC
+ * midnight (ttl below); after that it is the stale fallback, so a NASA outage after
+ * midnight serves yesterday's picture marked STALE instead of an error.
+ */
+const CACHE_KEY = 'nasa:apod:latest:v1'
+
 export const onRequest: PagesFunction<Env> = (ctx) => {
-  const utcDate = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
-  return cachedJson(ctx, `nasa:apod:${utcDate}`, CACHE_TTL_SECONDS, async () => {
+  return cachedJson(ctx, CACHE_KEY, CACHE_TTL_SECONDS, async () => {
     if (!ctx.env.NASA_API_KEY)
       console.warn('[apod] NASA_API_KEY missing — falling back to DEMO_KEY (rate-limited)')
     const apiKey = ctx.env.NASA_API_KEY || 'DEMO_KEY'

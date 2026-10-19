@@ -41,7 +41,7 @@ const REPORT_PATH = process.env.INCIDENT_REPORT ?? 'incident-report.json'
 const nonNull = (value) => value !== null && value !== undefined
 
 /** Each check: the path, plus a predicate over the parsed JSON body. */
-const CHECKS = [
+export const CHECKS = [
   {
     path: '/api/solar-wind',
     requires: 'currentKp and windSpeed present',
@@ -66,6 +66,18 @@ const CHECKS = [
   { path: '/api/neo', requires: '200 + JSON', check: () => true },
   { path: '/api/quakes', requires: '200 + JSON', check: () => true },
   { path: '/api/eonet', requires: '200 + JSON', check: () => true },
+  // Unprobed until #61, which is how a dead APOD and a week-long DONKI outage (#42) went unnoticed.
+  {
+    path: '/api/apod',
+    requires: 'title and a media url',
+    check: (b) => typeof b?.title === 'string' && typeof b?.url === 'string',
+  },
+  {
+    path: '/api/donki',
+    requires: 'flares, cmes, geomagneticStorms and seps arrays',
+    check: (b) =>
+      ['flares', 'cmes', 'geomagneticStorms', 'seps'].every((k) => Array.isArray(b?.[k])),
+  },
 ]
 
 /**

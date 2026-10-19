@@ -1,25 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as CacheModule from '../../../functions/api/_cache'
+
 // Mock the Cache API module so it is never loaded; these tests drive the KV-first
-// producer directly. The error builders mirror the real ones closely enough to
-// assert status and X-Error-Kind.
-vi.mock('../../../functions/api/_cache', () => ({
+// producer directly. The error builders are the real ones, so status and
+// X-Error-Kind can't drift from production.
+vi.mock('../../../functions/api/_cache', async (importActual) => ({
+  ...(await importActual<typeof CacheModule>()),
   cachedJson: vi.fn(),
   fetchUpstream: vi.fn(),
-  upstreamError: vi.fn(
-    (status: number, message: string) =>
-      new Response(JSON.stringify({ error: message }), {
-        status: status === 0 || status >= 520 ? 503 : 502,
-        headers: { 'X-Error-Kind': 'upstream' },
-      }),
-  ),
-  contractError: vi.fn(
-    (message: string) =>
-      new Response(JSON.stringify({ error: message }), {
-        status: 502,
-        headers: { 'X-Error-Kind': 'contract' },
-      }),
-  ),
 }))
 
 const { KV_LAUNCHES_KEY, KV_FRESH_SECONDS, produceLaunches } =
@@ -114,7 +103,7 @@ describe('produceLaunches (KV-first, #30)', () => {
   it('is a contract error with no KV copy and a live payload that breaks the schema', async () => {
     const fetchImpl = vi.fn(async () => new Response('{"error":"busy"}', { status: 200 }))
     const out = await produceLaunches(undefined, fetchImpl, NOW)
-    expect((out as Response).status).toBe(502)
+    expect((out as Response).status).toBe(500)
     expect((out as Response).headers.get('X-Error-Kind')).toBe('contract')
   })
 

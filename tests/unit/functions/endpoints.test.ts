@@ -1,32 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as CacheModule from '../../../functions/api/_cache'
+
 // Mock the shared cache/upstream helper for every endpoint under test here.
 // `cachedJson` just runs the producer and hands back whatever it returns (a
 // CacheableResult), so tests can assert on that value directly without
-// standing up the real Cache API. `upstreamError` mirrors the real
-// normalization (0 or >=520 -> 503, everything else -> 502) so tests can
-// assert on the status code an endpoint actually causes.
-vi.mock('../../../functions/api/_cache', () => {
+// standing up the real Cache API. The error builders are the real ones, so
+// tests assert on the status code an endpoint actually causes.
+vi.mock('../../../functions/api/_cache', async (importActual) => {
   return {
+    ...(await importActual<typeof CacheModule>()),
     cachedJson: vi.fn(
       async (_ctx: unknown, _key: string, _ttl: number, produce: () => Promise<unknown>) =>
         produce(),
     ),
     fetchUpstream: vi.fn(),
-    upstreamError: vi.fn((status: number, message: string) => {
-      const normalized = status === 0 || status >= 520 ? 503 : 502
-      return new Response(JSON.stringify({ error: message }), {
-        status: normalized,
-        headers: { 'Content-Type': 'application/json', 'X-Error-Kind': 'upstream' },
-      })
-    }),
-    contractError: vi.fn(
-      (message: string) =>
-        new Response(JSON.stringify({ error: message }), {
-          status: 502,
-          headers: { 'Content-Type': 'application/json', 'X-Error-Kind': 'contract' },
-        }),
-    ),
   }
 })
 
@@ -231,11 +219,11 @@ describe('aircraft fan-out', () => {
 })
 
 describe('quakes upstream error', () => {
-  it('returns a 502 body without a details field when USGS is non-2xx', async () => {
+  it('returns a 503 body without a details field when USGS is non-2xx', async () => {
     mockFetchUpstream.mockResolvedValue(fakeResponse(500, { error: 'upstream said no' }))
     const ctx = makeCtx('https://observatory.test/api/quakes')
     const res = await callQuakes(ctx)
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(503)
     const json = await res.json()
     expect(json).toHaveProperty('error')
     expect(json).not.toHaveProperty('details')
@@ -250,7 +238,7 @@ describe('quakes upstream error', () => {
   it('marks a USGS payload that fails the schema as a contract failure', async () => {
     mockFetchUpstream.mockResolvedValue(fakeResponse(200, { unexpected: 'shape' }))
     const res = await callQuakes(makeCtx('https://observatory.test/api/quakes'))
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(500)
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
   })
 })

@@ -72,21 +72,32 @@ export async function fetchUpstream(
 }
 
 /**
- * Build a normalized error Response. The upstream's own status is never proxied: a
- * timeout / connection failure (0) or an upstream-side edge error (>= 520) becomes 503,
- * everything else becomes 502. `message` must be our own text, never upstream body text.
+ * Our error statuses. Never 502 or 504: on the custom domain Cloudflare replaces an
+ * origin 502/504 with its own plain "error code: 502" page, dropping our JSON body and
+ * X-Error-Kind, and only Enterprise zones can turn that off (#61). 503 and 500 pass
+ * through untouched.
  */
-export function upstreamError(status: number, message: string): Response {
-  return errorResponse(normalizeStatus(status), message, 'upstream')
+const UPSTREAM_STATUS = 503
+const CONTRACT_STATUS = 500
+
+/**
+ * The upstream was unavailable. Always a 503; the upstream's own status is never
+ * proxied (a NASA 429 must not read as ours), but it is recorded in
+ * `X-Upstream-Status` for debugging. `message` must be our own text, never upstream body text.
+ */
+export function upstreamError(upstreamStatus: number, message: string): Response {
+  const res = errorResponse(UPSTREAM_STATUS, message, 'upstream')
+  res.headers.set('X-Upstream-Status', String(upstreamStatus))
+  return res
 }
 
 /**
  * The upstream answered, but its payload failed our schema or parsed to nothing usable.
- * Always a 502, marked `X-Error-Kind: contract` so the health check never retries it and
+ * Always a 500, marked `X-Error-Kind: contract` so the health check never retries it and
  * never accepts a STALE fallback for it: shape drift has to alert.
  */
 export function contractError(message: string): Response {
-  return errorResponse(502, message, 'contract')
+  return errorResponse(CONTRACT_STATUS, message, 'contract')
 }
 
 function errorResponse(status: number, message: string, kind: ErrorKind): Response {
@@ -96,8 +107,8 @@ function errorResponse(status: number, message: string, kind: ErrorKind): Respon
   })
 }
 
-function normalizeStatus(status: number): number {
-  return status === 0 || status >= 520 ? 503 : 502
+function statusFor(kind: ErrorKind): number {
+  return kind === 'contract' ? CONTRACT_STATUS : UPSTREAM_STATUS
 }
 
 function errorKindOf(res: Response): ErrorKind {
@@ -160,7 +171,9 @@ async function serveStale(
 /** Status of a stored negative entry, clamped to a real error status. */
 function negStatus(negHit: Response): number {
   const raw = Number(negHit.headers.get('X-Neg-Status'))
-  return Number.isFinite(raw) && raw >= 400 && raw <= 599 ? raw : 503
+  // An entry stored before #61 may say 502 or 504; Cloudflare would replace those.
+  if (raw === 502 || raw === 504) return UPSTREAM_STATUS
+  return Number.isFinite(raw) && raw >= 400 && raw <= 599 ? raw : UPSTREAM_STATUS
 }
 
 /** Replay a stored negative entry at its real status. */
@@ -183,6 +196,7 @@ function storeNegative(
   status: number,
   body: string,
   kind: ErrorKind,
+  upstreamStatus: string | null = null,
 ): Response {
   const headers = new Headers({
     'Content-Type': 'application/json',
@@ -191,6 +205,7 @@ function storeNegative(
     'X-Neg-Status': String(status),
     [ERROR_KIND_HEADER]: kind,
   })
+  if (upstreamStatus !== null) headers.set('X-Upstream-Status', upstreamStatus)
   ctx.waitUntil(cache.put(negReq, new Response(body, { status: 200, headers })))
 
   const out = new Headers(headers)
@@ -256,8 +271,8 @@ export async function cachedJson(
     console.warn(`[cache] producer threw for ${key}:`, err)
     // An unparseable body (upstream.json() on an HTML 200) is shape drift, not an outage.
     const isContract = err instanceof SyntaxError
-    const status = isContract ? 502 : 503
     const kind: ErrorKind = isContract ? 'contract' : 'upstream'
+    const status = statusFor(kind)
     const body = JSON.stringify({
       error: isContract ? 'Invalid upstream response' : 'Upstream unavailable',
     })
@@ -268,10 +283,18 @@ export async function cachedJson(
   if (result instanceof Response) {
     // 2xx: a producer-supplied pass-through, returned uncached.
     if (result.ok) return result
-    const status = normalizeStatus(result.status)
     const kind = errorKindOf(result)
+    const status = statusFor(kind)
     const body = (await result.text()) || JSON.stringify({ error: 'Upstream error' })
-    const neg = storeNegative(ctx, cache, negReq, status, body, kind)
+    const neg = storeNegative(
+      ctx,
+      cache,
+      negReq,
+      status,
+      body,
+      kind,
+      result.headers.get('X-Upstream-Status'),
+    )
     return stale ? serveStale(stale.entry, stale.age, status, kind) : neg
   }
 

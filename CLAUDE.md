@@ -60,9 +60,9 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 - **`scripts/check-health.mjs` retries transient failures only.** Status 0, 5xx and 429 get 3 attempts with 2s/5s backoff, because a single slow upstream used to fail the workflow and page Discord — `fetchUpstream`'s deadline is 8 s, so an upstream slower than that becomes our 503. Content-contract failures (missing fields, `X-Data-Degraded`, `X-Error-Kind: contract`) are never retried: they mean upstream shape drift, which is the thing the check exists to catch, and retrying would only delay the alert
 - **A retry inside the negative cache is not a retry.** `_cache.ts` negative-caches a failure for 60 s, so the 2 s / 5 s backoff above only replayed one cached error. From #16 until #21, every "after 3 attempts" failure took about 70 ms and never reached the upstream. A response with `X-Cache: NEG` now waits 65 s before the next attempt. Retry any cached endpoint past its cache window
 - **`X-Error-Kind` says why a handler failed.**
-  - `contractError()` (502, `contract`) is for a payload that broke our schema or parsed to nothing. It means shape drift.
+  - `contractError()` (500, `contract`) is for a payload that broke our schema or parsed to nothing. It means shape drift.
   - `upstreamError()` (`upstream`) is for an unavailable upstream.
-  - Never return `upstreamError(502, …)`. `tests/unit/error-kind-contract.test.ts` scans every handler for it, because that would make drift look like an outage.
+  - **Never answer with 502 or 504 (#61).** On the custom domain Cloudflare replaces an origin 502/504 with its own plain "error code: 502" page, dropping the JSON body and `X-Error-Kind`. pages.dev previews do not, so a preview can look fine while production hides the error kind. Only Enterprise zones can turn it off. `tests/unit/error-kind-contract.test.ts` scans every function for a 502 or 504 status.
 - **Stale-if-error.**
   - `cachedJson` stores positive entries for TTL + 24 h and decides freshness from `X-Cached-At`.
   - When the producer fails (or a neg entry is live), the last good body goes out as a 200 with `X-Cache: STALE`, `X-Data-Age`, `X-Stale-Status` and `X-Error-Kind`.
@@ -95,7 +95,7 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
 - `functions/` is typechecked via `tsconfig.functions.json` with `lib: ["ES2022"]` and **no DOM lib** — workers-types `Response`/`Request` collide with `lib.dom`
 - Standalone `tsc` on individual files needs `--ignoreConfig` under TypeScript 6, or it refuses to run because `tsconfig.json` exists
 - `_cache.ts` lookup order is the positive key then `${key}:neg`, so a 60 s negative entry can never shadow fresh data. A non-ok producer `Response` is an error; a 2xx one is an uncached passthrough (unused since launches went KV-first in #30)
-- Never proxy an upstream status code: `upstreamError()` maps 0 and >= 520 to 503 and everything else to 502, so a NASA 429 is not mistaken for ours
+- Never proxy an upstream status code: `upstreamError()` is always 503, with the upstream status in `X-Upstream-Status`, so a NASA 429 is not mistaken for ours
 - Cloudflare's auto-injected Web Analytics beacon needs BOTH `https://static.cloudflareinsights.com` in `script-src` (to load) and `https://cloudflareinsights.com` in `connect-src` (to report). It posts to the absolute URL `https://cloudflareinsights.com/cdn-cgi/rum`, not to our own origin, so allowing only the script host loads the beacon and then silently blocks every beacon it sends. Verified in a browser, 2026-09-08
 
 ## Workflow

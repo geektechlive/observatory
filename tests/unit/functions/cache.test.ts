@@ -7,49 +7,7 @@ import {
   UpstreamError,
   upstreamError,
 } from '../../../functions/api/_cache'
-
-interface Entry {
-  text: string
-  status: number
-  headers: [string, string][]
-}
-
-function installFakeCache(): Map<string, Entry> {
-  const store = new Map<string, Entry>()
-  const fake = {
-    match: async (req: Request): Promise<Response | undefined> => {
-      const e = store.get(req.url)
-      return e
-        ? new Response(e.text, { status: e.status, headers: new Headers(e.headers) })
-        : undefined
-    },
-    put: async (req: Request, res: Response): Promise<void> => {
-      store.set(req.url, { text: await res.text(), status: res.status, headers: [...res.headers] })
-    },
-  }
-  vi.stubGlobal('caches', { default: fake })
-  return store
-}
-
-interface TestCtx {
-  ctx: { request: { url: string }; waitUntil: (p: Promise<unknown>) => void }
-  settle: () => Promise<void>
-}
-
-function makeCtx(): TestCtx {
-  const pending: Promise<unknown>[] = []
-  return {
-    ctx: {
-      request: { url: 'https://example.test/api/x' },
-      waitUntil: (p) => {
-        pending.push(p)
-      },
-    },
-    settle: async () => {
-      await Promise.all(pending)
-    },
-  }
-}
+import { installFakeCache, makeCtx, type TestCtx } from './_fakeCache'
 
 describe('cachedJson', () => {
   beforeEach(() => {
@@ -111,12 +69,12 @@ describe('cachedJson', () => {
 
     const first = await cachedJson(ctx, 'k', 100, produce)
     await settle()
-    expect(first.status).toBe(502) // normalized, never the raw 500
+    expect(first.status).toBe(503) // normalized, never the raw 500 (and never 502: Cloudflare replaces it)
     expect(first.headers.get('X-Cache')).toBe('NEG')
     expect(await first.text()).toBe('{"error":"Upstream NASA API error"}')
 
     const second = await cachedJson(ctx, 'k', 100, produce)
-    expect(second.status).toBe(502)
+    expect(second.status).toBe(503)
     expect(second.headers.get('X-Cache')).toBe('NEG')
     expect(produce).toHaveBeenCalledTimes(1)
   })
@@ -270,7 +228,7 @@ describe('cachedJson stale-if-error', () => {
     expect(await res.text()).toBe('{"good":1}')
     expect(res.headers.get('X-Cache')).toBe('STALE')
     expect(res.headers.get('X-Data-Age')).toBe('400')
-    expect(res.headers.get('X-Stale-Status')).toBe('502')
+    expect(res.headers.get('X-Stale-Status')).toBe('503')
     expect(res.headers.get('X-Error-Kind')).toBe('upstream')
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=60')
   })
@@ -334,7 +292,7 @@ describe('cachedJson stale-if-error', () => {
     })
     expect(res.headers.get('X-Cache')).toBe('STALE')
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
-    expect(res.headers.get('X-Stale-Status')).toBe('502')
+    expect(res.headers.get('X-Stale-Status')).toBe('500')
   })
 
   it('can opt out of stale-if-error, for inner raw-feed caches', async () => {
@@ -349,7 +307,7 @@ describe('cachedJson stale-if-error', () => {
 
     now.mockReturnValue(t0 + 200_000)
     const res = await cachedJson(tc.ctx, 'k', 100, failing, { staleIfError: false })
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(503)
     expect(res.headers.get('X-Cache')).toBe('NEG')
   })
 
@@ -358,16 +316,16 @@ describe('cachedJson stale-if-error', () => {
     await cachedJson(tc.ctx, 'k', 100, async () => contractError('Invalid EONET response'))
     await tc.settle()
     const res = await cachedJson(tc.ctx, 'k', 100, async () => ({ body: '{}' }))
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(500)
     expect(res.headers.get('X-Cache')).toBe('NEG')
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
   })
 })
 
 describe('contractError', () => {
-  it('is a 502 marked as a contract failure, with our own message', async () => {
+  it('is a 500 marked as a contract failure, with our own message', async () => {
     const res = contractError('Invalid EONET response')
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(500)
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
     expect(await res.json()).toEqual({ error: 'Invalid EONET response' })
   })
@@ -378,11 +336,11 @@ describe('contractError', () => {
 })
 
 describe('upstreamError', () => {
-  it('maps 0 and >= 520 to 503 and everything else to 502, with our own message only', async () => {
+  it('is always a 503, never a 502 or 504 that Cloudflare would replace, with our own message only', async () => {
     expect(upstreamError(0, 'nope').status).toBe(503)
     expect(upstreamError(520, 'nope').status).toBe(503)
-    expect(upstreamError(500, 'nope').status).toBe(502)
-    expect(upstreamError(429, 'nope').status).toBe(502)
+    expect(upstreamError(500, 'nope').status).toBe(503)
+    expect(upstreamError(429, 'nope').status).toBe(503)
     const res = upstreamError(500, 'Upstream unavailable')
     expect(await res.json()).toEqual({ error: 'Upstream unavailable' })
   })

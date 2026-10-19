@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  CHECKS,
   isTransient,
   judgeStale,
   NEG_RETRY_DELAY_MS,
@@ -211,5 +212,25 @@ describe('toReport', () => {
       },
     ])
     expect(entry).toMatchObject({ ok: true, warning: true })
+  })
+})
+
+describe('probed endpoints (#42, #61)', () => {
+  type Check = { path: string; check: (body: unknown) => boolean }
+  const byPath = (path: string) => (CHECKS as Check[]).find((c) => c.path === path)
+
+  it('probes APOD: a title and a picture or video URL', () => {
+    const apod = byPath('/api/apod')
+    expect(apod).toBeDefined()
+    expect(apod?.check({ title: 'Pillars', url: 'https://apod.nasa.gov/x.jpg' })).toBe(true)
+    expect(apod?.check({ title: 'Pillars', url: null })).toBe(false)
+    expect(apod?.check({})).toBe(false)
+  })
+
+  it('probes DONKI: all four event arrays present', () => {
+    const donki = byPath('/api/donki')
+    expect(donki).toBeDefined()
+    expect(donki?.check({ flares: [], cmes: [], geomagneticStorms: [], seps: [] })).toBe(true)
+    expect(donki?.check({ flares: [] })).toBe(false)
   })
 })
