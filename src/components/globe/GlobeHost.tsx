@@ -18,6 +18,11 @@ type GlobeProps = ComponentProps<typeof Globe> & {
 }
 
 const NONE: readonly never[] = []
+
+/** Any empty list becomes the one shared empty array, so the renderer sees no change (#60). */
+function orNone<T>(list: readonly T[] | undefined): readonly T[] {
+  return list && list.length > 0 ? list : NONE
+}
 /** Matches the SVG globe's default when the ISS feed has no altitude yet. */
 const DEFAULT_ISS_ALT_KM = 420
 
@@ -95,15 +100,15 @@ export function GlobeHost({ census, ...props }: GlobeProps) {
         issLat !== undefined && issLon !== undefined
           ? { lat: issLat, lon: issLon, alt: issAlt ?? DEFAULT_ISS_ALT_KM }
           : null,
-      trail: trail ?? NONE,
-      events: events ?? NONE,
-      quakes: quakes ?? NONE,
-      fires: fires ?? NONE,
-      fireballs: fireballs ?? NONE,
-      launches: launches ?? NONE,
-      disasters: disasters ?? NONE,
-      satellites: satellites ?? NONE,
-      aurora: aurora ?? NONE,
+      trail: orNone(trail),
+      events: orNone(events),
+      quakes: orNone(quakes),
+      fires: orNone(fires),
+      fireballs: orNone(fireballs),
+      launches: orNone(launches),
+      disasters: orNone(disasters),
+      satellites: orNone(satellites),
+      aurora: orNone(aurora),
       tracking,
     })
   }, [

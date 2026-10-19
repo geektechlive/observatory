@@ -4,7 +4,7 @@
  * ("Hub", "Tia"). Nameplates skip the depth test and are hidden by the ray-sphere
  * occlusion test instead, so one behind the Earth never shows through it.
  */
-import { Matrix4 } from 'three'
+import { Matrix4, Sprite } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { GlobeLayerObjects } from '@/components/globe/three/layers'
@@ -50,7 +50,22 @@ describe('GlobeLayerObjects nameplates', () => {
       planLayers({ ...EMPTY, satellites: [{ name: 'Hubble', lat: 0, lon: 0, alt: 540 }] }),
     )
     const [plate] = objects.debugNameplates()
-    expect(plate?.depthTest).toBe(false)
+    // Read the real materials, not a field that only claims it.
+    const sprites: Sprite[] = []
+    plate?.object.traverse((o) => {
+      if (o instanceof Sprite) sprites.push(o)
+    })
+    expect(sprites.length).toBe(2)
+    for (const s of sprites) expect(s.material.depthTest).toBe(false)
+  })
+
+  it('creates nameplates hidden, so a draw before the occlusion test shows nothing (#60)', () => {
+    const objects = new GlobeLayerObjects()
+    objects.buildStatic(
+      planLayers({ ...EMPTY, satellites: [{ name: 'Back', lat: 0, lon: 90, alt: 540 }] }),
+    )
+    objects.updateIss(planLayers({ ...EMPTY, iss: { lat: 0, lon: 90, alt: 420 } }))
+    for (const p of objects.debugNameplates()) expect(p.object.visible).toBe(false)
   })
 
   it('tracks the ISS nameplate too, and drops it when the ISS goes away', () => {

@@ -76,7 +76,7 @@ test.describe('Map event dot click', () => {
     context.on('page', (p) => newPages.push(p))
 
     // Globe is the default — switch to flat map to get the MapLibre canvas
-    await page.getByRole('button', { name: 'Map' }).click()
+    await page.getByRole('button', { name: 'Map', exact: true }).click()
 
     // Wait for map canvas to be present
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 15_000 })
@@ -104,7 +104,7 @@ test.describe('Map event dot click', () => {
   test('the popup contains a source link, not the raw API URL', async ({ page }) => {
     await page.goto('/')
     // Globe is the default — switch to flat map to get the MapLibre canvas
-    await page.getByRole('button', { name: 'Map' }).click()
+    await page.getByRole('button', { name: 'Map', exact: true }).click()
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 15_000 })
     await waitForEventDot(page)
 

@@ -64,7 +64,7 @@ test.describe('Map health', () => {
     )
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Map' }).click()
+    await page.getByRole('button', { name: 'Map', exact: true }).click()
 
     // The canvas exists as soon as the Map is constructed, so on its own it is
     // not evidence the style resolved. The attribution control is only rendered

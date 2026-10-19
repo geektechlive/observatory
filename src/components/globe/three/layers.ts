@@ -188,7 +188,6 @@ interface Nameplate {
   name: string
   object: Object3D
   local: Vector3
-  depthTest: boolean
 }
 
 export class GlobeLayerObjects {
@@ -271,12 +270,13 @@ export class GlobeLayerObjects {
       label.center.set(plate.anchorX, 0.5)
       label.scale.set(PLATE_SCALE * plate.aspect, PLATE_SCALE, 1)
       this.issGroup.add(core, glow, label)
+      // Hidden until the first occlusion test: its sprites skip the depth test (#60).
+      this.issGroup.visible = false
       this.group.add(this.issGroup)
       this.issPlate = {
         name: plan.iss.name,
         object: this.issGroup,
         local: new Vector3(),
-        depthTest: false,
       }
     }
     this.issGroup.position.fromArray(plan.iss.position)
@@ -295,6 +295,27 @@ export class GlobeLayerObjects {
       this.group.add(this.trailLine)
     }
     this.trailLine.geometry.setFromPoints(plan.trail.map((p) => new Vector3().fromArray(p)))
+  }
+
+  /**
+   * Moves the satellite nameplates to their new positions without rebuilding them (#60).
+   * Returns false, and changes nothing, unless the plan names exactly the same
+   * spacecraft in the same order; the caller then rebuilds.
+   */
+  moveSpacecraft(plan: LayerPlan): boolean {
+    const craft = plan.markers.filter((m) => m.glyph.shape === 'spacecraft')
+    if (craft.length !== this.staticPlates.length) return false
+    const same = craft.every(
+      (m, i) => m.glyph.shape === 'spacecraft' && m.glyph.name === this.staticPlates[i]?.name,
+    )
+    if (!same) return false
+    craft.forEach((m, i) => {
+      const plate = this.staticPlates[i]
+      if (!plate) return
+      plate.local.fromArray(m.position)
+      for (const child of plate.object.children) child.position.fromArray(m.position)
+    })
+    return true
   }
 
   /** Hide every nameplate whose anchor is behind the Earth from this camera. */
@@ -344,11 +365,13 @@ export class GlobeLayerObjects {
     glow.position.fromArray(position)
     glow.scale.setScalar(ISS_SCALE * 0.8)
     group.add(glow, sprite)
+    // Hidden until the first occlusion test: these sprites skip the depth test, so a
+    // plate drawn before the test would show through the Earth (#60).
+    group.visible = false
     this.staticPlates.push({
       name: shape.name,
       object: group,
       local: new Vector3().fromArray(position),
-      depthTest: false,
     })
     return group
   }

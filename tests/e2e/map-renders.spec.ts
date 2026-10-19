@@ -4,7 +4,7 @@ test.describe('World map', () => {
   test('map container is present in the DOM after switching to Map mode', async ({ page }) => {
     await page.goto('/')
     // Globe is the default view — switch to flat map first
-    await page.getByRole('button', { name: 'Map' }).click()
+    await page.getByRole('button', { name: 'Map', exact: true }).click()
     // MapLibre renders into a div with class maplibregl-map
     const map = page.locator('.maplibregl-map')
     await expect(map).toHaveCount(1, { timeout: 15_000 })
@@ -15,7 +15,7 @@ test.describe('World map', () => {
     // overlay, which shifted every data layer's colour. The basemap is now rethemed
     // layer by layer, so nothing between the canvas and the screen may recolour it.
     await page.goto('/')
-    await page.getByRole('button', { name: 'Map' }).click()
+    await page.getByRole('button', { name: 'Map', exact: true }).click()
     const canvas = page.locator('.maplibregl-canvas')
     await expect(canvas).toBeVisible({ timeout: 15_000 })
     const recolouring = await canvas.evaluate((el) => {

@@ -179,6 +179,25 @@ test.describe('Globe parity (#44)', () => {
       })
   })
 
+  test('satellites on: the globe does not rebuild its markers while the ISS moves (#60)', async ({
+    page,
+  }) => {
+    await mockFeeds(page)
+    await page.goto('/?globe=webgl')
+    await expect(page.locator('[data-globe-mode]')).toHaveAttribute('data-globe-mode', 'webgl', {
+      timeout: 15_000,
+    })
+    await page.getByRole('switch', { name: /Satellites/ }).click()
+    await expect.poll(() => drawn(page), { timeout: 15_000 }).toMatchObject({ satellites: 1 })
+    const canvas = page.locator('canvas[data-globe-webgl]')
+    const builds = async () => Number((await canvas.getAttribute('data-globe-builds')) ?? '0')
+    const before = await builds()
+    expect(before).toBeGreaterThan(0)
+    // About 15 ISS updates at 5 Hz and one satellite refresh (every 2 s).
+    await page.waitForTimeout(3000)
+    expect(await builds()).toBe(before)
+  })
+
   test('switching a layer off removes it, and the census lane follows', async ({ page }) => {
     await mockFeeds(page)
     await page.goto('/?globe=webgl')

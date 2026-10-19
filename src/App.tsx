@@ -40,6 +40,12 @@ const WorldMap = lazy(() =>
 
 type MapMode = 'globe' | 'map'
 
+/**
+ * One empty list for every globe layer that's off or still loading. App re-renders
+ * at 5 Hz with the ISS, and a fresh `[]` each time made the globe rebuild (#60).
+ */
+const NO_ITEMS: readonly never[] = []
+
 const CONSOLES: Record<ConsoleView, ComponentType> = {
   earth: EarthConsole,
   sun: SunConsole,
@@ -228,15 +234,15 @@ export function App() {
                     issLat={issLat}
                     issLon={issLon}
                     issAlt={issOn ? issPos?.alt : undefined}
-                    trail={issOn ? issTrail : []}
-                    events={layers.events && !tracking ? globeEvents : []}
-                    launches={layers.launches || tracking ? launchMarkers : []}
-                    fireballs={layers.fireballs && !tracking ? fireballMarkers : []}
-                    quakes={layers.quakes && !tracking ? quakeMarkers : []}
-                    disasters={layers.disasters && !tracking ? disasterMarkers : []}
-                    satellites={layers.satellites || tracking ? satellites : []}
-                    fires={layers.fires && !tracking ? (firesData?.fires ?? []) : []}
-                    aurora={layers.aurora ? (auroraData?.points ?? []) : []}
+                    trail={issOn ? issTrail : NO_ITEMS}
+                    events={layers.events && !tracking ? globeEvents : NO_ITEMS}
+                    launches={layers.launches || tracking ? launchMarkers : NO_ITEMS}
+                    fireballs={layers.fireballs && !tracking ? fireballMarkers : NO_ITEMS}
+                    quakes={layers.quakes && !tracking ? quakeMarkers : NO_ITEMS}
+                    disasters={layers.disasters && !tracking ? disasterMarkers : NO_ITEMS}
+                    satellites={layers.satellites || tracking ? satellites : NO_ITEMS}
+                    fires={layers.fires && !tracking ? (firesData?.fires ?? NO_ITEMS) : NO_ITEMS}
+                    aurora={layers.aurora ? (auroraData?.points ?? NO_ITEMS) : NO_ITEMS}
                     showTerminator={layers.terminator}
                     warm={!tracking}
                     tracking={tracking}

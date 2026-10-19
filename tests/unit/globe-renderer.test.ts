@@ -8,6 +8,7 @@ import { Texture } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 import { GlobeRenderer, type RendererDeps } from '@/components/globe/three/GlobeRenderer'
+import { altToRadius, isOccluded } from '@/lib/globe3d'
 
 function fakes() {
   const canvas = document.createElement('canvas')
@@ -144,6 +145,120 @@ describe('GlobeRenderer', () => {
     const r = await GlobeRenderer.create({ ...OPTIONS, onContextLost }, f.deps)
     f.canvas.dispatchEvent(new Event('webglcontextlost'))
     expect(onContextLost).toHaveBeenCalledOnce()
+    r.dispose()
+  })
+})
+
+describe('GlobeRenderer satellites never flash through the Earth (#60)', () => {
+  const BASE = {
+    iss: null,
+    trail: [],
+    events: [],
+    quakes: [],
+    fires: [],
+    fireballs: [],
+    launches: [],
+    disasters: [],
+    aurora: [],
+    tracking: false,
+  }
+  // The globe starts facing 12°E: 12°E is in front, 168°W is behind the Earth.
+  const SATS = [
+    { name: 'Front', lat: 0, lon: 12, alt: 540 },
+    { name: 'Back', lat: 0, lon: -168, alt: 540 },
+  ]
+
+  /** Records, at every draw call, which nameplates were visible. */
+  function recordDraws(f: ReturnType<typeof fakes>, r: GlobeRenderer): Record<string, boolean>[] {
+    const draws: Record<string, boolean>[] = []
+    f.renderer.render.mockImplementation(() => {
+      draws.push(Object.fromEntries(r.debugNameplates().map((p) => [p.name, p.object.visible])))
+    })
+    return draws
+  }
+
+  it('hides a back-side satellite on the first draw after setLayers (frame loop)', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const draws = recordDraws(f, r)
+    r.attach(document.createElement('div'))
+    f.tick(16)
+    r.setLayers({ ...BASE, satellites: SATS })
+    f.tick(32)
+    f.tick(48)
+    const withPlates = draws.filter((d) => 'Back' in d)
+    expect(withPlates.length).toBeGreaterThan(0)
+    for (const d of withPlates) {
+      expect(d['Back']).toBe(false)
+      expect(d['Front']).toBe(true)
+    }
+    r.dispose()
+  })
+
+  it('hides a satellite on the same frame it rotates behind the limb', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    // Record visibility AND the pose at each draw call.
+    const draws: { visible: boolean; facing: number }[] = []
+    f.renderer.render.mockImplementation(() => {
+      const plate = r.debugNameplates().find((p) => p.name === 'Limb')
+      if (plate) draws.push({ visible: plate.object.visible, facing: r.facing() })
+    })
+    r.attach(document.createElement('div'))
+    const LON = 12 + 70
+    r.setLayers({ ...BASE, satellites: [{ name: 'Limb', lat: 0, lon: LON, alt: 540 }] })
+    for (let t = 0; t <= 30_000; t += 100) f.tick(t)
+
+    // Expected for the pose drawn: the satellite sits `delta` degrees from the facing
+    // longitude, on the equator, seen from the camera on +Z at distance 4.1.
+    const R = altToRadius(540)
+    const expected = (facing: number) => {
+      const d = ((LON - facing) * Math.PI) / 180
+      return !isOccluded([R * Math.sin(d), 0, R * Math.cos(d)], [0, 0, 4.1])
+    }
+    expect(draws.some((d) => d.visible)).toBe(true)
+    expect(draws.some((d) => !d.visible)).toBe(true)
+    for (const d of draws) expect(d.visible).toBe(expected(d.facing))
+    r.dispose()
+  })
+
+  it('hides a back-side satellite on the single draw under reduced motion', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create({ ...OPTIONS, reducedMotion: true }, f.deps)
+    const draws = recordDraws(f, r)
+    r.attach(document.createElement('div'))
+    r.setLayers({ ...BASE, satellites: SATS })
+    const last = draws.at(-1)
+    expect(last?.['Back']).toBe(false)
+    expect(last?.['Front']).toBe(true)
+    r.dispose()
+  })
+
+  it('does not rebuild static layers when an update has the same contents', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const events = [{ lat: 0, lon: 12, kind: 'wildfires' }]
+    r.setLayers({ ...BASE, events, satellites: SATS })
+    // What App does at 5 Hz: fresh empty arrays and a fresh array of the same items.
+    r.setLayers({ ...BASE, fires: [], aurora: [], events: [...events], satellites: SATS })
+    r.setLayers({ ...BASE, fires: [], aurora: [], events: [...events], satellites: SATS })
+    expect(r.canvas.dataset['globeBuilds']).toBe('1')
+    r.dispose()
+  })
+
+  it('moves satellites in place when only their positions change', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.setLayers({ ...BASE, satellites: SATS })
+    const before = r.debugNameplates().find((p) => p.name === 'Front')
+    r.setLayers({
+      ...BASE,
+      satellites: SATS.map((s) => ({ ...s, lon: s.lon + 1 })),
+    })
+    const after = r.debugNameplates().find((p) => p.name === 'Front')
+    expect(r.canvas.dataset['globeBuilds']).toBe('1')
+    expect(after?.object).toBe(before?.object)
+    expect(after?.local.x).not.toBeCloseTo(0.0, 6)
     r.dispose()
   })
 })

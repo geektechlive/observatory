@@ -32,6 +32,7 @@ import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 import { GlobeLayerObjects } from './layers'
 import { atmosphereFragment, atmosphereVertex, earthFragment, earthVertex } from './shaders'
 
+/** Layers that rebuild when their contents change. Satellites move in place instead. */
 const STATIC_KEYS = [
   'events',
   'quakes',
@@ -39,9 +40,17 @@ const STATIC_KEYS = [
   'fireballs',
   'launches',
   'disasters',
-  'satellites',
   'aurora',
 ] as const
+
+/**
+ * Same items in the same order. App re-renders at 5 Hz and hands over fresh arrays
+ * (a new `[]` for every layer that's off), so array identity alone rebuilt every
+ * marker five times a second (#60).
+ */
+function sameItems(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return a === b || (a.length === b.length && a.every((item, i) => item === b[i]))
+}
 
 /** A focusable item's position on the canvas this frame (CSS px from the top left). */
 export interface ProjectedItem {
@@ -120,6 +129,8 @@ export class GlobeRenderer {
   private lastFrame: number | null = null
   private lastSun = 0
   private rotationPaused = false
+  /** Static-layer rebuilds so far, mirrored on the canvas for e2e (#60). */
+  private builds = 0
   private attached = false
   private disposed = false
 
@@ -235,9 +246,16 @@ export class GlobeRenderer {
     const last = this.lastInput
     const staticChanged =
       !last ||
-      STATIC_KEYS.some((key) => last[key] !== input[key]) ||
-      last.tracking !== input.tracking
-    if (staticChanged) this.layers.buildStatic(plan)
+      last.tracking !== input.tracking ||
+      STATIC_KEYS.some((key) => !sameItems(last[key], input[key]))
+    const satellitesChanged = !last || !sameItems(last.satellites, input.satellites)
+    // The satellite feed refreshes every 2 s with new objects; move the plates if the
+    // same spacecraft are named, rebuild only when the set changes.
+    if (staticChanged || (satellitesChanged && !this.layers.moveSpacecraft(plan))) {
+      this.layers.buildStatic(plan)
+      this.builds += 1
+      this.canvas.dataset['globeBuilds'] = String(this.builds)
+    }
     this.layers.updateIss(plan)
     this.lastInput = input
     this.focusables = [
@@ -323,6 +341,11 @@ export class GlobeRenderer {
     this.lastFrame = null
   }
 
+  /** For tests: every spacecraft nameplate, the ISS first. */
+  debugNameplates(): ReturnType<GlobeLayerObjects['debugNameplates']> {
+    return this.layers.debugNameplates()
+  }
+
   /** For lifecycle tests: the meshes whose geometry and material dispose() must free. */
   debugMeshes(): readonly Mesh<BufferGeometry, Material>[] {
     return this.meshes as Mesh<BufferGeometry, Material>[]
@@ -365,14 +388,28 @@ export class GlobeRenderer {
       this.sun.fromArray(sunDirection(new Date()))
       this.lastSun = now
     }
+    this.syncOcclusion()
     this.renderer.render(this.scene, this.camera)
     this.emitFrame()
     this.schedule()
   }
 
   private renderOnce(): void {
+    this.syncOcclusion()
     this.renderer.render(this.scene, this.camera)
     this.emitFrame()
+  }
+
+  /**
+   * Hide the nameplates behind the Earth for the pose about to be drawn. It must run
+   * before the draw: their sprites skip the depth test, so hiding them after the draw
+   * let each frame show the previous pose's mistakes, and a freshly built plate
+   * showed through the Earth for one frame (#60).
+   */
+  private syncOcclusion(): void {
+    this.globe.updateMatrixWorld()
+    this.camera.updateMatrixWorld()
+    this.layers.updateOcclusion(this.globe.matrixWorld, this.camera.position.toArray())
   }
 
   private emitFrame(): void {
@@ -381,7 +418,6 @@ export class GlobeRenderer {
     this.globe.updateMatrixWorld()
     this.camera.updateMatrixWorld()
     const cam = this.camera.position.toArray()
-    this.layers.updateOcclusion(this.globe.matrixWorld, cam)
     if (!this.onFrame || this.focusables.length === 0) return
     const size = this.options.size
     this.focusables.forEach((f, i) => {
