@@ -83,6 +83,13 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
   - `src/lib/palette.ts` holds the data colours. It emits hex, because MapLibre's parser rejects `oklch()`.
   - `src/styles/palette.css` is **generated** from `palette.ts`. A unit test fails on drift. Regenerate with `pnpm exec vitest run tests/unit/palette.test.ts -u`, and never hand-edit it.
   - Severity thresholds live in `src/lib/severity.ts` only.
+- **Page layout follows the approved prototype (#63), not the v1 layout.**
+  - The prototype is `docs/design-history/mockups-v2.html` (Artifact WWKYsvhmPRvs4wyZ9WC1BE).
+  - Layout: `HeaderPlate`, then a grid in `App.module.css` of the dial rail, the lens and the console column, with each console's remaining panels below.
+  - Each console exports `Lead` and `Rest` (`consoleParts.ts`). `ConsoleVoice` writes the view's one Fraunces sentence from live data (`src/lib/voice.ts`).
+  - The globe is sized by `useLensSize`, and `GlobeRenderer.resize()` keeps the one WebGL context.
+  - VitalsSpine, BelterHeader and the Station Telemetry plate are gone on purpose.
+  - Under 900px the dial is a fixed bottom bar, a deliberate deviation from the prototype: `mobile.spec` needs it in view.
 - **`design-lint.json` decides where the colour-literal and 11px type-floor lint applies.** Add a directory when its reskin lands. Both stylelint and ESLint read it.
 - **CARTO dark-matter's `background` layer is the land; water is a fill on top of it.** `src/lib/basemap.ts` repaints those vector layers on `style.load`. Never grade the map with a CSS `filter`: it recolours every data layer. `tests/e2e/map-renders.spec.ts` guards this.
 - **WebGL nameplates skip the depth test, so occlusion must run BEFORE the draw (#60).** Satellite and ISS nameplate sprites use `depthTest: false` (otherwise the nearer Earth clips the name), and `updateOcclusion` hides the ones behind the Earth. `GlobeRenderer.syncOcclusion()` runs before every `render`, and plates are created `visible = false`. Running it after the draw, plus App handing over a fresh `[]` at 5 Hz (which rebuilt every plate), made back-side satellites strobe through the Earth. Keep layer props stable (shared empty arrays, `orNone` in GlobeHost), and keep satellites moving in place (`moveSpacecraft`), not rebuilding. Guarded by `globe-renderer.test.ts` (#60 block, incl. a limb-crossing check per drawn pose) and the `data-globe-builds` e2e in `globe-parity.spec.ts`

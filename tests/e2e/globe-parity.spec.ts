@@ -150,6 +150,13 @@ async function mockFeeds(page: Page): Promise<void> {
   )
 }
 
+/** A layer switch, opening the Layers disclosure first (closed by default since #63). */
+async function layerSwitch(page: Page, opts: { name: RegExp }) {
+  const chip = page.getByRole('button', { name: /Layers/ })
+  if ((await chip.getAttribute('aria-expanded')) === 'false') await chip.click()
+  return page.getByRole('switch', opts)
+}
+
 const drawn = async (page: Page): Promise<Record<string, number>> =>
   JSON.parse(
     (await page.locator('canvas[data-globe-webgl]').getAttribute('data-globe-layers')) ?? '{}',
@@ -162,8 +169,9 @@ test.describe('Globe parity (#44)', () => {
     await expect(page.locator('[data-globe-mode]')).toHaveAttribute('data-globe-mode', 'webgl', {
       timeout: 15_000,
     })
-    for (const name of ['Fires', 'Alerts', 'Fireballs', 'Aurora', 'Satellites']) {
-      await page.getByRole('switch', { name: new RegExp(name) }).click()
+    // Aurora is on by default since #62, so it is not toggled here.
+    for (const name of ['Fires', 'Alerts', 'Fireballs', 'Satellites']) {
+      await (await layerSwitch(page, { name: new RegExp(name) })).click()
     }
 
     await expect
@@ -187,7 +195,7 @@ test.describe('Globe parity (#44)', () => {
     await expect(page.locator('[data-globe-mode]')).toHaveAttribute('data-globe-mode', 'webgl', {
       timeout: 15_000,
     })
-    await page.getByRole('switch', { name: /Satellites/ }).click()
+    await (await layerSwitch(page, { name: /Satellites/ })).click()
     await expect.poll(() => drawn(page), { timeout: 15_000 }).toMatchObject({ satellites: 1 })
     const canvas = page.locator('canvas[data-globe-webgl]')
     const builds = async () => Number((await canvas.getAttribute('data-globe-builds')) ?? '0')
@@ -204,11 +212,11 @@ test.describe('Globe parity (#44)', () => {
     await expect(page.locator('[data-globe-mode]')).toHaveAttribute('data-globe-mode', 'webgl', {
       timeout: 15_000,
     })
-    await page.getByRole('switch', { name: /Fireballs/ }).click()
+    await (await layerSwitch(page, { name: /Fireballs/ })).click()
     await expect.poll(() => drawn(page)).toMatchObject({ fireballs: 1 })
     await expect(page.locator('[data-lane="space"]')).toHaveAttribute('data-state', 'live')
 
-    await page.getByRole('switch', { name: /Fireballs/ }).click()
+    await (await layerSwitch(page, { name: /Fireballs/ })).click()
     await expect.poll(async () => (await drawn(page))['fireballs'] ?? 0).toBe(0)
     await expect(page.locator('[data-lane="space"]')).toHaveAttribute('data-state', 'off')
   })

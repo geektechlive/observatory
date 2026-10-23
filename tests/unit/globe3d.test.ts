@@ -7,14 +7,17 @@ import { describe, expect, it } from 'vitest'
 import {
   altToRadius,
   facingLongitude,
+  GLOBE_SPIN_DEG_PER_SEC,
   gpuTier,
   isOccluded,
   isSurfaceVisible,
   latLonToVec3,
   rotationForFacing,
   sunDirection,
+  terminatorFacing,
   vec3ToLatLon,
 } from '@/lib/globe3d'
+import { subsolarPoint } from '@/lib/solar'
 
 const close = (a: readonly number[], b: readonly number[], digits = 6) => {
   a.forEach((v, i) => {
@@ -121,6 +124,33 @@ describe('facing longitude and rotation', () => {
     for (const lon of [-170, -45, 0, 30, 179]) {
       expect(facingLongitude(rotationForFacing(lon))).toBeCloseTo(lon, 6)
     }
+  })
+})
+
+describe('terminatorFacing (#62: open on the evening terminator, as the prototype does)', () => {
+  it('faces 82° east of the sub-solar point, so daylight sits on the left', () => {
+    for (const iso of ['2026-10-19T02:19:00Z', '2026-06-21T12:00:00Z', '2026-12-31T23:30:00Z']) {
+      const date = new Date(iso)
+      const sub = subsolarPoint(date).lon
+      const diff = ((((terminatorFacing(date) - sub) % 360) + 540) % 360) - 180
+      expect(diff).toBeCloseTo(82, 6)
+    }
+  })
+
+  it('at 16:40 UTC the sub-solar point is 70°W, so the globe faces 12°E', () => {
+    expect(terminatorFacing(new Date('2026-10-19T16:40:00Z'))).toBeCloseTo(12, 6)
+  })
+
+  it('stays within [-180, 180)', () => {
+    const lon = terminatorFacing(new Date('2026-10-19T02:19:00Z'))
+    expect(lon).toBeGreaterThanOrEqual(-180)
+    expect(lon).toBeLessThan(180)
+  })
+})
+
+describe('GLOBE_SPIN_DEG_PER_SEC', () => {
+  it('is the prototype spin rate, about half the old 6°/s', () => {
+    expect(GLOBE_SPIN_DEG_PER_SEC).toBeCloseTo(3.44, 2)
   })
 })
 

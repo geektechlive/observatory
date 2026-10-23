@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { useVisible } from '@/hooks/useVisible'
+import { GLOBE_SPIN_DEG_PER_SEC, terminatorFacing } from '@/lib/globe3d'
 import { HUD_HEX, ISS_HEX, SVG_GLOBE_HEX, withAlpha } from '@/lib/palette'
 import { horizonRadiusDeg, smallCircleRing, subsolarPoint } from '@/lib/solar'
 
@@ -29,9 +30,9 @@ const NO_SATELLITES: readonly GlobeSatellite[] = []
 const NO_FIRES: readonly GlobeFire[] = []
 const NO_AURORA: readonly [number, number, number][] = []
 
-// 0.60°/100ms = 6°/sec ≈ 60-sec full rotation
-const ROTATION_STEP_DEG = 0.6
 const ROTATION_INTERVAL_MS = 100
+// The shared spin rate (about 3.44°/s), stepped every 100 ms; WebGL matches it (#62).
+const ROTATION_STEP_DEG = (GLOBE_SPIN_DEG_PER_SEC * ROTATION_INTERVAL_MS) / 1000
 const SUBSOLAR_REFRESH_MS = 60000
 const DEFAULT_ISS_ALT_KM = 420
 
@@ -84,7 +85,8 @@ export function Globe({
 }: GlobeProps) {
   const reducedMotion = useReducedMotion()
   const visible = useVisible()
-  const [rotation, setRotation] = useState(-12)
+  // Open on the evening terminator, as the WebGL globe does (#62).
+  const [rotation, setRotation] = useState(() => -terminatorFacing(new Date()))
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   // The projection centres longitude -rotation, so that is the facing longitude.
   useEffect(() => {

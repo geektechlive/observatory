@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { isLayerKey, LAYER_KEYS, useUiStore } from '@/store/ui'
+import { DEFAULT_LAYERS, isLayerKey, LAYER_KEYS, useUiStore } from '@/store/ui'
 
 const PERSIST_KEY = 'observatory-ui'
 
@@ -143,9 +143,26 @@ describe('persistence', () => {
 
     expect(merged.layers.iss).toBe(false)
     // A layer absent from the saved blob falls back to its default, not undefined.
-    expect(merged.layers.aurora).toBe(false)
+    expect(merged.layers.aurora).toBe(DEFAULT_LAYERS.aurora)
     expect(Object.keys(merged.layers).sort()).toEqual([...LAYER_KEYS].sort())
     expect(merged.mapMode).toBe('map')
+  })
+
+  it('turns aurora on by default, as the approved prototype shows it (#62)', () => {
+    expect(DEFAULT_LAYERS.aurora).toBe(true)
+  })
+
+  it('migrates a saved v0 blob to aurora on once, keeping every other choice (#62)', () => {
+    const { migrate, version } = useUiStore.persist.getOptions()
+    expect(version).toBe(1)
+    const migrated = migrate?.(
+      { layers: { aurora: false, fires: true, iss: false }, mapMode: 'map' },
+      0,
+    ) as { layers: Record<string, boolean>; mapMode: string }
+    expect(migrated.layers['aurora']).toBe(true)
+    expect(migrated.layers['fires']).toBe(true)
+    expect(migrated.layers['iss']).toBe(false)
+    expect(migrated.mapMode).toBe('map')
   })
 
   it('keeps the current map mode when the persisted blob has none', () => {

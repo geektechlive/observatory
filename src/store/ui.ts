@@ -28,7 +28,7 @@ export type LayerKey =
   | 'aurora'
 
 // Curated-clean default: a tasteful subset on, everything else opt-in.
-const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
+export const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   iss: true,
   events: true,
   quakes: true,
@@ -43,7 +43,7 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   nws: false,
   aircraft: false,
   buoys: false,
-  aurora: false,
+  aurora: true, // on by default, as in the approved prototype (#62)
 }
 
 export const LAYER_KEYS = Object.keys(DEFAULT_LAYERS) as LayerKey[]
@@ -139,6 +139,14 @@ export const useUiStore = create<UiState>()(
     {
       name: PERSIST_KEY,
       storage: createJSONStorage(() => safeStorage),
+      // v1 (#62): aurora became a default. Saved v0 blobs predate that, so their
+      // aurora: false is the old default, not a choice; turn it on once.
+      version: 1,
+      migrate: (persisted, version) => {
+        const saved = (persisted ?? {}) as Partial<PersistedUiState>
+        if (version >= 1) return saved
+        return { ...saved, layers: { ...(saved.layers ?? {}), aurora: true } }
+      },
       partialize: (state): PersistedUiState => ({
         layers: state.layers,
         mapMode: state.mapMode,

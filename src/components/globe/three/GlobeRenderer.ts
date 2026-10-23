@@ -25,7 +25,14 @@ import {
   WebGLRenderer,
 } from 'three'
 
-import { facingLongitude, isSurfaceVisible, rotationForFacing, sunDirection } from '@/lib/globe3d'
+import {
+  facingLongitude,
+  GLOBE_SPIN_DEG_PER_SEC,
+  isSurfaceVisible,
+  rotationForFacing,
+  sunDirection,
+  terminatorFacing,
+} from '@/lib/globe3d'
 import { layerCounts, type LayerInput, planLayers } from '@/lib/globeLayers'
 import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 
@@ -88,13 +95,13 @@ export interface GlobeRendererOptions {
   /** Copper grade on; the ORBIT tracking view turns it off. */
   warm: boolean
   showTerminator?: boolean | undefined
+  /** Longitude to open on; defaults to the evening terminator (#62). Tests pin it. */
+  startFacing?: number | undefined
   onContextLost?: (() => void) | undefined
 }
 
-/** The SVG globe turns 0.6 degrees every 100 ms; match it so the crossfade doesn't jump. */
-const DEGREES_PER_MS = 0.006
-/** The SVG globe starts facing 12 degrees east. */
-const START_FACING = 12
+/** Shared with the SVG globe, so the crossfade does not jump (#62). */
+const DEGREES_PER_MS = GLOBE_SPIN_DEG_PER_SEC / 1000
 const CAMERA_DISTANCE = 4.1
 const SUN_REFRESH_MS = 60_000
 
@@ -124,7 +131,9 @@ export class GlobeRenderer {
   private projected: ProjectedItem[] = []
   private readonly scratch = new Vector3()
   private earthUniforms: Record<string, { value: unknown }> | null = null
-  private rotation = rotationForFacing(START_FACING)
+  private rotation: number
+  /** Current CSS size in px; starts at options.size and follows resize(). */
+  private size: number
   private frameId = 0
   private lastFrame: number | null = null
   private lastSun = 0
@@ -149,6 +158,8 @@ export class GlobeRenderer {
     this.textures = textures
     this.options = options
     this.deps = deps
+    this.rotation = rotationForFacing(options.startFacing ?? terminatorFacing(new Date()))
+    this.size = options.size
     this.canvas = renderer.domElement
     this.canvas.setAttribute('aria-hidden', 'true')
     // Tests and the host find this canvas by name; the SVG globe and starfield have canvases too.
@@ -229,11 +240,26 @@ export class GlobeRenderer {
     this.globe.rotation.y = this.rotation
     this.scene.add(this.globe)
     this.globe.add(this.layers.group)
-    // Point sprites are sized in globe units; convert at the camera's focal length.
-    const pixels =
-      this.options.size * Math.min(globalThis.devicePixelRatio || 1, this.options.dprCap)
-    this.layers.setPixelScale(pixels / (2 * Math.tan((this.camera.fov * Math.PI) / 360)))
+    this.applyPixelScale()
     this.earthUniforms = earth.material.uniforms
+  }
+
+  /** Point sprites are sized in globe units; convert at the camera's focal length. */
+  private applyPixelScale(): void {
+    const pixels = this.size * Math.min(globalThis.devicePixelRatio || 1, this.options.dprCap)
+    this.layers.setPixelScale(pixels / (2 * Math.tan((this.camera.fov * Math.PI) / 360)))
+  }
+
+  /**
+   * Draw at a new CSS size (#63): the layout gives the globe whatever the lens can hold.
+   * Keeps the GPU context; the a11y overlay reads the same size, so positions agree.
+   */
+  resize(size: number): void {
+    if (this.disposed || size === this.size) return
+    this.size = size
+    this.renderer.setSize(size, size, false)
+    this.applyPixelScale()
+    if (this.frameId === 0 && this.attached) this.renderOnce()
   }
 
   /**
@@ -304,6 +330,17 @@ export class GlobeRenderer {
   /** Longitude currently facing the camera, in degrees. */
   facing(): number {
     return facingLongitude(this.rotation)
+  }
+
+  /**
+   * Turn to face a longitude. GlobeHost passes the SVG globe's facing just before the
+   * crossfade, so the two line up, including after a console switch (#62).
+   */
+  setFacing(lon: number): void {
+    this.rotation = rotationForFacing(lon)
+    this.globe.rotation.y = this.rotation
+    this.lastFrame = null
+    if (this.frameId === 0 && this.attached) this.renderOnce()
   }
 
   attach(parent: HTMLElement): void {
@@ -419,7 +456,7 @@ export class GlobeRenderer {
     this.camera.updateMatrixWorld()
     const cam = this.camera.position.toArray()
     if (!this.onFrame || this.focusables.length === 0) return
-    const size = this.options.size
+    const size = this.size
     this.focusables.forEach((f, i) => {
       const item = this.projected[i]
       if (!item) return

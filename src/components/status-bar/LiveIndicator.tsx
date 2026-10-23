@@ -4,6 +4,8 @@ type LiveStatus = 'syncing' | 'live' | 'degraded' | 'offline'
 
 interface LiveIndicatorProps {
   status?: LiveStatus
+  /** Healthy feed count, shown as "Live, N feeds" (#63). */
+  feeds?: number | undefined
 }
 
 const LABEL: Record<LiveStatus, string> = {
@@ -21,11 +23,15 @@ const STATUS_CLASS: Record<LiveStatus, string> = {
 }
 
 /** Feed health. A status region, so LIVE turning DEGRADED is announced. */
-export function LiveIndicator({ status = 'live' }: LiveIndicatorProps) {
+export function LiveIndicator({ status = 'live', feeds }: LiveIndicatorProps) {
+  const label =
+    status === 'live' && feeds !== undefined
+      ? `${LABEL.live}, ${String(feeds)} ${feeds === 1 ? 'feed' : 'feeds'}`
+      : LABEL[status]
   return (
     <div className={[liveStyles.root, STATUS_CLASS[status]].join(' ')} role="status">
       <span className={liveStyles.dot ?? ''} aria-hidden="true" />
-      <span className={liveStyles.label ?? ''}>{LABEL[status]}</span>
+      <span className={liveStyles.label ?? ''}>{label}</span>
     </div>
   )
 }

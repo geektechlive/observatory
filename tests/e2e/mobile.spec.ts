@@ -26,19 +26,6 @@ test.describe('Mobile layout (390 x 844)', () => {
     await expect(iss).not.toBeVisible()
   })
 
-  test('vital-signs strip starts at its LIVE label, not snapped past it (#54)', async ({
-    page,
-  }) => {
-    await page.goto('/')
-    const spine = page.getByRole('region', { name: 'Live vital signs' })
-    await expect(spine).toBeVisible()
-    // The strip overflows on a phone; scroll snapping once parked it on the
-    // first readout cell, hiding the LIVE label off the left edge.
-    await page.waitForTimeout(500)
-    const scrollLeft = await spine.evaluate((el) => el.scrollLeft)
-    expect(scrollLeft).toBe(0)
-  })
-
   test('page has no horizontal overflow', async ({ page }) => {
     await page.goto('/')
     const overflowing = await page.evaluate(

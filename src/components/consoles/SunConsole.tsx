@@ -10,13 +10,10 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 import styles from './console.module.css'
 
-export function SunConsole() {
+/** Beside the Sun stage (#63): activity, wind and the geomagnetic response. */
+export function SunConsoleLead() {
   return (
-    <div className={styles.console ?? ''}>
-      <div className={styles.intro ?? ''}>
-        <span className={styles.introTitle ?? ''}>Sun</span>
-        <span className={styles.introSub ?? ''}>Heliophysics · space weather · forecast</span>
-      </div>
+    <>
       <ErrorBoundary label="Solar Activity">
         <SolarActivityPanel />
       </ErrorBoundary>
@@ -26,6 +23,13 @@ export function SunConsole() {
       <ErrorBoundary label="Geomagnetic">
         <GeomagPanel />
       </ErrorBoundary>
+    </>
+  )
+}
+
+export function SunConsoleRest() {
+  return (
+    <>
       <ErrorBoundary label="CME Watch">
         <CmePanel />
       </ErrorBoundary>
@@ -43,6 +47,6 @@ export function SunConsole() {
           <SolarCyclePanel />
         </ErrorBoundary>
       </div>
-    </div>
+    </>
   )
 }

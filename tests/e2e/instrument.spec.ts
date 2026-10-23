@@ -1,11 +1,6 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('The Instrument', () => {
-  test('vital-signs spine is present', async ({ page }) => {
-    await page.goto('/')
-    await expect(page.getByLabel('Live vital signs')).toBeVisible()
-  })
-
   test('orbital dial switches console and updates the hash', async ({ page }) => {
     await page.goto('/')
     // default view is earth
@@ -23,6 +18,7 @@ test.describe('The Instrument', () => {
 
   test('layer control toggles a layer', async ({ page }) => {
     await page.goto('/')
+    await page.getByRole('button', { name: /Layers/ }).click()
     const fires = page.getByRole('switch', { name: /Fires/ })
     await expect(fires).toHaveAttribute('aria-checked', 'false')
     await fires.click()

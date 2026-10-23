@@ -109,6 +109,49 @@
   color: var(--bone);
 }
 
+/* Desktop and tablet (#63): a vertical rail of machined rings left of the lens, as in
+   the approved prototype. The active ring is a polished copper button. */
+@media (width >= 900px) {
+  .dial {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-5) 0;
+  }
+
+  .orbitLine,
+  .nodeSub {
+    display: none;
+  }
+
+  .node {
+    padding: 0;
+  }
+
+  .glyphRing {
+    width: 52px;
+    height: 52px;
+    background: radial-gradient(circle at 35% 30%, var(--hull-2), var(--hull) 70%);
+    box-shadow:
+      inset 0 1px 0 var(--plate-highlight),
+      0 4px 10px var(--shade-edge);
+  }
+
+  .nodeActive .glyphRing {
+    color: var(--void);
+    border-color: var(--copper-glow);
+    transform: none;
+    background: radial-gradient(circle at 35% 30%, var(--copper-glow), var(--copper-2) 75%);
+    box-shadow:
+      inset 0 1px 0 var(--plate-highlight),
+      0 4px 10px var(--shade-edge);
+  }
+
+  .nodeActive .nodeLabel {
+    color: var(--copper-glow);
+  }
+}
+
 /* Below 899px the stage + telemetry plate stack tall enough that the dial can
    fall off the first screenful. Pin it as a sticky hull bar above the ticker
    so the console selector is always reachable without scrolling — this is

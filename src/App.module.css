@@ -1,135 +1,76 @@
-/* The shell (ROCI v2, #52): section grids, the globe frame, the telemetry plate.
-   Tokens only; every shared value lives in src/styles/tokens.css. */
+/* The page (#63), after the approved ROCI v2 prototype: header plate, then a grid of
+   the dial rail, the lens and the console column, with the rest of the console below.
+   Breakpoints follow the prototype (1100 / 640), plus 899 where the dial becomes the
+   fixed bottom bar (orbital-dial.module.css). Tokens only. */
 
-.main {
+.page {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding-bottom: var(--ticker-h);
+  gap: var(--space-5);
+  padding: var(--space-5) var(--gutter) calc(var(--ticker-h) + var(--space-5));
   isolation: isolate;
 }
 
-/* ============================================================
-   SECTION GRIDS
-   ============================================================ */
-
-/* Section 1: Globe hero — wide globe + narrow telemetry panel */
-.globeSection {
+.main {
   display: grid;
-  grid-template-columns: 1fr 460px;
-  gap: var(--space-gap);
-  padding: var(--space-6) var(--gutter);
-}
-
-/* Section 2: Big news row — 3 equal cards */
-.newsSection {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-gap);
-  padding: 0 var(--gutter) var(--space-6);
-}
-
-/* Section 4: Asteroid table + Fireballs */
-.asteroidSection {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: var(--space-gap);
-  padding: 0 var(--gutter) var(--space-6);
-}
-
-/* Section 5: Solar Wind — full width */
-.solarSection {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr 1fr;
-  gap: var(--space-gap);
-  padding: 0 var(--gutter) var(--space-6);
-}
-
-.deepSpaceSection {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-gap);
-  padding: 0 var(--gutter) var(--space-6);
-}
-
-.cycleSection {
-  padding: 0 var(--gutter) var(--space-6);
-}
-
-/* Section 2: Launches — full width */
-.launchSection {
-  padding: 0 var(--gutter) var(--space-6);
-}
-
-/* Globe panel — hull plate */
-.globeFrame {
-  position: relative;
-  padding: 20px;
-  background: var(--plate-bg);
-  border: 1px solid var(--plate-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--plate-shadow);
-  overflow: hidden;
-}
-
-/* Inner weld-seam dashed border */
-.globeFrame::before {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border: 1px dashed var(--panel-border-strong);
-  border-radius: 2px;
-  pointer-events: none;
-}
-
-/* Telemetry plate — right of globe */
-.telemetryPlate {
-  position: relative;
-  padding: 28px 24px 22px;
-  background: var(--plate-bg);
-  border: 1px solid var(--plate-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--plate-shadow);
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: 76px minmax(0, 1fr) minmax(300px, 380px);
+  grid-template-areas:
+    'dial lens console'
+    'rest rest rest'
+    'foot foot foot';
+  align-items: start;
   gap: var(--space-5);
-  overflow: hidden;
 }
 
-/* Hazard chevron at top of telemetry plate */
-.telemetryPlate::before {
-  content: '';
+.dial {
+  grid-area: dial;
+}
+
+.lens {
+  position: relative;
+  grid-area: lens;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.console {
+  grid-area: console;
+}
+
+.rest {
+  grid-area: rest;
+}
+
+.footer {
+  grid-area: foot;
+}
+
+/* The stage holds the instrument (globe, Sun or sky) or the flat map. */
+.stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: 100%;
+}
+
+.stage[data-stage='map'] {
+  justify-items: stretch;
+}
+
+/* Layers sit in the lens's top-left corner, outside the round bezel; over the map's
+   corner in map mode. */
+.layers {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  height: 5px;
-  background: var(--hazard-stripe);
-  opacity: 0.85;
+  z-index: 3;
 }
 
-/* Globe center + layer control. The control sits beside the instrument, not over
-   it (it used to float top-right and cover the bezel). In map mode it floats over the
-   map's corner as before, so the map keeps the frame's full width. */
-.globeCenter {
-  position: relative;
-  display: grid;
-
-  /* minmax(0, 1fr), not the implicit auto column: auto grows to the instrument's
-     536px, so its max-width: 100% never shrinks it on a phone. */
-  grid-template-columns: minmax(0, 1fr) auto;
-  place-items: center;
-  align-items: start;
-  min-height: 400px;
-}
-
-.globeCenter[data-stage='map'] {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-/* width:100% so the MapLibre child doesn't collapse; transform/filter are
-   intentionally NOT retained at rest (a lingering filter/transform on the map
-   ancestor breaks its click coordinate math). */
+/* width:100% so the MapLibre child doesn't collapse; transform/filter are not kept
+   at rest (a lingering filter or transform on the map ancestor breaks its clicks). */
 .stageMorph {
   width: 100%;
   display: grid;
@@ -149,272 +90,94 @@
   }
 }
 
-.layerOverlay {
-  margin: 10px 0 0 var(--space-4);
-  z-index: 5;
-}
-
-.globeCenter[data-stage='map'] .layerOverlay {
+/* Sub-solar bottom left, the ISS bottom right, over the lens's empty corners outside
+   the round bezel, as in the prototype. */
+.plates {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  margin: 0;
-}
-
-@media (width <= 700px) {
-  .globeCenter {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .layerOverlay {
-    order: -1;
-    justify-self: end;
-    margin: 0 0 var(--space-3);
-  }
-}
-
-/* ISS readout bar below globe */
-.issReadoutBar {
-  margin-top: var(--space-4);
-  padding: 10px 14px;
-  background: var(--void);
-  border: 1px solid var(--plate-edge);
-  border-radius: var(--radius);
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--space-4);
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.issReadoutLabel {
-  color: var(--copper-glow);
-  letter-spacing: 0.12em;
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  font-family: var(--font-stencil);
-}
-
-.issReadoutValues {
+  inset: auto 0 0;
   display: flex;
-  gap: var(--space-2) var(--space-5);
-  color: var(--bone-dim);
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: var(--space-4);
+  pointer-events: none;
 }
 
-.issVal {
-  color: var(--signal);
+.plates > * {
+  pointer-events: auto;
 }
 
-.issReadoutDelta {
-  color: var(--bone-faint);
-  letter-spacing: 0.08em;
+@media (prefers-reduced-motion: reduce) {
+  .stageMorph {
+    animation: none;
+  }
 }
 
-/* At phone width the three columns squeezed the values into a stack between the
-   label and the toggle: the values take their own full row instead. */
-@media (width <= 640px) {
-  .issReadoutBar {
-    grid-template-columns: auto 1fr;
+/* Tablet: the dial stays beside the lens, the console drops below it. */
+@media (width <= 1100px) {
+  .main {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-areas:
+      'dial lens'
+      'console console'
+      'rest rest'
+      'foot foot';
   }
 
-  .issReadoutValues {
+  .console {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: start;
+  }
+
+  /* The voice line and its sub-line span the row; the panels share it below. */
+  .console > p {
     grid-column: 1 / -1;
   }
 }
 
-/* Brass plate header (engraved nameplate) */
-.brassPlate {
-  padding: 8px 12px;
-  background: var(--brass-plate-bg);
-  color: var(--void);
-  border: 1px solid var(--plate-edge);
-  font-family: var(--font-stencil);
-  font-size: var(--text-xs);
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  box-shadow:
-    inset 0 1px 0 var(--sheen-line),
-    inset 0 -1px 0 var(--shade-edge);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-/* Salvage plate readout row */
-.salvagePlates {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--plate-seam);
-  gap: 0;
-  flex: 1;
-}
-
-.salvagePlate {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 14px 4px;
-  border-bottom: 1px solid var(--plate-seam);
-}
-
-.salvagePlate:last-child {
-  border-bottom: none;
-}
-
-.salvageLabel {
-  font-family: var(--font-stencil);
-  font-size: var(--text-xs);
-  letter-spacing: 0.2em;
-  color: var(--bone-faint);
-  text-transform: uppercase;
-}
-
-.salvageSub {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--bone-faint);
-  letter-spacing: 0.1em;
-  margin-top: var(--space-2);
-  text-transform: uppercase;
-}
-
-/* A live number is a readout: mono, tabular, no glow (rule 7 keeps Fraunces for the
-   console's one line; copper housing never emits light, and these don't need to). */
-.salvageValue {
-  font-family: var(--font-mono);
-  font-size: clamp(30px, 3.4vw, 42px);
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums slashed-zero;
-  text-align: right;
-}
-
-.salvageChalk {
-  font-family: var(--font-stencil);
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  color: var(--copper-glow);
-  margin-top: var(--space-2);
-  text-transform: lowercase;
-  text-align: right;
-}
-
-/* Map mode toggle row */
-.mapToggleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0 0;
-  border-top: 1px dashed var(--plate-seam);
-  flex-shrink: 0;
-}
-
-/* Map mode toggle: a segmented control on a small plate */
-.mapToggle {
-  display: inline-flex;
-  border: 1px solid var(--plate-edge);
-  border-radius: var(--radius);
-  padding: 2px;
-  background: var(--scrim);
-}
-
-.mapToggleBtn {
-  padding: 5px 12px;
-  min-height: 24px;
-  background: transparent;
-  color: var(--bone-dim);
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border-radius: calc(var(--radius) - 2px);
-  transition:
-    background var(--duration-fast),
-    color var(--duration-fast);
-}
-
-.mapToggleBtnActive {
-  background: var(--copper);
-  color: var(--void);
-}
-
-/* Corner rivets on telemetry plate */
-.cornerRivet {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--rivet);
-  box-shadow: 0 1px 2px var(--shade-edge);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-
-@media (width <= 1199px) {
-  .globeSection {
-    grid-template-columns: 1fr;
-  }
-
-  .newsSection {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .asteroidSection {
-    grid-template-columns: 1fr;
-  }
-
-  .solarSection {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
+/* The dial is a fixed bar above the ticker here, so it leaves the grid. Reserve room
+   so content and the footer never sit under it. 108px matches its --dial-bar-h. */
 @media (width <= 899px) {
-  .globeSection,
-  .newsSection,
-  .asteroidSection {
-    grid-template-columns: 1fr;
-    padding-left: var(--space-5);
-    padding-right: var(--space-5);
-  }
-
-  .solarSection,
-  .deepSpaceSection {
-    grid-template-columns: 1fr;
-    padding-left: var(--space-5);
-    padding-right: var(--space-5);
-  }
-
-  .cycleSection {
-    padding-left: var(--space-5);
-    padding-right: var(--space-5);
-  }
-
-  .launchSection {
-    padding-left: var(--space-5);
-    padding-right: var(--space-5);
-  }
-
-  .globeCenter {
-    min-height: 300px;
-  }
-
-  /* OrbitalDial becomes a fixed hull bar above the ticker at this breakpoint
-     (see orbital-dial.module.css) — reserve room so console content and the
-     footer don't render underneath it. 108px matches the dial's --dial-bar-h
-     fallback; the 640px dial breakpoint uses a shorter bar, which just leaves
-     a little extra breathing room here rather than a hard cutoff. */
-  .main {
+  .page {
     padding-bottom: calc(var(--ticker-h) + 108px + env(safe-area-inset-bottom));
+  }
+
+  .main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'lens'
+      'console'
+      'rest'
+      'foot';
+  }
+
+  /* The dial is position: fixed here; its wrapper must not claim an implicit column. */
+  .dial {
+    display: contents;
+  }
+
+  /* No empty corners to spare at this width: the plates sit under the instrument. */
+  .plates {
+    position: static;
+    width: 100%;
+  }
+}
+
+@media (width <= 640px) {
+  .page {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+
+  /* Layers and Pause stack above the globe instead of sitting in its corners. */
+  .layers {
+    position: static;
+    justify-self: start;
+    margin-bottom: var(--space-3);
+  }
+
+  .plates {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

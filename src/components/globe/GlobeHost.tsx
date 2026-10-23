@@ -15,6 +15,8 @@ import type { GlobeRenderer } from './three/GlobeRenderer'
 type GlobeProps = ComponentProps<typeof Globe> & {
   /** Live lane census for the bezel (#51); the bezel is drawn only when it is given. */
   census?: readonly LaneCensus[] | undefined
+  /** Called with the facing longitude, every frame on WebGL; write it to the DOM, not state. */
+  onFacing?: ((lon: number) => void) | undefined
 }
 
 const NONE: readonly never[] = []
@@ -66,12 +68,19 @@ function releaseAfterFailure(): void {
  * for when it falls back (no WebGL, save-data, ?globe=svg).
  * `data-globe-mode` says which one is live, so e2e can't pass silently on the fallback.
  */
-export function GlobeHost({ census, ...props }: GlobeProps) {
+export function GlobeHost({ census, onFacing, ...props }: GlobeProps) {
   const [mode, setMode] = useState<GlobeMode>('svg')
   const [renderer, setRenderer] = useState<GlobeRenderer | null>(null)
   const slot = useRef<HTMLDivElement>(null)
   const reducedMotion = useReducedMotion()
   const size = props.size ?? 460
+  // The renderer is created once at the size of the moment and resized after that (#63),
+  // so a layout change never tears down and rebuilds the WebGL context.
+  const sizeRef = useRef(size)
+  useEffect(() => {
+    sizeRef.current = size
+    renderer?.resize(size)
+  }, [renderer, size])
   const warm = props.warm ?? true
   // Read at creation only; later changes go through setWarm so the renderer isn't rebuilt.
   const initialWarm = useRef(warm)
@@ -146,9 +155,24 @@ export function GlobeHost({ census, ...props }: GlobeProps) {
 
   // The bezel's bearing scale follows whichever globe is live.
   const bezel = useRef<GlobeBezelHandle>(null)
+  // A ref, so a new onFacing from the parent never re-subscribes the renderer.
+  const onFacingRef = useRef(onFacing)
+  useEffect(() => {
+    onFacingRef.current = onFacing
+  }, [onFacing])
   const onFacingChange = useCallback((lon: number) => {
     bezel.current?.setFacing(lon)
+    onFacingRef.current?.(lon)
   }, [])
+  // The SVG globe's latest facing, handed to the WebGL globe at the crossfade (#62).
+  const svgFacing = useRef<number | null>(null)
+  const onSvgFacingChange = useCallback(
+    (lon: number) => {
+      svgFacing.current = lon
+      onFacingChange(lon)
+    },
+    [onFacingChange],
+  )
   useEffect(() => {
     renderer?.setOnRotate(onFacingChange)
     return () => renderer?.setOnRotate(null)
@@ -169,11 +193,16 @@ export function GlobeHost({ census, ...props }: GlobeProps) {
     }
 
     const start = () => {
-      acquireRenderer(size, reducedMotion, initialWarm.current, () => {
+      acquireRenderer(sizeRef.current, reducedMotion, initialWarm.current, () => {
         fallBack('WebGL context lost')
       })
         .then((created) => {
           if (cancelled || !slot.current) return
+          // Pick up exactly where the SVG globe is, so the crossfade doesn't jump. The
+          // renderer is shared across console switches, so this also resets it on return.
+          if (svgFacing.current !== null) created.setFacing(svgFacing.current)
+          // The shared renderer may have been created at another size (another console).
+          created.resize(sizeRef.current)
           created.attach(slot.current)
           attached = created
           setRenderer(created)
@@ -195,7 +224,7 @@ export function GlobeHost({ census, ...props }: GlobeProps) {
       else window.clearTimeout(idle)
       attached?.detach()
     }
-  }, [size, reducedMotion])
+  }, [reducedMotion])
 
   const webgl = mode === 'webgl'
   const box = size + 2 * BEZEL_WIDTH
@@ -226,7 +255,7 @@ export function GlobeHost({ census, ...props }: GlobeProps) {
             <Globe
               {...props}
               autoRotate={autoRotate}
-              onFacingChange={webgl ? undefined : onFacingChange}
+              onFacingChange={webgl ? undefined : onSvgFacingChange}
             />
           </div>
           <div

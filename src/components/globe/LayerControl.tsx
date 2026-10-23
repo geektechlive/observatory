@@ -74,7 +74,6 @@ export function LayerControl({ showMapLayers = false }: { showMapLayers?: boolea
         <span aria-hidden="true">{open ? '▾' : '▸'}</span> Layers
       </button>
       <div className={styles.list ?? ''} id={listId} data-open={open}>
-        <div className={styles.heading ?? ''}>Layers</div>
         {GLOBE_LAYERS.map((d) => (
           <Toggle key={d.key} def={d} />
         ))}

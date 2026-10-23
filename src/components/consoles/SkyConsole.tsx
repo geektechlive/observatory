@@ -10,24 +10,31 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 import styles from './console.module.css'
 
-export function SkyConsole() {
+/** Beside the sky dome (#63): tonight's planets, Sun and Moon, and close approaches. */
+export function SkyConsoleLead() {
   return (
-    <div className={styles.console ?? ''}>
-      <div className={styles.intro ?? ''}>
-        <span className={styles.introTitle ?? ''}>Sky</span>
-        <span className={styles.introSub ?? ''}>Planets · deep space · near-Earth objects</span>
-      </div>
-      <div className={styles.wide ?? ''}>
-        <ErrorBoundary label="APOD">
-          <ApodCard />
-        </ErrorBoundary>
-      </div>
+    <>
       <ErrorBoundary label="Planets Tonight">
         <PlanetsPanel />
       </ErrorBoundary>
       <ErrorBoundary label="Sun & Moon">
         <SunMoonPanel />
       </ErrorBoundary>
+      <ErrorBoundary label="Sentry">
+        <SentryPanel />
+      </ErrorBoundary>
+    </>
+  )
+}
+
+export function SkyConsoleRest() {
+  return (
+    <>
+      <div className={styles.wide ?? ''}>
+        <ErrorBoundary label="APOD">
+          <ApodCard />
+        </ErrorBoundary>
+      </div>
       <div className={styles.wide ?? ''}>
         <ErrorBoundary label="Close Approaches">
           <AsteroidTable />
@@ -36,15 +43,12 @@ export function SkyConsole() {
       <ErrorBoundary label="Fireballs">
         <FireballList />
       </ErrorBoundary>
-      <ErrorBoundary label="Sentry">
-        <SentryPanel />
-      </ErrorBoundary>
       <ErrorBoundary label="Mars Weather">
         <MarsWeatherPanel />
       </ErrorBoundary>
       <ErrorBoundary label="Exoplanets">
         <ExoplanetPanel />
       </ErrorBoundary>
-    </div>
+    </>
   )
 }

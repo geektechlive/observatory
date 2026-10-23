@@ -37,6 +37,10 @@
   height: 100%;
   object-fit: cover;
   display: block;
+
+  /* SDO burns its timestamp into the bottom of the frame, just inside the round crop,
+     which cut it in half. 1.12 pushes it past the edge; the corona still fits. */
+  transform: scale(1.12);
 }
 
 .limb {

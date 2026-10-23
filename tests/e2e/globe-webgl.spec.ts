@@ -68,7 +68,9 @@ test.describe('Globe host', () => {
   test('a11y overlay: drawn events are focusable, and focus holds the globe still (#48)', async ({
     page,
   }) => {
-    // One wildfire at 12°E, the longitude the globe faces when it starts.
+    // The globe opens on the evening terminator (#62). At 16:40 UTC the sub-solar point
+    // is 70°W, so it opens facing 12°E: freeze the clock there and put a wildfire at 12°E.
+    await page.clock.setFixedTime(new Date('2026-10-19T16:40:00Z'))
     await page.route('/api/eonet', (route) =>
       route.fulfill({
         status: 200,

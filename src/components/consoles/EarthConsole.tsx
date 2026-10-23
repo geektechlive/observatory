@@ -1,18 +1,33 @@
 import { Co2Panel } from '@/components/panels/Co2Panel'
 import { EpicPanel } from '@/components/panels/EpicPanel'
+import { GeomagKpPanel } from '@/components/panels/GeomagKpPanel'
+import { NwsAlertsPanel } from '@/components/panels/NwsAlertsPanel'
+import { SeismicPanel } from '@/components/panels/SeismicPanel'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 import styles from './console.module.css'
 
-export function EarthConsole() {
+/** Beside the globe (#63): the prototype's three Earth panels. */
+export function EarthConsoleLead() {
   return (
-    <div className={styles.console ?? ''}>
-      <div className={styles.intro ?? ''}>
-        <span className={styles.introTitle ?? ''}>Earth</span>
-        <span className={styles.introSub ?? ''}>
-          Hazards &amp; systems — toggle live layers on the globe above
-        </span>
-      </div>
+    <>
+      <ErrorBoundary label="Seismic">
+        <SeismicPanel />
+      </ErrorBoundary>
+      <ErrorBoundary label="Geomagnetic">
+        <GeomagKpPanel />
+      </ErrorBoundary>
+      <ErrorBoundary label="Weather alerts">
+        <NwsAlertsPanel />
+      </ErrorBoundary>
+    </>
+  )
+}
+
+/** Below the globe: the rest of the Earth console. */
+export function EarthConsoleRest() {
+  return (
+    <>
       <div className={styles.wide ?? ''}>
         <ErrorBoundary label="EPIC">
           <EpicPanel />
@@ -21,6 +36,6 @@ export function EarthConsole() {
       <ErrorBoundary label="Atmospheric CO₂">
         <Co2Panel />
       </ErrorBoundary>
-    </div>
+    </>
   )
 }

@@ -1,6 +1,7 @@
 /* GlobeHost: the bezel ring around a lens that holds the SVG first paint and the
    WebGL crossfade (#46, #51). The whole instrument scales down to fit narrow screens. */
 .instrument {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: var(--space-3);
@@ -53,7 +54,11 @@
   height: 100%;
 }
 
+/* Pause sits in the instrument's top-right corner (#63), outside the round bezel. */
 .controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
   display: flex;
-  justify-content: center;
 }

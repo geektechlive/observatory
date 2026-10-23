@@ -1,0 +1,29 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--panel-body-pad);
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.place {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--bone-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mag {
+  font-size: var(--text-sm);
+}

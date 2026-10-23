@@ -72,6 +72,25 @@ export function rotationForFacing(lon: number): number {
   return (-90 - lon) * RAD
 }
 
+/**
+ * Spin rate for both globes, in degrees per second (#62). The approved prototype turns
+ * 0.00006 rad/ms, about 3.44°/s; the old 6°/s read as busy. The SVG and WebGL globes
+ * must share it, or the crossfade jumps.
+ */
+export const GLOBE_SPIN_DEG_PER_SEC = (0.00006 * 1000) / RAD
+
+/** How far east of the sub-solar point the globe opens: the evening terminator. */
+const TERMINATOR_OFFSET_DEG = 82
+
+/**
+ * The longitude to open on (#62): just past the evening terminator, so sunlit copper
+ * sits on the left and city lights on the right, whatever the time. A fixed 12°E opened
+ * on a black night side during US evenings.
+ */
+export function terminatorFacing(date: Date): number {
+  return wrapLon(subsolarPoint(date).lon + TERMINATOR_OFFSET_DEG)
+}
+
 export interface GpuInfo {
   renderer: string
   maxTextureSize: number

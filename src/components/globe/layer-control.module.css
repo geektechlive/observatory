@@ -1,24 +1,8 @@
 /* Layer control: a scrim plate of switches. Each row carries a Swatch for identity
    and ink for the label; the switch state shows as a filled or hollow mark (ROCI v2, #57). */
 .control {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: var(--space-3) var(--space-3) 9px;
-  background: var(--scrim);
-  border: 1px solid var(--plate-seam);
-  border-radius: var(--radius);
-  backdrop-filter: blur(6px);
-  min-width: 124px;
-}
-
-.heading {
-  font-family: var(--font-stencil);
-  font-size: var(--text-xs);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--copper-glow);
-  margin-bottom: var(--space-2);
+  position: relative;
+  display: block;
 }
 
 .row {
@@ -76,61 +60,56 @@
   margin: 5px 0;
 }
 
+/* At every width (#63) the switches sit behind a native disclosure button, closed by
+   default: open, the list covered the globe's bezel at desktop sizes. Opened, it
+   floats over the lens corner rather than pushing the instrument down. */
 .chip {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 6px 10px;
+  background: var(--scrim);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  backdrop-filter: blur(6px);
+  color: var(--copper-glow);
+  font-family: var(--font-stencil);
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) ease;
+}
+
+.chip:hover {
+  border-color: var(--copper);
 }
 
 .list {
-  display: contents;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 6px;
+  padding: var(--space-3) var(--space-3) 9px;
+  background: var(--scrim);
+  border: 1px solid var(--plate-seam);
+  border-radius: var(--radius);
+  backdrop-filter: blur(6px);
+  min-width: 124px;
 }
 
+.list[data-open='false'] {
+  display: none;
+}
+
+/* On a phone the list opens in the flow, above the globe. */
 @media (width <= 640px) {
-  .control {
-    display: block;
-    padding: 0;
-    background: none;
-    border: none;
-    backdrop-filter: none;
-    min-width: 0;
-  }
-
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 24px;
-    padding: 6px 10px;
-    background: var(--scrim);
-    border: 1px solid var(--plate-edge);
-    border-radius: var(--radius);
-    backdrop-filter: blur(6px);
-    color: var(--copper-glow);
-    font-family: var(--font-stencil);
-    font-size: var(--text-xs);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: border-color var(--duration-fast) ease;
-  }
-
-  .chip:hover {
-    border-color: var(--copper);
-  }
-
   .list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    margin-top: 6px;
-    padding: var(--space-3) var(--space-3) 9px;
-    background: var(--scrim);
-    border: 1px solid var(--plate-seam);
-    border-radius: var(--radius);
-    backdrop-filter: blur(6px);
-    min-width: 124px;
-  }
-
-  .list[data-open='false'] {
-    display: none;
+    position: static;
   }
 }

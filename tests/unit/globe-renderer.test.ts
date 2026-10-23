@@ -8,7 +8,7 @@ import { Texture } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 import { GlobeRenderer, type RendererDeps } from '@/components/globe/three/GlobeRenderer'
-import { altToRadius, isOccluded } from '@/lib/globe3d'
+import { altToRadius, GLOBE_SPIN_DEG_PER_SEC, isOccluded, terminatorFacing } from '@/lib/globe3d'
 
 function fakes() {
   const canvas = document.createElement('canvas')
@@ -46,6 +46,8 @@ const OPTIONS = {
   dprCap: 1.5,
   reducedMotion: false,
   warm: true,
+  // Fixed so the geometry in these tests doesn't depend on the clock.
+  startFacing: 12,
 }
 
 describe('GlobeRenderer', () => {
@@ -66,7 +68,7 @@ describe('GlobeRenderer', () => {
     expect(f.renderer.forceContextLoss).toHaveBeenCalled()
   })
 
-  it('rotates westward at the SVG globe rate (6 degrees per second)', async () => {
+  it('rotates westward at the shared spin rate (#62)', async () => {
     const f = fakes()
     const r = await GlobeRenderer.create(OPTIONS, f.deps)
     const parent = document.createElement('div')
@@ -74,7 +76,25 @@ describe('GlobeRenderer', () => {
     const before = r.facing()
     f.tick(1000)
     f.tick(2000)
-    expect(before - r.facing()).toBeCloseTo(6, 0)
+    expect(before - r.facing()).toBeCloseTo(GLOBE_SPIN_DEG_PER_SEC, 3)
+    r.dispose()
+  })
+
+  it('starts facing the evening terminator when no start is given (#62)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-19T02:19:00Z'))
+    const f = fakes()
+    const r = await GlobeRenderer.create({ ...OPTIONS, startFacing: undefined }, f.deps)
+    expect(r.facing()).toBeCloseTo(terminatorFacing(new Date('2026-10-19T02:19:00Z')), 6)
+    r.dispose()
+    vi.useRealTimers()
+  })
+
+  it('setFacing turns the globe to a longitude, so the SVG crossfade lines up (#62)', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.setFacing(-133.5)
+    expect(r.facing()).toBeCloseTo(-133.5, 6)
     r.dispose()
   })
 
@@ -303,6 +323,23 @@ describe('GlobeRenderer onFrame (#48: one pose source for the a11y overlay)', ()
     // The point facing the camera projects to the canvas centre
     expect(front?.x).toBeCloseTo(230, 0)
     expect(front?.y).toBeCloseTo(230, 0)
+    r.dispose()
+  })
+
+  it('resize() changes the drawing size and the projection, without a new context (#63)', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const frames: { x: number; y: number }[][] = []
+    r.setOnFrame((items) => frames.push(items.map((i) => ({ x: i.x, y: i.y }))))
+    r.setLayers(LAYERS)
+    r.attach(document.createElement('div'))
+    r.resize(680)
+    f.tick(16)
+    expect(f.renderer.setSize).toHaveBeenLastCalledWith(680, 680, false)
+    // The point facing the camera now projects to the centre of the larger canvas.
+    expect(frames.at(-1)?.[0]?.x).toBeCloseTo(340, 0)
+    expect(frames.at(-1)?.[0]?.y).toBeCloseTo(340, 0)
+    expect(f.renderer.dispose).not.toHaveBeenCalled()
     r.dispose()
   })
 
