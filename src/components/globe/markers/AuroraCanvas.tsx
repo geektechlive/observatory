@@ -1,12 +1,13 @@
 import { memo, useEffect, useRef } from 'react'
 
+import { auroraAlpha } from '@/lib/auroraField'
 import { AURORA_HEX, withAlpha } from '@/lib/palette'
 
 import { project } from '../useGlobeProjection'
 
-/** Aurora intensity (0-29) sets the alpha; the hue is the one aurora green (owner pick). */
+/** Aurora intensity (about 4-29) sets the alpha; the hue is the one aurora green (owner pick). */
 function auroraFill(intensity: number): string {
-  return withAlpha(AURORA_HEX, Math.min(0.45, 0.07 + intensity / 70))
+  return withAlpha(AURORA_HEX, auroraAlpha(intensity))
 }
 
 interface AuroraCanvasProps {

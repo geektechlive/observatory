@@ -4,8 +4,10 @@
  * only turns a plan into three.js objects. Colours come from palette.ts only, and
  * magnitude is drawn as size, never as colour within a lane (spec section 4).
  */
+import { auroraAlpha } from './auroraField'
 import { altToRadius, latLonToVec3 } from './globe3d'
 import { AURORA_HEX, eonetKind, gdacsColor, ISS_HEX, LANES } from './palette'
+import { gdacsStatus, quakeStatus } from './severity'
 
 type Vec3 = [number, number, number]
 
@@ -26,7 +28,7 @@ export interface LayerInput {
   launches: readonly { lat: number; lon: number; name: string }[]
   disasters: readonly { lat: number; lon: number; type: string; alert: string; name: string }[]
   satellites: readonly { name: string; lat: number; lon: number; alt?: number | undefined }[]
-  /** OVATION [lon, lat, intensity 0..1] triplets. */
+  /** OVATION [lon, lat, intensity] triplets; intensity runs about 4..29 (see auroraAlpha). */
   aurora: readonly (readonly [number, number, number])[]
   tracking: boolean
 }
@@ -65,20 +67,28 @@ export interface PlannedPoint {
   alpha: number
 }
 
+/** An active hazard that glows (#50): bloom on the high tier, an additive sprite on low. */
+export interface PlannedGlow {
+  layer: 'events' | 'disasters' | 'quakes'
+  position: Vec3
+  color: string
+}
+
 export interface LayerPlan {
   iss: { position: Vec3; color: string; name: string } | null
   trail: Vec3[]
   markers: PlannedMarker[]
   spikes: PlannedSpike[]
   points: PlannedPoint[]
+  glows: PlannedGlow[]
+  /** OVATION cells for the aurora field texture (#50); `points` keeps the per-cell census. */
+  aurora: LayerInput['aurora']
 }
 
 /** Markers sit just off the surface so they never z-fight the Earth. */
 const SURFACE = 1.008
-const AURORA_SHELL = 1.012
+export const AURORA_SHELL = 1.012
 const DEFAULT_SAT_ALT_KM = 550
-/** OVATION is a dense grid: normal blending converges on the aurora green instead of climbing to white. */
-const AURORA_ALPHA = 0.12
 
 /** Quake spike height, globe radii: M4 is a stub, M8 stands tall; unknown is a stub. */
 export function spikeHeight(mag: number | null): number {
@@ -196,7 +206,7 @@ export function planLayers(input: LayerInput): LayerPlan {
       position: latLonToVec3(lat, lon, AURORA_SHELL),
       color: AURORA_HEX,
       size: 0.035,
-      alpha: Math.min(Math.max(intensity, 0), 1) * AURORA_ALPHA,
+      alpha: auroraAlpha(intensity),
     })
   }
 
@@ -213,5 +223,42 @@ export function planLayers(input: LayerInput): LayerPlan {
     markers,
     spikes,
     points,
+    glows: planGlows(input, markers, spikes),
+    aurora: input.aurora,
   }
+}
+
+/**
+ * Active hazards (#50): every EONET event (the feed lists open events only), GDACS
+ * orange and red, and quakes at watch or above (M4.5+). Severity thresholds come
+ * from severity.ts, never from here.
+ */
+function planGlows(
+  input: LayerInput,
+  markers: readonly PlannedMarker[],
+  spikes: readonly PlannedSpike[],
+): PlannedGlow[] {
+  const glows: PlannedGlow[] = []
+  for (const m of markers) {
+    if (m.layer === 'events') glows.push({ layer: 'events', position: m.position, color: m.color })
+  }
+  input.disasters.forEach((d) => {
+    if (gdacsStatus(d.alert) === 'nominal') return
+    glows.push({
+      layer: 'disasters',
+      position: latLonToVec3(d.lat, d.lon, SURFACE),
+      color: gdacsColor(d.alert),
+    })
+  })
+  input.quakes.forEach((q, i) => {
+    const spike = spikes[i]
+    if (q.mag === null || quakeStatus(q.mag) === 'nominal' || !spike) return
+    const tip = 1 + spike.height
+    glows.push({
+      layer: 'quakes',
+      position: [spike.base[0] * tip, spike.base[1] * tip, spike.base[2] * tip],
+      color: spike.color,
+    })
+  })
+  return glows
 }

@@ -12,10 +12,12 @@ import {
   CanvasTexture,
   Color,
   ConeGeometry,
+  DataTexture,
   Float32BufferAttribute,
   Group,
   InstancedMesh,
   Line,
+  LinearFilter,
   LineBasicMaterial,
   type Material,
   Matrix4,
@@ -25,6 +27,8 @@ import {
   type Object3D,
   Points,
   Quaternion,
+  RedFormat,
+  RepeatWrapping,
   ShaderMaterial,
   SphereGeometry,
   Sprite,
@@ -33,11 +37,31 @@ import {
   Vector3,
 } from 'three'
 
+import { auroraFieldData, FIELD_H, FIELD_W } from '@/lib/auroraField'
 import { isOccluded, type Vec3 } from '@/lib/globe3d'
-import type { Glyph, LayerPlan, PlannedPoint } from '@/lib/globeLayers'
-import { BONE_HEX, VOID_HEX } from '@/lib/palette'
+import {
+  AURORA_SHELL,
+  type Glyph,
+  type LayerPlan,
+  type PlannedGlow,
+  type PlannedPoint,
+} from '@/lib/globeLayers'
+import { AURORA_HEX, BONE_HEX, VOID_HEX } from '@/lib/palette'
+
+import { auroraFragment, auroraVertex } from './shaders'
+
+/**
+ * three.js layer for the bloom pass (#50). Only the ISS core, aurora, hazard cores and
+ * the Earth's city-light twin are on it; glyphs, nameplates and copper never are.
+ */
+export const BLOOM_LAYER = 1
 
 const GLYPH_PX = 64
+/** High tier: the emissive bead under a hazard glyph that the bloom spreads. */
+const HAZARD_CORE_RADIUS = 0.008
+/** Low tier: the additive halo around a hazard glyph, in globe units. */
+const HAZARD_SPRITE_SCALE = 0.08
+const HAZARD_SPRITE_OPACITY = 0.6
 const MARKER_SCALE = 0.055
 const ISS_SCALE = 0.11
 /** Nameplate canvas: ring and dot on the left, the name beside it. */
@@ -190,18 +214,31 @@ interface Nameplate {
   local: Vector3
 }
 
+export interface LayerObjectOptions {
+  /** High tier: hazards glow through the bloom pass. Low tier: additive sprites. */
+  bloom: boolean
+}
+
 export class GlobeLayerObjects {
   readonly group = new Group()
   private readonly staticGroup = new Group()
   private readonly glyphCache = new Map<string, GlyphTexture>()
+  private readonly bloom: boolean
   private issGroup: Group | null = null
+  private issCore: Mesh | null = null
   private issPlate: Nameplate | null = null
   private staticPlates: Nameplate[] = []
+  private hazardCores: Mesh[] = []
+  private hazardSprites: Sprite[] = []
+  private auroraField: Mesh<BufferGeometry, ShaderMaterial> | null = null
+  private auroraTexture: DataTexture | null = null
+  private auroraTime = 0
   private trailLine: Line | null = null
   private pixelScale = 460
   private readonly scratch = new Vector3()
 
-  constructor() {
+  constructor({ bloom }: LayerObjectOptions = { bloom: false }) {
+    this.bloom = bloom
     this.group.add(this.staticGroup)
   }
 
@@ -216,6 +253,13 @@ export class GlobeLayerObjects {
   buildStatic(plan: LayerPlan): void {
     this.clear(this.staticGroup)
     this.staticPlates = []
+    this.hazardCores = []
+    this.hazardSprites = []
+    this.auroraField = null
+    this.auroraTexture?.dispose()
+    this.auroraTexture = null
+    // Glows first, so a low-tier sprite draws under the glyph that sits on it.
+    for (const g of plan.glows) this.staticGroup.add(this.buildGlow(g))
     for (const m of plan.markers) {
       const key = `${JSON.stringify(m.glyph)}:${m.color}`
       let glyph = this.glyphCache.get(key)
@@ -226,16 +270,23 @@ export class GlobeLayerObjects {
       this.staticGroup.add(this.nameplateOrGlyph(glyph, m.position, m.color, m.glyph))
     }
     if (plan.spikes.length) this.staticGroup.add(this.buildSpikes(plan))
-    for (const layer of ['fires', 'aurora'] as const) {
-      const pts = plan.points.filter((p) => p.layer === layer)
-      if (pts.length) this.staticGroup.add(this.buildPoints(pts, layer === 'aurora'))
-    }
+    const fires = plan.points.filter((p) => p.layer === 'fires')
+    if (fires.length) this.staticGroup.add(this.buildPoints(fires))
+    if (plan.aurora.length) this.staticGroup.add(this.buildAuroraField(plan.aurora))
+  }
+
+  /** Seconds of shimmer for the aurora field; the renderer freezes it when motion stops. */
+  setTime(seconds: number): void {
+    this.auroraTime = seconds
+    const uniform = this.auroraField?.material.uniforms['time']
+    if (uniform) uniform.value = seconds
   }
 
   updateIss(plan: LayerPlan): void {
     if (!plan.iss) {
       if (this.issGroup) this.disposeObject(this.issGroup)
       this.issGroup = null
+      this.issCore = null
       this.issPlate = null
       if (this.trailLine) this.disposeObject(this.trailLine)
       this.trailLine = null
@@ -247,6 +298,9 @@ export class GlobeLayerObjects {
         new SphereGeometry(0.012, 12, 8),
         new MeshBasicMaterial({ color: plan.iss.color }),
       )
+      // The core blooms; the name and the sprite glow stay sharp (#50).
+      core.layers.enable(BLOOM_LAYER)
+      this.issCore = core
       const glow = new Sprite(
         new SpriteMaterial({
           map: this.glow(plan.iss.color),
@@ -331,6 +385,33 @@ export class GlobeLayerObjects {
     return this.issPlate ? [this.issPlate, ...this.staticPlates] : this.staticPlates
   }
 
+  /** For tests: the bloom-only hazard cores (high tier). */
+  debugHazardCores(): readonly Mesh[] {
+    return this.hazardCores
+  }
+
+  /** For tests: the additive hazard sprites (low tier). */
+  debugHazardSprites(): readonly Sprite[] {
+    return this.hazardSprites
+  }
+
+  /** For tests: the ISS core and its sprites (glow and name). */
+  debugIss(): { core: Mesh; sprites: Sprite[] } | null {
+    if (!this.issGroup || !this.issCore) return null
+    return {
+      core: this.issCore,
+      sprites: this.issGroup.children.filter((c): c is Sprite => c instanceof Sprite),
+    }
+  }
+
+  debugAuroraField(): Mesh | null {
+    return this.auroraField
+  }
+
+  debugAuroraTime(): number {
+    return this.auroraTime
+  }
+
   /** A plain glyph sprite, or a spacecraft nameplate with its glow, anchored on the marker point. */
   private nameplateOrGlyph(
     glyph: GlyphTexture,
@@ -380,6 +461,67 @@ export class GlobeLayerObjects {
     this.clear(this.group)
     for (const t of this.glyphCache.values()) t.map.dispose()
     this.glyphCache.clear()
+    this.auroraTexture?.dispose()
+    this.auroraTexture = null
+  }
+
+  /**
+   * An active hazard's glow (#50). High tier: a small emissive core drawn only in the
+   * bloom pass, so the glyph and its void halo stay sharp. Low tier: an additive sprite.
+   */
+  private buildGlow(glow: PlannedGlow): Object3D {
+    if (this.bloom) {
+      const core = new Mesh(
+        new SphereGeometry(HAZARD_CORE_RADIUS, 10, 6),
+        new MeshBasicMaterial({ color: glow.color }),
+      )
+      core.position.fromArray(glow.position)
+      core.layers.set(BLOOM_LAYER)
+      this.hazardCores.push(core)
+      return core
+    }
+    const sprite = new Sprite(
+      new SpriteMaterial({
+        map: this.glow(glow.color),
+        blending: AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+        opacity: HAZARD_SPRITE_OPACITY,
+      }),
+    )
+    sprite.position.fromArray(glow.position)
+    sprite.scale.setScalar(HAZARD_SPRITE_SCALE)
+    this.hazardSprites.push(sprite)
+    return sprite
+  }
+
+  /** One shell for the whole oval (#50), drawn in the main pass and the bloom pass. */
+  private buildAuroraField(cells: LayerPlan['aurora']): Mesh {
+    const texture = new DataTexture(auroraFieldData(cells), FIELD_W, FIELD_H, RedFormat)
+    texture.wrapS = RepeatWrapping
+    texture.magFilter = LinearFilter
+    texture.minFilter = LinearFilter
+    texture.needsUpdate = true
+    this.auroraTexture = texture
+    const mesh = new Mesh(
+      new SphereGeometry(AURORA_SHELL, 96, 64),
+      new ShaderMaterial({
+        uniforms: {
+          field: { value: texture },
+          color: { value: new Color(AURORA_HEX) },
+          time: { value: this.auroraTime },
+        },
+        vertexShader: auroraVertex,
+        fragmentShader: auroraFragment,
+        transparent: true,
+        depthWrite: false,
+        // Normal blending: overlapping cells converge on the one green instead of white.
+        blending: NormalBlending,
+      }),
+    )
+    mesh.layers.enable(BLOOM_LAYER)
+    this.auroraField = mesh
+    return mesh
   }
 
   private buildSpikes(plan: LayerPlan): InstancedMesh {
@@ -404,7 +546,7 @@ export class GlobeLayerObjects {
     return mesh
   }
 
-  private buildPoints(pts: readonly PlannedPoint[], field: boolean): Points {
+  private buildPoints(pts: readonly PlannedPoint[]): Points {
     const geometry = new BufferGeometry()
     const color = new Color()
     geometry.setAttribute(
@@ -439,14 +581,12 @@ export class GlobeLayerObjects {
       uniforms: {
         scale: { value: this.pixelScale },
         halo: { value: new Color(VOID_HEX) },
-        // A field (aurora) has no halo; discrete markers keep theirs for contrast.
-        haloAmount: { value: field ? 0 : 1 },
+        haloAmount: { value: 1 },
       },
       vertexShader: pointVertex,
       fragmentShader: pointFragment,
       transparent: true,
       depthWrite: false,
-      // Normal blending even for the aurora field: additive overlap of a dense grid climbs to white.
       blending: NormalBlending,
     })
     return new Points(geometry, material)

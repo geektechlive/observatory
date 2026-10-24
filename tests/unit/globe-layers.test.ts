@@ -146,12 +146,13 @@ describe('planLayers', () => {
     for (const s of stations) expect(s.color).toBe(ISS_HEX)
   })
 
-  it('turns aurora triplets into a single-hue field just above the surface, intensity as alpha', () => {
+  it('turns aurora triplets into a single-hue field just above the surface, OVATION intensity as alpha', () => {
     const plan = planLayers({
       ...EMPTY,
+      // Real OVATION values run about 4..29; the old clamp to 0..1 made them all equal.
       aurora: [
-        [0, 70, 0.8],
-        [10, 70, 0.1],
+        [0, 70, 25],
+        [10, 70, 5],
       ],
     })
     const field = plan.points.filter((p) => p.layer === 'aurora')
@@ -160,5 +161,51 @@ describe('planLayers', () => {
     expect(field[0]?.alpha ?? 0).toBeGreaterThan(field[1]?.alpha ?? 0)
     expect(radius(field[0]?.position ?? [])).toBeGreaterThan(1)
     expect(field[0]?.position).not.toEqual(latLonToVec3(70, 0, 1))
+  })
+})
+
+describe('planLayers active-hazard glows (#50)', () => {
+  it('glows every open EONET event, GDACS orange and red, and quakes M4.5 and up', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      events: [{ lat: 10, lon: 20, kind: 'wildfires' }],
+      disasters: [
+        { lat: 1, lon: 1, type: 'FL', alert: 'Green', name: 'quiet' },
+        { lat: 2, lon: 2, type: 'TC', alert: 'Orange', name: 'storm' },
+        { lat: 3, lon: 3, type: 'EQ', alert: 'Red', name: 'big' },
+      ],
+      quakes: [
+        { lat: 30, lon: 40, mag: 4.4, place: 'small' },
+        { lat: 31, lon: 41, mag: 4.5, place: 'watch' },
+        { lat: 32, lon: 42, mag: 6.8, place: 'hazard' },
+        { lat: 33, lon: 43, mag: null, place: 'unknown' },
+      ],
+    })
+    expect(plan.glows.map((g) => g.layer)).toEqual([
+      'events',
+      'disasters',
+      'disasters',
+      'quakes',
+      'quakes',
+    ])
+  })
+
+  it('puts a quake glow at the spike tip, in the spike colour', () => {
+    const plan = planLayers({ ...EMPTY, quakes: [{ lat: 0, lon: 0, mag: 6, place: 'x' }] })
+    const [glow] = plan.glows
+    const [spike] = plan.spikes
+    expect(radius(glow?.position ?? [])).toBeCloseTo(1 + (spike?.height ?? 0), 6)
+    expect(glow?.color).toBe(spike?.color)
+  })
+
+  it('never glows launches, fireballs, fires or spacecraft', () => {
+    const plan = planLayers({
+      ...EMPTY,
+      launches: [{ lat: 28, lon: -80, name: 'pad' }],
+      fireballs: [{ lat: 5, lon: 5, energy: 1 }],
+      fires: [{ lat: 6, lon: 6, frp: 50 }],
+      satellites: [{ name: 'Hubble', lat: 0, lon: 0, alt: 540 }],
+    })
+    expect(plan.glows).toEqual([])
   })
 })

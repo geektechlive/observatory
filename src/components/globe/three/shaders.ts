@@ -64,6 +64,61 @@ export const earthFragment = /* glsl */ `
   }
 `
 
+/**
+ * The Earth in the bloom pass (#50): only the night side's city lights, black
+ * everywhere else, so copper never glows. It still writes depth, so nothing on the
+ * far side of the planet glows through it. Shares the Earth's uniforms.
+ */
+export const earthBloomFragment = /* glsl */ `
+  uniform sampler2D nightTex;
+  uniform vec3 sunDir;
+  uniform vec3 gNight;
+  uniform float showTerminator;
+  varying vec2 vUv;
+  varying vec3 vNormalObj;
+
+  void main() {
+    float ndl = dot(normalize(vNormalObj), sunDir);
+    float dayAmt = mix(1.0, smoothstep(-0.08, 0.12, ndl), showTerminator);
+    float city = texture2D(nightTex, vUv).r;
+    gl_FragColor = vec4(gNight * pow(city, 1.6) * 1.8 * (1.0 - dayAmt), 1.0);
+    #include <colorspace_fragment>
+  }
+`
+
+export const auroraVertex = /* glsl */ `
+  varying vec3 vPos;
+  void main() {
+    vPos = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+/**
+ * The aurora field (#50). The texel lookup is fieldUv() in src/lib/auroraField.ts,
+ * which the unit tests pin; keep the two in step. The shimmer drifts slow bands along
+ * the oval; time stands still under reduced motion and while rotation is paused.
+ */
+export const auroraFragment = /* glsl */ `
+  #define PI 3.141592653589793
+  uniform sampler2D field;
+  uniform vec3 color;
+  uniform float time;
+  varying vec3 vPos;
+  void main() {
+    vec3 n = normalize(vPos);
+    float lat = degrees(asin(clamp(n.y, -1.0, 1.0)));
+    float lon = degrees(atan(-n.z, n.x));
+    vec2 uv = vec2((lon + 180.5) / 360.0, (lat + 90.5) / 181.0);
+    float a = texture2D(field, uv).r;
+    if (a <= 0.0) discard;
+    float lonR = radians(lon);
+    float shimmer = 0.78 + 0.22 * sin(lonR * 26.0 + time * 0.5 + 2.0 * sin(lonR * 7.0 - time * 0.21));
+    gl_FragColor = vec4(color, a * shimmer);
+    #include <colorspace_fragment>
+  }
+`
+
 export const atmosphereVertex = /* glsl */ `
   varying vec3 vNormalView;
   varying vec3 vNormalObj;
