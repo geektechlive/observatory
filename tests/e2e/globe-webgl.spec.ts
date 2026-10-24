@@ -22,6 +22,16 @@ test.describe('Globe host', () => {
     await expect(host(page)).toHaveAttribute('data-globe-mode', 'webgl', { timeout: 15_000 })
   })
 
+  test('headless SwiftShader is the low tier: sprites, not bloom (#50)', async ({ page }) => {
+    // This also means e2e never draws the bloom pass; see the CLAUDE.md gotcha.
+    await page.goto('/')
+    await expect(page.locator('canvas[data-globe-webgl]')).toHaveAttribute(
+      'data-globe-bloom',
+      'sprites',
+      { timeout: 15_000 },
+    )
+  })
+
   test('?globe=svg keeps the SVG globe', async ({ page }) => {
     await page.goto('/?globe=svg')
     await page.waitForTimeout(2500) // past the idle upgrade window
