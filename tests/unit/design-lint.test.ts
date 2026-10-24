@@ -10,7 +10,7 @@ import { resolve } from 'node:path'
 
 import { ESLint } from 'eslint'
 import stylelint from 'stylelint'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 const root = resolve(__dirname, '../..')
 const designLint = JSON.parse(readFileSync(resolve(root, 'design-lint.json'), 'utf8')) as {
@@ -35,6 +35,12 @@ async function cssErrors(code: string, file: string): Promise<string[]> {
 }
 
 const eslint = new ESLint({ cwd: root })
+
+// The first typed lint builds the TS program, about 6 s under `pnpm verify`'s parallel
+// load. Pay it once here, so it doesn't time out whichever test happens to run first.
+beforeAll(async () => {
+  await eslint.lintText('export {}\n', { filePath: resolve(root, ENFORCED_TS) })
+}, 60_000)
 
 async function tsMessages(code: string, file: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath: resolve(root, file) })

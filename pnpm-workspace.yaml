@@ -32,6 +32,13 @@ minimumReleaseAgeExclude:
   - lightningcss
   - workerd
 
+# Forced patch versions. Each entry says why and when it can go.
+overrides:
+  # GHSA-xjj6-f33q-929c (undici DoS, fixed in 7.30.1). wrangler 4.152.0 > miniflare
+  # still pins an older 7.x. Same major, patch only. Drop once `pnpm why undici`
+  # shows miniflare on >=7.30.1 without this.
+  'undici@>=7.18.0 <7.30.1': ^7.30.1
+
 # Advisories accepted on purpose. Each entry needs: why it cannot be fixed, why it
 # does not reach us, and when to look again. Everything else still fails CI.
 auditConfig:

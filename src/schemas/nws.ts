@@ -2,8 +2,6 @@ import { z } from 'zod'
 
 export const NwsFeatureSchema = z.object({
   geometry: z.unknown(), // GeoJSON Polygon/MultiPolygon
-  /** Legacy, ignored by the client since #38 (colour comes from severity); dropped server-side next. */
-  color: z.string().optional(),
   event: z.string(),
   severity: z.string(),
   headline: z.string(),

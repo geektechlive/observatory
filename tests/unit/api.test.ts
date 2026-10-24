@@ -669,7 +669,6 @@ describe('fetchNwsAlerts', () => {
         features: [
           {
             geometry: { type: 'Polygon', coordinates: [] },
-            color: '#ff3b30',
             event: 'Flash Flood Warning',
             severity: 'Severe',
             headline: 'h',

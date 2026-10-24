@@ -21,23 +21,10 @@ const RawSchema = z.object({
   ),
 })
 
-function severityColor(sev: string): string {
-  switch (sev) {
-    case 'Extreme':
-      return '#d000ff'
-    case 'Severe':
-      return '#ff3b30'
-    case 'Moderate':
-      return '#ff9500'
-    case 'Minor':
-      return '#ffd60a'
-    default:
-      return '#8aa0a8'
-  }
-}
-
+// The client colours alerts from `severity` (src/lib/severity.ts). v2 dropped the old
+// server `color` field (#43); the key bump keeps cached v1 bodies from being served.
 export const onRequest: PagesFunction = (ctx) =>
-  cachedJson(ctx, 'nws:alerts:v1', CACHE_TTL_SECONDS, async () => {
+  cachedJson(ctx, 'nws:alerts:v2', CACHE_TTL_SECONDS, async () => {
     const upstream = await fetchUpstream(SOURCE, {
       headers: { 'User-Agent': 'observatory.geektechlive.com', Accept: 'application/geo+json' },
     })
@@ -57,7 +44,6 @@ export const onRequest: PagesFunction = (ctx) =>
         return [
           {
             geometry: f.geometry,
-            color: severityColor(sev),
             event: f.properties.event ?? 'Alert',
             severity: sev,
             headline: f.properties.headline ?? '',
