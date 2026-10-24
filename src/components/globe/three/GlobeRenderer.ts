@@ -36,8 +36,15 @@ import {
 import { layerCounts, type LayerInput, planLayers } from '@/lib/globeLayers'
 import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 
-import { GlobeLayerObjects } from './layers'
-import { atmosphereFragment, atmosphereVertex, earthFragment, earthVertex } from './shaders'
+import { SelectiveBloom } from './bloom'
+import { BLOOM_LAYER, GlobeLayerObjects, OVERLAY_LAYER } from './layers'
+import {
+  atmosphereFragment,
+  atmosphereVertex,
+  earthBloomFragment,
+  earthFragment,
+  earthVertex,
+} from './shaders'
 
 /** Layers that rebuild when their contents change. Satellites move in place instead. */
 const STATIC_KEYS = [
@@ -75,9 +82,20 @@ export interface WebGLRendererLike {
   setPixelRatio(ratio: number): void
   setSize(width: number, height: number, updateStyle?: boolean): void
   render(scene: Scene, camera: PerspectiveCamera): void
+  /** The overlay pass draws over the bloom without clearing (#50). */
+  autoClear?: boolean | undefined
   dispose(): void
   forceContextLoss(): void
   capabilities: { getMaxAnisotropy(): number }
+}
+
+/** The high tier's bloom post-process (#50); tests pass a fake, since it needs a GPU. */
+export interface BloomLike {
+  /** Adds the glow onto the canvas; call right after the scene is drawn. */
+  render(): void
+  /** Device pixels. */
+  setSize(width: number, height: number): void
+  dispose(): void
 }
 
 export interface RendererDeps {
@@ -85,6 +103,14 @@ export interface RendererDeps {
   loadTexture: (url: string) => Promise<Texture>
   requestFrame: (cb: (t: number) => void) => number
   cancelFrame: (id: number) => void
+  /** Only called when options.bloom is on. Width and height are device pixels. */
+  createBloom?: (
+    renderer: WebGLRendererLike,
+    scene: Scene,
+    camera: PerspectiveCamera,
+    width: number,
+    height: number,
+  ) => BloomLike
 }
 
 export interface GlobeRendererOptions {
@@ -97,6 +123,8 @@ export interface GlobeRendererOptions {
   showTerminator?: boolean | undefined
   /** Longitude to open on; defaults to the evening terminator (#62). Tests pin it. */
   startFacing?: number | undefined
+  /** High tier: selective bloom. Low tier (phones, weak GPUs): additive sprites (#50). */
+  bloom?: boolean | undefined
   onContextLost?: (() => void) | undefined
 }
 
@@ -112,6 +140,9 @@ const defaultDeps: RendererDeps = {
   cancelFrame: (id) => {
     cancelAnimationFrame(id)
   },
+  // createRenderer above makes a real WebGLRenderer; only the tests narrow it.
+  createBloom: (renderer, scene, camera, width, height) =>
+    new SelectiveBloom(renderer as WebGLRenderer, scene, camera, width, height),
 }
 
 const vec = (rgb: readonly number[]): Vector3 => new Vector3(rgb[0], rgb[1], rgb[2])
@@ -123,7 +154,10 @@ export class GlobeRenderer {
   private readonly globe = new Group()
   private readonly sun = new Vector3()
   private readonly meshes: Mesh[] = []
-  private readonly layers = new GlobeLayerObjects()
+  private readonly layers: GlobeLayerObjects
+  private readonly bloom: BloomLike | null
+  /** Aurora shimmer clock; it runs only while the globe turns (spec section 6). */
+  private auroraSeconds = 0
   private lastInput: LayerInput | null = null
   private onFrame: ((items: readonly ProjectedItem[]) => void) | null = null
   private onRotate: ((facingLon: number) => void) | null = null
@@ -160,15 +194,22 @@ export class GlobeRenderer {
     this.deps = deps
     this.rotation = rotationForFacing(options.startFacing ?? terminatorFacing(new Date()))
     this.size = options.size
+    this.layers = new GlobeLayerObjects({ bloom: options.bloom === true })
     this.canvas = renderer.domElement
     this.canvas.setAttribute('aria-hidden', 'true')
     // Tests and the host find this canvas by name; the SVG globe and starfield have canvases too.
     this.canvas.dataset['globeWebgl'] = ''
-    renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, options.dprCap))
+    renderer.setPixelRatio(this.pixelRatio())
     renderer.setSize(options.size, options.size, false)
     this.camera.position.set(0, 0, CAMERA_DISTANCE)
     this.camera.lookAt(0, 0, 0)
     this.buildScene()
+    const px = this.devicePixels(options.size)
+    this.bloom =
+      options.bloom === true && deps.createBloom
+        ? deps.createBloom(renderer, this.scene, this.camera, px, px)
+        : null
+    this.canvas.dataset['globeBloom'] = this.bloom ? 'bloom' : 'sprites'
     this.canvas.addEventListener('webglcontextlost', this.handleContextLost)
     document.addEventListener('visibilitychange', this.handleVisibility)
   }
@@ -235,8 +276,19 @@ export class GlobeRenderer {
         depthWrite: false,
       }),
     )
-    this.meshes.push(earth, atmosphere)
-    this.globe.add(earth, atmosphere)
+    // The Earth as the bloom pass sees it (#50): city lights only, sharing the Earth's
+    // geometry and uniforms. It writes depth, so far-side glows stay hidden.
+    const bloomTwin = new Mesh(
+      earth.geometry,
+      new ShaderMaterial({
+        uniforms: earth.material.uniforms,
+        vertexShader: earthVertex,
+        fragmentShader: earthBloomFragment,
+      }),
+    )
+    bloomTwin.layers.set(BLOOM_LAYER)
+    this.meshes.push(earth, atmosphere, bloomTwin)
+    this.globe.add(earth, atmosphere, bloomTwin)
     this.globe.rotation.y = this.rotation
     this.scene.add(this.globe)
     this.globe.add(this.layers.group)
@@ -244,9 +296,18 @@ export class GlobeRenderer {
     this.earthUniforms = earth.material.uniforms
   }
 
+  private pixelRatio(): number {
+    return Math.min(globalThis.devicePixelRatio || 1, this.options.dprCap)
+  }
+
+  /** The drawing buffer's side for a CSS size; WebGLRenderer.setSize floors it the same way. */
+  private devicePixels(size: number): number {
+    return Math.floor(size * this.pixelRatio())
+  }
+
   /** Point sprites are sized in globe units; convert at the camera's focal length. */
   private applyPixelScale(): void {
-    const pixels = this.size * Math.min(globalThis.devicePixelRatio || 1, this.options.dprCap)
+    const pixels = this.size * this.pixelRatio()
     this.layers.setPixelScale(pixels / (2 * Math.tan((this.camera.fov * Math.PI) / 360)))
   }
 
@@ -258,6 +319,7 @@ export class GlobeRenderer {
     if (this.disposed || size === this.size) return
     this.size = size
     this.renderer.setSize(size, size, false)
+    this.bloom?.setSize(this.devicePixels(size), this.devicePixels(size))
     this.applyPixelScale()
     if (this.frameId === 0 && this.attached) this.renderOnce()
   }
@@ -388,6 +450,11 @@ export class GlobeRenderer {
     return this.meshes as Mesh<BufferGeometry, Material>[]
   }
 
+  /** For tests: the aurora shimmer clock, in seconds. */
+  debugAuroraTime(): number {
+    return this.layers.debugAuroraTime()
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
@@ -400,6 +467,7 @@ export class GlobeRenderer {
     }
     for (const t of this.textures) t.dispose()
     this.layers.dispose()
+    this.bloom?.dispose()
     this.renderer.dispose()
     this.renderer.forceContextLoss()
   }
@@ -417,23 +485,53 @@ export class GlobeRenderer {
 
   private readonly frame = (now: number): void => {
     if (!this.rotationPaused && this.lastFrame !== null) {
-      this.rotation += (now - this.lastFrame) * DEGREES_PER_MS * (Math.PI / 180)
+      const elapsed = now - this.lastFrame
+      this.rotation += elapsed * DEGREES_PER_MS * (Math.PI / 180)
       this.globe.rotation.y = this.rotation
+      // The aurora shimmers only while the globe turns: §6 allows no other motion.
+      this.auroraSeconds += elapsed / 1000
+      this.layers.setTime(this.auroraSeconds)
     }
     this.lastFrame = now
     if (now - this.lastSun > SUN_REFRESH_MS) {
       this.sun.fromArray(sunDirection(new Date()))
       this.lastSun = now
     }
-    this.syncOcclusion()
-    this.renderer.render(this.scene, this.camera)
-    this.emitFrame()
+    this.draw()
     this.schedule()
   }
 
   private renderOnce(): void {
+    this.draw()
+  }
+
+  /**
+   * High tier: scene, then the glow, then glyphs and nameplates on top, so no halo
+   * washes out a letter or a void outline (#50). The overlay keeps the scene's depth,
+   * so the Earth still hides glyphs behind it. Low tier: one pass with both layers.
+   */
+  private draw(): void {
     this.syncOcclusion()
-    this.renderer.render(this.scene, this.camera)
+    const { camera, renderer } = this
+    if (!this.bloom) {
+      camera.layers.set(0)
+      camera.layers.enable(OVERLAY_LAYER)
+      renderer.render(this.scene, camera)
+      this.emitFrame()
+      return
+    }
+    camera.layers.set(0)
+    renderer.render(this.scene, camera)
+    this.bloom.render()
+    camera.layers.set(OVERLAY_LAYER)
+    const autoClear = renderer.autoClear
+    renderer.autoClear = false
+    try {
+      renderer.render(this.scene, camera)
+    } finally {
+      renderer.autoClear = autoClear
+      camera.layers.set(0)
+    }
     this.emitFrame()
   }
 

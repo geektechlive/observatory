@@ -45,6 +45,7 @@ function acquireRenderer(size: number, reducedMotion: boolean, warm: boolean, on
         size,
         textures: { day: `/textures/day-${w}.webp`, night: `/textures/night-${w}.webp` },
         dprCap: tier.dprCap,
+        bloom: tier.bloom,
         reducedMotion,
         warm,
         onContextLost: onLost,
