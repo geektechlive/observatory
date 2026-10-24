@@ -28,8 +28,12 @@ import { BLOOM_LAYER } from './layers'
 
 /** Every source is pre-selected by layer, so nothing needs a luminance threshold. */
 const THRESHOLD = 0
-const STRENGTH = 1.1
-const RADIUS = 0.55
+/**
+ * Tuned on an M5 Pro after the sRGB encode: encoding lifts the blur's faint wide mips,
+ * so a larger radius or strength veils the whole night side (seen at 1.1 / 0.55).
+ */
+const STRENGTH = 0.5
+const RADIUS = 0.15
 
 /**
  * Adds light onto a premultiplied, transparent canvas: colour one-plus-one, and alpha
@@ -51,6 +55,8 @@ function addMaterial(): ShaderMaterial {
       void main() {
         vec3 c = texture2D(glow, vUv).rgb;
         gl_FragColor = vec4(c, max(c.r, max(c.g, c.b)));
+        // The blur is linear (HalfFloat target); the canvas is sRGB like the main pass.
+        #include <colorspace_fragment>
       }
     `,
     blending: CustomBlending,
@@ -91,9 +97,14 @@ export class SelectiveBloom implements BloomLike {
     const { renderer, camera } = this
     const mask = camera.layers.mask
     camera.layers.set(BLOOM_LAYER)
-    renderer.setRenderTarget(this.target)
-    renderer.render(this.scene, camera)
-    camera.layers.mask = mask
+    try {
+      renderer.setRenderTarget(this.target)
+      renderer.render(this.scene, camera)
+    } finally {
+      // Left on BLOOM_LAYER, every later main pass would draw only the glow sources.
+      camera.layers.mask = mask
+      renderer.setRenderTarget(null)
+    }
     // Offscreen: the pass leaves the composited blur in renderTargetsHorizontal[0].
     this.pass.render(renderer, this.target, this.target, 0, false)
     const glow = this.add.uniforms['glow']

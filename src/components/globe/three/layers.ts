@@ -56,6 +56,12 @@ import { auroraFragment, auroraVertex } from './shaders'
  */
 export const BLOOM_LAYER = 1
 
+/**
+ * Glyphs and nameplates (#50). The high tier draws them after the bloom is added, so a
+ * halo never lands on a letter or a void outline; the low tier draws them with the scene.
+ */
+export const OVERLAY_LAYER = 2
+
 const GLYPH_PX = 64
 /** High tier: the emissive bead under a hazard glyph that the bloom spreads. */
 const HAZARD_CORE_RADIUS = 0.008
@@ -322,6 +328,7 @@ export class GlobeLayerObjects {
         }),
       )
       label.center.set(plate.anchorX, 0.5)
+      label.layers.set(OVERLAY_LAYER)
       label.scale.set(PLATE_SCALE * plate.aspect, PLATE_SCALE, 1)
       this.issGroup.add(core, glow, label)
       // Hidden until the first occlusion test: its sprites skip the depth test (#60).
@@ -430,6 +437,7 @@ export class GlobeLayerObjects {
     )
     sprite.position.fromArray(position)
     sprite.center.set(glyph.anchorX, 0.5)
+    sprite.layers.set(OVERLAY_LAYER)
     const h = spacecraft ? PLATE_SCALE : MARKER_SCALE
     sprite.scale.set(h * glyph.aspect, h, 1)
     if (shape.shape !== 'spacecraft') return sprite
@@ -475,7 +483,9 @@ export class GlobeLayerObjects {
         new SphereGeometry(HAZARD_CORE_RADIUS, 10, 6),
         new MeshBasicMaterial({ color: glow.color }),
       )
+      // Lift the bead by its radius so the Earth twin's depth doesn't hide half of it.
       core.position.fromArray(glow.position)
+      core.position.setLength(core.position.length() + HAZARD_CORE_RADIUS)
       core.layers.set(BLOOM_LAYER)
       this.hazardCores.push(core)
       return core

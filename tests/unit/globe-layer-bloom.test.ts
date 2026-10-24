@@ -7,7 +7,7 @@
 import { AdditiveBlending, Layers, Mesh, type Object3D, Points, Sprite } from 'three'
 import { describe, expect, it } from 'vitest'
 
-import { BLOOM_LAYER, GlobeLayerObjects } from '@/components/globe/three/layers'
+import { BLOOM_LAYER, GlobeLayerObjects, OVERLAY_LAYER } from '@/components/globe/three/layers'
 import { planLayers } from '@/lib/globeLayers'
 
 const EMPTY = {
@@ -43,6 +43,8 @@ const PLAN = planLayers({
 
 const bloomOnly = new Layers()
 bloomOnly.set(BLOOM_LAYER)
+const overlayOnly = new Layers()
+overlayOnly.set(OVERLAY_LAYER)
 const mainOnly = new Layers()
 
 function build(bloom: boolean): GlobeLayerObjects {
@@ -69,6 +71,19 @@ describe('GlobeLayerObjects bloom set, high tier', () => {
 
   it('never puts a sprite (glyph, nameplate or name glow) on the bloom layer', () => {
     expect(inBloom.filter((o) => o instanceof Sprite)).toEqual([])
+  })
+
+  it('draws glyphs and nameplates only in the overlay pass, after the glow is added', () => {
+    // The bloom add lands on every pixel under a halo; a glyph drawn before it washed
+    // out (the white "S" event letters vanished on an M5 Pro, 2026-10-23).
+    const overlay = all(objects).filter((o) => o instanceof Sprite && drawsIn(o, overlayOnly))
+    // 5 markers (event, 2 GDACS, launch pad, Hubble plate) + the ISS name.
+    expect(overlay).toHaveLength(6)
+    for (const s of overlay) {
+      expect(drawsIn(s, mainOnly)).toBe(false)
+      expect(drawsIn(s, bloomOnly)).toBe(false)
+      expect((s as Sprite).material.blending).not.toBe(AdditiveBlending)
+    }
   })
 
   it('blooms one emissive core per active hazard, drawn only in the bloom pass', () => {

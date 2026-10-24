@@ -5,7 +5,7 @@
  * built on the low tier. The Earth gets a bloom-only twin (city lights only) so
  * copper never glows; the atmosphere stays out of the bloom pass.
  */
-import { Layers, Texture } from 'three'
+import { Layers, type PerspectiveCamera, Texture } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -13,7 +13,7 @@ import {
   GlobeRenderer,
   type RendererDeps,
 } from '@/components/globe/three/GlobeRenderer'
-import { BLOOM_LAYER } from '@/components/globe/three/layers'
+import { BLOOM_LAYER, OVERLAY_LAYER } from '@/components/globe/three/layers'
 
 function fakes() {
   const order: string[] = []
@@ -21,7 +21,10 @@ function fakes() {
     domElement: document.createElement('canvas'),
     setPixelRatio: vi.fn(),
     setSize: vi.fn(),
-    render: vi.fn(() => order.push('render')),
+    // Records which layers each draw saw: main (0), overlay (2), or both.
+    render: vi.fn((_scene: unknown, camera: PerspectiveCamera) =>
+      order.push(`render:${String(camera.layers.mask)}`),
+    ),
     dispose: vi.fn(),
     forceContextLoss: vi.fn(),
     capabilities: { getMaxAnisotropy: () => 8 },
@@ -74,23 +77,26 @@ const LAYERS = {
 const bloomOnly = new Layers()
 bloomOnly.set(BLOOM_LAYER)
 const mainOnly = new Layers()
+const MAIN = 1
+const OVERLAY = 1 << OVERLAY_LAYER
 
 describe('GlobeRenderer bloom (#50)', () => {
-  it('adds the bloom after every draw, on attach and in the frame loop', async () => {
+  it('draws the scene, adds the bloom, then draws glyphs on top: on attach and every frame', async () => {
     const f = fakes()
     const r = await GlobeRenderer.create(OPTIONS, f.deps)
     r.attach(document.createElement('div'))
     f.tick(16)
-    expect(f.order).toEqual(['render', 'bloom', 'render', 'bloom'])
+    const frame = [`render:${String(MAIN)}`, 'bloom', `render:${String(OVERLAY)}`]
+    expect(f.order).toEqual([...frame, ...frame])
     r.dispose()
   })
 
-  it('never builds the bloom on the low tier', async () => {
+  it('never builds the bloom on the low tier, and draws glyphs in the one pass', async () => {
     const f = fakes()
     const r = await GlobeRenderer.create({ ...OPTIONS, bloom: false }, f.deps)
     r.attach(document.createElement('div'))
     expect(f.deps.createBloom).not.toHaveBeenCalled()
-    expect(f.order).toEqual(['render'])
+    expect(f.order).toEqual([`render:${String(MAIN | OVERLAY)}`])
     r.dispose()
   })
 
@@ -150,11 +156,14 @@ describe('GlobeRenderer aurora time (#50, spec section 6)', () => {
 
   it('never moves under reduced motion', async () => {
     const f = fakes()
+    const requestFrame = vi.fn(f.deps.requestFrame)
+    f.deps.requestFrame = requestFrame
     const r = await GlobeRenderer.create({ ...OPTIONS, reducedMotion: true }, f.deps)
     r.setLayers(LAYERS)
     r.attach(document.createElement('div'))
-    f.tick(1000)
-    f.tick(9000)
+    // No frame loop at all, so nothing can advance the clock: one still draw, at t = 0.
+    expect(requestFrame).not.toHaveBeenCalled()
+    expect(f.order.filter((s) => s.startsWith('render')).length).toBeGreaterThan(0)
     expect(r.debugAuroraTime()).toBe(0)
     r.dispose()
   })

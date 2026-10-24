@@ -37,7 +37,7 @@ import { layerCounts, type LayerInput, planLayers } from '@/lib/globeLayers'
 import { GLOBE_GRADE, hexToLinear, ISS_HEX } from '@/lib/palette'
 
 import { SelectiveBloom } from './bloom'
-import { BLOOM_LAYER, GlobeLayerObjects } from './layers'
+import { BLOOM_LAYER, GlobeLayerObjects, OVERLAY_LAYER } from './layers'
 import {
   atmosphereFragment,
   atmosphereVertex,
@@ -82,6 +82,8 @@ export interface WebGLRendererLike {
   setPixelRatio(ratio: number): void
   setSize(width: number, height: number, updateStyle?: boolean): void
   render(scene: Scene, camera: PerspectiveCamera): void
+  /** The overlay pass draws over the bloom without clearing (#50). */
+  autoClear?: boolean | undefined
   dispose(): void
   forceContextLoss(): void
   capabilities: { getMaxAnisotropy(): number }
@@ -202,7 +204,7 @@ export class GlobeRenderer {
     this.camera.position.set(0, 0, CAMERA_DISTANCE)
     this.camera.lookAt(0, 0, 0)
     this.buildScene()
-    const px = options.size * this.pixelRatio()
+    const px = this.devicePixels(options.size)
     this.bloom =
       options.bloom === true && deps.createBloom
         ? deps.createBloom(renderer, this.scene, this.camera, px, px)
@@ -298,6 +300,11 @@ export class GlobeRenderer {
     return Math.min(globalThis.devicePixelRatio || 1, this.options.dprCap)
   }
 
+  /** The drawing buffer's side for a CSS size; WebGLRenderer.setSize floors it the same way. */
+  private devicePixels(size: number): number {
+    return Math.floor(size * this.pixelRatio())
+  }
+
   /** Point sprites are sized in globe units; convert at the camera's focal length. */
   private applyPixelScale(): void {
     const pixels = this.size * this.pixelRatio()
@@ -312,7 +319,7 @@ export class GlobeRenderer {
     if (this.disposed || size === this.size) return
     this.size = size
     this.renderer.setSize(size, size, false)
-    this.bloom?.setSize(size * this.pixelRatio(), size * this.pixelRatio())
+    this.bloom?.setSize(this.devicePixels(size), this.devicePixels(size))
     this.applyPixelScale()
     if (this.frameId === 0 && this.attached) this.renderOnce()
   }
@@ -498,10 +505,33 @@ export class GlobeRenderer {
     this.draw()
   }
 
+  /**
+   * High tier: scene, then the glow, then glyphs and nameplates on top, so no halo
+   * washes out a letter or a void outline (#50). The overlay keeps the scene's depth,
+   * so the Earth still hides glyphs behind it. Low tier: one pass with both layers.
+   */
   private draw(): void {
     this.syncOcclusion()
-    this.renderer.render(this.scene, this.camera)
-    this.bloom?.render()
+    const { camera, renderer } = this
+    if (!this.bloom) {
+      camera.layers.set(0)
+      camera.layers.enable(OVERLAY_LAYER)
+      renderer.render(this.scene, camera)
+      this.emitFrame()
+      return
+    }
+    camera.layers.set(0)
+    renderer.render(this.scene, camera)
+    this.bloom.render()
+    camera.layers.set(OVERLAY_LAYER)
+    const autoClear = renderer.autoClear
+    renderer.autoClear = false
+    try {
+      renderer.render(this.scene, camera)
+    } finally {
+      renderer.autoClear = autoClear
+      camera.layers.set(0)
+    }
     this.emitFrame()
   }
 
