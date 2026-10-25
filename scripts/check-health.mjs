@@ -154,7 +154,11 @@ export async function runWithRetry(runOnce, opts = {}) {
   return { ...result, attempts: attempt }
 }
 
-async function runCheck(baseUrl, spec) {
+/**
+ * Run one check once. A body that fails its contract is marked `reason: 'contract'`, so
+ * toReport never calls it upstream-caused, whatever the response headers say.
+ */
+export async function runCheck(baseUrl, spec) {
   const url = `${baseUrl}${spec.path}`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -191,11 +195,11 @@ async function runCheck(baseUrl, spec) {
     try {
       body = await res.json()
     } catch {
-      return { ...base, ok: false, note: 'invalid JSON' }
+      return { ...base, ok: false, reason: 'contract', note: 'invalid JSON' }
     }
 
     if (!spec.check(body)) {
-      return { ...base, ok: false, note: `missing ${spec.requires}` }
+      return { ...base, ok: false, reason: 'contract', note: `missing ${spec.requires}` }
     }
 
     const source = res.headers.get('x-data-source')
@@ -235,6 +239,16 @@ function describe(r) {
   return `${r.ok ? 'PASS' : 'FAIL'} ${r.path} HTTP ${String(r.status)} ${String(r.ms)}ms ${r.note}${retries}`
 }
 
+/**
+ * Upstream-caused: our handler said so (`X-Error-Kind: upstream` on its 503, its degraded
+ * answer or its STALE fallback) and the body passed its contract. The reporter holds
+ * these for UPSTREAM_THRESHOLD runs (#71). Anything else, including a timeout reaching
+ * our own site, alerts on the first run.
+ */
+function isUpstreamCaused(r) {
+  return !r.ok && r.errorKind === 'upstream' && r.reason !== 'contract'
+}
+
 /** The incident report scripts/report-incidents.mjs consumes: one entry per endpoint. */
 export function toReport(results) {
   return results.map((r) => ({
@@ -243,6 +257,7 @@ export function toReport(results) {
     detail: describe(r),
     // Passing on a STALE fallback is tolerated, not recovered: an open issue stays open.
     ...(r.ok && r.warning ? { warning: true } : {}),
+    ...(isUpstreamCaused(r) ? { upstream: true } : {}),
   }))
 }
 

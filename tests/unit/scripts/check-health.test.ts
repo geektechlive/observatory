@@ -6,6 +6,7 @@ import {
   judgeStale,
   NEG_RETRY_DELAY_MS,
   retryDelayMs,
+  runCheck,
   runWithRetry,
   STALE_GRACE_SECONDS,
   toReport,
@@ -212,6 +213,68 @@ describe('toReport', () => {
       },
     ])
     expect(entry).toMatchObject({ ok: true, warning: true })
+  })
+
+  // #71: only upstream-caused failures wait for the 4-run threshold.
+  it('marks a failure upstream-caused only when the handler said so and the body was not at fault', () => {
+    const out = toReport([
+      result({ errorKind: 'upstream' }),
+      result({ status: 200, errorKind: 'upstream', note: 'degraded (noaa-flares)' }),
+      result({ status: 200, errorKind: 'contract', note: 'degraded (donki)' }),
+      result({ status: 500, errorKind: 'contract' }),
+      result({ status: 0, note: 'timeout after 15000 ms' }),
+      result({ status: 200, errorKind: 'upstream', reason: 'contract', note: 'missing title' }),
+      result({ status: 404 }),
+    ])
+    expect(out.map((e: { upstream?: boolean }) => e.upstream === true)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ])
+  })
+
+  it('never marks a pass upstream-caused', () => {
+    const [entry] = toReport([result({ ok: true, status: 200, errorKind: 'upstream' })])
+    expect(entry).not.toHaveProperty('upstream')
+  })
+})
+
+describe('runCheck (#71)', () => {
+  const spec = {
+    path: '/api/apod',
+    requires: 'title',
+    check: (b: { title?: unknown }) => typeof b.title === 'string',
+  }
+  const respond = (body: unknown, headers: Record<string, string> = {}, status = 200) =>
+    vi.fn(async () => new Response(JSON.stringify(body), { status, headers }))
+
+  it('calls a body missing its fields a contract failure, whatever the headers say', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond({}, { 'X-Error-Kind': 'upstream', 'X-Cache': 'STALE', 'X-Data-Age': '60' }),
+    )
+    const r = await runCheck('https://o.test', spec)
+    vi.unstubAllGlobals()
+    expect(r).toMatchObject({ ok: false, reason: 'contract' })
+    expect(toReport([r])[0]).not.toHaveProperty('upstream')
+  })
+
+  it('carries the handler error kind on a degraded answer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond(
+        { title: 'x' },
+        { 'X-Data-Degraded': '1', 'X-Data-Source': 'noaa-flares', 'X-Error-Kind': 'upstream' },
+      ),
+    )
+    const r = await runCheck('https://o.test', spec)
+    vi.unstubAllGlobals()
+    expect(r).toMatchObject({ ok: false, note: 'degraded (noaa-flares)' })
+    expect(toReport([r])[0]).toMatchObject({ upstream: true })
   })
 })
 

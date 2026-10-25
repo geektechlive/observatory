@@ -4,7 +4,9 @@ import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useImageBucket } from '@/hooks/useImageBucket'
+import { useSdoTimes } from '@/hooks/useSdoTimes'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
+import { formatObserved, observedAt } from '@/lib/sdoTimes'
 import { flareStatus } from '@/lib/severity'
 
 import styles from './sun-stage.module.css'
@@ -29,6 +31,9 @@ export function SunStage({ size = 460 }: { size?: number }) {
   const bucket = useImageBucket(REFRESH_MS)
   const [errored, setErrored] = useState(false)
   const { data: sa } = useSolarActivity()
+  // The zoom crops SDO's burned-in stamp, so the time comes from SDO's times files (#73).
+  const { data: sdo } = useSdoTimes()
+  const observed = sdo ? observedAt(sdo.times, wl) : null
 
   const flare = sa?.xray.currentClass ?? null
   const flaring = flare ? flare[0] === 'M' || flare[0] === 'X' : false
@@ -77,21 +82,28 @@ export function SunStage({ size = 460 }: { size?: number }) {
         <Label>GOES X-ray · SDO/AIA</Label>
       </div>
 
-      <div className={styles.waves ?? ''} role="group" aria-label="Wavelength">
-        {WAVELENGTHS.map((w) => (
-          <button
-            key={w.key}
-            type="button"
-            aria-pressed={w.key === wl}
-            className={styles.wave ?? ''}
-            onClick={() => {
-              setWl(w.key)
-              setErrored(false)
-            }}
-          >
-            {w.label}
-          </button>
-        ))}
+      <div className={styles.foot ?? ''}>
+        {observed && (
+          <span className={styles.observed ?? ''}>
+            Observed <time dateTime={observed}>{formatObserved(observed)}</time>
+          </span>
+        )}
+        <div className={styles.waves ?? ''} role="group" aria-label="Wavelength">
+          {WAVELENGTHS.map((w) => (
+            <button
+              key={w.key}
+              type="button"
+              aria-pressed={w.key === wl}
+              className={styles.wave ?? ''}
+              onClick={() => {
+                setWl(w.key)
+                setErrored(false)
+              }}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

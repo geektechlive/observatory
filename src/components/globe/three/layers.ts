@@ -223,6 +223,11 @@ interface Nameplate {
 export interface LayerObjectOptions {
   /** High tier: hazards glow through the bloom pass. Low tier: additive sprites. */
   bloom: boolean
+  /**
+   * The renderer's aurora clock in seconds, used as the field's `time` uniform as is.
+   * One clock (#70): the renderer advances it only while the globe turns (§6).
+   */
+  auroraTime?: { value: number }
 }
 
 export class GlobeLayerObjects {
@@ -238,13 +243,14 @@ export class GlobeLayerObjects {
   private hazardSprites: Sprite[] = []
   private auroraField: Mesh<BufferGeometry, ShaderMaterial> | null = null
   private auroraTexture: DataTexture | null = null
-  private auroraTime = 0
+  private readonly auroraTime: { value: number }
   private trailLine: Line | null = null
   private pixelScale = 460
   private readonly scratch = new Vector3()
 
-  constructor({ bloom }: LayerObjectOptions = { bloom: false }) {
+  constructor({ bloom, auroraTime = { value: 0 } }: LayerObjectOptions = { bloom: false }) {
     this.bloom = bloom
+    this.auroraTime = auroraTime
     this.group.add(this.staticGroup)
   }
 
@@ -279,13 +285,6 @@ export class GlobeLayerObjects {
     const fires = plan.points.filter((p) => p.layer === 'fires')
     if (fires.length) this.staticGroup.add(this.buildPoints(fires))
     if (plan.aurora.length) this.staticGroup.add(this.buildAuroraField(plan.aurora))
-  }
-
-  /** Seconds of shimmer for the aurora field; the renderer freezes it when motion stops. */
-  setTime(seconds: number): void {
-    this.auroraTime = seconds
-    const uniform = this.auroraField?.material.uniforms['time']
-    if (uniform) uniform.value = seconds
   }
 
   updateIss(plan: LayerPlan): void {
@@ -415,10 +414,6 @@ export class GlobeLayerObjects {
     return this.auroraField
   }
 
-  debugAuroraTime(): number {
-    return this.auroraTime
-  }
-
   /** A plain glyph sprite, or a spacecraft nameplate with its glow, anchored on the marker point. */
   private nameplateOrGlyph(
     glyph: GlyphTexture,
@@ -519,7 +514,7 @@ export class GlobeLayerObjects {
         uniforms: {
           field: { value: texture },
           color: { value: new Color(AURORA_HEX) },
-          time: { value: this.auroraTime },
+          time: this.auroraTime,
         },
         vertexShader: auroraVertex,
         fragmentShader: auroraFragment,

@@ -36,6 +36,13 @@ const STRENGTH = 0.5
 const RADIUS = 0.15
 
 /**
+ * The glow sources render at half size (#69). UnrealBloomPass starts its blur at half
+ * size anyway, so a full-size input only cost VRAM; its depth buffer still hides
+ * far-side glows behind the Earth twin.
+ */
+const half = (px: number) => Math.max(1, Math.round(px / 2))
+
+/**
  * Adds light onto a premultiplied, transparent canvas: colour one-plus-one, and alpha
  * grows by the glow's brightest channel so a halo past the limb still shows.
  */
@@ -89,7 +96,7 @@ export class SelectiveBloom implements BloomLike {
     this.renderer = renderer
     this.scene = scene
     this.camera = camera
-    this.target = new WebGLRenderTarget(width, height, { type: HalfFloatType })
+    this.target = new WebGLRenderTarget(half(width), half(height), { type: HalfFloatType })
     this.pass = new UnrealBloomPass(new Vector2(width, height), STRENGTH, RADIUS, THRESHOLD)
   }
 
@@ -117,8 +124,13 @@ export class SelectiveBloom implements BloomLike {
   }
 
   setSize(width: number, height: number): void {
-    this.target.setSize(width, height)
+    this.target.setSize(half(width), half(height))
     this.pass.setSize(width, height)
+  }
+
+  /** For tests: the glow-source target's size in pixels. */
+  debugTargetSize(): [number, number] {
+    return [this.target.width, this.target.height]
   }
 
   dispose(): void {

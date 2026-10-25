@@ -29,4 +29,15 @@ describe('SelectiveBloom', () => {
     expect(setRenderTarget).toHaveBeenLastCalledWith(null)
     bloom.dispose()
   })
+
+  it('draws the glow sources at half size, on create and on resize (#69)', () => {
+    // The pass's first blur level is half size already, so a full-size input target only
+    // cost VRAM (8 bytes a pixel, HalfFloat RGBA).
+    const renderer = {} as WebGLRenderer
+    const bloom = new SelectiveBloom(renderer, new Scene(), new PerspectiveCamera(), 1360, 1360)
+    expect(bloom.debugTargetSize()).toEqual([680, 680])
+    bloom.setSize(1001, 640)
+    expect(bloom.debugTargetSize()).toEqual([501, 320])
+    bloom.dispose()
+  })
 })

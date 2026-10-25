@@ -81,6 +81,8 @@ describe('produceLaunches (KV-first, #30)', () => {
     expect(JSON.parse(out.body)).toEqual(PAYLOAD)
     expect(out.degraded).toBe(true)
     expect(out.extraHeaders).toMatchObject({ 'X-Data-Source': 'kv-backup', 'X-Data-Age': '108000' })
+    // #71: says why, so the health check holds an RLL outage instead of paging at once.
+    expect(out.extraHeaders?.['X-Error-Kind']).toBe('upstream')
     // The failure mode was invisible before #30: the reason must reach the logs.
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('403'))
   })

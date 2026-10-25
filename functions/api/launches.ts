@@ -98,12 +98,17 @@ export async function produceLaunches(
   const live = await fetchLive(fetchImpl)
   if (!(live instanceof Response) || !kvCopy) return live
 
-  // Live failed but an older KV copy exists: real data, past its fresh window.
+  // Live failed but an older KV copy exists: real data, past its fresh window. Say why,
+  // so the health check holds an outage but alerts on drift (#71).
   return {
     body: JSON.stringify(kvCopy.data),
     ttl: DEGRADED_TTL_SECONDS,
     degraded: true,
-    extraHeaders: { 'X-Data-Source': 'kv-backup', 'X-Data-Age': String(kvCopy.age) },
+    extraHeaders: {
+      'X-Data-Source': 'kv-backup',
+      'X-Data-Age': String(kvCopy.age),
+      'X-Error-Kind': live.headers.get('X-Error-Kind') ?? 'upstream',
+    },
   }
 }
 

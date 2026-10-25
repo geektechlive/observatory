@@ -13,11 +13,20 @@
 // An issue only closes when its signature reports a pass: if a check is removed or
 // renamed while its issue is open, close that issue by hand.
 //
+// Upstream threshold (#71, Chris's call 2026-10-25): an entry marked `upstream` (an
+// outage we can't fix, e.g. NASA down) opens or reopens an issue only on its
+// UPSTREAM_THRESHOLD-th run in a row; before that it is a `hold`: logged, no issue, no
+// ping. At the 6 h health cadence that is 18-24 h after it starts. Contract failures,
+// our own errors and a down site are never marked upstream, so they still open at once.
+// The streak lives in a JSON file the workflow keeps in actions/cache; losing it only
+// restarts the count (a later alert, never a false one).
+//
 // Usage: node scripts/report-incidents.mjs [report.json]
-// Env: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), RUN_URL; DISCORD_* optional.
+// Env: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), RUN_URL; DISCORD_* optional;
+// INCIDENT_STREAKS (default incident-streaks.json).
 // The repo is public: bodies carry only the report's detail lines and the run link.
 
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -26,6 +35,8 @@ import { discordConfigured, HEADER, postDiscord } from './notify-discord.mjs'
 const LABEL = 'incident'
 const AREA_LABEL = 'infra'
 const API = 'https://api.github.com'
+/** Consecutive upstream-caused failing runs before an issue opens (#71). */
+export const UPSTREAM_THRESHOLD = 4
 
 export function issueTitle(signature) {
   return `[observatory] ${signature}`
@@ -33,9 +44,24 @@ export function issueTitle(signature) {
 
 const fence = (detail) => `\`\`\`\n${detail}\n\`\`\``
 
-function openBody(entry, runUrl) {
+/**
+ * Pure: each signature's run of consecutive upstream-caused failures, including this
+ * report. A pass, a non-upstream failure or a missing entry resets it (and drops it).
+ */
+export function nextStreaks(report, previous) {
+  const out = {}
+  for (const entry of report) {
+    if (!entry.ok && entry.upstream) out[entry.signature] = (previous[entry.signature] ?? 0) + 1
+  }
+  return out
+}
+
+function openBody(entry, runUrl, streak) {
+  const why = entry.upstream
+    ? ` It is upstream-caused and has failed ${String(streak)} health runs in a row.`
+    : ''
   return [
-    `Opened automatically by the \`data-refresh\` workflow: **${entry.signature}** failed.`,
+    `Opened automatically by the \`data-refresh\` workflow: **${entry.signature}** failed.${why}`,
     '',
     fence(entry.detail),
     '',
@@ -48,10 +74,10 @@ function openBody(entry, runUrl) {
 
 /**
  * Pure: decide what to do for each report entry given the existing incident issues.
- * Returns actions of type open | reopen | comment | close; `notify` marks the ones
- * that should ping Discord.
+ * Returns actions of type open | reopen | comment | close | hold; `notify` marks the
+ * ones that should ping Discord. `streaks` is nextStreaks() for this report.
  */
-export function planActions(report, issues, runUrl) {
+export function planActions(report, issues, runUrl, streaks = {}) {
   const byTitle = new Map()
   for (const issue of issues) {
     const seen = byTitle.get(issue.title)
@@ -66,8 +92,12 @@ export function planActions(report, issues, runUrl) {
     const base = { signature: entry.signature, title }
 
     if (!entry.ok) {
-      if (!issue) {
-        actions.push({ ...base, type: 'open', body: openBody(entry, runUrl), notify: true })
+      const streak = streaks[entry.signature] ?? 0
+      if (entry.upstream && issue?.state !== 'open' && streak < UPSTREAM_THRESHOLD) {
+        actions.push({ ...base, type: 'hold', streak, notify: false })
+      } else if (!issue) {
+        const body = openBody(entry, runUrl, streak)
+        actions.push({ ...base, type: 'open', body, notify: true })
       } else if (issue.state !== 'open') {
         const comment = `Failed again. Reopening.\n\n${fence(entry.detail)}\n\nRun: ${runUrl}`
         actions.push({ ...base, type: 'reopen', number: issue.number, comment, notify: true })
@@ -170,10 +200,25 @@ async function apply(gh, repo, action) {
       await gh('POST', `${issuePath}/comments`, { body: action.comment })
       await gh('PATCH', issuePath, { state: 'closed', state_reason: 'completed' })
       break
+    case 'hold':
+      return `upstream failure ${String(action.streak)}/${String(UPSTREAM_THRESHOLD)}, no issue yet`
     default:
       throw new Error(`unknown action ${String(action.type)}`)
   }
   return `https://github.com/${repo}/issues/${String(action.number)}`
+}
+
+/** The previous run's streaks; none (first run, cache evicted, bad file) means start over. */
+async function readStreaks(path) {
+  try {
+    const parsed = JSON.parse(await readFile(path, 'utf8'))
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, n]) => Number.isInteger(n) && n > 0),
+    )
+  } catch {
+    return {}
+  }
 }
 
 async function main(argv) {
@@ -186,9 +231,14 @@ async function main(argv) {
   const report = JSON.parse(await readFile(reportPath, 'utf8'))
   if (!Array.isArray(report)) throw new Error(`${reportPath} is not an array`)
 
+  // Written before any GitHub call, so a GitHub outage can't lose the count.
+  const streaksPath = process.env.INCIDENT_STREAKS ?? 'incident-streaks.json'
+  const streaks = nextStreaks(report, await readStreaks(streaksPath))
+  await writeFile(streaksPath, JSON.stringify(streaks, null, 2))
+
   const gh = github(token)
   await ensureLabel(gh, repo)
-  const actions = planActions(report, await listIncidentIssues(gh, repo), runUrl)
+  const actions = planActions(report, await listIncidentIssues(gh, repo), runUrl, streaks)
   if (actions.length === 0) {
     console.log('no actions: nothing failing, no open incidents to update')
     return 0

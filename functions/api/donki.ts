@@ -29,6 +29,8 @@ interface FeedResult<T> {
   data: T[]
   /** false when the feed was unavailable, or every row it sent failed our schema (drift) */
   ok: boolean
+  /** Why a feed is not ok: unavailable (upstream) or the wrong shape (contract). */
+  why?: 'upstream' | 'contract'
   quota: string | null
 }
 
@@ -70,14 +72,14 @@ async function fetchFeed<T>(url: string, schema: z.ZodType<T>): Promise<FeedResu
   try {
     const res = await fetchUpstream(url)
     const quota = res.headers.get('X-RateLimit-Remaining')
-    if (!res.ok) return { data: [], ok: false, quota }
+    if (!res.ok) return { data: [], ok: false, why: 'upstream', quota }
     const rows = await readArray(res)
-    if (rows === null) return { data: [], ok: false, quota }
+    if (rows === null) return { data: [], ok: false, why: 'contract', quota }
     const { data, drift } = parseRows(rows, schema)
-    return { data, ok: !drift, quota }
+    return drift ? { data, ok: false, why: 'contract', quota } : { data, ok: true, quota }
   } catch {
     // A timeout on one feed must not sink the other three.
-    return { data: [], ok: false, quota: null }
+    return { data: [], ok: false, why: 'upstream', quota: null }
   }
 }
 
@@ -131,6 +133,15 @@ export const onRequest: PagesFunction<Env> = (ctx) => {
     const extraHeaders: Record<string, string> = {}
     const quota = flaresResult.quota ?? cmesResult.quota ?? stormsResult.quota ?? sepsResult.quota
     if (quota !== null) extraHeaders['X-Quota-Remaining'] = quota
+
+    // A degraded answer says why and who served it (#71): the health check holds an
+    // upstream outage for 4 runs, but drift must alert on the first.
+    if (failed.length > 0) {
+      extraHeaders['X-Error-Kind'] = failed.some((f) => f.why === 'contract')
+        ? 'contract'
+        : 'upstream'
+      extraHeaders['X-Data-Source'] = !flaresResult.ok && flares.ok ? 'noaa-flares' : 'donki'
+    }
 
     return { body: JSON.stringify(data), extraHeaders, degraded: failed.length > 0 }
   })

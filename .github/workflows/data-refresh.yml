@@ -7,6 +7,8 @@ name: data-refresh
 # Alerting: each check writes incident-report.json and scripts/report-incidents.mjs
 # turns it into one GitHub issue per failing source (opened, commented, reopened,
 # auto-closed on recovery) and pings Discord with the issue link on open/reopen/close.
+# An upstream-caused health failure (an outage we can't fix) opens only after 4 runs
+# in a row (#71); drift and our own errors open on the first.
 on:
   schedule:
     - cron: '17 */6 * * *' # refresh: four times a day, so one missed run never matters
@@ -89,6 +91,16 @@ jobs:
         with:
           node-version: '22'
 
+      # The reporter holds an upstream-caused failure until it has failed 4 runs in a row
+      # (#71). The count rides between runs in the cache: each run saves under its own
+      # key, and the prefix restores the newest. An evicted cache only restarts the count.
+      - name: Restore incident streaks
+        uses: actions/cache/restore@v6
+        with:
+          path: incident-streaks.json
+          key: incident-streaks-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: incident-streaks-
+
       - name: Check endpoints
         id: check
         run: node scripts/check-health.mjs
@@ -99,6 +111,15 @@ jobs:
         run: node scripts/report-incidents.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The reporter writes the streaks before any GitHub call, so save them even when
+      # it later failed.
+      - name: Save incident streaks
+        if: always() && hashFiles('incident-streaks.json') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: incident-streaks.json
+          key: incident-streaks-${{ github.run_id }}-${{ github.run_attempt }}
 
       # Posts as a bot rather than a webhook so the alert can be moved between
       # channels by changing one secret. Only runs if the reporter itself failed.

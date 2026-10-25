@@ -4,7 +4,15 @@
  * void halo (Codex finding 13) and the 11px names. High tier marks a small emissive
  * core per hazard on the bloom layer; low tier draws an additive sprite instead.
  */
-import { AdditiveBlending, Layers, Mesh, type Object3D, Points, Sprite } from 'three'
+import {
+  AdditiveBlending,
+  Layers,
+  Mesh,
+  type Object3D,
+  Points,
+  type ShaderMaterial,
+  Sprite,
+} from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { BLOOM_LAYER, GlobeLayerObjects, OVERLAY_LAYER } from '@/components/globe/three/layers'
@@ -130,10 +138,14 @@ describe('GlobeLayerObjects bloom set, low tier (sprites, owner default for phon
   })
 })
 
-describe('GlobeLayerObjects aurora time', () => {
-  it('passes time to the field shader', () => {
-    const objects = build(false)
-    objects.setTime(12.5)
-    expect(objects.debugAuroraTime()).toBe(12.5)
+describe('GlobeLayerObjects aurora time (#70)', () => {
+  it('reads the clock it was given: one clock, no copy to drift', () => {
+    const clock = { value: 0 }
+    const objects = new GlobeLayerObjects({ bloom: false, auroraTime: clock })
+    objects.buildStatic(PLAN)
+    clock.value = 12.5
+    const material = objects.debugAuroraField()?.material as ShaderMaterial
+    expect(material.uniforms['time']).toBe(clock)
+    expect(objects).not.toHaveProperty('setTime')
   })
 })

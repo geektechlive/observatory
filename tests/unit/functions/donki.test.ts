@@ -23,6 +23,7 @@ const mockFetch = vi.mocked(fetchUpstream)
 interface Result {
   body: string
   degraded?: boolean
+  extraHeaders?: Record<string, string>
 }
 interface Donki {
   flares: { flrID: string; classType?: string | null }[]
@@ -111,5 +112,49 @@ describe('/api/donki', () => {
     const out = (await call()) as Response
     expect(out.status).toBe(503)
     expect(out.headers.get('X-Error-Kind')).toBe('upstream')
+  })
+
+  // #71: the health check counts only upstream-caused trouble toward its 4-run threshold;
+  // drift must still alert on the first run, so a degraded answer has to say which it is.
+  it('says a degraded answer is upstream-caused, and served by NOAA, when DONKI is down', async () => {
+    route({ NOAA: () => ok([NOAA_FLARE]) })
+    const out = (await call()) as Result
+    expect(out.extraHeaders?.['X-Error-Kind']).toBe('upstream')
+    expect(out.extraHeaders?.['X-Data-Source']).toBe('noaa-flares')
+  })
+
+  it('says a degraded answer is a contract failure when a feed drifted', async () => {
+    route({
+      FLR: () => ok([FLARE]),
+      CME: () => ok([{ renamed: 'field' }]),
+      GST: () => ok([STORM]),
+      SEP: () => ok([SEP]),
+    })
+    const out = (await call()) as Result
+    expect(out.extraHeaders?.['X-Error-Kind']).toBe('contract')
+    expect(out.extraHeaders?.['X-Data-Source']).toBe('donki')
+  })
+
+  it('calls a non-array body a contract failure, not an outage', async () => {
+    route({
+      FLR: () => ok({ error: 'moved' }),
+      CME: () => ok([CME]),
+      GST: () => ok([STORM]),
+      SEP: () => ok([SEP]),
+      NOAA: () => ok([NOAA_FLARE]),
+    })
+    const out = (await call()) as Result
+    expect(out.extraHeaders?.['X-Error-Kind']).toBe('contract')
+  })
+
+  it('sends no error kind on a clean answer', async () => {
+    route({
+      FLR: () => ok([FLARE]),
+      CME: () => ok([CME]),
+      GST: () => ok([STORM]),
+      SEP: () => ok([SEP]),
+    })
+    const out = (await call()) as Result
+    expect(out.extraHeaders?.['X-Error-Kind']).toBeUndefined()
   })
 })

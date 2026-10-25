@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Refresh the durable Workers KV snapshots that back /api/iss-tle, /api/satellites
-// and /api/launches.
+// Refresh the durable Workers KV snapshots that back /api/iss-tle, /api/satellites,
+// /api/launches and /api/apod (APOD from science.nasa.gov, #72: too big a page to
+// parse inside the Worker's 10 ms CPU budget).
 //
 // Why this exists: CelesTrak returns HTTP 522 to Cloudflare Workers egress (observed
 // from about 2026-09-03), so the Pages Functions cannot fetch TLEs themselves. An
@@ -40,6 +41,8 @@ const RLL_URL = 'https://fdo.rocketlaunch.live/json/launches/next/5'
 const KEY_ISS = 'tle:iss:v1'
 const KEY_SATELLITES = 'tle:satellites:v1'
 const KEY_LAUNCHES_BACKUP = 'rll:launches:next:v1:backup'
+const KEY_APOD = 'apod:science:v1'
+const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
 const FETCH_RETRIES = 3
@@ -109,6 +112,74 @@ export function isValidLaunchesPayload(value) {
     Array.isArray(value.result) &&
     typeof value.count === 'number'
   )
+}
+
+// APOD (#72). apod.nasa.gov now 301s to science.nasa.gov/apod/, and NASA's APOD API
+// still scrapes the old page (2026-10-25: title "NASA Science", the NASA logo as url).
+// Each day is an article at /image-article/apod-<year>-<month>-<day>-<slug>/.
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+]
+const APOD_ARTICLE = /https:\/\/science\.nasa\.gov\/image-article\/apod-(\d{4})-([a-z]+)-(\d{1,2})-[a-z0-9-]+\//g
+const APOD_IMAGE_HOST = 'https://assets.science.nasa.gov/'
+const MIN_EXPLANATION_CHARS = 50
+
+/** ISO date from an article URL's apod-<year>-<month>-<day> slug, or null. */
+function apodSlugDate(url) {
+  const m = new RegExp(APOD_ARTICLE.source).exec(url)
+  if (!m) return null
+  const month = MONTHS.indexOf(m[2])
+  if (month < 0) return null
+  return `${m[1]}-${String(month + 1).padStart(2, '0')}-${m[3].padStart(2, '0')}`
+}
+
+/** The newest APOD article on the index page; its explanation links to older days. */
+export function apodArticleUrl(html) {
+  let best = null
+  for (const [url] of String(html).matchAll(APOD_ARTICLE)) {
+    const date = apodSlugDate(url)
+    if (date && (!best || date > best.date)) best = { url, date }
+  }
+  return best?.url ?? null
+}
+
+const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+
+function decodeEntities(text) {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code) => {
+    if (code[0] !== '#') return NAMED_ENTITIES[code.toLowerCase()] ?? whole
+    const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : Number(code.slice(1))
+    return Number.isFinite(n) ? String.fromCodePoint(n) : whole
+  })
+}
+
+const plainText = (html) =>
+  decodeEntities(html.replace(/<[^>]*>/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/**
+ * An APOD article page in the NASA APOD API's shape, so /api/apod serves either.
+ * Throws on anything missing: a page we can't read must never become a stored placeholder.
+ */
+export function parseApodArticle(html, articleUrl) {
+  const date = apodSlugDate(articleUrl)
+  if (!date) throw new Error(`no date in APOD article URL ${articleUrl}`)
+
+  const titleHtml = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1]
+  const title = titleHtml ? plainText(titleHtml) : ''
+  if (!title || title === 'NASA Science') throw new Error('APOD article has no title')
+
+  const image = /<meta property="og:image" content="([^"]+)"/.exec(html)?.[1]
+  const url = image ? decodeEntities(image) : ''
+  if (!url.startsWith(APOD_IMAGE_HOST)) throw new Error(`APOD article has no image on ${APOD_IMAGE_HOST}`)
+
+  const descHtml = /<p[^>]*media-detail-hero__description[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1]
+  const explanation = descHtml ? plainText(descHtml).replace(/^Explanation:\s*/, '') : ''
+  if (explanation.length < MIN_EXPLANATION_CHARS) throw new Error('APOD article has no explanation')
+
+  return { date, title, explanation, url, hdurl: url, media_type: 'image', service_version: 'science.nasa.gov' }
 }
 
 /**
@@ -255,6 +326,18 @@ function fetchLaunches() {
   )
 }
 
+async function fetchApod() {
+  const html = { headers: { Accept: 'text/html' } }
+  const articleUrl = await fetchWithRetry(APOD_INDEX, html, {
+    validate: (text) => {
+      const url = apodArticleUrl(text)
+      if (!url) throw new Error('no APOD article link on the index page')
+      return url
+    },
+  })
+  return fetchWithRetry(articleUrl, html, { validate: (text) => parseApodArticle(text, articleUrl) })
+}
+
 function envelope(source, data) {
   return JSON.stringify({ fetchedAt: new Date().toISOString(), source, data })
 }
@@ -350,6 +433,15 @@ const SOURCES = [
     source: 'rocketlaunch.live',
     fetch: fetchLaunches,
     summary: (json) => `${String(json.result.length)} upcoming`,
+  },
+  {
+    signature: 'refresh:apod',
+    key: KEY_APOD,
+    // A day and a half: /api/apod falls back to NASA's API and then this copy meanwhile.
+    maxAgeMs: 36 * HOUR_MS,
+    source: 'science.nasa.gov',
+    fetch: fetchApod,
+    summary: (apod) => `${apod.date} ${apod.title}`,
   },
 ]
 

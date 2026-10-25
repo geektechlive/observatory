@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-// @ts-expect-error plain ESM script, no type declarations
-import { discordMessage, issueTitle, planActions } from '../../../scripts/report-incidents.mjs'
+import {
+  discordMessage,
+  issueTitle,
+  nextStreaks,
+  planActions,
+  UPSTREAM_THRESHOLD,
+  // @ts-expect-error plain ESM script, no type declarations
+} from '../../../scripts/report-incidents.mjs'
 
 const RUN = 'https://github.com/geektechlive/observatory/actions/runs/1'
 
@@ -87,6 +93,74 @@ describe('planActions', () => {
     )
     expect(actions).toHaveLength(1)
     expect(actions[0].type).toBe('open')
+  })
+})
+
+// #71 (owner's call, 2026-10-25): outages we can't fix were noise. An upstream-caused
+// failure opens an issue only on its 4th health run in a row; everything else at once.
+describe('upstream threshold', () => {
+  const up = (signature: string) => ({
+    ...fail(signature, 'FAIL HTTP 503 upstream'),
+    upstream: true,
+  })
+
+  it('counts consecutive upstream failures, and resets on a pass or any other failure', () => {
+    const prev = { 'health:/api/apod': 2, 'health:/api/donki': 3, 'health:/api/neo': 1 }
+    expect(
+      nextStreaks(
+        [
+          up('health:/api/apod'),
+          pass('health:/api/donki'),
+          fail('health:/api/neo'),
+          up('health:/api/eonet'),
+        ],
+        prev,
+      ),
+    ).toEqual({ 'health:/api/apod': 3, 'health:/api/eonet': 1 })
+  })
+
+  it('holds an upstream failure below the threshold: no issue, no ping', () => {
+    const [action] = planActions([up('health:/api/apod')], [], RUN, { 'health:/api/apod': 3 })
+    expect(action).toMatchObject({ type: 'hold', notify: false, streak: 3 })
+  })
+
+  it(`opens on the ${String(UPSTREAM_THRESHOLD)}th upstream failure in a row, and says so`, () => {
+    expect(UPSTREAM_THRESHOLD).toBe(4)
+    const [action] = planActions([up('health:/api/apod')], [], RUN, { 'health:/api/apod': 4 })
+    expect(action).toMatchObject({ type: 'open', notify: true })
+    expect(action.body).toContain('4 health runs in a row')
+  })
+
+  it('holds a reopen the same way', () => {
+    const closed = [issue('health:/api/apod', 'closed')]
+    expect(
+      planActions([up('health:/api/apod')], closed, RUN, { 'health:/api/apod': 1 })[0],
+    ).toMatchObject({ type: 'hold' })
+    expect(
+      planActions([up('health:/api/apod')], closed, RUN, { 'health:/api/apod': 4 })[0],
+    ).toMatchObject({ type: 'reopen' })
+  })
+
+  it('keeps commenting on an issue that is already open', () => {
+    const open = [issue('health:/api/apod', 'open')]
+    expect(
+      planActions([up('health:/api/apod')], open, RUN, { 'health:/api/apod': 1 })[0],
+    ).toMatchObject({ type: 'comment' })
+  })
+
+  it('opens a contract or site failure on the first run, streak or not', () => {
+    const [action] = planActions([fail('health:/api/apod', 'FAIL missing title')], [], RUN, {})
+    expect(action).toMatchObject({ type: 'open', notify: true })
+  })
+
+  it('loses nothing but time if the streak store is gone: a hold, never a false open', () => {
+    const [action] = planActions(
+      [up('health:/api/apod')],
+      [],
+      RUN,
+      nextStreaks([up('health:/api/apod')], {}),
+    )
+    expect(action).toMatchObject({ type: 'hold', streak: 1 })
   })
 })
 

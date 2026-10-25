@@ -156,8 +156,11 @@ export class GlobeRenderer {
   private readonly meshes: Mesh[] = []
   private readonly layers: GlobeLayerObjects
   private readonly bloom: BloomLike | null
-  /** Aurora shimmer clock; it runs only while the globe turns (spec section 6). */
-  private auroraSeconds = 0
+  /**
+   * Aurora shimmer clock in seconds; it runs only while the globe turns (spec section 6).
+   * The aurora field uses this object as its `time` uniform, so it is the only copy (#70).
+   */
+  private readonly auroraTime = { value: 0 }
   private lastInput: LayerInput | null = null
   private onFrame: ((items: readonly ProjectedItem[]) => void) | null = null
   private onRotate: ((facingLon: number) => void) | null = null
@@ -194,7 +197,10 @@ export class GlobeRenderer {
     this.deps = deps
     this.rotation = rotationForFacing(options.startFacing ?? terminatorFacing(new Date()))
     this.size = options.size
-    this.layers = new GlobeLayerObjects({ bloom: options.bloom === true })
+    this.layers = new GlobeLayerObjects({
+      bloom: options.bloom === true,
+      auroraTime: this.auroraTime,
+    })
     this.canvas = renderer.domElement
     this.canvas.setAttribute('aria-hidden', 'true')
     // Tests and the host find this canvas by name; the SVG globe and starfield have canvases too.
@@ -452,7 +458,7 @@ export class GlobeRenderer {
 
   /** For tests: the aurora shimmer clock, in seconds. */
   debugAuroraTime(): number {
-    return this.layers.debugAuroraTime()
+    return this.auroraTime.value
   }
 
   dispose(): void {
@@ -489,8 +495,7 @@ export class GlobeRenderer {
       this.rotation += elapsed * DEGREES_PER_MS * (Math.PI / 180)
       this.globe.rotation.y = this.rotation
       // The aurora shimmers only while the globe turns: §6 allows no other motion.
-      this.auroraSeconds += elapsed / 1000
-      this.layers.setTime(this.auroraSeconds)
+      this.auroraTime.value += elapsed / 1000
     }
     this.lastFrame = now
     if (now - this.lastSun > SUN_REFRESH_MS) {

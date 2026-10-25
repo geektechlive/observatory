@@ -32,6 +32,7 @@ coverage/
 
 # data-refresh workflow output, read by scripts/report-incidents.mjs
 incident-report.json
+incident-streaks.json
 
 # Claude Code worktrees
 .claude/worktrees/

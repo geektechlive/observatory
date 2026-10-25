@@ -12,7 +12,7 @@ const DATA_SOURCES = [
   { label: 'JPL Sentry (impact risk)', href: 'https://ssd-api.jpl.nasa.gov/sentry.api' },
   { label: 'JPL Fireball', href: 'https://ssd-api.jpl.nasa.gov/fireball.api' },
   { label: 'DONKI (space weather)', href: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI' },
-  { label: 'APOD', href: 'https://apod.nasa.gov' },
+  { label: 'APOD', href: 'https://science.nasa.gov/apod/' },
   { label: 'CelesTrak (ISS TLE)', href: 'https://celestrak.org' },
 ]
 
