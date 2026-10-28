@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { onRequest } from '../../../functions/api/aurora'
+import { gridValue } from '../../../src/lib/auroraChance'
 import { installFakeCache, makeCtx } from './_fakeCache'
 
 type Cell = [number, number, number]
@@ -40,6 +41,7 @@ type Handler = (ctx: unknown) => Promise<Response>
 const call = () => (onRequest as unknown as Handler)(makeCtx('https://o.test/api/aurora').ctx)
 
 interface Body {
+  grid: string[]
   points: Cell[]
   reach: {
     likely: { n: [number, number][]; s: [number, number][] }
@@ -72,5 +74,15 @@ describe('/api/aurora reach (#77)', () => {
     expect(body.points).toHaveLength(3500)
     expect(Math.min(...body.points.map(([, lat]) => Math.abs(lat)))).toBeGreaterThanOrEqual(50)
     expect(body.reach.likely.n.every(([, lat]) => lat === 45)).toBe(true)
+  })
+
+  it('ships the whole grid compactly, so the location never has to leave the browser (#80)', async () => {
+    serve(grid(45, 75, (lat) => (lat >= 50 ? 30 : 11)))
+    const body = await (await call()).json<Body>()
+    expect(body.grid).toHaveLength(181)
+    expect(body.grid.every((row) => row.length === 360)).toBe(true)
+    expect(gridValue(body.grid, 47, -95)).toBe(11)
+    expect(gridValue(body.grid, 60, 10)).toBe(30)
+    expect(gridValue(body.grid, 30, 10)).toBe(0)
   })
 })

@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
+import { encodeGrid } from '../../src/lib/auroraChance'
 import { auroraReach, REACH_LIKELY, REACH_POSSIBLE } from '../../src/lib/auroraReach'
 import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
@@ -46,6 +47,9 @@ export const onRequest: PagesFunction = (ctx) =>
       body: JSON.stringify({
         points,
         reach,
+        // The whole grid, one character per cell (#80): a few kB gzipped, so the Tonight
+        // panel reads the user's own cells and the location never leaves the browser.
+        grid: encodeGrid(cells),
         observationTime: parsed.data['Observation Time'] ?? '',
         forecastTime: parsed.data['Forecast Time'] ?? '',
         updatedAt: new Date().toISOString(),
