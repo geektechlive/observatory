@@ -2,9 +2,11 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useGeolocation } from '@/hooks/useGeolocation'
+import { useUiStore } from '@/store/ui'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  useUiStore.setState({ observer: null, geoStatus: null })
 })
 
 describe('useGeolocation', () => {
@@ -36,7 +38,34 @@ describe('useGeolocation', () => {
     await waitFor(() => {
       expect(result.current.status).toBe('granted')
     })
-    expect(result.current.coords).toEqual({ lat: 40.7128, lon: -74.006, isFallback: false })
+    // Rounded to 0.1° (~11 km): enough for sky times, and all a third party ever sees (#78).
+    expect(result.current.coords).toEqual({ lat: 40.7, lon: -74, isFallback: false })
+  })
+
+  it('shares one location between panels: granted once, seen by every caller (#78)', async () => {
+    const getCurrentPosition = vi.fn((success: PositionCallback) => {
+      success({ coords: { latitude: 39.0997, longitude: -94.5786 } } as GeolocationPosition)
+    })
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
+
+    const sunMoon = renderHook(() => useGeolocation())
+    const tonight = renderHook(() => useGeolocation())
+    act(() => {
+      sunMoon.result.current.request()
+    })
+
+    await waitFor(() => {
+      expect(tonight.result.current.status).toBe('granted')
+    })
+    expect(tonight.result.current.coords).toEqual({ lat: 39.1, lon: -94.6, isFallback: false })
+    expect(getCurrentPosition).toHaveBeenCalledOnce()
+  })
+
+  it('never saves the location across visits', () => {
+    useUiStore.setState({ observer: { lat: 39.1, lon: -94.6, isFallback: false } })
+    const persisted = useUiStore.persist.getOptions().partialize?.(useUiStore.getState())
+    expect(persisted).not.toHaveProperty('observer')
+    expect(persisted).not.toHaveProperty('geoStatus')
   })
 
   it('resolves to denied when getCurrentPosition errors', async () => {

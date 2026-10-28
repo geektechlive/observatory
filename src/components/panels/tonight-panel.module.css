@@ -1,0 +1,106 @@
+/* Tonight from here (#78): a static strip, one cell per hour. Darkness is drawn as
+   luminance (bone mixed into the hull), not colour, so no data lane is borrowed. */
+.ask,
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--panel-body-pad);
+}
+
+.locateBtn {
+  align-self: flex-start;
+  min-height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  color: var(--copper-glow);
+  background: var(--hud-faint);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.locateBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.locateBtn:hover:not(:disabled) {
+  border-color: var(--copper-2);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.factValue {
+  font-size: var(--text-base);
+}
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cell {
+  position: relative;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--hull-2);
+}
+
+.slot[data-darkness='day'] .cell {
+  background: color-mix(in oklch, var(--bone) 46%, var(--hull-2));
+}
+
+.slot[data-darkness='civil'] .cell {
+  background: color-mix(in oklch, var(--bone) 28%, var(--hull-2));
+}
+
+.slot[data-darkness='nautical'] .cell {
+  background: color-mix(in oklch, var(--bone) 16%, var(--hull-2));
+}
+
+.slot[data-darkness='astronomical'] .cell {
+  background: color-mix(in oklch, var(--bone) 8%, var(--hull-2));
+}
+
+.moon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bone);
+  transform: translate(-50%, -50%);
+}
+
+.hour {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
+  text-align: center;
+}

@@ -52,6 +52,16 @@ export function isLayerKey(value: string): value is LayerKey {
   return Object.prototype.hasOwnProperty.call(DEFAULT_LAYERS, value)
 }
 
+/** The user's location, once they ask for it (#78). Rounded to 0.1°, never persisted. */
+export interface Observer {
+  lat: number
+  lon: number
+  isFallback: boolean
+}
+
+/** Where a location request stands; null until the user first asks. */
+export type GeoRequestStatus = 'requesting' | 'granted' | 'denied'
+
 interface UiState {
   view: ConsoleView
   mapMode: MapMode
@@ -63,6 +73,9 @@ interface UiState {
   sourceErrors: Record<string, boolean>
   /** Graded per-source health. Absent key means "not reported yet". */
   sourceHealth: Partial<Record<SourceName, SourceState>>
+  /** Shared by every panel that needs the user's location; kept out of `partialize`. */
+  observer: Observer | null
+  geoStatus: GeoRequestStatus | null
   setView: (view: ConsoleView) => void
   setMapMode: (mode: MapMode) => void
   toggleLayer: (key: LayerKey) => void
@@ -72,6 +85,8 @@ interface UiState {
   setQuotaRemaining: (n: number | null) => void
   setSourceError: (key: string, hasError: boolean) => void
   setSourceHealth: (name: SourceName, state: SourceState) => void
+  setObserver: (observer: Observer | null) => void
+  setGeoStatus: (status: GeoRequestStatus | null) => void
 }
 
 /** Only the user's stage preferences survive a reload; live data never does. */
@@ -119,6 +134,8 @@ export const useUiStore = create<UiState>()(
       quotaRemaining: null,
       sourceErrors: {},
       sourceHealth: {},
+      observer: null,
+      geoStatus: null,
       setView: (view) => set({ view }),
       setMapMode: (mapMode) => set({ mapMode }),
       toggleLayer: (key) =>
@@ -135,6 +152,8 @@ export const useUiStore = create<UiState>()(
         if (get().sourceHealth[name] === state) return
         set((s) => ({ sourceHealth: { ...s.sourceHealth, [name]: state } }))
       },
+      setObserver: (observer) => set({ observer }),
+      setGeoStatus: (geoStatus) => set({ geoStatus }),
     }),
     {
       name: PERSIST_KEY,

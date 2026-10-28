@@ -19,7 +19,9 @@ export function normalizeLon(lon: number): number {
 /**
  * Subsolar point — the lat/lon where the Sun is directly overhead.
  * Declination via the standard cosine approximation; longitude from UTC time
- * of day (good to ~1°, ample for a day/night overlay).
+ * of day. Longitude ignores the equation of time, so it can be off by up to ~4°
+ * (16 minutes, early November): ample for a day/night overlay, too coarse for
+ * twilight times, which use src/lib/tonight.ts instead.
  */
 export function subsolarPoint(date: Date): LatLon {
   const start = Date.UTC(date.getUTCFullYear(), 0, 0)
