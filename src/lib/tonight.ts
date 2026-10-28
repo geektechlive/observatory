@@ -36,14 +36,19 @@ function toEquatorial(lambda: number, beta: number, eps: number): { ra: number; 
   return { ra: ra * DEG, dec: dec * DEG }
 }
 
-/** The Sun's altitude in degrees, without refraction. */
-export function sunAltitude(date: Date, lat: number, lon: number): number {
+/** The Sun's right ascension and declination in degrees. */
+export function sunEquatorial(date: Date): { ra: number; dec: number } {
   const n = daysSinceJ2000(date)
   const meanLon = 280.46 + 0.9856474 * n
   const anomaly = 357.528 + 0.9856003 * n
   const lambda = meanLon + 1.915 * sin(anomaly) + 0.02 * sin(2 * anomaly)
   const eps = 23.439 - 0.0000004 * n
-  const { ra, dec } = toEquatorial(lambda, 0, eps)
+  return toEquatorial(lambda, 0, eps)
+}
+
+/** The Sun's altitude in degrees, without refraction. */
+export function sunAltitude(date: Date, lat: number, lon: number): number {
+  const { ra, dec } = sunEquatorial(date)
   return altitude(date, lat, lon, ra, dec)
 }
 

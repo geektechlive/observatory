@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { useIssTle } from '@/hooks/useIssTle'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
-import { useSourceQuery } from '@/hooks/useSourceQuery'
-import { fetchIssTleEnvelope } from '@/lib/api/iss'
 import type { IssPosition } from '@/lib/orbit/propagate'
 import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
 
@@ -22,16 +21,7 @@ export interface IssState {
 
 export function useIss(): IssState {
   const reducedMotion = useReducedMotion()
-  const {
-    data: tle,
-    isLoading,
-    error,
-  } = useSourceQuery('iss-tle', {
-    queryKey: ['iss-tle'],
-    queryFn: fetchIssTleEnvelope,
-    staleTime: 24 * 60 * 60 * 1000,
-    refetchInterval: 24 * 60 * 60 * 1000,
-  })
+  const { data: tle, isLoading, error } = useIssTle()
 
   const trail = useMemo(() => {
     if (!tle) return []

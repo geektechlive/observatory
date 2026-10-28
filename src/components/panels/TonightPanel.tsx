@@ -6,14 +6,17 @@ import { Readout } from '@/components/ui/Readout'
 import { useAurora } from '@/hooks/useAurora'
 import { useClouds } from '@/hooks/useClouds'
 import { useGeolocation } from '@/hooks/useGeolocation'
+import { useIssTle } from '@/hooks/useIssTle'
 import { useNow } from '@/hooks/useNow'
 import { useSolarCycle } from '@/hooks/useSolarCycle'
 import { useSunMoon } from '@/hooks/useSunMoon'
 import { auroraChanceAt, kpAt } from '@/lib/auroraChance'
+import { type IssPass, tleEpoch, visiblePasses } from '@/lib/orbit/passes'
 import {
   cloudCoverAt,
   type Darkness,
   darkWindow,
+  STRIP_HOURS,
   type TonightSlot,
   tonightStrip,
 } from '@/lib/tonight'
@@ -78,6 +81,38 @@ function darkLabel(dark: { start: Date; end: Date } | null, now: Date): string {
   return `${clock(dark.start)}–${clock(dark.end)}`
 }
 
+/**
+ * Visible ISS passes (#81): sunlit station, dark sky, above 10°. Passes already over
+ * are dropped; the orbit data's age is shown because a stale TLE drifts by minutes.
+ */
+function IssPasses({ passes, now, line1 }: { passes: IssPass[]; now: Date; line1: string }) {
+  const ahead = passes.filter((p) => p.end.getTime() >= now.getTime())
+  const ageHours = Math.max(0, Math.round((now.getTime() - tleEpoch(line1).getTime()) / 3_600_000))
+  return (
+    <div className={styles.passes ?? ''}>
+      <Label tone="dim">Visible ISS passes</Label>
+      {ahead.length === 0 ? (
+        <Label>No visible ISS passes in the next 12 hours.</Label>
+      ) : (
+        <ul className={styles.passList ?? ''}>
+          {ahead.map((p) => (
+            <li key={p.start.getTime()} className={styles.pass ?? ''}>
+              <Readout
+                value={`${clock(p.start)}–${clock(p.end)}`}
+                className={styles.passTime ?? ''}
+              />
+              <span className={styles.passWhere ?? ''}>
+                up to {String(Math.round(p.maxElevation))}° · {p.from} → {p.to}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Label>Orbit data {String(ageHours)} h old</Label>
+    </div>
+  )
+}
+
 /** Before the user shares a location: say what the panel does, and ask. */
 function Ask({ status, request }: { status: string; request: () => void }) {
   return (
@@ -115,6 +150,7 @@ export function TonightPanel() {
   const { data: clouds } = useClouds(coords)
   const { data: aurora } = useAurora(true)
   const { data: cycle } = useSolarCycle()
+  const { data: tle } = useIssTle()
   const hour = Math.floor(now.getTime() / 3_600_000)
 
   const sky = useMemo(() => {
@@ -125,6 +161,11 @@ export function TonightPanel() {
       dark: darkWindow(at, coords.lat, coords.lon),
     }
   }, [coords, hour])
+
+  const passes = useMemo(() => {
+    if (!coords || !tle) return null
+    return visiblePasses(tle, coords.lat, coords.lon, new Date(hour * 3_600_000), STRIP_HOURS)
+  }, [coords, tle, hour])
 
   if (!coords || !sky) {
     return (
@@ -211,6 +252,7 @@ export function TonightPanel() {
             times clear sky: our estimate, not NOAA’s.
           </Label>
         )}
+        {passes && tle && <IssPasses passes={passes} now={now} line1={tle.line1} />}
         <Label>
           Your approximate location is sent to{' '}
           <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">

@@ -24,6 +24,8 @@ const sky = vi.hoisted((): { aurora: unknown; cycle: unknown } => ({
 }))
 vi.mock('@/hooks/useAurora', () => ({ useAurora: () => sky.aurora }))
 vi.mock('@/hooks/useSolarCycle', () => ({ useSolarCycle: () => sky.cycle }))
+// No orbit data: passes are covered in tonight-passes.test.tsx (#81).
+vi.mock('@/hooks/useIssTle', () => ({ useIssTle: () => ({ data: undefined }) }))
 vi.mock('@/hooks/useSunMoon', () => ({
   useSunMoon: () => ({ data: { fracIllum: 97, curPhase: 'Waning Gibbous' } }),
 }))
