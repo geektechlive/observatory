@@ -45,6 +45,7 @@ export type SourceName =
   | 'space-news'
   | 'sun-moon'
   | 'swpc-alerts'
+  | 'weather'
 
 export type SourceState = 'unknown' | 'ok' | 'degraded' | 'error'
 
@@ -182,6 +183,13 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: false,
     maxAgeMs: 6 * HOUR,
     required: hasContent,
+  },
+  // Open-Meteo cloud cover (#79): only fetched once the user shares a location.
+  weather: {
+    label: 'Cloud Cover',
+    headline: false,
+    maxAgeMs: 3 * HOUR,
+    required: (data) => isRecord(data) && nonEmptyArrayField(data['hourly'], 'time'),
   },
 }
 

@@ -98,6 +98,18 @@
   transform: translate(-50%, -50%);
 }
 
+.cloud {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone);
+  text-align: center;
+}
+
+.body a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .hour {
   font-family: var(--font-mono);
   font-size: var(--text-xs);

@@ -3,10 +3,11 @@ import { useMemo } from 'react'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
+import { useClouds } from '@/hooks/useClouds'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { useNow } from '@/hooks/useNow'
 import { useSunMoon } from '@/hooks/useSunMoon'
-import { type Darkness, darkWindow, tonightStrip } from '@/lib/tonight'
+import { cloudCoverAt, type Darkness, darkWindow, tonightStrip } from '@/lib/tonight'
 
 import styles from './tonight-panel.module.css'
 
@@ -55,7 +56,9 @@ function Ask({ status, request }: { status: string; request: () => void }) {
         </button>
       )}
       {status === 'denied' && <Label>Location denied.</Label>}
-      <Label>Rounded to about 11 km and never saved.</Label>
+      <Label>
+        Rounded to about 11 km and never saved. For cloud cover it is sent to Open-Meteo.
+      </Label>
     </div>
   )
 }
@@ -69,6 +72,7 @@ export function TonightPanel() {
   const { coords, status, request } = useGeolocation()
   const now = useNow(CLOCK_TICK_MS)
   const { data: sunMoon } = useSunMoon()
+  const { data: clouds } = useClouds(coords)
   const hour = Math.floor(now.getTime() / 3_600_000)
 
   const sky = useMemo(() => {
@@ -105,24 +109,42 @@ export function TonightPanel() {
           </span>
         </div>
         <ol className={styles.strip ?? ''}>
-          {sky.strip.map((slot) => (
-            <li
-              key={slot.time.getTime()}
-              className={styles.slot ?? ''}
-              data-darkness={slot.darkness}
-              aria-label={`${clock(slot.time)} ${DARKNESS_WORDS[slot.darkness]}${slot.moonUp ? ', moon up' : ''}`}
-            >
-              <span className={styles.cell ?? ''} aria-hidden="true">
-                {slot.moonUp && <span className={styles.moon ?? ''} />}
-              </span>
-              <span className={styles.hour ?? ''} aria-hidden="true">
-                {clock(slot.time).slice(0, 2)}
-              </span>
-            </li>
-          ))}
+          {sky.strip.map((slot) => {
+            const cloud = clouds ? cloudCoverAt(clouds.hourly, slot.time) : null
+            const moon = slot.moonUp ? ', moon up' : ''
+            const cloudWords = cloud === null ? '' : `, ${String(cloud)}% cloud`
+            return (
+              <li
+                key={slot.time.getTime()}
+                className={styles.slot ?? ''}
+                data-darkness={slot.darkness}
+                aria-label={`${clock(slot.time)} ${DARKNESS_WORDS[slot.darkness]}${moon}${cloudWords}`}
+              >
+                <span className={styles.cell ?? ''} aria-hidden="true">
+                  {slot.moonUp && <span className={styles.moon ?? ''} />}
+                </span>
+                <span className={styles.hour ?? ''} aria-hidden="true">
+                  {clock(slot.time).slice(0, 2)}
+                </span>
+                {clouds && (
+                  <span className={styles.cloud ?? ''} data-cloud aria-hidden="true">
+                    {cloud === null ? '—' : String(cloud)}
+                  </span>
+                )}
+              </li>
+            )
+          })}
         </ol>
         <Label>
           {place(coords.lat, coords.lon)} · local times · darker cells are darker sky · dot: Moon up
+          {clouds ? ' · bottom row: cloud %' : ''}
+        </Label>
+        <Label>
+          Your approximate location is sent to{' '}
+          <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">
+            Open-Meteo
+          </a>{' '}
+          for cloud cover.
         </Label>
       </div>
     </GlassPanel>

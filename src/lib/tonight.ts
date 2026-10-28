@@ -117,6 +117,19 @@ export function darkWindow(now: Date, lat: number, lon: number): { start: Date; 
   return { start: new Date(start), end: new Date(edge(step, step + STEP_MS)) }
 }
 
+/**
+ * Cloud cover (%) for the hour `time` falls in, from an hourly series in Unix seconds
+ * (#79); null outside the forecast or where the value is missing.
+ */
+export function cloudCoverAt(
+  series: { time: readonly number[]; cloud_cover: readonly (number | null)[] },
+  time: Date,
+): number | null {
+  const hourStart = Math.floor(time.getTime() / HOUR_MS) * 3600
+  const i = series.time.indexOf(hourStart)
+  return i < 0 ? null : (series.cloud_cover[i] ?? null)
+}
+
 export interface TonightSlot {
   time: Date
   sunAlt: number

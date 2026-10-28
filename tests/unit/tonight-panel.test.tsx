@@ -13,6 +13,10 @@ const NOW = new Date('2026-10-27T22:40:00Z')
 const state = vi.hoisted(() => ({ request: vi.fn(), now: new Date('2026-10-27T22:40:00Z') }))
 
 vi.mock('@/hooks/useNow', () => ({ useNow: () => state.now }))
+const clouds = vi.hoisted(() => ({
+  useClouds: vi.fn<(observer: unknown) => { data: unknown }>(() => ({ data: undefined })),
+}))
+vi.mock('@/hooks/useClouds', () => clouds)
 vi.mock('@/hooks/useSunMoon', () => ({
   useSunMoon: () => ({ data: { fracIllum: 97, curPhase: 'Waning Gibbous' } }),
 }))
@@ -66,6 +70,32 @@ describe('TonightPanel', () => {
     state.now = new Date('2026-10-28T02:14:00Z')
     render(<TonightPanel />)
     expect(screen.getByText(/^until \d{2}:\d{2}$/)).toBeTruthy()
+  })
+
+  it('asks Open-Meteo for nothing until the location is shared (#79)', () => {
+    render(<TonightPanel />)
+    expect(clouds.useClouds).toHaveBeenLastCalledWith(null)
+  })
+
+  it('shows hourly cloud cover, and says the approximate location goes to Open-Meteo (#79)', () => {
+    const start = Math.floor(NOW.getTime() / 3_600_000) * 3600
+    clouds.useClouds.mockReturnValue({
+      data: {
+        hourly: {
+          time: Array.from({ length: 12 }, (_, i) => start + i * 3600),
+          cloud_cover: [45, 32, 10, 36, 93, 85, 6, 3, 24, 100, 100, null],
+        },
+      },
+    })
+    useUiStore.setState({ observer: { lat: 39.1, lon: -94.6, isFallback: false } })
+    render(<TonightPanel />)
+    const cells = [...document.querySelectorAll('[data-cloud]')].map((c) => c.textContent)
+    expect(cells).toEqual(['45', '32', '10', '36', '93', '85', '6', '3', '24', '100', '100', '—'])
+    expect(document.body.textContent).toMatch(/approximate location is sent to Open-Meteo/i)
+    expect(screen.getByRole('link', { name: /Open-Meteo/ }).getAttribute('href')).toBe(
+      'https://open-meteo.com/',
+    )
+    clouds.useClouds.mockReturnValue({ data: undefined })
   })
 
   it('names each hour for screen readers, with darkness and the moon', () => {
