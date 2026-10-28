@@ -13,6 +13,7 @@ const DAY = 24 * HOUR
 
 /** One entry per fetcher in `src/lib/api` (quota/client are infrastructure, not sources). */
 export type SourceName =
+  | 'aftershocks'
   | 'aircraft'
   | 'air-quality'
   | 'apod'
@@ -89,6 +90,13 @@ function nonEmptyArrayField(data: unknown, key: string): boolean {
 }
 
 export const SOURCES: Record<SourceName, SourceContract> = {
+  aftershocks: {
+    // Most weeks no recent quake has a USGS forecast, so an empty list is a real answer.
+    label: 'Aftershock Odds',
+    headline: false,
+    maxAgeMs: 3 * HOUR,
+    required: (data) => isRecord(data) && Array.isArray(data['forecasts']),
+  },
   aircraft: { label: 'Aircraft', headline: false, maxAgeMs: 5 * MINUTE, required: hasContent },
   'air-quality': {
     label: 'Air Quality',

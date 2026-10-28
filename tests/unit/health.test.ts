@@ -176,3 +176,13 @@ describe('2026-09-07 upstream-drift regression', () => {
     expect(deriveLiveStatus(map)).toBe('degraded')
   })
 })
+
+describe('aftershocks contract (#76)', () => {
+  it('treats an empty list as usable: most weeks no quake has a forecast', () => {
+    expect(evaluateSource('aftershocks', { forecasts: [], updatedAt: 'x' }, FRESH)).toBe('ok')
+  })
+
+  it('treats a payload without the list as an error', () => {
+    expect(evaluateSource('aftershocks', { updatedAt: 'x' }, FRESH)).toBe('error')
+  })
+})

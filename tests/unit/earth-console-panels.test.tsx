@@ -37,6 +37,10 @@ vi.mock('@/hooks/useQuakes', () => ({ useQuakes: () => quakes }))
 vi.mock('@/hooks/useSolarWind', () => ({ useSolarWind: () => wind }))
 vi.mock('@/hooks/useNwsAlerts', () => ({ useNwsAlerts: () => nws }))
 vi.mock('@/hooks/useNow', () => ({ useNow: () => NOW }))
+// No forecasts: the odds block is covered in seismic-aftershocks.test.tsx (#76).
+vi.mock('@/hooks/useAftershocks', () => ({
+  useAftershocks: () => ({ data: { forecasts: [], updatedAt: '' } }),
+}))
 
 afterEach(() => {
   cleanup()

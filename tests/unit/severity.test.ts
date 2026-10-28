@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  aftershockStatus,
   bzStatus,
   dstStatus,
   flareStatus,
@@ -116,5 +117,18 @@ describe('statusVar', () => {
     expect(statusVar('watch')).toBe('var(--amber)')
     expect(statusVar('hazard')).toBe('var(--mcrn)')
     expect(statusVar(null)).toBe('var(--bone-dim)')
+  })
+})
+
+// #76: USGS odds of at least one aftershock in the next week. Red only for a real chance
+// of a damaging one; amber when an M5+ is plausible.
+describe('aftershockStatus', () => {
+  it.each([
+    [{ m5: 0.05, m6: 0.004 }, 'nominal'],
+    [{ m5: 0.1, m6: 0.01 }, 'watch'],
+    [{ m5: 0.39, m6: 0.048 }, 'watch'],
+    [{ m5: 0.7, m6: 0.1 }, 'hazard'],
+  ] as const)('week odds %o are %s', (week, status) => {
+    expect(aftershockStatus(week)).toBe(status)
   })
 })

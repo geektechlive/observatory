@@ -1,0 +1,16 @@
+{
+  "id": "us6000u18k",
+  "properties": {
+    "products": {
+      "oaf": [
+        {
+          "contents": {
+            "forecast.json": {
+              "url": "https://earthquake.usgs.gov/product/oaf/us6000u18k/us/1793030666272/forecast.json"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

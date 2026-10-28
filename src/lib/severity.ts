@@ -42,6 +42,16 @@ export function quakeStatus(magnitude: number): Status {
   return 'nominal'
 }
 
+/**
+ * USGS odds of at least one aftershock in the next week (#76): hazard at a 10% chance
+ * of an M6+ (a damaging one), watch at a 10% chance of an M5+.
+ */
+export function aftershockStatus(week: { m5: number; m6: number }): Status {
+  if (week.m6 >= 0.1) return 'hazard'
+  if (week.m5 >= 0.1) return 'watch'
+  return 'nominal'
+}
+
 /** Palermo scale: above -2 merits careful monitoring (CNEOS). */
 export function palermoStatus(ps: number): Status {
   return ps > -2 ? 'hazard' : 'nominal'

@@ -1,0 +1,121 @@
+{
+  "expireTime": 1824603683226,
+  "forecast": [
+    {
+      "label": "1 Day",
+      "bins": [
+        {
+          "magnitude": 3.0,
+          "probability": 0.9982
+        },
+        {
+          "magnitude": 4.0,
+          "probability": 0.545
+        },
+        {
+          "magnitude": 5.0,
+          "probability": 0.0801
+        },
+        {
+          "magnitude": 6.0,
+          "probability": 0.008
+        },
+        {
+          "magnitude": 7.0,
+          "probability": 0.0007
+        },
+        {
+          "magnitude": 8.0,
+          "probability": 0.0
+        }
+      ]
+    },
+    {
+      "label": "1 Week",
+      "bins": [
+        {
+          "magnitude": 3.0,
+          "probability": 0.9999
+        },
+        {
+          "magnitude": 4.0,
+          "probability": 0.983
+        },
+        {
+          "magnitude": 5.0,
+          "probability": 0.3919
+        },
+        {
+          "magnitude": 6.0,
+          "probability": 0.0479
+        },
+        {
+          "magnitude": 7.0,
+          "probability": 0.0039
+        },
+        {
+          "magnitude": 8.0,
+          "probability": 0.0004
+        }
+      ]
+    },
+    {
+      "label": "1 Month",
+      "bins": [
+        {
+          "magnitude": 3.0,
+          "probability": 0.9999
+        },
+        {
+          "magnitude": 4.0,
+          "probability": 0.9999
+        },
+        {
+          "magnitude": 5.0,
+          "probability": 0.7508
+        },
+        {
+          "magnitude": 6.0,
+          "probability": 0.1435
+        },
+        {
+          "magnitude": 7.0,
+          "probability": 0.0158
+        },
+        {
+          "magnitude": 8.0,
+          "probability": 0.0016
+        }
+      ]
+    },
+    {
+      "label": "1 Year",
+      "bins": [
+        {
+          "magnitude": 3.0,
+          "probability": 0.9999
+        },
+        {
+          "magnitude": 4.0,
+          "probability": 0.9998
+        },
+        {
+          "magnitude": 5.0,
+          "probability": 0.9591
+        },
+        {
+          "magnitude": 6.0,
+          "probability": 0.3463
+        },
+        {
+          "magnitude": 7.0,
+          "probability": 0.046
+        },
+        {
+          "magnitude": 8.0,
+          "probability": 0.0051
+        }
+      ]
+    }
+  ]
+}
