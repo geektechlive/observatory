@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { altToRadius, latLonToVec3 } from '@/lib/globe3d'
-import { planLayers } from '@/lib/globeLayers'
+import { AURORA_SHELL, planLayers } from '@/lib/globeLayers'
 import { eonetKind, ISS_HEX, LANES, STATUS_HEX } from '@/lib/palette'
 
 const EMPTY = {
@@ -207,5 +207,39 @@ describe('planLayers active-hazard glows (#50)', () => {
       satellites: [{ name: 'Hubble', lat: 0, lon: 0, alt: 540 }],
     })
     expect(plan.glows).toEqual([])
+  })
+})
+
+describe('planLayers aurora reach (#77)', () => {
+  const line = (lat: number, from: number, to: number): [number, number][] =>
+    Array.from({ length: to - from + 1 }, (_, i): [number, number] => [from + i, lat])
+  const REACH = {
+    likely: { n: line(55, -120, -60), s: line(-62, 100, 140) },
+    possible: { n: line(50, -120, -60), s: [] },
+  }
+
+  it('draws the likely edge in watch amber, just above the aurora shell, per hemisphere', () => {
+    const plan = planLayers({ ...EMPTY, auroraReach: REACH })
+    const likely = plan.reach.filter((r) => r.kind === 'likely')
+    expect(likely).toHaveLength(2)
+    for (const r of plan.reach) {
+      expect(r.color).toBe(STATUS_HEX.watch)
+      for (const p of r.points) expect(radius(p)).toBeCloseTo(AURORA_SHELL + 0.001, 6)
+    }
+    expect(likely[0]?.points[0]).toEqual(
+      latLonToVec3(55, -120, AURORA_SHELL + 0.001).map((v) => expect.closeTo(v, 9)),
+    )
+  })
+
+  it('draws the possible edge too, fainter', () => {
+    const plan = planLayers({ ...EMPTY, auroraReach: REACH })
+    const possible = plan.reach.filter((r) => r.kind === 'possible')
+    expect(possible).toHaveLength(1)
+    const likelyAlpha = plan.reach.find((r) => r.kind === 'likely')?.alpha ?? 0
+    expect(possible[0]?.alpha).toBeLessThan(likelyAlpha)
+  })
+
+  it('plans no reach without data', () => {
+    expect(planLayers(EMPTY).reach).toEqual([])
   })
 })

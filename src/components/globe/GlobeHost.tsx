@@ -4,6 +4,7 @@ import { Chip } from '@/components/ui/Chip'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import type { LaneCensus } from '@/lib/census'
 import { gpuTier } from '@/lib/globe3d'
+import type { LayerInput } from '@/lib/globeLayers'
 import { chooseGlobeMode, type GlobeMode, readGlobeModeInput, readGpuInfo } from '@/lib/globeMode'
 
 import { Globe } from './Globe'
@@ -17,6 +18,8 @@ type GlobeProps = ComponentProps<typeof Globe> & {
   census?: readonly LaneCensus[] | undefined
   /** Called with the facing longitude, every frame on WebGL; write it to the DOM, not state. */
   onFacing?: ((lon: number) => void) | undefined
+  /** How far the aurora reaches (#77); drawn on the WebGL globe only. */
+  auroraReach?: LayerInput['auroraReach']
 }
 
 const NONE: readonly never[] = []
@@ -69,7 +72,7 @@ function releaseAfterFailure(): void {
  * for when it falls back (no WebGL, save-data, ?globe=svg).
  * `data-globe-mode` says which one is live, so e2e can't pass silently on the fallback.
  */
-export function GlobeHost({ census, onFacing, ...props }: GlobeProps) {
+export function GlobeHost({ census, onFacing, auroraReach, ...props }: GlobeProps) {
   const [mode, setMode] = useState<GlobeMode>('svg')
   const [renderer, setRenderer] = useState<GlobeRenderer | null>(null)
   const slot = useRef<HTMLDivElement>(null)
@@ -119,6 +122,7 @@ export function GlobeHost({ census, onFacing, ...props }: GlobeProps) {
       disasters: orNone(disasters),
       satellites: orNone(satellites),
       aurora: orNone(aurora),
+      auroraReach,
       tracking,
     })
   }, [
@@ -135,6 +139,7 @@ export function GlobeHost({ census, onFacing, ...props }: GlobeProps) {
     disasters,
     satellites,
     aurora,
+    auroraReach,
     tracking,
   ])
 

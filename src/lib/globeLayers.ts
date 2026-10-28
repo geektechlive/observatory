@@ -5,8 +5,9 @@
  * magnitude is drawn as size, never as colour within a lane (spec section 4).
  */
 import { auroraAlpha } from './auroraField'
+import { type Reach, reachSegments } from './auroraReach'
 import { altToRadius, latLonToVec3 } from './globe3d'
-import { AURORA_HEX, eonetKind, gdacsColor, ISS_HEX, LANES } from './palette'
+import { AURORA_HEX, eonetKind, gdacsColor, ISS_HEX, LANES, STATUS_HEX } from './palette'
 import { gdacsStatus, quakeStatus } from './severity'
 
 type Vec3 = [number, number, number]
@@ -30,6 +31,8 @@ export interface LayerInput {
   satellites: readonly { name: string; lat: number; lon: number; alt?: number | undefined }[]
   /** OVATION [lon, lat, intensity] triplets; intensity runs about 4..29 (see auroraAlpha). */
   aurora: readonly (readonly [number, number, number])[]
+  /** The oval's equatorward edge at 10% (likely) and 5% (possible), from /api/aurora (#77). */
+  auroraReach?: { likely: Reach; possible: Reach } | undefined
   tracking: boolean
 }
 
@@ -83,11 +86,26 @@ export interface LayerPlan {
   glows: PlannedGlow[]
   /** OVATION cells for the aurora field texture (#50); `points` keeps the per-cell census. */
   aurora: LayerInput['aurora']
+  /** How far the aurora reaches (#77): one polyline per contiguous run of the edge. */
+  reach: PlannedReach[]
+}
+
+export interface PlannedReach {
+  kind: 'likely' | 'possible'
+  points: Vec3[]
+  color: string
+  alpha: number
+  /** Line width in CSS pixels. */
+  width: number
 }
 
 /** Markers sit just off the surface so they never z-fight the Earth. */
 const SURFACE = 1.008
 export const AURORA_SHELL = 1.012
+/** The reach line rides just above the aurora field so the field never covers it. */
+const REACH_SHELL = AURORA_SHELL + 0.001
+const REACH_ALPHA = { likely: 0.9, possible: 0.5 } as const
+const REACH_WIDTH = { likely: 2, possible: 1 } as const
 const DEFAULT_SAT_ALT_KM = 550
 
 /** Quake spike height, globe radii: M4 is a stub, M8 stands tall; unknown is a stub. */
@@ -225,7 +243,25 @@ export function planLayers(input: LayerInput): LayerPlan {
     points,
     glows: planGlows(input, markers, spikes),
     aurora: input.aurora,
+    reach: planReach(input.auroraReach),
   }
+}
+
+/**
+ * The aurora's reach (#77) in watch amber: the likely (10%) edge bold, the possible
+ * (5%) edge faint. Each hemisphere's line breaks where nothing reaches the threshold.
+ */
+function planReach(reach: LayerInput['auroraReach']): PlannedReach[] {
+  if (!reach) return []
+  return (['likely', 'possible'] as const).flatMap((kind) =>
+    [...reachSegments(reach[kind].n), ...reachSegments(reach[kind].s)].map((run) => ({
+      kind,
+      points: run.map(([lon, lat]) => latLonToVec3(lat, lon, REACH_SHELL)),
+      color: STATUS_HEX.watch,
+      alpha: REACH_ALPHA[kind],
+      width: REACH_WIDTH[kind],
+    })),
+  )
 }
 
 /**

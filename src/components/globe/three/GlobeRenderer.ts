@@ -315,6 +315,8 @@ export class GlobeRenderer {
   private applyPixelScale(): void {
     const pixels = this.size * this.pixelRatio()
     this.layers.setPixelScale(pixels / (2 * Math.tan((this.camera.fov * Math.PI) / 360)))
+    // Fat lines (#77) size in CSS pixels against the canvas's CSS size.
+    this.layers.setResolution(this.size)
   }
 
   /**
@@ -341,6 +343,8 @@ export class GlobeRenderer {
     const staticChanged =
       !last ||
       last.tracking !== input.tracking ||
+      // The reach is one object per aurora fetch, so identity is the change test (#77).
+      last.auroraReach !== input.auroraReach ||
       STATIC_KEYS.some((key) => !sameItems(last[key], input[key]))
     const satellitesChanged = !last || !sameItems(last.satellites, input.satellites)
     // The satellite feed refreshes every 2 s with new objects; move the plates if the

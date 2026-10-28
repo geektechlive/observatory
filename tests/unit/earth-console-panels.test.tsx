@@ -37,6 +37,8 @@ vi.mock('@/hooks/useQuakes', () => ({ useQuakes: () => quakes }))
 vi.mock('@/hooks/useSolarWind', () => ({ useSolarWind: () => wind }))
 vi.mock('@/hooks/useNwsAlerts', () => ({ useNwsAlerts: () => nws }))
 vi.mock('@/hooks/useNow', () => ({ useNow: () => NOW }))
+// No reach yet: the reach rows are covered in geomag-aurora-reach.test.tsx (#77).
+vi.mock('@/hooks/useAurora', () => ({ useAurora: () => ({ data: undefined }) }))
 // No forecasts: the odds block is covered in seismic-aftershocks.test.tsx (#76).
 vi.mock('@/hooks/useAftershocks', () => ({
   useAftershocks: () => ({ data: { forecasts: [], updatedAt: '' } }),

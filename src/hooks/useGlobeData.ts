@@ -163,6 +163,8 @@ export function useGlobeData() {
     satellites: layers.satellites || tracking ? satellites : NO_ITEMS,
     fires: layers.fires && !tracking ? (firesData?.fires ?? NO_ITEMS) : NO_ITEMS,
     aurora: layers.aurora ? (auroraData?.points ?? NO_ITEMS) : NO_ITEMS,
+    // One object per fetch, so the renderer rebuilds only when it changes (#77).
+    auroraReach: layers.aurora ? auroraData?.reach : undefined,
     showTerminator: layers.terminator,
     warm: !tracking,
     tracking,

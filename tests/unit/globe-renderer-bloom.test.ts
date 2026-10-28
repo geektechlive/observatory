@@ -139,6 +139,33 @@ describe('GlobeRenderer bloom (#50)', () => {
   })
 })
 
+describe('GlobeRenderer aurora reach (#77)', () => {
+  const reach = (lat: number) => ({
+    likely: {
+      n: [
+        [-100, lat],
+        [-99, lat],
+      ] as [number, number][],
+      s: [],
+    },
+    possible: { n: [], s: [] },
+  })
+
+  it('rebuilds the static layers when a new reach arrives, not when the same one does', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const builds = () => Number(f.renderer.domElement.dataset['globeBuilds'])
+    const first = reach(55)
+    r.setLayers({ ...LAYERS, auroraReach: first })
+    const after = builds()
+    r.setLayers({ ...LAYERS, auroraReach: first })
+    expect(builds()).toBe(after)
+    r.setLayers({ ...LAYERS, auroraReach: reach(52) })
+    expect(builds()).toBe(after + 1)
+    r.dispose()
+  })
+})
+
 describe('GlobeRenderer aurora time (#50, spec section 6)', () => {
   it('advances while the globe turns', async () => {
     const f = fakes()

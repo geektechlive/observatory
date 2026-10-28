@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
+import { auroraReach, REACH_LIKELY, REACH_POSSIBLE } from '../../src/lib/auroraReach'
 import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
 
 // NOAA OVATION aurora forecast (global 1° grid). Public, no key.
@@ -26,8 +27,16 @@ export const onRequest: PagesFunction = (ctx) =>
       return contractError('Invalid OVATION response')
     }
 
+    // The reach line comes from the full grid (#77): in a big storm the trim below
+    // drops the weak equatorward edge, which is exactly the line.
+    const cells = parsed.data.coordinates
+    const reach = {
+      likely: auroraReach(cells, REACH_LIKELY),
+      possible: auroraReach(cells, REACH_POSSIBLE),
+    }
+
     // Keep the strongest oval cells; normalize lon to [-180,180].
-    const points = parsed.data.coordinates
+    const points = cells
       .filter((p) => p[2] >= MIN_INTENSITY)
       .sort((a, b) => b[2] - a[2])
       .slice(0, MAX_POINTS)
@@ -36,6 +45,7 @@ export const onRequest: PagesFunction = (ctx) =>
     return {
       body: JSON.stringify({
         points,
+        reach,
         observationTime: parsed.data['Observation Time'] ?? '',
         forecastTime: parsed.data['Forecast Time'] ?? '',
         updatedAt: new Date().toISOString(),

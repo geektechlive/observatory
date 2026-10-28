@@ -34,8 +34,12 @@ import {
   Sprite,
   SpriteMaterial,
   type Texture,
+  Vector2,
   Vector3,
 } from 'three'
+import { Line2 } from 'three/addons/lines/Line2.js'
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 
 import { auroraFieldData, FIELD_H, FIELD_W } from '@/lib/auroraField'
 import { isOccluded, type Vec3 } from '@/lib/globe3d'
@@ -45,6 +49,7 @@ import {
   type LayerPlan,
   type PlannedGlow,
   type PlannedPoint,
+  type PlannedReach,
 } from '@/lib/globeLayers'
 import { AURORA_HEX, BONE_HEX, VOID_HEX } from '@/lib/palette'
 
@@ -245,6 +250,8 @@ export class GlobeLayerObjects {
   private auroraTexture: DataTexture | null = null
   private readonly auroraTime: { value: number }
   private trailLine: Line | null = null
+  private reachLines: Line2[] = []
+  private readonly resolution = new Vector2(460, 460)
   private pixelScale = 460
   private readonly scratch = new Vector3()
 
@@ -285,6 +292,8 @@ export class GlobeLayerObjects {
     const fires = plan.points.filter((p) => p.layer === 'fires')
     if (fires.length) this.staticGroup.add(this.buildPoints(fires))
     if (plan.aurora.length) this.staticGroup.add(this.buildAuroraField(plan.aurora))
+    this.reachLines = plan.reach.map((r) => this.buildReachLine(r))
+    for (const l of this.reachLines) this.staticGroup.add(l)
   }
 
   updateIss(plan: LayerPlan): void {
@@ -412,6 +421,33 @@ export class GlobeLayerObjects {
 
   debugAuroraField(): Mesh | null {
     return this.auroraField
+  }
+
+  debugReachLines(): Line2[] {
+    return this.reachLines
+  }
+
+  /** The canvas's CSS size, which fat lines need to turn their width into pixels. */
+  setResolution(cssPx: number): void {
+    this.resolution.set(cssPx, cssPx)
+    for (const l of this.reachLines) l.material.resolution.copy(this.resolution)
+  }
+
+  /**
+   * How far the aurora reaches (#77), in the main pass only, never bloomed. A fat line:
+   * WebGL draws plain lines 1 px wide everywhere, and those vanished on the dark limb.
+   */
+  private buildReachLine(reach: PlannedReach): Line2 {
+    const geometry = new LineGeometry().setPositions(reach.points.flat())
+    const material = new LineMaterial({
+      color: reach.color,
+      linewidth: reach.width,
+      transparent: true,
+      opacity: reach.alpha,
+      depthWrite: false,
+    })
+    material.resolution.copy(this.resolution)
+    return new Line2(geometry, material)
   }
 
   /** A plain glyph sprite, or a spacecraft nameplate with its glow, anchored on the marker point. */

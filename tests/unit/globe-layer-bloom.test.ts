@@ -149,3 +149,44 @@ describe('GlobeLayerObjects aurora time (#70)', () => {
     expect(objects).not.toHaveProperty('setTime')
   })
 })
+
+describe('GlobeLayerObjects aurora reach (#77)', () => {
+  const line = (lat: number): [number, number][] =>
+    Array.from({ length: 30 }, (_, i): [number, number] => [-120 + i, lat])
+  const reachPlan = planLayers({
+    ...EMPTY,
+    auroraReach: { likely: { n: line(55), s: [] }, possible: { n: line(50), s: [] } },
+  })
+
+  it('draws one line per reach run, in the main pass only: amber data never glows', () => {
+    const objects = new GlobeLayerObjects({ bloom: true })
+    objects.buildStatic(reachPlan)
+    const lines = objects.debugReachLines()
+    expect(lines).toHaveLength(2)
+    for (const l of lines) {
+      expect(drawsIn(l, mainOnly)).toBe(true)
+      expect(drawsIn(l, bloomOnly)).toBe(false)
+      // 30 points make 29 segments.
+      expect(l.geometry.getAttribute('instanceStart').count).toBe(29)
+    }
+  })
+
+  it('draws real pixel widths: 1 px WebGL lines vanished on the dark limb (M5 Pro, 2026-10-27)', () => {
+    const objects = new GlobeLayerObjects({ bloom: true })
+    objects.setResolution(460)
+    objects.buildStatic(reachPlan)
+    const [likely, possible] = objects.debugReachLines()
+    expect(likely?.material.linewidth).toBe(2)
+    expect(possible?.material.linewidth).toBe(1)
+    expect(likely?.material.resolution.x).toBe(460)
+    objects.setResolution(680)
+    expect(likely?.material.resolution.toArray()).toEqual([680, 680])
+  })
+
+  it('drops the lines when the reach goes away', () => {
+    const objects = new GlobeLayerObjects({ bloom: true })
+    objects.buildStatic(reachPlan)
+    objects.buildStatic(planLayers(EMPTY))
+    expect(objects.debugReachLines()).toEqual([])
+  })
+})
