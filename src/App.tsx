@@ -126,7 +126,9 @@ export function App() {
               className={`${styles.rest ?? ''} ${consoleStyles.rest ?? ''}`}
               key={`rest-${view}`}
             >
-              <parts.Rest />
+              <Suspense fallback={null}>
+                <parts.Rest />
+              </Suspense>
             </section>
           </ErrorBoundary>
 

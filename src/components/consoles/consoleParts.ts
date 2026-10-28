@@ -1,18 +1,33 @@
-import type { ComponentType } from 'react'
+import { type ComponentType, lazy } from 'react'
 
 import type { ConsoleView } from '@/store/ui'
 
-import { EarthConsoleLead, EarthConsoleRest } from './EarthConsole'
-import { OrbitConsoleLead, OrbitConsoleRest } from './OrbitConsole'
-import { SkyConsoleLead, SkyConsoleRest } from './SkyConsole'
-import { SunConsoleLead, SunConsoleRest } from './SunConsole'
+import { EarthConsoleLead } from './EarthConsole'
+import { OrbitConsoleLead } from './OrbitConsole'
+import { SkyConsoleLead } from './SkyConsole'
+import { SunConsoleLead } from './SunConsole'
+
+// The Rest panels sit below the lens row, so each console's set loads in its own chunk
+// after first paint (#75). The entry chunk had 2.9 kB left under its 190 kB budget.
+const EarthConsoleRest = lazy(() =>
+  import('./EarthConsoleRest').then((m) => ({ default: m.EarthConsoleRest })),
+)
+const SunConsoleRest = lazy(() =>
+  import('./SunConsoleRest').then((m) => ({ default: m.SunConsoleRest })),
+)
+const SkyConsoleRest = lazy(() =>
+  import('./SkyConsoleRest').then((m) => ({ default: m.SkyConsoleRest })),
+)
+const OrbitConsoleRest = lazy(() =>
+  import('./OrbitConsoleRest').then((m) => ({ default: m.OrbitConsoleRest })),
+)
 
 export interface ConsoleParts {
   /** The mono line under the voice sentence. */
   sub: string
   /** Panels in the column beside the lens. */
   Lead: ComponentType
-  /** Panels in the grid below the lens row. */
+  /** Panels in the grid below the lens row; lazy, so render it inside Suspense. */
   Rest: ComponentType
 }
 

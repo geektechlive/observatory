@@ -467,10 +467,9 @@ export class GlobeRenderer {
     this.detach()
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost)
     document.removeEventListener('visibilitychange', this.handleVisibility)
-    for (const mesh of this.meshes) {
-      mesh.geometry.dispose()
-      ;(mesh.material as Material).dispose()
-    }
+    // The bloom twin shares the Earth's geometry, so free each geometry once (#74).
+    for (const geometry of new Set(this.meshes.map((m) => m.geometry))) geometry.dispose()
+    for (const mesh of this.meshes) (mesh.material as Material).dispose()
     for (const t of this.textures) t.dispose()
     this.layers.dispose()
     this.bloom?.dispose()

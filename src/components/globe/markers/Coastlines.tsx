@@ -1,35 +1,7 @@
-import { memo, useMemo } from 'react'
-import * as topojson from 'topojson-client'
-import type { GeometryCollection, Topology } from 'topojson-specification'
-import landTopo from 'world-atlas/land-110m.json'
+import { memo, useEffect, useMemo, useState } from 'react'
 
 import { coastPathData } from '../useGlobeProjection'
-
-/**
- * Real coastline data — processed once at module load.
- * GeoJSON is [lon, lat]; our project() takes (lat, lon) — swapped on import.
- */
-const LAND_RINGS: [number, number][][] = (() => {
-  const topo = landTopo as unknown as Topology<{ land: GeometryCollection }>
-  const geo = topojson.feature(topo, topo.objects.land)
-  const rings: [number, number][][] = []
-  const features = 'features' in geo ? geo.features : [geo]
-  for (const feature of features) {
-    const geom = feature.geometry
-    const polys =
-      geom.type === 'Polygon'
-        ? [geom.coordinates]
-        : geom.type === 'MultiPolygon'
-          ? geom.coordinates
-          : []
-    for (const poly of polys) {
-      const ring = poly[0]
-      if (!ring || ring.length < 6) continue
-      rings.push(ring.map((coord) => [coord[1] ?? 0, coord[0] ?? 0] as [number, number]))
-    }
-  }
-  return rings
-})()
+import { landRings, landRingsNow, type Ring } from './landRings'
 
 interface CoastlinesProps {
   rotation: number
@@ -38,16 +10,28 @@ interface CoastlinesProps {
   fillColor: string
 }
 
-/** Coastlines from world-atlas 110m. */
+/** Coastlines from world-atlas 110m; draws nothing until the land chunk arrives (#75). */
 export const Coastlines = memo(function Coastlines({
   rotation,
   R,
   strokeColor,
   fillColor,
 }: CoastlinesProps) {
+  const [rings, setRings] = useState<Ring[] | null>(landRingsNow)
+  useEffect(() => {
+    if (rings) return
+    let mounted = true
+    void landRings().then((r) => {
+      if (mounted) setRings(r)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [rings])
+
   const coastData = useMemo(
-    () => LAND_RINGS.map((ring) => coastPathData(ring, rotation, R)).filter((x) => x.d !== ''),
-    [rotation, R],
+    () => (rings ?? []).map((ring) => coastPathData(ring, rotation, R)).filter((x) => x.d !== ''),
+    [rings, rotation, R],
   )
   return (
     <g stroke={strokeColor} strokeWidth="0.5" opacity="0.95">

@@ -40,18 +40,26 @@ export function checkBundle(distDir, budgets = BUDGETS) {
   add('entry-found', Boolean(entryMatch), entryMatch ? entryMatch[1] : 'index.html names no module script')
   if (!entryMatch) return findings
 
+  // First-load JavaScript is the entry plus every chunk it imports statically, which Vite
+  // lists as modulepreload links. Since #75 split the console Rest panels out, the code
+  // they share with the entry sits in its own chunk; measuring the entry file alone
+  // read 140.8 kB while first paint still loaded about 180 kB.
   const entryPath = entryMatch[1]
-  const entry = readFileSync(join(distDir, entryPath))
-  const entryGzip = gz(entry)
-  add('entry-gzip', entryGzip <= budgets.entryGzip, `${entryPath} ${kb(entryGzip)} gzip (budget ${kb(budgets.entryGzip)})`)
+  const preloads = [...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1])
+  const initial = [entryPath, ...preloads]
+  const bodies = initial.map((path) => readFileSync(join(distDir, path)))
+  const initialGzip = bodies.reduce((sum, body) => sum + gz(body), 0)
+  const parts = preloads.length > 0 ? ` + ${preloads.join(', ')}` : ''
+  add('entry-gzip', initialGzip <= budgets.entryGzip, `${entryPath}${parts} ${kb(initialGzip)} gzip (budget ${kb(budgets.entryGzip)})`)
+  const withThree = initial.filter((_, i) => bodies[i].includes(THREE_MARKER))
   add(
     'entry-has-no-three',
-    !entry.includes(THREE_MARKER),
-    entry.includes(THREE_MARKER) ? `${entryPath} contains ${THREE_MARKER}: three.js must be a lazy chunk` : 'three.js not in entry',
+    withThree.length === 0,
+    withThree.length > 0 ? `${withThree.join(', ')} contains ${THREE_MARKER}: three.js must be a lazy chunk` : 'three.js not in first-load chunks',
   )
 
   for (const name of readdirSync(join(distDir, 'assets'))) {
-    if (!name.endsWith('.js') || `assets/${name}` === entryPath) continue
+    if (!name.endsWith('.js') || initial.includes(`assets/${name}`)) continue
     const body = readFileSync(join(distDir, 'assets', name))
     if (body.includes(THREE_MARKER)) {
       const size = gz(body)

@@ -109,6 +109,17 @@ describe('GlobeRenderer bloom (#50)', () => {
     r.dispose()
   })
 
+  it('frees the Earth geometry it shares with the bloom twin exactly once (#74)', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    const [earth, , twin] = r.debugMeshes()
+    if (!earth || !twin) throw new Error('expected the Earth and its bloom twin')
+    expect(twin.geometry).toBe(earth.geometry)
+    const dispose = vi.spyOn(earth.geometry, 'dispose')
+    r.dispose()
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
   it('frees the bloom render targets on dispose', async () => {
     const f = fakes()
     const r = await GlobeRenderer.create(OPTIONS, f.deps)
