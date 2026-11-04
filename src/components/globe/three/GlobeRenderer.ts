@@ -26,6 +26,7 @@ import {
 } from 'three'
 
 import {
+  type EarthTextureSet,
   facingLongitude,
   GLOBE_SPIN_DEG_PER_SEC,
   isSurfaceVisible,
@@ -120,7 +121,10 @@ export interface RendererDeps {
 
 export interface GlobeRendererOptions {
   size: number
-  textures: { day: string; night: string }
+  /** Drawn first; create() resolves once this pair is in. */
+  textures: EarthTextureSet
+  /** High tier (#85): a larger pair loaded after the first one and swapped in. */
+  upgrade?: EarthTextureSet | undefined
   dprCap: number
   reducedMotion: boolean
   /** Copper grade on; the ORBIT tracking view turns it off. */
@@ -160,7 +164,13 @@ function observeWithIntersection(el: Element, cb: (visible: boolean) => void): (
 
 const defaultDeps: RendererDeps = {
   createRenderer: () => new WebGLRenderer({ antialias: true, alpha: true }),
-  loadTexture: (url) => new TextureLoader().loadAsync(url),
+  loadTexture: (url) => {
+    // Must match the crossorigin on index.html's texture preloads (#85): a different
+    // CORS mode makes the browser ignore the preload and download the file again.
+    const loader = new TextureLoader()
+    loader.setCrossOrigin('anonymous')
+    return loader.loadAsync(url)
+  },
   requestFrame: (cb) => requestAnimationFrame(cb),
   cancelFrame: (id) => {
     cancelAnimationFrame(id)
@@ -172,6 +182,15 @@ const defaultDeps: RendererDeps = {
 }
 
 const vec = (rgb: readonly number[]): Vector3 => new Vector3(rgb[0], rgb[1], rgb[2])
+
+/** Earth textures are sRGB colour, sampled with up to 4x anisotropy. */
+function prepareEarthTextures(textures: readonly Texture[], renderer: WebGLRendererLike): void {
+  const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy())
+  for (const t of textures) {
+    t.colorSpace = SRGBColorSpace
+    t.anisotropy = anisotropy
+  }
+}
 
 export class GlobeRenderer {
   readonly canvas: HTMLCanvasElement
@@ -212,7 +231,8 @@ export class GlobeRenderer {
   private disposed = false
 
   private readonly renderer: WebGLRendererLike
-  private readonly textures: readonly Texture[]
+  /** The Earth's day and night textures; replaced once by the high tier's upgrade (#85). */
+  private textures: readonly Texture[]
   private readonly options: GlobeRendererOptions
   private readonly deps: RendererDeps
 
@@ -236,6 +256,8 @@ export class GlobeRenderer {
     this.canvas.setAttribute('aria-hidden', 'true')
     // Tests and the host find this canvas by name; the SVG globe and starfield have canvases too.
     this.canvas.dataset['globeWebgl'] = ''
+    // Which texture pair is drawn; the cold-load measurement waits on it (#85).
+    this.canvas.dataset['globeTextures'] = String(options.textures.width)
     renderer.setPixelRatio(this.pixelRatio())
     renderer.setSize(options.size, options.size, false)
     this.camera.position.set(0, 0, CAMERA_DISTANCE)
@@ -254,28 +276,64 @@ export class GlobeRenderer {
     this.sunTimer = setInterval(this.handleSunTimer, SUN_REFRESH_MS)
   }
 
-  /** Builds the renderer and resolves once both Earth textures are on the GPU. */
+  /**
+   * Builds the renderer and resolves once the first Earth texture pair is loaded. With
+   * options.upgrade it then fetches the larger pair and swaps it in (#85).
+   */
   static async create(
     options: GlobeRendererOptions,
     deps: RendererDeps = defaultDeps,
   ): Promise<GlobeRenderer> {
     const renderer = deps.createRenderer()
+    let globe: GlobeRenderer
     try {
-      const [day, night] = await Promise.all([
+      const textures = await Promise.all([
         deps.loadTexture(options.textures.day),
         deps.loadTexture(options.textures.night),
       ])
-      const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy())
-      for (const t of [day, night]) {
-        t.colorSpace = SRGBColorSpace
-        t.anisotropy = anisotropy
-      }
-      return new GlobeRenderer(renderer, [day, night], options, deps)
+      prepareEarthTextures(textures, renderer)
+      globe = new GlobeRenderer(renderer, textures, options, deps)
     } catch (error) {
       renderer.dispose()
       renderer.forceContextLoss()
       throw error
     }
+    if (options.upgrade) void globe.upgradeTextures(options.upgrade)
+    return globe
+  }
+
+  /**
+   * Swap in a larger pair once both files are in. A failure keeps the pair already
+   * drawn; a pair that lands after dispose() is freed, never drawn.
+   */
+  private async upgradeTextures(set: EarthTextureSet): Promise<void> {
+    const results = await Promise.allSettled([
+      this.deps.loadTexture(set.day),
+      this.deps.loadTexture(set.night),
+    ])
+    const loaded = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+    const [day, night] = loaded
+    if (this.disposed || !day || !night) {
+      for (const t of loaded) t.dispose()
+      const failure = results.find((r) => r.status === 'rejected')
+      if (failure && !this.disposed) {
+        console.warn(
+          `[globe] keeping the ${String(this.options.textures.width)} textures:`,
+          failure.reason,
+        )
+      }
+      return
+    }
+    prepareEarthTextures(loaded, this.renderer)
+    const previous = this.textures
+    this.textures = loaded
+    // The bloom twin shares these uniforms, so one assignment covers both passes.
+    const uniforms = this.earthUniforms
+    if (uniforms?.['dayTex']) uniforms['dayTex'].value = day
+    if (uniforms?.['nightTex']) uniforms['nightTex'].value = night
+    for (const t of previous) t.dispose()
+    this.canvas.dataset['globeTextures'] = String(set.width)
+    if (this.frameId === 0 && this.attached) this.renderOnce()
   }
 
   private buildScene(): void {

@@ -56,7 +56,11 @@ function fakes() {
 
 const OPTIONS = {
   size: 460,
-  textures: { day: '/textures/day-2048.webp', night: '/textures/night-2048.webp' },
+  textures: {
+    day: '/textures/day-2048.webp',
+    night: '/textures/night-2048.webp',
+    width: 2048 as const,
+  },
   dprCap: 1.5,
   reducedMotion: false,
   warm: true,

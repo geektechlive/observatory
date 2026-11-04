@@ -114,3 +114,33 @@ export function gpuTier({ renderer, maxTextureSize, isMobile }: GpuInfo): GpuTie
     ? { tier: 'low', textureWidth: 2048, bloom: false, dprCap: 1.5 }
     : { tier: 'high', textureWidth: 4096, bloom: true, dprCap: 2 }
 }
+
+/** One day/night pair of Earth textures in public/textures. */
+export interface EarthTextureSet {
+  day: string
+  night: string
+  width: 2048 | 4096
+}
+
+export interface GlobeTexturePlan {
+  /** Drawn first by every tier; index.html preloads exactly this pair (#85). */
+  first: EarthTextureSet
+  /** High tier only: loaded after the first draw and swapped in. */
+  upgrade?: EarthTextureSet | undefined
+}
+
+const earthTextures = (width: 2048 | 4096): EarthTextureSet => ({
+  day: `/textures/day-${String(width)}.webp`,
+  night: `/textures/night-${String(width)}.webp`,
+  width,
+})
+
+/**
+ * Small textures first (#85): the 2048 pair starts downloading with the page, so the
+ * globe draws without waiting on 767 kB of 4096 day texture. Only the high tier then
+ * fetches 4096; the tier is known only at runtime, which is why 4096 is never preloaded.
+ */
+export function globeTextures({ textureWidth }: Pick<GpuTier, 'textureWidth'>): GlobeTexturePlan {
+  const first = earthTextures(2048)
+  return textureWidth === 4096 ? { first, upgrade: earthTextures(4096) } : { first }
+}

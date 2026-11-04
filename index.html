@@ -33,6 +33,12 @@
     <!-- Self-hosted font preloads (critical weights only) -->
     <link rel="preload" href="/fonts/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- Earth textures every globe tier draws first (#85). Never preload the high tier's
+         large pair: the tier is picked at runtime. crossorigin matches three's TextureLoader, or it downloads twice.
+         Desktop-size screens only: on a 4G phone the early download delayed the app's first paint. -->
+    <link rel="preload" href="/textures/day-2048.webp" as="image" type="image/webp" crossorigin media="(min-width: 900px)" />
+    <link rel="preload" href="/textures/night-2048.webp" as="image" type="image/webp" crossorigin media="(min-width: 900px)" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>

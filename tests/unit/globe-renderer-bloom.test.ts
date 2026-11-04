@@ -52,7 +52,7 @@ function fakes() {
 
 const OPTIONS = {
   size: 460,
-  textures: { day: '/d.webp', night: '/n.webp' },
+  textures: { day: '/d.webp', night: '/n.webp', width: 2048 as const },
   dprCap: 2,
   reducedMotion: false,
   warm: true,

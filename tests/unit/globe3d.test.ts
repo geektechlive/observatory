@@ -8,6 +8,7 @@ import {
   altToRadius,
   facingLongitude,
   GLOBE_SPIN_DEG_PER_SEC,
+  globeTextures,
   gpuTier,
   isOccluded,
   isSurfaceVisible,
@@ -180,5 +181,22 @@ describe('gpuTier', () => {
       bloom: true,
       dprCap: 2,
     })
+  })
+})
+
+describe('globeTextures (#85)', () => {
+  const small = { day: '/textures/day-2048.webp', night: '/textures/night-2048.webp', width: 2048 }
+
+  it('starts the high tier on the preloaded 2048 pair, then upgrades to 4096', () => {
+    expect(globeTextures({ textureWidth: 4096 })).toEqual({
+      first: small,
+      upgrade: { day: '/textures/day-4096.webp', night: '/textures/night-4096.webp', width: 4096 },
+    })
+  })
+
+  it('never asks the low tier for 4096', () => {
+    const plan = globeTextures({ textureWidth: 2048 })
+    expect(plan).toEqual({ first: small })
+    expect(JSON.stringify(plan)).not.toContain('4096')
   })
 })

@@ -3,7 +3,7 @@ import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'r
 import { Chip } from '@/components/ui/Chip'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import type { LaneCensus } from '@/lib/census'
-import { gpuTier } from '@/lib/globe3d'
+import { globeTextures, gpuTier } from '@/lib/globe3d'
 import type { LayerInput } from '@/lib/globeLayers'
 import { chooseGlobeMode, type GlobeMode, readGlobeModeInput, readGpuInfo } from '@/lib/globeMode'
 
@@ -42,11 +42,12 @@ let failed = false
 function acquireRenderer(size: number, reducedMotion: boolean, warm: boolean, onLost: () => void) {
   if (!shared) {
     const tier = gpuTier(readGpuInfo())
-    const w = String(tier.textureWidth)
+    const plan = globeTextures(tier)
     shared = import('./three/GlobeRenderer').then(({ GlobeRenderer }) =>
       GlobeRenderer.create({
         size,
-        textures: { day: `/textures/day-${w}.webp`, night: `/textures/night-${w}.webp` },
+        textures: plan.first,
+        upgrade: plan.upgrade,
         dprCap: tier.dprCap,
         bloom: tier.bloom,
         reducedMotion,
