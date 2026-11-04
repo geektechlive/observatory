@@ -147,6 +147,35 @@ describe('/api/donki', () => {
     expect(out.extraHeaders?.['X-Error-Kind']).toBe('contract')
   })
 
+  // #82: with DONKI hung, every cache miss waited the full 8 s default deadline, then
+  // fetched NOAA. DONKI gets a short deadline and NOAA starts alongside it.
+  it('gives the DONKI feeds a deadline of 3 s or less', async () => {
+    route({ NOAA: () => ok([NOAA_FLARE]) })
+    await call()
+    const donkiCalls = mockFetch.mock.calls.filter(([url]) => url.includes('/DONKI/'))
+    expect(donkiCalls).toHaveLength(4)
+    for (const [, , opts] of donkiCalls) expect(opts?.timeoutMs).toBeLessThanOrEqual(3000)
+  })
+
+  it('asks NOAA for flares while DONKI is still pending', async () => {
+    let releaseDonki: () => void = () => undefined
+    const donkiGate = new Promise<void>((resolve) => {
+      releaseDonki = resolve
+    })
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('swpc.noaa.gov')) return ok([NOAA_FLARE])
+      await donkiGate
+      return down()
+    })
+    const pending = call()
+    await vi.waitFor(() => {
+      expect(mockFetch.mock.calls.some(([url]) => url.includes('swpc.noaa.gov'))).toBe(true)
+    })
+    releaseDonki()
+    const out = (await pending) as Result
+    expect(out.extraHeaders?.['X-Data-Source']).toBe('noaa-flares')
+  })
+
   it('sends no error kind on a clean answer', async () => {
     route({
       FLR: () => ok([FLARE]),

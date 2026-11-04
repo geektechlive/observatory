@@ -16,6 +16,11 @@ const NASA_API_BASE = 'https://api.nasa.gov'
 const NOAA_FLARES = 'https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json'
 const CACHE_TTL_SECONDS = 900 // 15 min
 /**
+ * A healthy DONKI answers in well under a second. While it hangs (#65), the 8 s default
+ * deadline made every cache miss wait 8 s before the NOAA fallback (#82).
+ */
+const DONKI_TIMEOUT_MS = 3000
+/**
  * One stable key, not one per date (#61): at midnight a dated key left stale-if-error
  * with nothing to fall back to.
  */
@@ -68,9 +73,13 @@ function parseRows<T>(rows: unknown[], schema: z.ZodType<T>): { data: T[]; drift
   return { data, drift: rows.length > 0 && data.length === 0 }
 }
 
-async function fetchFeed<T>(url: string, schema: z.ZodType<T>): Promise<FeedResult<T>> {
+async function fetchFeed<T>(
+  url: string,
+  schema: z.ZodType<T>,
+  timeoutMs?: number,
+): Promise<FeedResult<T>> {
   try {
-    const res = await fetchUpstream(url)
+    const res = await fetchUpstream(url, undefined, timeoutMs ? { timeoutMs } : undefined)
     const quota = res.headers.get('X-RateLimit-Remaining')
     if (!res.ok) return { data: [], ok: false, why: 'upstream', quota }
     const rows = await readArray(res)
@@ -106,14 +115,16 @@ export const onRequest: PagesFunction<Env> = (ctx) => {
     const range = `startDate=${dateString(-7)}&endDate=${dateString(0)}&api_key=${apiKey}`
     const donki = (endpoint: string) => `${NASA_API_BASE}/DONKI/${endpoint}?${range}`
 
+    // DONKI has been 503 for days at a time (#42). Flares can come from NOAA instead, so
+    // NOAA starts now rather than after DONKI fails (#82); fetchFeed never rejects.
+    const noaa = noaaFlares()
     const [flaresResult, cmesResult, stormsResult, sepsResult] = await Promise.all([
-      fetchFeed(donki('FLR'), SolarFlareSchema),
-      fetchFeed(donki('CME'), CmeSchema),
-      fetchFeed(donki('GST'), GeomagneticStormSchema),
-      fetchFeed(donki('SEP'), SepSchema),
+      fetchFeed(donki('FLR'), SolarFlareSchema, DONKI_TIMEOUT_MS),
+      fetchFeed(donki('CME'), CmeSchema, DONKI_TIMEOUT_MS),
+      fetchFeed(donki('GST'), GeomagneticStormSchema, DONKI_TIMEOUT_MS),
+      fetchFeed(donki('SEP'), SepSchema, DONKI_TIMEOUT_MS),
     ])
-    // DONKI has been 503 for days at a time (#42). Flares can come from NOAA instead.
-    const flares = flaresResult.ok ? flaresResult : await noaaFlares()
+    const flares = flaresResult.ok ? flaresResult : await noaa
 
     const feeds = [flares, cmesResult, stormsResult, sepsResult]
     if (feeds.every((f) => !f.ok)) return upstreamError(0, 'DONKI and NOAA flares unavailable')
