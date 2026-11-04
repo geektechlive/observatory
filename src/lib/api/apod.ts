@@ -1,9 +1,10 @@
+import { apiFetch } from '@/lib/api/client'
 import { type Apod, ApodSchema } from '@/schemas/apod'
 
 import { trackQuota } from './quota'
 
 export async function fetchApod(): Promise<Apod> {
-  const res = await fetch('/api/apod')
+  const res = await apiFetch('/api/apod')
   if (!res.ok) throw new Error(`APOD fetch failed: ${res.status}`)
   trackQuota(res)
   const data: unknown = await res.json()

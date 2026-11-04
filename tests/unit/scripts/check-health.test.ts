@@ -6,6 +6,7 @@ import {
   judgeStale,
   NEG_RETRY_DELAY_MS,
   retryDelayMs,
+  REVALIDATE_RECHECK_MS,
   runCheck,
   runWithRetry,
   STALE_GRACE_SECONDS,
@@ -127,6 +128,34 @@ describe('runWithRetry', () => {
 
     expect(delayMs).toHaveBeenCalledWith(2, neg)
   })
+
+  it('asks again after a REVALIDATING answer and judges the second one (#83)', async () => {
+    // An expired entry answers 200 at once while the refresh runs behind it. Judged as
+    // is, an outage would read as a pass on every run and never alert.
+    const revalidating = result({ ok: true, status: 200, cache: 'REVALIDATING', note: 'ok' })
+    const stale = result({ status: 200, cache: 'STALE', errorKind: 'upstream' })
+    const runOnce = vi.fn().mockResolvedValueOnce(revalidating).mockResolvedValueOnce(stale)
+    const delayMs = vi.fn(() => 0)
+
+    const out = await runWithRetry(runOnce, { attempts: 3, delayMs })
+
+    expect(runOnce).toHaveBeenCalledTimes(2)
+    expect(delayMs).toHaveBeenCalledWith(2, revalidating)
+    expect(out.ok).toBe(false)
+    expect(out.cache).toBe('STALE')
+  })
+
+  it('asks again after a REVALIDATING answer that failed too: its body is the old one', async () => {
+    // A degraded body stored by an earlier refresh says nothing about the upstream now.
+    const oldDegraded = result({ status: 200, cache: 'REVALIDATING', note: 'degraded (donki)' })
+    const fresh = result({ ok: true, status: 200, cache: 'HIT', note: 'ok' })
+    const runOnce = vi.fn().mockResolvedValueOnce(oldDegraded).mockResolvedValueOnce(fresh)
+
+    const out = await runWithRetry(runOnce, { attempts: 3, delayMs: noDelay })
+
+    expect(runOnce).toHaveBeenCalledTimes(2)
+    expect(out.ok).toBe(true)
+  })
 })
 
 describe('retryDelayMs', () => {
@@ -136,6 +165,12 @@ describe('retryDelayMs', () => {
     expect(NEG_RETRY_DELAY_MS).toBeGreaterThan(60_000)
     expect(retryDelayMs(2, result({ cache: 'NEG' }))).toBe(NEG_RETRY_DELAY_MS)
     expect(retryDelayMs(3, result({ cache: 'NEG' }))).toBe(NEG_RETRY_DELAY_MS)
+  })
+
+  it('gives a REVALIDATING answer time for the background refresh to land', () => {
+    // fetchUpstream's deadline is 8 s, so the refresh has settled by then either way.
+    expect(REVALIDATE_RECHECK_MS).toBeGreaterThan(8_000)
+    expect(retryDelayMs(2, result({ ok: true, cache: 'REVALIDATING' }))).toBe(REVALIDATE_RECHECK_MS)
   })
 
   it('keeps the short backoff for a live failure', () => {

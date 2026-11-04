@@ -30,6 +30,13 @@ const backoffMs = (attempt) => (attempt === 2 ? 2_000 : 5_000)
  */
 export const NEG_RETRY_DELAY_MS = 65_000
 /**
+ * Wait before re-asking after `X-Cache: REVALIDATING` (#83). That answer is the old body,
+ * served while the refresh runs behind it, so it says nothing about the upstream. The
+ * refresh gives up by fetchUpstream's 8 s deadline; the next answer is then a fresh HIT
+ * or a STALE carrying the failure's X-Error-Kind.
+ */
+export const REVALIDATE_RECHECK_MS = 12_000
+/**
  * How old a STALE fallback may be and still pass. The site is serving real data, so a
  * short upstream outage is not worth a page; past this it is, because visitors are
  * looking at hours-old data. Contract-caused STALE fails at any age.
@@ -103,8 +110,15 @@ export function isTransient(result) {
 
 /** Delay before attempt N, given the failure that prompted it. */
 export function retryDelayMs(attempt, failed) {
+  if (failed?.cache === 'REVALIDATING') return REVALIDATE_RECHECK_MS
   return failed?.cache === 'NEG' ? NEG_RETRY_DELAY_MS : backoffMs(attempt)
 }
+
+/**
+ * A REVALIDATING answer carries the body an earlier refresh stored, so neither its pass
+ * nor its failure says anything about the upstream now: ask again once the refresh lands.
+ */
+const unsettled = (result) => result.cache === 'REVALIDATING'
 
 /**
  * Decide whether a response served from the stale-if-error fallback is acceptable.
@@ -144,7 +158,7 @@ export async function runWithRetry(runOnce, opts = {}) {
   let attempt = 1
   let result = await runOnce(attempt)
 
-  while (!result.ok && isTransient(result) && attempt < attempts) {
+  while ((unsettled(result) || (!result.ok && isTransient(result))) && attempt < attempts) {
     attempt += 1
     const wait = delayMs(attempt, result)
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))

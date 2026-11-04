@@ -5,6 +5,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { defaultRetry } from '@/hooks/useSourceQuery'
+import { onRevalidating } from '@/lib/api/client'
+import { refetchOnceAfter } from '@/lib/api/revalidate'
 
 import { App } from './App'
 
@@ -21,6 +23,14 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// An old answer the server is refreshing (#83): ask again once the fresh copy has landed.
+// Every active query refetches; the ones already fresh come back as cache HITs.
+onRevalidating(
+  refetchOnceAfter(() => {
+    void queryClient.invalidateQueries({ refetchType: 'active' })
+  }),
+)
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')

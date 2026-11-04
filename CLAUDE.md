@@ -65,9 +65,13 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
   - `contractError()` (500, `contract`) is for a payload that broke our schema or parsed to nothing. It means shape drift.
   - `upstreamError()` (`upstream`) is for an unavailable upstream.
   - **Never answer with 502 or 504 (#61).** On the custom domain Cloudflare replaces an origin 502/504 with its own plain "error code: 502" page, dropping the JSON body and `X-Error-Kind`. pages.dev previews do not, so a preview can look fine while production hides the error kind. Only Enterprise zones can turn it off. `tests/unit/error-kind-contract.test.ts` scans every function for a 502 or 504 status.
-- **Stale-if-error.**
+- **Stale-while-revalidate and stale-if-error.**
   - `cachedJson` stores positive entries for TTL + 24 h and decides freshness from `X-Cached-At`.
-  - When the producer fails (or a neg entry is live), the last good body goes out as a 200 with `X-Cache: STALE`, `X-Data-Age`, `X-Stale-Status` and `X-Error-Kind`.
+  - **An expired entry answers at once (#83)** as a 200 with `X-Cache: REVALIDATING` and `max-age=0`, while `produce()` runs in `waitUntil`. A low-traffic site usually finds its entry expired, so visitors used to wait for NASA or NOAA on most loads. It lives in our cache code, not the CDN's `stale-while-revalidate` directive: browsers obey that directive too, and previews can't exercise it.
+  - The client's `apiFetch` (every `src/lib/api` fetcher uses it) notices a REVALIDATING answer, and `main.tsx` refetches the active queries 10 s later, once the fresh copy has landed. A new fetcher must use `apiFetch` or `getJson`, never bare `fetch`.
+  - When the background refresh fails, it writes the neg entry, and the next request gets the last good body as a 200 with `X-Cache: STALE`, `X-Data-Age`, `X-Stale-Status` and `X-Error-Kind`.
+  - The health check re-asks 12 s after a REVALIDATING answer and judges the second one. Judged as is, an outage would pass every run and never alert.
+  - `staleIfError: false` (inner raw-feed caches) turns both fallbacks off.
   - The health check passes an upstream-caused STALE with a WARN for up to 2 h. It fails a STALE caused by a contract failure, or one older than 2 h.
   - Per-colo and evictable like the rest of the Cache API, so this is best effort, not a guarantee.
 - **Alerts are GitHub issues.** Both data-refresh jobs write `incident-report.json`, and `scripts/report-incidents.mjs` keeps one `incident`-labelled issue per source (`[observatory] health:/api/eonet`).

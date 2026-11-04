@@ -1,10 +1,11 @@
+import { apiFetch } from '@/lib/api/client'
 import type { Geomag } from '@/schemas/geomag'
 import { GeomagSchema } from '@/schemas/geomag'
 
 import { getJsonMeta, type SourceEnvelope } from './client'
 
 export async function fetchGeomag(): Promise<Geomag> {
-  const res = await fetch('/api/geomag')
+  const res = await apiFetch('/api/geomag')
   if (!res.ok) throw new Error(`Geomag fetch failed: ${res.status}`)
   const json: unknown = await res.json()
   return GeomagSchema.parse(json)

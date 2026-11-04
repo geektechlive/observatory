@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api/client'
 import type { SunMoon } from '@/schemas/sunMoon'
 import { SunMoonSchema } from '@/schemas/sunMoon'
 
@@ -15,7 +16,7 @@ export async function fetchSunMoon({ lat, lon, tz, date }: SunMoonQuery): Promis
     tz: String(tz),
     date,
   })
-  const res = await fetch(`/api/sun-moon?${params.toString()}`)
+  const res = await apiFetch(`/api/sun-moon?${params.toString()}`)
   if (!res.ok) throw new Error(`Sun/Moon fetch failed: ${res.status}`)
   const json: unknown = await res.json()
   return SunMoonSchema.parse(json)

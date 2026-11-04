@@ -3,7 +3,7 @@ import { z, ZodError } from 'zod'
 
 vi.mock('@/lib/api/quota', () => ({ trackQuota: vi.fn() }))
 
-import { getJson, getJsonMeta, HttpError } from '@/lib/api/client'
+import { apiFetch, getJson, getJsonMeta, HttpError, onRevalidating } from '@/lib/api/client'
 import { trackQuota } from '@/lib/api/quota'
 
 const Schema = z.object({ ok: z.boolean() })
@@ -41,6 +41,36 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('apiFetch (#83)', () => {
+  afterEach(() => {
+    onRevalidating(null)
+  })
+
+  it('tells the listener when an answer came from an entry still being refreshed', async () => {
+    const listener = vi.fn()
+    onRevalidating(listener)
+    mockFetch({ headers: { 'X-Cache': 'REVALIDATING' }, json: { ok: true } })
+    await apiFetch('/api/test')
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays quiet for a fresh answer', async () => {
+    const listener = vi.fn()
+    onRevalidating(listener)
+    mockFetch({ headers: { 'X-Cache': 'HIT' }, json: { ok: true } })
+    await apiFetch('/api/test')
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('covers getJson too', async () => {
+    const listener = vi.fn()
+    onRevalidating(listener)
+    mockFetch({ headers: { 'X-Cache': 'REVALIDATING' }, json: { ok: true } })
+    await getJson('/api/test', Schema)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('getJson', () => {

@@ -1,10 +1,11 @@
+import { apiFetch } from '@/lib/api/client'
 import type { EonetResponse } from '@/schemas/eonet'
 import { EonetResponseSchema } from '@/schemas/eonet'
 
 import { getJsonMeta, type SourceEnvelope } from './client'
 
 export async function fetchEonetEvents(): Promise<EonetResponse> {
-  const res = await fetch('/api/eonet')
+  const res = await apiFetch('/api/eonet')
   if (!res.ok) throw new Error(`EONET fetch failed: ${res.status}`)
   const json: unknown = await res.json()
   return EonetResponseSchema.parse(json)

@@ -1,8 +1,9 @@
+import { apiFetch } from '@/lib/api/client'
 import type { SolarActivity } from '@/schemas/solarActivity'
 import { SolarActivitySchema } from '@/schemas/solarActivity'
 
 export async function fetchSolarActivity(): Promise<SolarActivity> {
-  const res = await fetch('/api/solar-activity')
+  const res = await apiFetch('/api/solar-activity')
   if (!res.ok) throw new Error(`Solar activity fetch failed: ${res.status}`)
   const json: unknown = await res.json()
   return SolarActivitySchema.parse(json)

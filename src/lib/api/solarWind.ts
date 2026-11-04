@@ -1,9 +1,10 @@
+import { apiFetch } from '@/lib/api/client'
 import { type SolarWind, SolarWindSchema } from '@/schemas/solarWind'
 
 import { getJsonMeta, type SourceEnvelope } from './client'
 
 export async function fetchSolarWind(): Promise<SolarWind> {
-  const res = await fetch('/api/solar-wind')
+  const res = await apiFetch('/api/solar-wind')
   if (!res.ok) throw new Error(`Solar wind fetch failed: ${res.status}`)
   const data: unknown = await res.json()
   return SolarWindSchema.parse(data)

@@ -49,6 +49,10 @@ describe('/api/apod across UTC midnight', () => {
       vi.fn(async () => new Response('down', { status: 500 })),
     )
     const day2 = makeCtx('https://observatory.test/api/apod')
+    // The first visitor gets yesterday's picture at once while NASA is asked (#83)...
+    expect((await call(day2)).headers.get('X-Cache')).toBe('REVALIDATING')
+    await day2.settle()
+    // ...and once that refresh has failed, the next one gets it marked STALE.
     const res = await call(day2)
     expect(res.status).toBe(200)
     expect(res.headers.get('X-Cache')).toBe('STALE')
@@ -72,8 +76,10 @@ describe('/api/apod across UTC midnight', () => {
       vi.fn(async () => new Response(JSON.stringify(next), { status: 200 })),
     )
     const day2 = makeCtx('https://observatory.test/api/apod')
+    expect((await call(day2)).headers.get('X-Cache')).toBe('REVALIDATING')
+    await day2.settle()
     const res = await call(day2)
-    expect(res.headers.get('X-Cache')).toBe('MISS')
+    expect(res.headers.get('X-Cache')).toBe('HIT')
     expect((await res.json<{ title: string }>()).title).toBe('A New Day')
   })
 

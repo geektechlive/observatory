@@ -1,8 +1,9 @@
+import { apiFetch } from '@/lib/api/client'
 import type { SpaceNews } from '@/schemas/spaceNews'
 import { SpaceNewsSchema } from '@/schemas/spaceNews'
 
 export async function fetchSpaceNews(): Promise<SpaceNews> {
-  const res = await fetch('/api/space-news')
+  const res = await apiFetch('/api/space-news')
   if (!res.ok) throw new Error(`Space news fetch failed: ${res.status}`)
   const json: unknown = await res.json()
   return SpaceNewsSchema.parse(json)

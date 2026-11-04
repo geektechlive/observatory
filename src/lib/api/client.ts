@@ -8,6 +8,25 @@ const HEADER_DEGRADED = 'X-Data-Degraded'
 const HEADER_AGE = 'X-Data-Age'
 /** Only NASA-backed routes set this; quota tracking is skipped when absent. */
 const HEADER_QUOTA = 'X-Quota-Remaining'
+/** `REVALIDATING`: an expired entry, answered at once while the server refreshes it (#83). */
+const HEADER_CACHE = 'X-Cache'
+
+let revalidatingListener: (() => void) | null = null
+
+/** Who to tell when an answer came from an entry the server is still refreshing. */
+export function onRevalidating(listener: (() => void) | null): void {
+  revalidatingListener = listener
+}
+
+/**
+ * `fetch` for our own `/api/*` routes. It notices an old answer the server is refreshing
+ * behind it, so the app can ask again once the fresh copy has landed.
+ */
+export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(url, init)
+  if (res.headers.get(HEADER_CACHE) === 'REVALIDATING') revalidatingListener?.()
+  return res
+}
 
 /** A non-2xx response. Carries the status so retry policy can branch on it. */
 export class HttpError extends Error {
@@ -43,7 +62,7 @@ export async function getJsonMeta<T>(
   schema: ZodType<T>,
   init?: RequestInit,
 ): Promise<SourceEnvelope<T>> {
-  const res = await fetch(url, init)
+  const res = await apiFetch(url, init)
   if (!res.ok) throw new HttpError(res.status, `Request failed (${res.status}): ${url}`)
 
   if (res.headers.get(HEADER_QUOTA) !== null) trackQuota(res)

@@ -1,10 +1,11 @@
+import { apiFetch } from '@/lib/api/client'
 import { type NeoResponse, NeoResponseSchema } from '@/schemas/neo'
 
 import { getJsonMeta, type SourceEnvelope } from './client'
 import { trackQuota } from './quota'
 
 export async function fetchNeo(): Promise<NeoResponse> {
-  const res = await fetch('/api/neo')
+  const res = await apiFetch('/api/neo')
   if (!res.ok) throw new Error(`NeoWs fetch failed: ${res.status}`)
   trackQuota(res)
   const data: unknown = await res.json()

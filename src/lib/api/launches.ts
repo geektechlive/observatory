@@ -1,9 +1,10 @@
+import { apiFetch } from '@/lib/api/client'
 import { type LaunchesResponse, LaunchesResponseSchema } from '@/schemas/launches'
 
 import { getJsonMeta, type SourceEnvelope } from './client'
 
 export async function fetchLaunches(): Promise<LaunchesResponse> {
-  const res = await fetch('/api/launches')
+  const res = await apiFetch('/api/launches')
   if (!res.ok) throw new Error(`Launches fetch failed: ${res.status}`)
   const data: unknown = await res.json()
   return LaunchesResponseSchema.parse(data)

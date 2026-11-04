@@ -203,27 +203,49 @@ describe('cachedJson stale-if-error', () => {
     ])
   })
 
-  it('refetches once the entry is older than its ttl', async () => {
+  it('answers an expired entry at once and refreshes it in the background (#83)', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await seed(tc)
+
+    now.mockReturnValue(t0 + 400_000)
+    // The upstream never answers: the visitor must not wait for it.
+    const produce = vi.fn(() => new Promise<{ body: string }>(() => {}))
+    const res = await cachedJson(tc.ctx, 'k', 100, produce)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('X-Cache')).toBe('REVALIDATING')
+    expect(res.headers.get('X-Data-Age')).toBe('400')
+    // No shared cache may keep an old answer: the next request should find the fresh one.
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0')
+    expect(await res.text()).toBe('{"good":1}')
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores the background refresh, so the next request is a HIT on new data', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
     const tc = makeCtx()
     await seed(tc)
 
     now.mockReturnValue(t0 + 101_000)
     const produce = vi.fn(async () => ({ body: '{"fresh":1}' }))
-    const res = await cachedJson(tc.ctx, 'k', 100, produce)
-    expect(res.headers.get('X-Cache')).toBe('MISS')
-    expect(await res.text()).toBe('{"fresh":1}')
+    await cachedJson(tc.ctx, 'k', 100, produce)
+    await tc.settle()
+    const next = await cachedJson(tc.ctx, 'k', 100, produce)
+    expect(next.headers.get('X-Cache')).toBe('HIT')
+    expect(next.headers.get('X-Data-Age')).toBe('0')
+    expect(await next.text()).toBe('{"fresh":1}')
     expect(produce).toHaveBeenCalledTimes(1)
   })
 
-  it('serves the last good body as STALE when the producer fails past ttl', async () => {
+  it('serves the last good body as STALE once the background refresh has failed', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
     const tc = makeCtx()
     await seed(tc)
 
     now.mockReturnValue(t0 + 400_000)
-    const res = await cachedJson(tc.ctx, 'k', 100, failing)
+    await cachedJson(tc.ctx, 'k', 100, failing)
     await tc.settle()
+    const res = await cachedJson(tc.ctx, 'k', 100, failing)
     expect(res.status).toBe(200)
     expect(await res.text()).toBe('{"good":1}')
     expect(res.headers.get('X-Cache')).toBe('STALE')
@@ -240,9 +262,12 @@ describe('cachedJson stale-if-error', () => {
     await seed(tc)
 
     now.mockReturnValue(t0 + 200_000)
-    const res = await cachedJson(tc.ctx, 'k', 100, async () => {
+    const boom = async (): Promise<never> => {
       throw new UpstreamError('boom')
-    })
+    }
+    await cachedJson(tc.ctx, 'k', 100, boom)
+    await tc.settle()
+    const res = await cachedJson(tc.ctx, 'k', 100, boom)
     expect(res.status).toBe(200)
     expect(res.headers.get('X-Cache')).toBe('STALE')
     expect(res.headers.get('X-Stale-Status')).toBe('503')
@@ -270,9 +295,10 @@ describe('cachedJson stale-if-error', () => {
     await seed(tc)
 
     now.mockReturnValue(t0 + 200_000)
-    const res = await cachedJson(tc.ctx, 'k', 100, async () =>
-      contractError('Invalid EONET response'),
-    )
+    const drifted = async (): Promise<Response> => contractError('Invalid EONET response')
+    await cachedJson(tc.ctx, 'k', 100, drifted)
+    await tc.settle()
+    const res = await cachedJson(tc.ctx, 'k', 100, drifted)
     expect(res.headers.get('X-Cache')).toBe('STALE')
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
   })
@@ -286,10 +312,13 @@ describe('cachedJson stale-if-error', () => {
     await seed(tc)
 
     now.mockReturnValue(t0 + 200_000)
-    const res = await cachedJson(tc.ctx, 'k', 100, async () => {
+    const html = async (): Promise<{ body: string }> => {
       JSON.parse('<html>maintenance</html>')
       return { body: '{}' }
-    })
+    }
+    await cachedJson(tc.ctx, 'k', 100, html)
+    await tc.settle()
+    const res = await cachedJson(tc.ctx, 'k', 100, html)
     expect(res.headers.get('X-Cache')).toBe('STALE')
     expect(res.headers.get('X-Error-Kind')).toBe('contract')
     expect(res.headers.get('X-Stale-Status')).toBe('500')
@@ -309,6 +338,23 @@ describe('cachedJson stale-if-error', () => {
     const res = await cachedJson(tc.ctx, 'k', 100, failing, { staleIfError: false })
     expect(res.status).toBe(503)
     expect(res.headers.get('X-Cache')).toBe('NEG')
+  })
+
+  it('never answers an inner raw-feed cache from an expired entry', async () => {
+    // The outer layer would re-store an old inner body as a fresh MISS (#83).
+    const now = vi.spyOn(Date, 'now').mockReturnValue(t0)
+    const tc = makeCtx()
+    await cachedJson(tc.ctx, 'k', 100, async () => ({ body: '{"good":1}' }), {
+      staleIfError: false,
+    })
+    await tc.settle()
+
+    now.mockReturnValue(t0 + 200_000)
+    const res = await cachedJson(tc.ctx, 'k', 100, async () => ({ body: '{"fresh":1}' }), {
+      staleIfError: false,
+    })
+    expect(res.headers.get('X-Cache')).toBe('MISS')
+    expect(await res.text()).toBe('{"fresh":1}')
   })
 
   it('replays the error kind on a neg hit when there is no stale body', async () => {
