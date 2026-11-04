@@ -6,6 +6,7 @@ import type { LaneCensus } from '@/lib/census'
 import { globeTextures, gpuTier } from '@/lib/globe3d'
 import type { LayerInput } from '@/lib/globeLayers'
 import { chooseGlobeMode, type GlobeMode, readGlobeModeInput, readGpuInfo } from '@/lib/globeMode'
+import { preloadTextures } from '@/lib/texturePreload'
 
 import { Globe } from './Globe'
 import styles from './globe-host.module.css'
@@ -43,6 +44,8 @@ function acquireRenderer(size: number, reducedMotion: boolean, warm: boolean, on
   if (!shared) {
     const tier = gpuTier(readGpuInfo())
     const plan = globeTextures(tier)
+    // Fetch the pictures alongside the chunk, not after it (#87).
+    preloadTextures(plan.first)
     shared = import('./three/GlobeRenderer').then(({ GlobeRenderer }) =>
       GlobeRenderer.create({
         size,
