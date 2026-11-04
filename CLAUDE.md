@@ -71,6 +71,7 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
   - The client's `apiFetch` (every `src/lib/api` fetcher uses it) notices a REVALIDATING answer, and `main.tsx` refetches the active queries 10 s later, once the fresh copy has landed. A new fetcher must use `apiFetch` or `getJson`, never bare `fetch`.
   - When the background refresh fails, it writes the neg entry, and the next request gets the last good body as a 200 with `X-Cache: STALE`, `X-Data-Age`, `X-Stale-Status` and `X-Error-Kind`.
   - The health check re-asks 12 s after a REVALIDATING answer and judges the second one. Judged as is, an outage would pass every run and never alert.
+  - Because visitors no longer wait for the upstream, the probe's own time says nothing about it. Every positive entry stores `X-Produce-Ms`, how long its producer took, and the health check WARNs when a HIT or MISS says more than 3 s (#86). Like every WARN, it only comments on an already-open incident issue (and keeps it open); otherwise it shows only in the run's table.
   - `staleIfError: false` (inner raw-feed caches) turns both fallbacks off.
   - The health check passes an upstream-caused STALE with a WARN for up to 2 h. It fails a STALE caused by a contract failure, or one older than 2 h.
   - Per-colo and evictable like the rest of the Cache API, so this is best effort, not a guarantee.

@@ -9,6 +9,7 @@ import {
   REVALIDATE_RECHECK_MS,
   runCheck,
   runWithRetry,
+  SLOW_PRODUCE_MS,
   STALE_GRACE_SECONDS,
   toReport,
   // @ts-expect-error plain ESM script, no type declarations
@@ -296,6 +297,29 @@ describe('runCheck (#71)', () => {
     vi.unstubAllGlobals()
     expect(r).toMatchObject({ ok: false, reason: 'contract' })
     expect(toReport([r])[0]).not.toHaveProperty('upstream')
+  })
+
+  it('warns, without failing, when the refresh behind the answer was slow (#86)', async () => {
+    vi.stubGlobal('fetch', respond({ title: 'x' }, { 'X-Cache': 'HIT', 'X-Produce-Ms': '8200' }))
+    const r = await runCheck('https://o.test', spec)
+    vi.unstubAllGlobals()
+    expect(r).toMatchObject({ ok: true, warning: 'slow upstream: 8200ms' })
+    expect(r.note).toContain('slow upstream: 8200ms')
+    expect(toReport([r])[0]).toMatchObject({ ok: true, warning: true })
+  })
+
+  it('does not warn at or under the slow threshold, or without a recorded time', async () => {
+    const cases: Record<string, string>[] = [
+      { 'X-Cache': 'MISS', 'X-Produce-Ms': String(SLOW_PRODUCE_MS) },
+      { 'X-Cache': 'MISS' },
+    ]
+    for (const headers of cases) {
+      vi.stubGlobal('fetch', respond({ title: 'x' }, headers))
+      const r = await runCheck('https://o.test', spec)
+      vi.unstubAllGlobals()
+      expect(r).toMatchObject({ ok: true })
+      expect(r.warning).toBeUndefined()
+    }
   })
 
   it('carries the handler error kind on a degraded answer', async () => {

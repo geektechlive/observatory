@@ -249,6 +249,7 @@ async function produceAndStore(
   const { ctx, cache, key, cacheReq, negReq } = slot
 
   let result: CacheableResult
+  const started = Date.now()
   try {
     result = await produce()
   } catch (err) {
@@ -286,6 +287,9 @@ async function produceAndStore(
     // Stored so a HIT can report real age instead of replaying the full TTL.
     'X-Cached-At': String(Date.now()),
     ...(result.extraHeaders ?? {}),
+    // How long the upstream took. Stored, so every HIT reports the refresh behind it:
+    // with #83 visitors no longer wait for it, so the health check reads it here (#86).
+    'X-Produce-Ms': String(Date.now() - started),
   })
   if (result.degraded === true) baseHeaders.set('X-Data-Degraded', '1')
 

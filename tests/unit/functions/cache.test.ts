@@ -35,6 +35,24 @@ describe('cachedJson', () => {
     expect(produce).toHaveBeenCalledTimes(1)
   })
 
+  it('records how long the producer took as X-Produce-Ms, on the MISS and on every HIT (#86)', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const { ctx, settle } = makeCtx()
+    const produce = vi.fn(async () => {
+      now.mockReturnValue(4_500)
+      // A producer cannot claim a time of its own.
+      return { body: '{}', extraHeaders: { 'X-Produce-Ms': '1' } }
+    })
+
+    const miss = await cachedJson(ctx, 'k', 100, produce)
+    await settle()
+    expect(miss.headers.get('X-Produce-Ms')).toBe('3500')
+
+    const hit = await cachedJson(ctx, 'k', 100, produce)
+    expect(hit.headers.get('X-Cache')).toBe('HIT')
+    expect(hit.headers.get('X-Produce-Ms')).toBe('3500')
+  })
+
   it('preserves extraHeaders and a producer ttl override', async () => {
     const { ctx, settle } = makeCtx()
     const res = await cachedJson(ctx, 'k', 100, async () => ({
@@ -233,6 +251,8 @@ describe('cachedJson stale-if-error', () => {
     const next = await cachedJson(tc.ctx, 'k', 100, produce)
     expect(next.headers.get('X-Cache')).toBe('HIT')
     expect(next.headers.get('X-Data-Age')).toBe('0')
+    // The health check reads the background refresh's duration from this answer.
+    expect(next.headers.get('X-Produce-Ms')).toBe('0')
     expect(await next.text()).toBe('{"fresh":1}')
     expect(produce).toHaveBeenCalledTimes(1)
   })

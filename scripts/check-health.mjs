@@ -42,6 +42,12 @@ export const REVALIDATE_RECHECK_MS = 12_000
  * looking at hours-old data. Contract-caused STALE fails at any age.
  */
 export const STALE_GRACE_SECONDS = 2 * 60 * 60
+/**
+ * A refresh slower than this is a WARN (#86). DONKI took 8.2 s for days (#65) and every
+ * run passed. Since #83 the probe's own time is our cache's, not the upstream's, so this
+ * reads `X-Produce-Ms`: how long the refresh behind a HIT or MISS took.
+ */
+export const SLOW_PRODUCE_MS = 3_000
 /** Where the per-endpoint results go for scripts/report-incidents.mjs. */
 const REPORT_PATH = process.env.INCIDENT_REPORT ?? 'incident-report.json'
 
@@ -143,6 +149,16 @@ export function judgeStale({ cache, errorKind, dataAge, staleStatus }) {
 }
 
 /**
+ * A warning when the refresh behind a HIT or MISS took longer than SLOW_PRODUCE_MS.
+ * A STALE or REVALIDATING body's time belongs to an older refresh, so it is not judged.
+ */
+export function slowWarning(cache, produceMs) {
+  if (cache !== 'HIT' && cache !== 'MISS') return undefined
+  const ms = produceMs === null || produceMs === '' ? NaN : Number(produceMs)
+  return ms > SLOW_PRODUCE_MS ? `slow upstream: ${String(ms)}ms` : undefined
+}
+
+/**
  * Run one check, retrying transient failures.
  *
  * Without this a single slow upstream fails the workflow and pages Discord. On
@@ -217,8 +233,9 @@ export async function runCheck(baseUrl, spec) {
     }
 
     const source = res.headers.get('x-data-source')
-    const note = [source, cache, stale.warning].filter(Boolean).join(' / ') || 'ok'
-    return { ...base, ok: true, note, warning: stale.warning }
+    const warning = stale.warning ?? slowWarning(cache, res.headers.get('x-produce-ms'))
+    const note = [source, cache, warning].filter(Boolean).join(' / ') || 'ok'
+    return { ...base, ok: true, note, warning }
   } catch (err) {
     const ms = Date.now() - started
     const message = err?.name === 'AbortError' ? `timeout after ${TIMEOUT_MS} ms` : err.message
