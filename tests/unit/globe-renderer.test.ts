@@ -4,7 +4,7 @@
  * graph itself is real three.js. The spike leaked its texture, materials and
  * atmosphere on teardown and setState'd every frame; these tests pin the fixes.
  */
-import { Texture } from 'three'
+import { type ShaderMaterial, Texture, type Vector3 } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 import { GlobeRenderer, type RendererDeps } from '@/components/globe/three/GlobeRenderer'
@@ -23,6 +23,8 @@ function fakes() {
   }
   const textures: Texture[] = []
   let frameCb: ((t: number) => void) | null = null
+  let onScreen: ((visible: boolean) => void) | null = null
+  const unobserve = vi.fn()
   const deps: RendererDeps = {
     createRenderer: () => renderer,
     loadTexture: (url: string) => {
@@ -36,8 +38,20 @@ function fakes() {
       return 1
     }),
     cancelFrame: vi.fn(),
+    observeVisibility: vi.fn((_el: Element, cb: (visible: boolean) => void) => {
+      onScreen = cb
+      return unobserve
+    }),
   }
-  return { deps, renderer, canvas, textures, tick: (t: number) => frameCb?.(t) }
+  return {
+    deps,
+    renderer,
+    canvas,
+    textures,
+    unobserve,
+    tick: (t: number) => frameCb?.(t),
+    setOnScreen: (visible: boolean) => onScreen?.(visible),
+  }
 }
 
 const OPTIONS = {
@@ -166,6 +180,126 @@ describe('GlobeRenderer', () => {
     f.canvas.dispatchEvent(new Event('webglcontextlost'))
     expect(onContextLost).toHaveBeenCalledOnce()
     r.dispose()
+  })
+})
+
+describe('GlobeRenderer frame budget (#84)', () => {
+  const LAYERS = {
+    iss: null,
+    trail: [],
+    events: [],
+    quakes: [],
+    fires: [],
+    fireballs: [],
+    launches: [],
+    disasters: [],
+    satellites: [],
+    aurora: [],
+    tracking: false,
+  }
+  const DISPLAY_FRAME_MS = 1000 / 60
+
+  it('draws about 30 times a second on a 60 Hz display, at the same spin speed', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.attach(document.createElement('div'))
+    f.tick(0)
+    const before = r.facing()
+    f.renderer.render.mockClear()
+    for (let i = 1; i <= 60; i += 1) f.tick(i * DISPLAY_FRAME_MS)
+    const draws = f.renderer.render.mock.calls.length
+    expect(draws).toBeGreaterThanOrEqual(29)
+    expect(draws).toBeLessThanOrEqual(31)
+    // Rotation is time-based: one second of display frames turns the globe one second's worth.
+    expect(before - r.facing()).toBeCloseTo(GLOBE_SPIN_DEG_PER_SEC, 3)
+    r.dispose()
+  })
+
+  it('stops the loop while paused and draws only when something changes', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.attach(document.createElement('div'))
+    f.tick(0)
+    r.setRotationPaused(true)
+    const requests = vi.mocked(f.deps.requestFrame).mock.calls.length
+    f.renderer.render.mockClear()
+    for (let i = 1; i <= 30; i += 1) f.tick(i * DISPLAY_FRAME_MS)
+    expect(f.renderer.render).not.toHaveBeenCalled()
+    expect(f.deps.requestFrame).toHaveBeenCalledTimes(requests)
+    r.setLayers(LAYERS)
+    expect(f.renderer.render).toHaveBeenCalledTimes(1)
+    r.setRotationPaused(false)
+    expect(f.deps.requestFrame).toHaveBeenCalledTimes(requests + 1)
+    r.dispose()
+  })
+
+  it('stops drawing off screen and resumes with one draw when it comes back', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.attach(document.createElement('div'))
+    f.tick(0)
+    f.setOnScreen(false)
+    expect(f.deps.cancelFrame).toHaveBeenCalled()
+    f.renderer.render.mockClear()
+    for (let i = 1; i <= 30; i += 1) f.tick(i * DISPLAY_FRAME_MS)
+    r.setLayers(LAYERS)
+    r.resize(600)
+    expect(f.renderer.render).not.toHaveBeenCalled()
+    const requests = vi.mocked(f.deps.requestFrame).mock.calls.length
+    f.setOnScreen(true)
+    expect(f.deps.requestFrame).toHaveBeenCalledTimes(requests + 1)
+    f.tick(10_000)
+    expect(f.renderer.render).toHaveBeenCalledTimes(1)
+    r.dispose()
+  })
+
+  it('draws once on coming back on screen while paused', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.attach(document.createElement('div'))
+    r.setRotationPaused(true)
+    f.setOnScreen(false)
+    f.renderer.render.mockClear()
+    f.setOnScreen(true)
+    expect(f.renderer.render).toHaveBeenCalledTimes(1)
+    r.dispose()
+  })
+
+  it('keeps the terminator current while paused: one draw a minute for the Sun', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+    vi.setSystemTime(new Date('2026-11-03T12:00:00Z'))
+    try {
+      const f = fakes()
+      const r = await GlobeRenderer.create(OPTIONS, f.deps)
+      r.attach(document.createElement('div'))
+      r.setRotationPaused(true)
+      const earth = r.debugMeshes()[0]?.material as ShaderMaterial
+      const sunDir = earth.uniforms['sunDir']?.value as Vector3
+      const before = { x: sunDir.x, z: sunDir.z }
+      f.renderer.render.mockClear()
+      vi.advanceTimersByTime(60_000)
+      expect(f.renderer.render).toHaveBeenCalledTimes(1)
+      expect(sunDir.x !== before.x || sunDir.z !== before.z).toBe(true)
+      r.dispose()
+      f.renderer.render.mockClear()
+      vi.advanceTimersByTime(120_000)
+      expect(f.renderer.render).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops observing on dispose, and draws nothing after it', async () => {
+    const f = fakes()
+    const r = await GlobeRenderer.create(OPTIONS, f.deps)
+    r.attach(document.createElement('div'))
+    expect(f.deps.observeVisibility).toHaveBeenCalledWith(f.canvas, expect.any(Function))
+    r.dispose()
+    expect(f.unobserve).toHaveBeenCalledOnce()
+    f.renderer.render.mockClear()
+    f.setOnScreen(true)
+    f.tick(50_000)
+    expect(f.renderer.render).not.toHaveBeenCalled()
   })
 })
 

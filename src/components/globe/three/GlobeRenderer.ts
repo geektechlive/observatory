@@ -111,6 +111,11 @@ export interface RendererDeps {
     width: number,
     height: number,
   ) => BloomLike
+  /**
+   * Calls back with whether the canvas is on screen; returns a function that stops
+   * watching (#84). The default wraps IntersectionObserver.
+   */
+  observeVisibility?: (el: Element, cb: (visible: boolean) => void) => () => void
 }
 
 export interface GlobeRendererOptions {
@@ -132,6 +137,26 @@ export interface GlobeRendererOptions {
 const DEGREES_PER_MS = GLOBE_SPIN_DEG_PER_SEC / 1000
 const CAMERA_DISTANCE = 4.1
 const SUN_REFRESH_MS = 60_000
+/**
+ * Least time between drawn frames while spinning (#84): about 30 fps. Not 33.3, because
+ * on a 60 Hz display the second frame lands at 33.3 ms give or take jitter, and a
+ * slightly early one would be skipped down to 20 fps. At 3.4 deg/s the edge moves
+ * under a pixel per frame, so the spin looks the same.
+ */
+const MIN_FRAME_MS = 30
+
+/** Without IntersectionObserver (jsdom, very old browsers) the globe counts as on screen. */
+function observeWithIntersection(el: Element, cb: (visible: boolean) => void): () => void {
+  if (typeof IntersectionObserver === 'undefined') return () => undefined
+  const observer = new IntersectionObserver((entries) => {
+    const entry = entries.at(-1)
+    if (entry) cb(entry.isIntersecting)
+  })
+  observer.observe(el)
+  return () => {
+    observer.disconnect()
+  }
+}
 
 const defaultDeps: RendererDeps = {
   createRenderer: () => new WebGLRenderer({ antialias: true, alpha: true }),
@@ -143,6 +168,7 @@ const defaultDeps: RendererDeps = {
   // createRenderer above makes a real WebGLRenderer; only the tests narrow it.
   createBloom: (renderer, scene, camera, width, height) =>
     new SelectiveBloom(renderer as WebGLRenderer, scene, camera, width, height),
+  observeVisibility: observeWithIntersection,
 }
 
 const vec = (rgb: readonly number[]): Vector3 => new Vector3(rgb[0], rgb[1], rgb[2])
@@ -173,8 +199,13 @@ export class GlobeRenderer {
   private size: number
   private frameId = 0
   private lastFrame: number | null = null
+  /** Wall-clock ms of the last sun update; the draw path refreshes it, paused or not. */
   private lastSun = 0
   private rotationPaused = false
+  /** False while the canvas is scrolled out of view (#84). */
+  private onScreen = true
+  private readonly unobserve: () => void
+  private readonly sunTimer: ReturnType<typeof setInterval>
   /** Static-layer rebuilds so far, mirrored on the canvas for e2e (#60). */
   private builds = 0
   private attached = false
@@ -218,6 +249,9 @@ export class GlobeRenderer {
     this.canvas.dataset['globeBloom'] = this.bloom ? 'bloom' : 'sprites'
     this.canvas.addEventListener('webglcontextlost', this.handleContextLost)
     document.addEventListener('visibilitychange', this.handleVisibility)
+    this.unobserve = deps.observeVisibility?.(this.canvas, this.handleOnScreen) ?? (() => undefined)
+    // With the loop stopped (paused, reduced motion) nothing else would move the Sun.
+    this.sunTimer = setInterval(this.handleSunTimer, SUN_REFRESH_MS)
   }
 
   /** Builds the renderer and resolves once both Earth textures are on the GPU. */
@@ -448,6 +482,10 @@ export class GlobeRenderer {
   setRotationPaused(paused: boolean): void {
     this.rotationPaused = paused
     this.lastFrame = null
+    // Nothing moves while paused, so there is no loop: data, resize and the sun draw
+    // on demand through renderOnce (#84).
+    if (paused) this.stopLoop()
+    else this.schedule()
   }
 
   /** For tests: every spacecraft nameplate, the ISS first. */
@@ -469,6 +507,8 @@ export class GlobeRenderer {
     if (this.disposed) return
     this.disposed = true
     this.detach()
+    this.unobserve()
+    clearInterval(this.sunTimer)
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost)
     document.removeEventListener('visibilitychange', this.handleVisibility)
     // The bloom twin shares the Earth's geometry, so free each geometry once (#74).
@@ -481,8 +521,20 @@ export class GlobeRenderer {
     this.renderer.forceContextLoss()
   }
 
+  /** Whether anything on the globe moves on its own right now. */
+  private running(): boolean {
+    return (
+      this.attached &&
+      !this.disposed &&
+      !this.options.reducedMotion &&
+      !document.hidden &&
+      !this.rotationPaused &&
+      this.onScreen
+    )
+  }
+
   private schedule(): void {
-    if (!this.attached || this.disposed || this.options.reducedMotion || document.hidden) return
+    if (this.frameId !== 0 || !this.running()) return
     this.frameId = this.deps.requestFrame(this.frame)
   }
 
@@ -493,7 +545,16 @@ export class GlobeRenderer {
   }
 
   private readonly frame = (now: number): void => {
-    if (!this.rotationPaused && this.lastFrame !== null) {
+    this.frameId = 0
+    // A frame already in flight when the globe paused or left the screen.
+    if (!this.running()) return
+    // About 30 fps while spinning (#84). Rotation is time-based, so skipped display
+    // frames don't slow the spin.
+    if (this.lastFrame !== null && now - this.lastFrame < MIN_FRAME_MS) {
+      this.schedule()
+      return
+    }
+    if (this.lastFrame !== null) {
       const elapsed = now - this.lastFrame
       this.rotation += elapsed * DEGREES_PER_MS * (Math.PI / 180)
       this.globe.rotation.y = this.rotation
@@ -501,16 +562,22 @@ export class GlobeRenderer {
       this.auroraTime.value += elapsed / 1000
     }
     this.lastFrame = now
-    if (now - this.lastSun > SUN_REFRESH_MS) {
-      this.sun.fromArray(sunDirection(new Date()))
-      this.lastSun = now
-    }
     this.draw()
     this.schedule()
   }
 
+  /** One still draw for a change while the loop is stopped; skipped when nobody can see it. */
   private renderOnce(): void {
+    if (!this.onScreen || document.hidden) return
     this.draw()
+  }
+
+  /** Moves the Sun once a minute, from any draw, so a paused globe keeps a current terminator. */
+  private refreshSun(): void {
+    const now = Date.now()
+    if (now - this.lastSun < SUN_REFRESH_MS) return
+    this.sun.fromArray(sunDirection(new Date(now)))
+    this.lastSun = now
   }
 
   /**
@@ -519,6 +586,8 @@ export class GlobeRenderer {
    * so the Earth still hides glyphs behind it. Low tier: one pass with both layers.
    */
   private draw(): void {
+    this.refreshSun()
+    // #60: occlusion runs for the pose about to be drawn, never after the draw.
     this.syncOcclusion()
     const { camera, renderer } = this
     if (!this.bloom) {
@@ -577,7 +646,28 @@ export class GlobeRenderer {
 
   private readonly handleVisibility = (): void => {
     if (document.hidden) this.stopLoop()
-    else this.schedule()
+    else this.resume()
+  }
+
+  /** While spinning the loop draws anyway (frameId is set between frames). */
+  private readonly handleSunTimer = (): void => {
+    if (this.frameId === 0 && this.attached && !this.disposed) this.renderOnce()
+  }
+
+  private readonly handleOnScreen = (visible: boolean): void => {
+    this.onScreen = visible
+    if (visible) this.resume()
+    else this.stopLoop()
+  }
+
+  /**
+   * Back in view: restart the loop if the globe spins, otherwise draw once, since
+   * changes that arrived while it was hidden were not drawn.
+   */
+  private resume(): void {
+    if (!this.attached || this.disposed) return
+    this.schedule()
+    if (this.frameId === 0) this.renderOnce()
   }
 
   private readonly handleContextLost = (event: Event): void => {
