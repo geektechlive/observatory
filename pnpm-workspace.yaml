@@ -1,15 +1,17 @@
-# Not a workspace definition: pnpm settings for this repo. Today, the accepted-
-# advisory list. Forced versions (`overrides:`) go here too, each with why and
-# when it can go; #96 removed the last one once wrangler shipped the fix.
+# Not a workspace definition: pnpm settings for this repo. Since pnpm 11 this is
+# the only place pnpm reads settings from (it ignores package.json's `pnpm` field).
+# Forced versions (`overrides:`) go here too, each with why and when it can go;
+# #96 removed the last one once wrangler shipped the fix.
 
-# Advisories accepted on purpose. Each entry needs: why it cannot be fixed, why it
-# does not reach us, and when to look again. Everything else still fails the gate.
-auditConfig:
-  ignoreGhsas:
-    # braces <=3.0.3 stack overflow on deeply nested ATTACKER-SUPPLIED brace
-    # patterns (#28). No patched braces exists (3.0.3 is the latest; micromatch
-    # 4.0.8 is latest too). Reached only via stylelint > micromatch at lint time,
-    # on glob patterns from this repo's own config and scripts: dev-only, never
-    # shipped, never fed outside input. Re-check when braces or micromatch
-    # publishes a new version.
-    - GHSA-vfj7-8cjw-p6xm
+# Packages allowed to run install scripts (pnpm 11 replaced `onlyBuiltDependencies`
+# with this, and fails on an undeclared one). esbuild and workerd fetch their
+# platform binaries; sharp is wrangler's image dependency.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+
+# Advisories accepted on purpose go under `auditConfig.ignoreGhsas`. Each entry
+# needs: why it cannot be fixed, why it does not reach us, and when to look again.
+# None today: #97's stylelint 18 dropped micromatch (and with it braces,
+# GHSA-vfj7-8cjw-p6xm, the last entry).

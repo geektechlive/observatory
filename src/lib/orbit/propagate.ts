@@ -1,4 +1,11 @@
-import * as satellite from 'satellite.js'
+import {
+  degreesLat,
+  degreesLong,
+  eciToGeodetic,
+  gstime,
+  propagate,
+  twoline2satrec,
+} from 'satellite.js'
 
 export interface IssPosition {
   lat: number
@@ -8,14 +15,15 @@ export interface IssPosition {
 }
 
 export function propagateIss(line1: string, line2: string, date: Date): IssPosition | null {
-  const satrec = satellite.twoline2satrec(line1, line2)
-  const result = satellite.propagate(satrec, date)
-  if (typeof result.position === 'boolean' || typeof result.velocity === 'boolean') return null
-  const gmst = satellite.gstime(date)
-  const geo = satellite.eciToGeodetic(result.position, gmst)
+  const satrec = twoline2satrec(line1, line2)
+  // v7 answers null when SGP4 fails (decayed, or elements out of range); satrec.error says why.
+  const result = propagate(satrec, date)
+  if (!result) return null
+  const gmst = gstime(date)
+  const geo = eciToGeodetic(result.position, gmst)
   return {
-    lat: satellite.degreesLat(geo.latitude),
-    lon: satellite.degreesLong(geo.longitude),
+    lat: degreesLat(geo.latitude),
+    lon: degreesLong(geo.longitude),
     alt: geo.height,
     vel: Math.sqrt(result.velocity.x ** 2 + result.velocity.y ** 2 + result.velocity.z ** 2) * 3600,
   }

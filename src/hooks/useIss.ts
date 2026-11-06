@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useIssTle } from '@/hooks/useIssTle'
+import { usePropagate } from '@/hooks/usePropagate'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import type { IssPosition } from '@/lib/orbit/propagate'
-import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
 
 /** Smooth-motion cadence: 5 Hz SGP4, matching the on-screen readout. */
 const LIVE_INTERVAL_MS = 200
@@ -22,21 +22,25 @@ export interface IssState {
 export function useIss(): IssState {
   const reducedMotion = useReducedMotion()
   const { data: tle, isLoading, error } = useIssTle()
+  // satellite.js is not in the page's first load (#97). Its import starts when this
+  // hook mounts, alongside the TLE fetch: started only after the TLE, the readout came
+  // ~240 ms later on a 4G profile.
+  const sgp4 = usePropagate(true)
 
   const trail = useMemo(() => {
-    if (!tle) return []
-    return computeTrail(tle.line1, tle.line2, new Date())
-  }, [tle])
+    if (!tle || !sgp4) return []
+    return sgp4.computeTrail(tle.line1, tle.line2, new Date())
+  }, [tle, sgp4])
 
   const [position, setPosition] = useState<IssPosition | null>(null)
   const lastUpdateRef = useRef<number>(0)
   const intervalMs = reducedMotion ? REDUCED_INTERVAL_MS : LIVE_INTERVAL_MS
 
   useEffect(() => {
-    if (!tle) return
+    if (!tle || !sgp4) return
 
     const update = () => {
-      const pos = propagateIss(tle.line1, tle.line2, new Date())
+      const pos = sgp4.propagateIss(tle.line1, tle.line2, new Date())
       if (pos !== null) setPosition(pos)
     }
 
@@ -63,7 +67,7 @@ export function useIss(): IssState {
     return () => {
       cancelAnimationFrame(rafId)
     }
-  }, [tle, reducedMotion])
+  }, [tle, sgp4, reducedMotion])
 
   return { position, trail, isLoading, error, intervalMs }
 }

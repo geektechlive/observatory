@@ -4,9 +4,18 @@
  * twilight): sunlight on the station against a dark sky is what makes it shine.
  * Checked against Heavens-Above to the minute (tests/unit/iss-passes.test.ts).
  */
-import * as satellite from 'satellite.js'
+import {
+  degreesToRadians,
+  ecfToLookAngles,
+  eciToEcf,
+  gstime,
+  propagate,
+  shadowFraction,
+  sunPos,
+  twoline2satrec,
+} from 'satellite.js'
 
-import { sunAltitude, sunEquatorial } from '@/lib/tonight'
+import { sunAltitude } from '@/lib/tonight'
 
 export interface IssPass {
   start: Date
@@ -22,7 +31,8 @@ export interface IssPass {
 const STEP_MS = 10_000
 const MIN_ELEVATION = 10
 const DARK_ENOUGH = -6
-const EARTH_RADIUS_KM = 6378.137
+/** In shadow once Earth hides at least half the Sun's disc (#97). */
+const SHADOWED = 0.5
 const RAD = Math.PI / 180
 const COMPASS = [
   'N',
@@ -46,21 +56,16 @@ const COMPASS = [
 const compass = (azDeg: number) =>
   COMPASS[Math.round((((azDeg % 360) + 360) % 360) / 22.5) % 16] ?? 'N'
 
+/** Julian date, as satellite.js's `sunPos` takes it. */
+const julianDay = (date: Date) => date.getTime() / 86_400_000 + 2440587.5
+
 /**
- * In Earth's shadow: behind the Earth from the Sun, within a cylinder of Earth's
- * radius. The penumbra is ignored; the edge is a few seconds wide.
+ * In Earth's shadow, from satellite.js's shadow cone (umbra and penumbra) (#97). It
+ * replaced our cylinder test, which it matched on all 25,920 ISS samples over 3 days
+ * at a 0.5 threshold; the penumbra it adds is a few seconds per orbit.
  */
 function inShadow(r: { x: number; y: number; z: number }, date: Date): boolean {
-  const { ra, dec } = sunEquatorial(date)
-  const s = {
-    x: Math.cos(dec * RAD) * Math.cos(ra * RAD),
-    y: Math.cos(dec * RAD) * Math.sin(ra * RAD),
-    z: Math.sin(dec * RAD),
-  }
-  const along = r.x * s.x + r.y * s.y + r.z * s.z
-  if (along >= 0) return false
-  const perp = Math.hypot(r.x - along * s.x, r.y - along * s.y, r.z - along * s.z)
-  return perp < EARTH_RADIUS_KM
+  return shadowFraction(sunPos(julianDay(date)).rsun, r) >= SHADOWED
 }
 
 /** A TLE's epoch: columns 19-32 of line 1 are a two-digit year and a fractional day. */
@@ -86,19 +91,17 @@ export function visiblePasses(
   from: Date,
   hours: number,
 ): IssPass[] {
-  const satrec = satellite.twoline2satrec(tle.line1, tle.line2)
+  const satrec = twoline2satrec(tle.line1, tle.line2)
   const observer = {
-    latitude: satellite.degreesToRadians(lat),
-    longitude: satellite.degreesToRadians(lon),
+    latitude: degreesToRadians(lat),
+    longitude: degreesToRadians(lon),
     height: 0,
   }
   const sample = (time: Date): Sample | null => {
-    const { position } = satellite.propagate(satrec, time)
-    if (typeof position === 'boolean') return null
-    const look = satellite.ecfToLookAngles(
-      observer,
-      satellite.eciToEcf(position, satellite.gstime(time)),
-    )
+    const result = propagate(satrec, time)
+    if (!result) return null
+    const { position } = result
+    const look = ecfToLookAngles(observer, eciToEcf(position, gstime(time)))
     const elevation = look.elevation / RAD
     const visible =
       elevation > MIN_ELEVATION &&

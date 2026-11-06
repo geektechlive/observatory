@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
+import { usePropagate } from '@/hooks/usePropagate'
 import { fetchSatellites } from '@/lib/api/satellites'
-import { propagateIss } from '@/lib/orbit/propagate'
 import { useUiStore } from '@/store/ui'
 
 export interface TrackedSatellite {
@@ -28,6 +28,8 @@ export function useSatellites(enabled = true): TrackedSatellite[] {
   })
 
   const [positions, setPositions] = useState<TrackedSatellite[]>([])
+  // satellite.js loads with the TLEs, not with the page (#97).
+  const sgp4 = usePropagate((data?.satellites.length ?? 0) > 0)
 
   useEffect(() => {
     useUiStore.getState().setSourceError('satellites', error != null)
@@ -35,13 +37,13 @@ export function useSatellites(enabled = true): TrackedSatellite[] {
 
   useEffect(() => {
     const sats = data?.satellites
-    if (!sats || sats.length === 0) return
+    if (!sats || sats.length === 0 || !sgp4) return
 
     const update = () => {
       const now = new Date()
       const next: TrackedSatellite[] = []
       for (const s of sats) {
-        const pos = propagateIss(s.line1, s.line2, now)
+        const pos = sgp4.propagateIss(s.line1, s.line2, now)
         if (pos !== null) next.push({ name: s.name, lat: pos.lat, lon: pos.lon, alt: pos.alt })
       }
       setPositions(next)
@@ -52,7 +54,7 @@ export function useSatellites(enabled = true): TrackedSatellite[] {
     return () => {
       clearInterval(id)
     }
-  }, [data])
+  }, [data, sgp4])
 
   return positions
 }

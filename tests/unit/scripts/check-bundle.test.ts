@@ -72,6 +72,27 @@ describe('checkBundle', () => {
     expect(findings.find((f) => f.rule === 'entry-gzip')?.detail).toContain('shared-x.js')
   })
 
+  // #97: satellite.js 7 in the first load cost ~5 kB gzip and split it into 18 chunks.
+  it('fails when satellite.js lands in the entry or a chunk it preloads', () => {
+    const sgp4 = 'var e={Decayed:6,SemiLatusRectumBelowZero:4}'
+    const inEntry = fakeDist({ 'assets/index-abc.js': sgp4 })
+    expect(failures(checkBundle(inEntry, BUDGETS))).toContain('entry-has-no-sgp4')
+    const preloaded = fakeDist(
+      { 'assets/index-abc.js': 'x', 'assets/dist-x.js': sgp4 },
+      'index-abc.js',
+      ['dist-x.js'],
+    )
+    expect(failures(checkBundle(preloaded, BUDGETS))).toContain('entry-has-no-sgp4')
+  })
+
+  it('accepts satellite.js in a lazy chunk', () => {
+    const dir = fakeDist({
+      'assets/index-abc.js': 'import("./propagate-x.js")',
+      'assets/propagate-x.js': 'var e={SemiLatusRectumBelowZero:4}',
+    })
+    expect(failures(checkBundle(dir, BUDGETS))).toEqual([])
+  })
+
   it('fails when three.js lands in a chunk the entry preloads', () => {
     const dir = fakeDist(
       { 'assets/index-abc.js': 'x', 'assets/shared-x.js': 'class WebGLRenderer {}' },

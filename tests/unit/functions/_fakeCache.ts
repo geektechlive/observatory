@@ -38,8 +38,15 @@ export function makeCtx(url = 'https://example.test/api/x'): TestCtx {
         pending.push(p)
       },
     },
+    // Like the Workers runtime, wait for every waitUntil, including ones registered by a
+    // task already waiting (a background refresh's own cache.put). A one-shot
+    // Promise.all missed those, and APOD's midnight test raced the put.
     settle: async () => {
-      await Promise.all(pending)
+      let seen = -1
+      while (seen !== pending.length) {
+        seen = pending.length
+        await Promise.all(pending)
+      }
     },
   }
 }

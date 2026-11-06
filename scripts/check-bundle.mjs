@@ -27,6 +27,10 @@ export const BUDGETS = {
 }
 
 const THREE_MARKER = 'WebGLRenderer'
+// satellite.js's SatRecError names survive minification. It loads with the first
+// orbit to propagate, not with the page (#97): in the first load it cost ~5 kB gzip
+// and split the first-load code into 18 chunks.
+const SGP4_MARKER = 'SemiLatusRectumBelowZero'
 const gz = (buf) => gzipSync(buf, { level: 9 }).length
 const kb = (n) => `${(n / 1000).toFixed(1)} kB`
 
@@ -56,6 +60,14 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     'entry-has-no-three',
     withThree.length === 0,
     withThree.length > 0 ? `${withThree.join(', ')} contains ${THREE_MARKER}: three.js must be a lazy chunk` : 'three.js not in first-load chunks',
+  )
+  const withSgp4 = initial.filter((_, i) => bodies[i].includes(SGP4_MARKER))
+  add(
+    'entry-has-no-sgp4',
+    withSgp4.length === 0,
+    withSgp4.length > 0
+      ? `${withSgp4.join(', ')} contains ${SGP4_MARKER}: satellite.js must load on first use (src/lib/orbit/loadPropagate.ts)`
+      : 'satellite.js not in first-load chunks',
   )
 
   for (const name of readdirSync(join(distDir, 'assets'))) {

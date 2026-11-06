@@ -373,12 +373,19 @@ describe('useIss', () => {
     expect(result.current.position).toBeNull()
   })
 
+  // satellite.js loads after the TLE (#97), so the trail and position follow it.
   it('calls computeTrail after TLE resolves', async () => {
     const { result } = renderHook(() => useIss(), { wrapper: createWrapper() })
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
     })
-    expect(mockedComputeTrail).toHaveBeenCalled()
+    await waitFor(() => {
+      expect(mockedComputeTrail).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(result.current.position).toEqual({ lat: 10, lon: 20, alt: 400, vel: 27000 })
+    })
+    expect(result.current.trail).toEqual([[20, 10]])
   })
 
   it('error is null on successful fetch', async () => {
