@@ -90,6 +90,46 @@
   }
 }
 
+/* The Expand button (#89) on stages other than the globe, which carries it beside Pause. */
+.tools {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+}
+
+/* A wrapper that adds no box, only `inert` while the lens is expanded. */
+.contents {
+  display: contents;
+}
+
+/* Expanded (#89): the lens covers the screen, the ticker included. The page is its own
+   stacking context (isolation), so it rises above the fixed ticker as a whole. */
+.page[data-expanded] {
+  position: relative;
+  z-index: var(--z-overlay);
+}
+
+/* z-index: over the phone's fixed dial bar, which lives inside the page too. */
+.lens[data-expanded] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  align-content: center;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: max(var(--space-5), env(safe-area-inset-top))
+    max(var(--space-5), env(safe-area-inset-right)) max(var(--space-5), env(safe-area-inset-bottom))
+    max(var(--space-5), env(safe-area-inset-left));
+  background: var(--void);
+}
+
+/* The flat map has no size of its own: give it the screen, less the lens's margin. */
+.lens[data-expanded] .stage[data-stage='map'],
+.lens[data-expanded] .stage[data-stage='map'] .stageMorph {
+  height: calc(100dvh - 2 * var(--space-5));
+}
+
 /* Sub-solar bottom left, the ISS bottom right, over the lens's empty corners outside
    the round bezel, as in the prototype. */
 .plates {
@@ -180,4 +220,10 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Expanded (#89), the corner plates keep the lens's margin rather than touching the
+   screen edge. Last, after every plain .plates rule (no-descending-specificity). */
+.lens[data-expanded] .plates {
+  inset: auto var(--space-5) var(--space-5);
 }

@@ -26,7 +26,10 @@ const WAVELENGTHS: Wavelength[] = [
 
 const REFRESH_MS = 10 * 60 * 1000
 
-export function SunStage({ size = 460 }: { size?: number }) {
+/** The disc's share of the stage at its normal 460px, kept when expanded (#89). */
+const DISC_SHARE = 380 / 460
+
+export function SunStage({ size = 460, expanded = false }: { size?: number; expanded?: boolean }) {
   const [wl, setWl] = useState('0171')
   const bucket = useImageBucket(REFRESH_MS)
   const [errored, setErrored] = useState(false)
@@ -37,7 +40,7 @@ export function SunStage({ size = 460 }: { size?: number }) {
 
   const flare = sa?.xray.currentClass ?? null
   const flaring = flare ? flare[0] === 'M' || flare[0] === 'X' : false
-  const disc = Math.min(size, 380)
+  const disc = expanded ? Math.round(size * DISC_SHARE) : Math.min(size, 380)
   const src = `https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_${wl}.jpg?t=${bucket}`
 
   return (

@@ -5,6 +5,7 @@ import { ConsoleVoice } from '@/components/consoles/ConsoleVoice'
 import { Footer } from '@/components/footer/Footer'
 import { GlobeHost } from '@/components/globe/GlobeHost'
 import { LayerControl } from '@/components/globe/LayerControl'
+import { ExpandButton } from '@/components/lens/ExpandButton'
 import { IssPlate, type MapMode } from '@/components/lens/IssPlate'
 import { SubsolarPlate, type SubsolarPlateHandle } from '@/components/lens/SubsolarPlate'
 import { OrbitalDial } from '@/components/nav/OrbitalDial'
@@ -16,6 +17,7 @@ import { Ticker } from '@/components/ticker/Ticker'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useGlobeData } from '@/hooks/useGlobeData'
 import { useHashView } from '@/hooks/useHashView'
+import { useLensExpand } from '@/hooks/useLensExpand'
 import { useLensSize } from '@/hooks/useLensSize'
 import { useUiStore } from '@/store/ui'
 
@@ -38,7 +40,9 @@ export function App() {
   const { globeProps, census, issPos, issIntervalMs } = useGlobeData()
 
   const lens = useRef<HTMLElement>(null)
-  const size = useLensSize(lens)
+  const { expanded, toggle, buttonRef } = useLensExpand()
+  const size = useLensSize(lens, expanded)
+  const expand = <ExpandButton ref={buttonRef} expanded={expanded} onToggle={toggle} />
   const subsolar = useRef<SubsolarPlateHandle>(null)
   const onFacing = useCallback((lon: number) => {
     subsolar.current?.setFacing(lon)
@@ -50,15 +54,23 @@ export function App() {
   return (
     <>
       <StarField />
-      <div className={styles.page ?? ''}>
-        <HeaderPlate />
+      {/* Expanded (#89), the lens covers the screen and everything else is inert. */}
+      <div className={styles.page ?? ''} data-expanded={expanded || undefined}>
+        <div className={styles.contents ?? ''} inert={expanded}>
+          <HeaderPlate />
+        </div>
 
         <main id="main-content" className={styles.main ?? ''}>
-          <div className={styles.dial ?? ''}>
+          <div className={styles.dial ?? ''} inert={expanded}>
             <OrbitalDial />
           </div>
 
-          <section ref={lens} className={styles.lens ?? ''} aria-label="Instrument">
+          <section
+            ref={lens}
+            className={styles.lens ?? ''}
+            aria-label="Instrument"
+            data-expanded={expanded || undefined}
+          >
             <div
               className={styles.stage ?? ''}
               data-stage={stageKind === 'globe' ? mapMode : stageKind}
@@ -68,9 +80,13 @@ export function App() {
                   <LayerControl showMapLayers={mapMode === 'map'} />
                 </div>
               )}
+              {/* The globe carries the button beside Pause; every other stage, top right. */}
+              {!(stageKind === 'globe' && mapMode === 'globe') && (
+                <div className={styles.tools ?? ''}>{expand}</div>
+              )}
               <div className={styles.stageMorph ?? ''} key={stageKind}>
                 {stageKind === 'sun' ? (
-                  <SunStage size={size} />
+                  <SunStage size={size} expanded={expanded} />
                 ) : stageKind === 'sky' ? (
                   <SkyStage size={size} />
                 ) : mapMode === 'globe' ? (
@@ -80,6 +96,7 @@ export function App() {
                     autoRotate={true}
                     census={census}
                     onFacing={onFacing}
+                    tools={expand}
                   />
                 ) : (
                   <Suspense fallback={null}>
@@ -113,6 +130,7 @@ export function App() {
               aria-labelledby={`console-tab-${view}`}
               className={`${styles.console ?? ''} ${consoleStyles.lead ?? ''}`}
               key={`lead-${view}`}
+              inert={expanded}
             >
               <ConsoleVoice view={view} />
               <p className={consoleStyles.sub ?? ''}>{parts.sub}</p>
@@ -125,6 +143,7 @@ export function App() {
               aria-label={`More ${view} panels`}
               className={`${styles.rest ?? ''} ${consoleStyles.rest ?? ''}`}
               key={`rest-${view}`}
+              inert={expanded}
             >
               <Suspense fallback={null}>
                 <parts.Rest />
@@ -132,15 +151,17 @@ export function App() {
             </section>
           </ErrorBoundary>
 
-          <div className={styles.footer ?? ''}>
+          <div className={styles.footer ?? ''} inert={expanded}>
             <Footer />
           </div>
         </main>
       </div>
 
-      <ErrorBoundary>
-        <Ticker />
-      </ErrorBoundary>
+      <div className={styles.contents ?? ''} inert={expanded}>
+        <ErrorBoundary>
+          <Ticker />
+        </ErrorBoundary>
+      </div>
     </>
   )
 }

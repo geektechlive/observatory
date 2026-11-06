@@ -1,4 +1,11 @@
-import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { Chip } from '@/components/ui/Chip'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
@@ -21,6 +28,8 @@ type GlobeProps = ComponentProps<typeof Globe> & {
   onFacing?: ((lon: number) => void) | undefined
   /** How far the aurora reaches (#77); drawn on the WebGL globe only. */
   auroraReach?: LayerInput['auroraReach']
+  /** Extra controls beside Pause rotation, such as the lens's Expand button (#89). */
+  tools?: ReactNode
 }
 
 const NONE: readonly never[] = []
@@ -76,7 +85,7 @@ function releaseAfterFailure(): void {
  * for when it falls back (no WebGL, save-data, ?globe=svg).
  * `data-globe-mode` says which one is live, so e2e can't pass silently on the fallback.
  */
-export function GlobeHost({ census, onFacing, auroraReach, ...props }: GlobeProps) {
+export function GlobeHost({ census, onFacing, auroraReach, tools, ...props }: GlobeProps) {
   const [mode, setMode] = useState<GlobeMode>('svg')
   const [renderer, setRenderer] = useState<GlobeRenderer | null>(null)
   const slot = useRef<HTMLDivElement>(null)
@@ -293,6 +302,7 @@ export function GlobeHost({ census, onFacing, auroraReach, ...props }: GlobeProp
         >
           {userPaused ? 'Resume rotation' : 'Pause rotation'}
         </Chip>
+        {tools}
       </div>
     </div>
   )

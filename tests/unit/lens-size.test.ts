@@ -23,3 +23,17 @@ describe('globeSizeFor (#63)', () => {
     expect(globeSizeFor(900, 900)).toBeGreaterThan(560)
   })
 })
+
+describe('globeSizeFor, expanded (#89)', () => {
+  it('drops the 760px cap and fills the viewport height, less its margin and the bezel', () => {
+    expect(globeSizeFor(1408, 900, true)).toBe(900 - 48 - 76)
+  })
+
+  it('is still bound by the width on a phone held upright', () => {
+    expect(globeSizeFor(343, 844, true)).toBe(343 - 76)
+  })
+
+  it('never goes below a readable minimum', () => {
+    expect(globeSizeFor(300, 200, true)).toBe(240)
+  })
+})

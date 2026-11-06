@@ -61,4 +61,5 @@
   right: 0;
   z-index: 2;
   display: flex;
+  gap: var(--space-3);
 }
