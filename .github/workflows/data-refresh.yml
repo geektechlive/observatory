@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
 
       # Fails only when a source's KV copy is past its max age, not on one missed fetch.
       - name: Refresh KV snapshots
@@ -89,7 +89,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
 
       # The reporter holds an upstream-caused failure until it has failed 4 runs in a row
       # (#71). The count rides between runs in the cache: each run saves under its own

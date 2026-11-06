@@ -1,52 +1,15 @@
-# Not a workspace definition — pnpm 10 reads several settings from this file,
-# and minimumReleaseAgeExclude is one of them (the `pnpm` field in package.json
-# is not consulted for it).
-#
-# Dependabot runs its helper with --config.minimumReleaseAge=4320, a 3-day
-# supply-chain cooldown. pnpm applies that to the WHOLE dependency graph, not
-# just the package being bumped, so a single freshly-published transitive
-# package aborts the entire resolution:
-#
-#   ERR_PNPM_NO_MATURE_MATCHING_VERSION  Version 1.2.8 (released 35 hours ago)
-#   of @rolldown/binding-linux-s390x-gnu does not meet the minimumReleaseAge
-#
-# That is what failed the 2026-09-10 Dependabot run. It was reported against
-# @types/node, which was merely the dependency being processed at the time and
-# had nothing to do with the cause.
-#
-# The entries below are platform-specific native binaries that are published in
-# lockstep with their parent package, so holding them to a separate maturity
-# window buys nothing the parent's own cooldown does not already provide. The
-# cooldown still applies to every ordinary dependency.
-#
-# Only `@scope/*` patterns and exact names are supported — partial-name globs
-# such as `lightningcss-*` are not. If an unscoped platform binary trips this
-# again, add it by exact name.
-minimumReleaseAgeExclude:
-  - '@rolldown/*'
-  - '@cloudflare/*'
-  - '@esbuild/*'
-  - '@img/*'
-  - rolldown
-  - esbuild
-  - lightningcss
-  - workerd
-
-# Forced patch versions. Each entry says why and when it can go.
-overrides:
-  # GHSA-xjj6-f33q-929c (undici DoS, fixed in 7.30.1). wrangler 4.152.0 > miniflare
-  # still pins an older 7.x. Same major, patch only. Drop once `pnpm why undici`
-  # shows miniflare on >=7.30.1 without this.
-  'undici@>=7.18.0 <7.30.1': ^7.30.1
+# Not a workspace definition: pnpm settings for this repo. Today, the accepted-
+# advisory list. Forced versions (`overrides:`) go here too, each with why and
+# when it can go; #96 removed the last one once wrangler shipped the fix.
 
 # Advisories accepted on purpose. Each entry needs: why it cannot be fixed, why it
-# does not reach us, and when to look again. Everything else still fails CI.
+# does not reach us, and when to look again. Everything else still fails the gate.
 auditConfig:
   ignoreGhsas:
     # braces <=3.0.3 stack overflow on deeply nested ATTACKER-SUPPLIED brace
     # patterns (#28). No patched braces exists (3.0.3 is the latest; micromatch
-    # 4.0.8 and stylelint 17.16.0 are latest too). Reached only via
-    # stylelint > micromatch at lint time, on glob patterns from this repo's own
-    # config and scripts: dev-only, never shipped, never fed outside input.
-    # Re-check when braces or micromatch publishes a new version.
+    # 4.0.8 is latest too). Reached only via stylelint > micromatch at lint time,
+    # on glob patterns from this repo's own config and scripts: dev-only, never
+    # shipped, never fed outside input. Re-check when braces or micromatch
+    # publishes a new version.
     - GHSA-vfj7-8cjw-p6xm
