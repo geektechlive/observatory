@@ -10,7 +10,11 @@ const HorizonsRawSchema = z.object({ result: z.string().optional() })
 // JPL Horizons geocentric ephemerides for the planets, Moon and Sun. Public, no key.
 const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 const CACHE_TTL_SECONDS = 3600 // 1h
-const FAN_OUT_TIMEOUT_MS = 12000
+// Horizons answers 503 to overlapping requests from one address (#88), so the bodies
+// are asked one at a time (~140 ms each). A body gets 4 s; past 10 s in all, the rest
+// are skipped and the answer goes out degraded.
+const BODY_TIMEOUT_MS = 4000
+const TOTAL_BUDGET_MS = 10_000
 
 const BODIES: { name: string; id: string }[] = [
   { name: 'Sun', id: '10' },
@@ -55,7 +59,7 @@ async function fetchBody(
     const res = await fetchUpstream(
       `${HORIZONS}?${params.toString()}`,
       { headers: { Accept: 'application/json', 'User-Agent': 'observatory.geektechlive.com' } },
-      { timeoutMs: FAN_OUT_TIMEOUT_MS },
+      { timeoutMs: BODY_TIMEOUT_MS },
     )
     if (!res.ok) return null
     const parsedJson = HorizonsRawSchema.safeParse(await res.json())
@@ -76,16 +80,30 @@ async function fetchBody(
 
 export const onRequest: PagesFunction = (ctx) => {
   const start = ymd(new Date())
-  return cachedJson(ctx, `horizons:planets:${start}`, CACHE_TTL_SECONDS, async () => {
+  return cachedJson(ctx, `horizons:planets:v2:${start}`, CACHE_TTL_SECONDS, async () => {
     const stop = ymd(new Date(Date.now() + 86_400_000))
-    const results = await Promise.all(BODIES.map((b) => fetchBody(b.name, b.id, start, stop)))
-    const bodies = results.filter((b): b is NonNullable<typeof b> => b !== null)
+    const started = Date.now()
+    const bodies: NonNullable<Awaited<ReturnType<typeof fetchBody>>>[] = []
+    for (const b of BODIES) {
+      if (Date.now() - started > TOTAL_BUDGET_MS) break
+      const body = await fetchBody(b.name, b.id, start, stop)
+      if (body) bodies.push(body)
+    }
     const degraded = bodies.length < BODIES.length
 
     if (bodies.length === 0) return upstreamError(0, 'JPL Horizons unavailable')
+    if (degraded) {
+      console.warn(
+        `[planets] ${String(BODIES.length - bodies.length)} of 9 bodies missing; answering degraded`,
+      )
+    }
 
     return {
       body: JSON.stringify({ bodies, updatedAt: new Date().toISOString() }),
+      // A degraded answer says why and who served it (#71), or its outages page at once.
+      ...(degraded
+        ? { extraHeaders: { 'X-Error-Kind': 'upstream', 'X-Data-Source': 'horizons' } }
+        : {}),
       degraded,
     }
   })
