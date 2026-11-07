@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchLookup,
   fetchTrajectoryAround,
+  fetchTrajectorySpan,
   trajectoryFacts,
   trajectoryWindow,
 } from '@/lib/api/jplLookup'
@@ -75,7 +76,7 @@ describe('fetchTrajectoryAround', () => {
       '/api/trajectory?id=sb%3A20000433&start=2026-11-06&end=2026-11-08&step=1d',
       undefined,
     )
-    expect(r).toEqual({ state: 'unavailable', reason: 'failed' })
+    expect(r).toEqual({ state: 'unavailable', reason: 'not-found' })
   })
 
   it('does not ask for a date it cannot serve', async () => {
@@ -86,6 +87,35 @@ describe('fetchTrajectoryAround', () => {
       reason: 'out-of-range',
     })
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('fetchTrajectorySpan (#145)', () => {
+  it('asks /api/trajectory for the span the orrery draws', async () => {
+    const fetch = vi.fn(async () => new Response('{}', { status: 500 }))
+    vi.stubGlobal('fetch', fetch)
+    await fetchTrajectorySpan('sb:2099942', { start: '2025-12-04', end: '2027-12-04', step: '2d' })
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/trajectory?id=sb%3A2099942&start=2025-12-04&end=2027-12-04&step=2d',
+      undefined,
+    )
+  })
+
+  it('passes on how long a busy queue asks to wait, and says when JPL has no such object', async () => {
+    const answer = (status: number, headers: Record<string, string> = {}) =>
+      vi.fn(async () => new Response('{"error":"x"}', { status, headers }))
+    const span = { start: '2025-12-04', end: '2027-12-04', step: '2d' }
+    vi.stubGlobal('fetch', answer(503, { 'Retry-After': '20' }))
+    expect(await fetchTrajectorySpan('sb:1', span)).toEqual({
+      state: 'unavailable',
+      reason: 'busy',
+      retryAfterS: 20,
+    })
+    vi.stubGlobal('fetch', answer(404))
+    expect(await fetchTrajectorySpan('sb:1', span)).toEqual({
+      state: 'unavailable',
+      reason: 'not-found',
+    })
   })
 })
 
