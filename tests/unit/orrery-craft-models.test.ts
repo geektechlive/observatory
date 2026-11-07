@@ -69,6 +69,17 @@ describe('spacecraft models (#115)', () => {
     }
   })
 
+  // Seen only on the deployed preview (dev ignores _headers): GLTFLoader reads a model's
+  // embedded textures by fetching blob: URLs, which connect-src refused, so Parker and
+  // JWST drew untextured. A blob: URL is only ever made by the page itself.
+  it('lets GLTFLoader fetch the blob: URLs of embedded textures under the CSP', () => {
+    const headers = readFileSync(resolve(PUBLIC, '_headers'), 'utf8')
+    const directive = (name: string) =>
+      (new RegExp(`${name} ([^;]+);`).exec(headers)?.[1] ?? '').split(/\s+/)
+    expect(directive('connect-src')).toContain('blob:')
+    expect(directive('img-src')).toContain('blob:')
+  })
+
   it('keeps every model under 500 kB', () => {
     for (const file of readdirSync(MODEL_DIR)) {
       expect(readFileSync(resolve(MODEL_DIR, file)).length, file).toBeLessThan(500_000)
