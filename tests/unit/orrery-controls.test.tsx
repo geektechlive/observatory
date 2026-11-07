@@ -272,6 +272,23 @@ describe('Inspector for a spacecraft (#93)', () => {
   const earth = fixtureTrack('earth', '399', 'Earth', { category: 'planet', group: 'planet' })
   const SIM = Date.parse('2026-11-06T00:00:00Z')
 
+  it('credits the NASA 3D model, its page and its orientation, not to scale (#115)', () => {
+    render(<Inspector body="naif:-31" simMs={SIM} tracks={[earth, v1]} onClose={() => undefined} />)
+    const credit = screen.getByRole('link', { name: /3D model: NASA\/Christopher R\. Meaney/ })
+    expect(credit.getAttribute('href')).toBe(
+      'https://science.nasa.gov/3d-resources/voyager-probe-a/',
+    )
+    expect(screen.getByText(/High-gain antenna toward Earth · not to scale/)).toBeTruthy()
+  })
+
+  it('calls a stand-in a simplified model (#115)', () => {
+    const psyche = fixtureTrack('voyager1', '-255', 'Psyche', { group: 'mission' })
+    render(
+      <Inspector body="naif:-255" simMs={SIM} tracks={[earth, psyche]} onClose={() => undefined} />,
+    )
+    expect(screen.getByText(/^Simplified model/)).toBeTruthy()
+  })
+
   it('shows Horizons as the source, a prediction label, light time and DSN contact', () => {
     render(
       <Inspector

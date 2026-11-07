@@ -15,10 +15,12 @@ import {
   LineDashedMaterial,
   Mesh,
   MeshBasicMaterial,
+  type Object3D,
   PerspectiveCamera,
   PointLight,
   Scene,
   SphereGeometry,
+  Sprite,
   TextureLoader,
   Vector3,
   WebGLRenderer,
@@ -37,6 +39,8 @@ import {
   PLANETS,
 } from '@/lib/orrery'
 import type { BodyName } from '@/lib/orrery/bodies'
+import { threeQuarterView } from '@/lib/orrery/craftModelFit'
+import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
@@ -45,7 +49,8 @@ import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { CraftFilter } from '../craftFilter'
 import { DEFAULT_PRESET } from '../defaultView'
 import { BodySkins } from './bodySkins'
-import { CRAFT_MIN_PX, CraftLayer, craftRadius } from './craftLayer'
+import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
+import { CraftModelLayer } from './craftModelLayer'
 import { type FocusPreset, FOV, frameView } from './framing'
 import { MoonLayer } from './moonLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
@@ -196,6 +201,19 @@ export class OrreryRenderer {
   private readonly craft = new CraftLayer((pos) => this.toScene(pos))
   /** Major moons and Earth's Moon (#107), around their planets as drawn. */
   private readonly moons = new MoonLayer()
+  /**
+   * The focused craft as a 3D model (#115). GLTFLoader is its own chunk, fetched with the
+   * first model; the models need no decoder (scripts/craft-models.mjs).
+   */
+  private readonly models = new CraftModelLayer(
+    (url) =>
+      import('three/examples/jsm/loaders/GLTFLoader.js')
+        .then(({ GLTFLoader }) => new GLTFLoader().loadAsync(url))
+        .then((gltf) => gltf.scene),
+    () => {
+      this.markDirty()
+    },
+  )
   /** Faint dashed ring where Voyager 1 crossed the heliopause (#93), approximate. */
   private readonly heliopause = new Line(
     new BufferGeometry(),
@@ -292,6 +310,7 @@ export class OrreryRenderer {
       this.craft.paths,
       this.craft.stalks,
       this.craft.markers,
+      this.models.group,
     )
     this.orbitGroup.add(this.heliopause)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
@@ -359,7 +378,7 @@ export class OrreryRenderer {
   }
 
   private minPx(name: SceneKey): number {
-    if (!isBody(name)) return CRAFT_MIN_PX
+    if (!isBody(name)) return CRAFT_ICON_PX / 2
     if (this.mode === 'proportional') return MIN_PX_PROPORTIONAL
     return this.mode === 'log' ? MIN_PX[name] * 0.6 : MIN_PX[name]
   }
@@ -377,7 +396,7 @@ export class OrreryRenderer {
     }
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
-      c.mesh.scale.setScalar(craftRadius(this.radiusOf(c.key), this.unitsPerPx(depth)))
+      c.mesh.scale.setScalar(craftIconScale(this.unitsPerPx(depth)))
     }
     // Maps once a planet is big enough on screen; the flat dot below that (#105).
     // A body out of view counts as size 0, so its map is not fetched until it is seen.
@@ -392,6 +411,34 @@ export class OrreryRenderer {
     this.canvas.dataset['orrerySkins'] = skinned.join(',')
     this.skins.faceCamera(this.camera.position)
     this.placeMoons()
+    this.placeModel()
+  }
+
+  /** The focused craft's model at its position, its axis along its attitude (#115). */
+  private placeModel(): void {
+    const key = this.models.shownKey()
+    this.craft.setModelKey(key)
+    const model = this.models.shownModel()
+    if (!key || !model) return
+    const at = this.craft.position(key)
+    const facing = this.craftFacing(key)
+    if (!at || !facing) return
+    this.models.place(at, this.unitsPerPx(at.distanceTo(this.camera.position)), facing)
+  }
+
+  /** Scene direction a craft model's axis points along (its attitude), or null. */
+  private craftFacing(key: SceneKey): Vector3 | null {
+    const naif = this.craft.naifIdOf(key)
+    const model = naif ? craftModelFor(naif) : undefined
+    const helio = this.craft.helioOf(key)
+    if (!model || !helio) return null
+    const jd = Number.isNaN(this.lastJd) ? jdFromDate(new Date(this.clock.simTime())) : this.lastJd
+    const earth = this.earthTrack
+      ? earthState(this.earthTrack, jd).position
+      : heliocentric('Earth', jd)
+    const d = attitudeDirection(model.attitude, helio, earth)
+    // Ecliptic (x, y, z) to scene (x, z, -y), as place3d and the linear mode both map.
+    return new Vector3(d.x, d.z, -d.y)
   }
 
   /**
@@ -490,7 +537,7 @@ export class OrreryRenderer {
       mesh.scale.setScalar(this.radiusOf(name))
     }
     this.skins.orient(jd)
-    this.craft.place(jd, this.radiusOf('craft'))
+    this.craft.place(jd)
   }
 
   /** Where a body or craft is drawn now, scene space. */
@@ -631,6 +678,7 @@ export class OrreryRenderer {
     this.preset = preset
     this.presetPristine = true
     this.focusBody = null
+    this.models.show(null, null)
     this.canvas.dataset['orreryFocus'] = preset
     const points =
       preset === 'heliosphere'
@@ -667,6 +715,9 @@ export class OrreryRenderer {
     this.focusBody = name
     this.preset = null
     this.canvas.dataset['orreryFocus'] = name
+    // A focused craft draws as its 3D model (#115); anything else drops the model.
+    const craftNaif = isBody(name) ? null : this.craft.naifIdOf(name)
+    this.models.show(craftNaif ? name : null, craftNaif)
     const target = this.bodyPosition(name)
     const r = this.radiusOf(name)
     // A craft is a marker, not a body: stand back far enough that it stays a few px and
@@ -676,6 +727,12 @@ export class OrreryRenderer {
       : CRAFT_FOCUS_DISTANCE[this.mode]
     const dir = this.camera.position.clone().sub(this.controls.target).normalize()
     if (dir.lengthSq() === 0) dir.set(0, 0.5, 1).normalize()
+    // A craft with a model is seen three-quarter on, so its shape reads (#115).
+    const facing = craftNaif ? this.craftFacing(name) : null
+    if (facing) {
+      const v = threeQuarterView(facing)
+      dir.set(v.x, v.y, v.z)
+    }
     this.flyTo(target.clone().add(dir.multiplyScalar(distance)), target, instant)
   }
 
@@ -721,7 +778,7 @@ export class OrreryRenderer {
   }
 
   private projectOne(
-    mesh: Mesh,
+    mesh: Object3D,
   ): Pick<ProjectedBody, 'x' | 'y' | 'visible' | 'behind' | 'radiusPx'> {
     const depth = mesh.position.distanceTo(this.camera.position)
     this.scratch.copy(mesh.position).project(this.camera)
@@ -729,7 +786,9 @@ export class OrreryRenderer {
     const y = ((1 - this.scratch.y) / 2) * this.height
     const behind = this.scratch.z > 1
     const visible = !behind && x >= 0 && x <= this.width && y >= 0 && y <= this.height
-    const radiusPx = depth > 0 ? mesh.scale.x / this.unitsPerPx(depth) : 0
+    // A sphere's scale is its radius; a sprite's is its full width (#115).
+    const radius = mesh instanceof Sprite ? mesh.scale.x / 2 : mesh.scale.x
+    const radiusPx = depth > 0 ? radius / this.unitsPerPx(depth) : 0
     return { x, y, visible, behind, radiusPx }
   }
 
@@ -905,6 +964,8 @@ export class OrreryRenderer {
       .join(',')
     const path = this.craft.trajectoryCounts()
     d['orreryTrajectory'] = path ? `${String(path.past)},${String(path.future)}` : ''
+    // The focused craft's 3D model: loading:, model:, simplified: or failed:<naif> (#115).
+    d['orreryModel'] = this.models.state()
   }
 
   private readonly handleContextLost = (e: Event) => {
@@ -927,6 +988,7 @@ export class OrreryRenderer {
       ;(line.material as LineBasicMaterial).dispose()
     }
     this.craft.dispose()
+    this.models.dispose()
     this.moons.dispose()
     this.sunImage.stop()
     this.skins.dispose()
