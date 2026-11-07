@@ -20,7 +20,7 @@ function formatArrival(iso: string | null): string {
 export function CmePanel() {
   const { data, isLoading, error } = useCme()
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="CME Watch">
         <PanelState kind="loading" />

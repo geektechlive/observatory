@@ -12,7 +12,7 @@ export function SpaceNewsPanel() {
   const { data, isLoading, error } = useSpaceNews()
   const updatedAt = useQueryClient().getQueryState(['space-news'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Mission Intel">
         <PanelState kind="loading" />

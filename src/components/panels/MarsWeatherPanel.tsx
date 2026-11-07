@@ -22,7 +22,7 @@ export function MarsWeatherPanel() {
   const { data, isLoading, error } = useMarsWeather()
   const updatedAt = useQueryClient().getQueryState(['mars-weather'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Mars Weather">
         <PanelState kind="loading" />

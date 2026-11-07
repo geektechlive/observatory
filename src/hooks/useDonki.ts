@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { fetchDonki } from '@/lib/api/donki'
+import { toError } from '@/lib/toError'
 import type { DonkiResponse } from '@/schemas/donki'
 import { useUiStore } from '@/store/ui'
 
@@ -25,6 +26,6 @@ export function useDonki(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

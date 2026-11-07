@@ -22,7 +22,7 @@ export function SwpcAlertsPanel() {
   const { data, isLoading, error } = useSwpcAlerts()
   const updatedAt = useQueryClient().getQueryState(['swpc-alerts'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="SWPC Alerts">
         <PanelState kind="loading" />

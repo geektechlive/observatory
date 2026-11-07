@@ -17,7 +17,7 @@ export function SolarCyclePanel() {
   const { data, isLoading, error } = useSolarCycle()
   const updatedAt = useQueryClient().getQueryState(['solar-cycle'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Solar Cycle 25">
         <PanelState kind="loading" />

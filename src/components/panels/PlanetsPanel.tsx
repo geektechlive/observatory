@@ -30,7 +30,7 @@ export function PlanetsPanel() {
   const { data, isLoading, error } = usePlanets()
   const updatedAt = useQueryClient().getQueryState(['planets'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Planets Tonight">
         <PanelState kind="loading" detail="Plotting ephemerides" />

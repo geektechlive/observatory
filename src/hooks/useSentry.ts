@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { fetchSentry } from '@/lib/api/sentry'
+import { toError } from '@/lib/toError'
 import type { SentryResponse } from '@/schemas/sentry'
 
 export function useSentry(): {
@@ -19,6 +20,6 @@ export function useSentry(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

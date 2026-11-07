@@ -52,7 +52,7 @@ export function SunMoonPanel() {
   const { data, isLoading, error, isFallbackLocation, geoStatus, requestLocation } = useSunMoon()
   const updatedAt = useQueryClient().getQueryState(['sun-moon'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Sun & Moon" breathe>
         <PanelState kind="loading" />

@@ -1,5 +1,6 @@
 import { useSourceQuery } from '@/hooks/useSourceQuery'
 import { fetchNeoEnvelope } from '@/lib/api/neo'
+import { toError } from '@/lib/toError'
 import type { NeoResponse } from '@/schemas/neo'
 
 export function useNeo(): {
@@ -18,6 +19,6 @@ export function useNeo(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

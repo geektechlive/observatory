@@ -36,7 +36,7 @@ export function SolarActivityPanel() {
   const { data, isLoading, error } = useSolarActivity()
   const updatedAt = useQueryClient().getQueryState(['solar-activity'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Solar Activity" breathe>
         <PanelState kind="loading" />

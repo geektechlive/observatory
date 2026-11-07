@@ -31,7 +31,7 @@ export function PeopleInSpacePanel() {
   const { data, isLoading, error } = usePeopleInSpace()
   const updatedAt = useQueryClient().getQueryState(['people-in-space'])?.dataUpdatedAt ?? 0
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Humans in Orbit">
         <PanelState kind="loading" />

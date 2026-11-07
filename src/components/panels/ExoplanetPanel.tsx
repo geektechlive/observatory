@@ -9,7 +9,7 @@ export function ExoplanetPanel() {
   const { data, isLoading, error } = useExoplanets()
   const animated = useCountUp(data?.count ?? 0)
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Exoplanets">
         <PanelState kind="loading" />

@@ -545,7 +545,7 @@ export function WorldMap() {
 
           const clickPopupEl = clickPopupRef.current.getElement()
           const mapWrap = containerRef.current?.parentElement
-          if (clickPopupEl && mapWrap) mapWrap.appendChild(clickPopupEl)
+          if (mapWrap) mapWrap.appendChild(clickPopupEl)
         },
       )
 
@@ -594,7 +594,7 @@ export function WorldMap() {
           // Move popup element to mapWrap so it isn't clipped by the container's overflow:hidden
           const popupEl = popupRef.current.getElement()
           const mapWrap = containerRef.current?.parentElement
-          if (popupEl && mapWrap) mapWrap.appendChild(popupEl)
+          if (mapWrap) mapWrap.appendChild(popupEl)
         },
       )
 

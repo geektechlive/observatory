@@ -13,7 +13,7 @@ Vite 8 + React 19 + TypeScript 7 strict (6 for lint only, #97) · Cloudflare Pag
 - `pnpm dev` — local Vite dev server
 - `pnpm pages:dev` — local dev with Pages Functions (KV, env vars via .dev.vars)
 - `pnpm build` — production build to dist/
-- `pnpm lint` — ESLint + stylelint
+- `pnpm lint` — ESLint + stylelint. ESLint runs with `--max-warnings 0` (#113): a warning fails the gate, because 27 standing warnings once hid new ones
 - `pnpm typecheck` — tsc strict check
 - `pnpm verify` — **the gate before every merge to `main`**: lint, typecheck, unit tests with coverage thresholds, build, e2e, and `pnpm audit --audit-level=high`. There is no CI (#33)
 

@@ -65,7 +65,7 @@ type Payload = {
 function asPayload(result: unknown): Payload {
   // A cacheable payload, not the raw-Response passthrough branch. Checked
   // structurally so the test does not depend on a global Response.
-  expect(typeof (result as Payload)?.body).toBe('string')
+  expect(typeof (result as Payload).body).toBe('string')
   return result as Payload
 }
 

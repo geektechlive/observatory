@@ -9,7 +9,7 @@ import styles from './counter-panel.module.css'
 export function Co2Panel() {
   const { data, isLoading, error } = useCo2()
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Atmospheric CO₂">
         <PanelState kind="loading" />

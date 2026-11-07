@@ -74,7 +74,7 @@ function StationBlock({ station }: { station: DsnStation }) {
 export function DsnPanel() {
   const { data, isLoading, error } = useDsn()
 
-  if (isLoading && !data) {
+  if (isLoading) {
     return (
       <GlassPanel variant="tile" label="Deep Space Network">
         <PanelState kind="loading" detail="Acquiring signal" />

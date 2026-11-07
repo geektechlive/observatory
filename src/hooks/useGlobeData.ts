@@ -53,7 +53,7 @@ export function useGlobeData() {
         const geom = ev.geometry.find(isPointGeometry)
         if (!geom) return []
         const kind = ev.categories[0]?.id ?? 'other'
-        return [{ lat: geom.coordinates[1] ?? 0, lon: geom.coordinates[0] ?? 0, kind }]
+        return [{ lat: geom.coordinates[1], lon: geom.coordinates[0], kind }]
       }),
     [eventsData],
   )

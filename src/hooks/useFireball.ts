@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { fetchFireball } from '@/lib/api/fireball'
+import { toError } from '@/lib/toError'
 import type { FireballResponse } from '@/schemas/fireball'
 
 export function useFireball(enabled = true): {
@@ -20,6 +21,6 @@ export function useFireball(enabled = true): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { fetchApod } from '@/lib/api/apod'
+import { toError } from '@/lib/toError'
 import type { Apod } from '@/schemas/apod'
 
 function msUntilUtcMidnight(): number {
@@ -27,6 +28,6 @@ export function useApod(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

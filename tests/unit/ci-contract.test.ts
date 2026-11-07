@@ -120,6 +120,14 @@ describe('workflow contract', () => {
   })
 })
 
+describe('lint', () => {
+  // 27 warnings sat on main unnoticed, so two new ones in #106 went unseen (#113).
+  // Stylelint already fails on its findings; ESLint must too.
+  it('fails on any ESLint warning', () => {
+    expect(pkg.scripts?.['lint']).toMatch(/eslint \. --max-warnings 0/)
+  })
+})
+
 describe('Vite configs', () => {
   // Vite's future native config loader has no CommonJS globals; it warned on every
   // build and test run until #95.

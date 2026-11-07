@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { fetchEpic } from '@/lib/api/epic'
+import { toError } from '@/lib/toError'
 import type { EpicResponse } from '@/schemas/epic'
 import { useUiStore } from '@/store/ui'
 
@@ -25,6 +26,6 @@ export function useEpic(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

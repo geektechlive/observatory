@@ -1,5 +1,6 @@
 import { useSourceQuery } from '@/hooks/useSourceQuery'
 import { fetchSolarWindEnvelope } from '@/lib/api/solarWind'
+import { toError } from '@/lib/toError'
 import type { SolarWind } from '@/schemas/solarWind'
 
 export function useSolarWind(): {
@@ -18,6 +19,6 @@ export function useSolarWind(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

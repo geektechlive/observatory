@@ -1,5 +1,6 @@
 import { useSourceQuery } from '@/hooks/useSourceQuery'
 import { fetchLaunchesEnvelope } from '@/lib/api/launches'
+import { toError } from '@/lib/toError'
 import type { LaunchesResponse } from '@/schemas/launches'
 
 export function useLaunches(): {
@@ -18,6 +19,6 @@ export function useLaunches(): {
   return {
     data,
     isLoading,
-    error: error instanceof Error ? error : error != null ? new Error(String(error)) : null,
+    error: error == null ? null : toError(error),
   }
 }

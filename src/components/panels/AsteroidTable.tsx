@@ -48,14 +48,18 @@ function flattenNeos(record: Record<string, NeoObject[]>): FlatNeo[] {
   return all
 }
 
+/** Ascending sort value per column; hazardous objects sort first. */
+const SORT_VALUE: Record<SortKey, (n: FlatNeo) => number> = {
+  missKm: (n) => n.missKm,
+  velocity: (n) => n.velocityKps,
+  diameter: (n) => (n.diameterMin + n.diameterMax) / 2,
+  hazardous: (n) => (n.isHazardous ? 0 : 1),
+}
+
 function sortNeos(neos: FlatNeo[], key: SortKey, dir: SortDir): FlatNeo[] {
+  const value = SORT_VALUE[key]
   return [...neos].sort((a, b) => {
-    let diff = 0
-    if (key === 'missKm') diff = a.missKm - b.missKm
-    else if (key === 'velocity') diff = a.velocityKps - b.velocityKps
-    else if (key === 'diameter')
-      diff = (a.diameterMin + a.diameterMax) / 2 - (b.diameterMin + b.diameterMax) / 2
-    else if (key === 'hazardous') diff = (b.isHazardous ? 1 : 0) - (a.isHazardous ? 1 : 0)
+    const diff = value(a) - value(b)
     return dir === 'asc' ? diff : -diff
   })
 }
