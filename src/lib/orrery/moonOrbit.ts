@@ -39,8 +39,17 @@ const len = (a: Vec3) => Math.hypot(a.x, a.y, a.z)
 const scale = (a: Vec3, k: number): Vec3 => ({ x: a.x * k, y: a.y * k, z: a.z * k })
 const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
 
-/** The osculating ellipse through r with velocity v (au, au/day) about μ (au³/day²). */
-function osculating(r: Vec3, v: Vec3, mu: number): Vec3[] | null {
+/**
+ * The osculating ellipse through r with velocity v (au, au/day) about μ (au³/day²),
+ * starting at r. Null for an unbound (parabolic or hyperbolic) state. Also used for an
+ * object looked up at JPL (#145), about the Sun.
+ */
+export function osculatingLoop(
+  r: Vec3,
+  v: Vec3,
+  mu: number,
+  count = MOON_ORBIT_POINTS,
+): Vec3[] | null {
   const h = cross(r, v)
   const hLen = len(h)
   const rLen = len(r)
@@ -55,8 +64,8 @@ function osculating(r: Vec3, v: Vec3, mu: number): Vec3[] | null {
   // Start at the moon's own true anomaly, so its position is the loop's first vertex.
   const nuNow = Math.atan2(dot(r, Q), dot(r, P))
   const points: Vec3[] = []
-  for (let i = 0; i < MOON_ORBIT_POINTS; i += 1) {
-    const nu = nuNow + (i / MOON_ORBIT_POINTS) * 2 * Math.PI
+  for (let i = 0; i < count; i += 1) {
+    const nu = nuNow + (i / count) * 2 * Math.PI
     const rad = p / (1 + e * Math.cos(nu))
     const c = Math.cos(nu) * rad
     const s = Math.sin(nu) * rad
@@ -88,6 +97,6 @@ export function moonOrbit(body: MoonBody, jd: number): MoonOrbit | null {
   }
   const aAu = body.semiMajorAxisKm / AU_KM
   const mu = (4 * Math.PI * Math.PI * aAu ** 3) / (period * period)
-  const points = osculating(now.position, now.velocity, mu)
+  const points = osculatingLoop(now.position, now.velocity, mu)
   return points ? { kind: 'osculating', points } : null
 }
