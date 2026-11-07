@@ -1,13 +1,20 @@
+/* Bottom-left, stacked above MapLibre's credits line (10px margin + 24px control +
+   a gap). The top-left corner belongs to the Layers button and its list (#106). */
 .legend {
+  --credits-clearance: 44px;
+
   position: absolute;
-  top: 12px;
-  left: 12px;
+  bottom: var(--credits-clearance);
+  left: 10px;
   background: var(--scrim);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius-panel);
   padding: 10px 12px;
   min-width: 150px;
-  z-index: 10;
+
+  /* Under the Layers control (App.module.css .layers, 3), so its open list draws over
+     the legend rather than the other way round (#106). */
+  z-index: 2;
 }
 
 /* Copper top accent stripe */

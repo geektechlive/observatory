@@ -34,7 +34,7 @@ export function MapLegend({ events, issVisible }: MapLegendProps) {
   if (activeCategories.length === 0 && !issVisible) return null
 
   return (
-    <div className={styles.legend ?? ''}>
+    <div className={styles.legend ?? ''} data-map-legend="">
       <div className={styles.heading ?? ''}>EONET · LIVE</div>
       {activeCategories.map((cat) => (
         <div key={cat.id} className={styles.row ?? ''}>

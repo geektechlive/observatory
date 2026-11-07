@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
+import { e2ePort } from './tests/e2ePort'
+
+// One preview server per checkout, so parallel worktrees never test each other's
+// build (#111).
+const PORT = e2ePort(import.meta.dirname, process.env)
+const BASE_URL = `http://localhost:${PORT}`
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -8,7 +15,7 @@ export default defineConfig({
   workers: process.env['CI'] ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -28,8 +35,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm build && pnpm preview',
-    url: 'http://localhost:4173',
+    command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
+    url: BASE_URL,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
   },

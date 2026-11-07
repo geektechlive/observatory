@@ -78,8 +78,13 @@ test.describe('Map health', () => {
 
     expect(mapErrors, 'MapLibre reported errors while loading the style').toEqual([])
 
-    const mapWorkers = workerUrls.filter((u) => /maplibre/.test(u))
-    expect(mapWorkers, 'MapLibre never started its worker').not.toEqual([])
+    // MapLibre starts its worker when the first source is added after style load,
+    // which can land just after the credits attach; wait for it (#112).
+    const mapWorkerUrls = () => workerUrls.filter((u) => /maplibre/.test(u))
+    await expect
+      .poll(mapWorkerUrls, { message: 'MapLibre never started its worker', timeout: 15_000 })
+      .not.toEqual([])
+    const mapWorkers = mapWorkerUrls()
 
     // A worker served as index.html still returns 200, so the status alone
     // proves nothing — the content type is what distinguishes a real module
