@@ -35,6 +35,13 @@ describe('SOURCES', () => {
     expect(SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }] })).toBe(true)
   })
 
+  it('grades orrery close approaches by a non-empty approach list, 36 h before degraded (#92)', () => {
+    expect(SOURCES['orrery-neo'].headline).toBe(false)
+    expect(SOURCES['orrery-neo'].maxAgeMs).toBe(36 * 3_600_000)
+    expect(SOURCES['orrery-neo'].required({ approaches: [] })).toBe(false)
+    expect(SOURCES['orrery-neo'].required({ approaches: [{ id: 'sb:524522' }] })).toBe(true)
+  })
+
   it('gives every source a label and a positive max age', () => {
     for (const name of SOURCE_NAMES) {
       const contract = SOURCES[name]

@@ -6,9 +6,11 @@ import {
   fetchWithRetry,
   isValidLaunchesPayload,
   KEY_ORRERY_BODIES,
+  KEY_ORRERY_NEO,
   kvPutInit,
   parseTle,
   refreshOrreryBodies,
+  refreshOrreryNeo,
   tleChecksumOk,
   // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/refresh-data.mjs'
@@ -281,5 +283,101 @@ describe('refreshOrreryBodies (#93)', () => {
       pauseMs: 0,
     })
     expect(b.entry.ok).toBe(false)
+  })
+})
+
+describe('refreshOrreryNeo (#92)', () => {
+  const NOW = Date.UTC(2026, 10, 7, 4)
+  // Two approaches: one numbered, one provisional; Scout and NEOCC tables minimal.
+  const CAD = {
+    signature: { version: '1.5' },
+    count: 2,
+    fields: ['des', 'orbit_id', 'jd', 'cd', 'dist', 'dist_min', 'dist_max', 'v_rel', 'fullname'],
+    data: [
+      [
+        '524522',
+        '99',
+        '2461347.3',
+        '2026-Nov-02 19:10',
+        '0.04',
+        '0.039',
+        '0.041',
+        '8.7',
+        '524522 Zoozve',
+      ],
+      [
+        '2026 UE2',
+        '4',
+        '2461342.5',
+        '2026-Oct-29 01:26',
+        '0.0008',
+        '0.0007',
+        '0.0009',
+        '7.6',
+        '(2026 UE2)',
+      ],
+    ],
+  }
+  const NEOCC_HEADER =
+    'Last Update: 2026-11-07 04:20 UTC\n t\n c\nAAAAAAAAAAAA AAAAAAAAAAAAAAAA | x |\n'
+  const deps = (overrides: Record<string, unknown> = {}) => ({
+    now: NOW,
+    previousText: null,
+    pauseMs: 0,
+    fetchJplJson: (url: string) =>
+      Promise.resolve(url.includes('scout') ? { data: [{ objectName: 'A1' }] } : CAD),
+    fetchHorizonsText: (url: string) => {
+      const p = new URL(url).searchParams
+      const command = (p.get('COMMAND') ?? '').replace(/'|DES=|;/g, '')
+      const start = Number((p.get('START_TIME') ?? '').replace(/'|JD/g, ''))
+      const rows = Array.from(
+        { length: 161 },
+        (_, i) => `${String(start + i * 0.125)}, A.D. x, 1, 0.5, 0, 0, 0.017, 0,`,
+      )
+      const target = /^\d+$/.test(command) ? `${command} Zoozve` : `(${command})`
+      return Promise.resolve(`Target body name: ${target}\n$$SOE\n${rows.join('\n')}\n$$EOE\n`)
+    },
+    fetchNeoccText: () => Promise.resolve(NEOCC_HEADER),
+    ...overrides,
+  })
+
+  it('writes the finished body with its age and counts as KV metadata', async () => {
+    const { entry, write } = await refreshOrreryNeo(null, deps())
+    expect(entry.ok).toBe(true)
+    expect(entry.detail).toMatch(/2 approaches/)
+    expect(write.key).toBe(KEY_ORRERY_NEO)
+    expect(write.metadata).toEqual({
+      fetchedAt: new Date(NOW).toISOString(),
+      approaches: 2,
+      placed: 2,
+      scout: 1,
+      missing: 0,
+    })
+  })
+
+  it('ships without Scout, as a warning naming it', async () => {
+    const { entry, write } = await refreshOrreryNeo(
+      null,
+      deps({
+        fetchJplJson: (url: string) =>
+          url.includes('scout') ? Promise.reject(new Error('HTTP 503')) : Promise.resolve(CAD),
+      }),
+    )
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(true)
+    expect(entry.detail).toMatch(/missing jpl-scout/)
+    expect(JSON.parse(write.value).scout).toBeNull()
+  })
+
+  it('judges a CAD failure by the age of the copy it would replace (36 h)', async () => {
+    const failing = deps({ fetchJplJson: () => Promise.reject(new Error('HTTP 503')) })
+    const young = JSON.stringify({ generatedAt: new Date(NOW - 10 * HOUR).toISOString() })
+    const old = JSON.stringify({ generatedAt: new Date(NOW - 40 * HOUR).toISOString() })
+    const a = await refreshOrreryNeo(null, { ...failing, previousText: young })
+    expect(a.entry.ok).toBe(true)
+    expect(a.write).toBeUndefined()
+    const b = await refreshOrreryNeo(null, { ...failing, previousText: old })
+    expect(b.entry.ok).toBe(false)
+    expect(b.entry.detail).toMatch(/refresh:orrery-neo/)
   })
 })

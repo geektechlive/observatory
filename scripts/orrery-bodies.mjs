@@ -40,7 +40,7 @@ const jdFromMs = (ms) => ms / DAY_MS + JD_UNIX_EPOCH
 const msFromJd = (jd) => (jd - JD_UNIX_EPOCH) * DAY_MS
 const round = (value, decimals) => Number(value.toFixed(decimals))
 
-class BudgetExceeded extends Error {}
+export class BudgetExceeded extends Error {}
 
 /** Horizons' STEP_SIZE: "30 m" below an hour (Phobos, #107), "12 h" below a day, else days. */
 export function stepSize(days) {
@@ -73,19 +73,23 @@ export function horizonsUrl(command, startJd, stopJd, stepDays, center = '10') {
 /**
  * Ask for one span, clamping to the ephemeris limits Horizons reports. Returns the
  * samples (or null if the clamped span is empty) plus what was learnt about the span.
+ * `spec.command` and `spec.targetOk` default to the NAIF id; small bodies (#92) pass
+ * their own, since "433;" names Eros and its answer reads "433 Eros (A898 PA)".
  */
-async function fetchSpan(spec, startJd, stopJd, step, ask, now) {
+export async function fetchSpan(spec, startJd, stopJd, step, ask, now) {
+  const command = spec.command ?? spec.naifId
+  const targetOk = spec.targetOk ?? ((target) => target.includes(`(${spec.naifId})`))
   let start = startJd
   let stop = stopJd
   const learnt = { availableFrom: null, availableTo: null, observedUntil: null, target: null }
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     if (stop < start) return { samples: null, ...learnt }
-    const text = await ask(horizonsUrl(spec.naifId, start, stop, step, spec.center))
+    const text = await ask(horizonsUrl(command, start, stop, step, spec.center))
     // The tracking note sits in the header of every answer, refusals included.
     learnt.observedUntil ??= parseObservedUntil(text, now)
     const parsed = parseHorizonsVectors(text)
     if (parsed && parsed.samples.length > 0) {
-      if (!parsed.target || !parsed.target.includes(`(${spec.naifId})`)) {
+      if (!parsed.target || !targetOk(parsed.target)) {
         throw new Error(`Horizons answered for target ${JSON.stringify(parsed.target)}`)
       }
       return { samples: parsed.samples, ...learnt, target: parsed.target }
@@ -105,7 +109,7 @@ async function fetchSpan(spec, startJd, stopJd, step, ask, now) {
 }
 
 /** Uniform samples as one flat array; the step comes from the data itself. */
-function toSpan(samples, withVelocity) {
+export function toSpan(samples, withVelocity) {
   const first = samples[0]
   const second = samples[1]
   const step = second ? round(second.jd - first.jd, 9) : 1
@@ -247,4 +251,4 @@ export async function buildOrreryBodies({
   }
 }
 
-export { msFromJd }
+export { jdFromMs, msFromJd }

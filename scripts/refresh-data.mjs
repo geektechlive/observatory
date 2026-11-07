@@ -3,7 +3,9 @@
 // /api/launches and /api/apod (APOD from science.nasa.gov, #72: too big a page to
 // parse inside the Worker's 10 ms CPU budget), and /api/orrery-bodies (#93: craft,
 // Earth and Moon from JPL Horizons, which refuses overlapping requests, so it is asked
-// here one request at a time, never on the request path; see orrery-bodies.mjs).
+// here one request at a time, never on the request path; see orrery-bodies.mjs), and
+// /api/orrery-neo (#92: close approaches placed with Horizons, JPL Scout and ESA NEOCC;
+// see orrery-neo.mjs).
 //
 // Why this exists: CelesTrak returns HTTP 522 to Cloudflare Workers egress (observed
 // from about 2026-09-03), so the Pages Functions cannot fetch TLEs themselves. An
@@ -21,6 +23,8 @@
 //   node scripts/refresh-data.mjs --dry-run  fetch and validate only, no credentials needed
 //   ... --dry-run --only=orrery-bodies --bodies-out=/tmp/bodies.json
 //                                            just the orrery step, payload saved locally
+//   ... --dry-run --only=orrery-neo --neo-out=/tmp/neo.json
+//                                            just the close-approach step (#92)
 //
 // Env (write mode only):
 //   CLOUDFLARE_API_TOKEN   token with "Workers KV Storage: Edit" on the account
@@ -32,6 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 import { buildOrreryBodies } from './orrery-bodies.mjs'
+import { buildOrreryNeo } from './orrery-neo.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(HERE, '..')
@@ -53,6 +58,11 @@ export const KEY_ORRERY_BODIES = 'horizons:bodies:v1'
 const ORRERY_SIGNATURE = 'refresh:orrery-bodies'
 /** /api/orrery-bodies serves a copy up to 72 h old before calling it degraded. */
 const ORRERY_MAX_AGE_MS = 72 * 3_600_000
+/** The orrery's close approaches, Scout and NEOCC (#92): a finished body, with metadata. */
+export const KEY_ORRERY_NEO = 'horizons:neo:v1'
+const NEO_SIGNATURE = 'refresh:orrery-neo'
+/** The approach list changes daily; /api/orrery-neo calls a copy degraded past 36 h. */
+const NEO_MAX_AGE_MS = 36 * 3_600_000
 const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
@@ -558,12 +568,74 @@ export async function refreshOrreryBodies(config, deps = {}) {
   }
 }
 
+/** JPL's SSD APIs (CAD, Scout) answer JSON. */
+function fetchJplJson(url) {
+  return fetchWithRetry(url, { headers: { Accept: 'application/json' } }, { validate: JSON.parse })
+}
+
+/** ESA NEOCC's flat files are plain text. */
+function fetchNeoccText(url) {
+  return fetchWithRetry(url, { headers: { Accept: 'text/plain' } })
+}
+
+/**
+ * The orrery's close approaches (#92): one finished body plus metadata in one KV write,
+ * like the craft. Scout, NEOCC or single asteroids that fail ship as a warning; only a
+ * CAD failure is a failure, judged by the age of the copy it would replace.
+ */
+export async function refreshOrreryNeo(config, deps = {}) {
+  const now = deps.now ?? Date.now()
+  const previousText = deps.previousText ?? (await readKv(KEY_ORRERY_NEO, config))
+  try {
+    const { payload, requests } = await buildOrreryNeo({
+      now,
+      fetchJplJson: deps.fetchJplJson ?? fetchJplJson,
+      fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
+      fetchNeoccText: deps.fetchNeoccText ?? fetchNeoccText,
+      ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+    })
+    const placed = payload.approaches.filter((a) => a.fine !== null).length
+    const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    const detail =
+      `ok ${NEO_SIGNATURE} ${String(payload.approaches.length)} approaches, ` +
+      `${String(placed)} placed, ${String(requests)} JPL requests` +
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+    console.log(detail)
+    return {
+      entry: { signature: NEO_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      write: {
+        key: KEY_ORRERY_NEO,
+        value: JSON.stringify(payload),
+        metadata: {
+          fetchedAt: payload.generatedAt,
+          approaches: payload.approaches.length,
+          placed,
+          scout: payload.scout?.objects.length ?? 0,
+          missing: payload.missing.length,
+        },
+      },
+    }
+  } catch (err) {
+    const previous = parseJsonOrNull(previousText)
+    const verdict = classifyFailure({
+      err,
+      envelopeText: previous ? JSON.stringify({ fetchedAt: previous.generatedAt }) : previousText,
+      maxAgeMs: NEO_MAX_AGE_MS,
+      now,
+    })
+    const detail = `${NEO_SIGNATURE} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    return { entry: { ...verdict, signature: NEO_SIGNATURE, detail } }
+  }
+}
+
 async function main(argv) {
   const dryRun = argv.includes('--dry-run')
   // Local runs: --only=orrery-bodies skips the other sources; --bodies-out=path saves
   // the payload a dry run would have written.
   const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length)
   const bodiesOut = argv.find((a) => a.startsWith('--bodies-out='))?.slice('--bodies-out='.length)
+  const neoOut = argv.find((a) => a.startsWith('--neo-out='))?.slice('--neo-out='.length)
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
@@ -582,6 +654,21 @@ async function main(argv) {
       if (dryRun && bodiesOut) {
         await writeFile(bodiesOut, write.value)
         console.log(`  saved ${KEY_ORRERY_BODIES} to ${bodiesOut} (${String(write.value.length)} bytes)`)
+      }
+    }
+  }
+
+  // After the craft step, never beside it: both ask JPL, one request at a time (#88).
+  if (!only || only === 'orrery-neo') {
+    const began = Date.now()
+    const { entry, write } = await refreshOrreryNeo(config)
+    console.log(`  ${NEO_SIGNATURE} took ${String(Math.round((Date.now() - began) / 1000))} s`)
+    report.push(entry)
+    if (write) {
+      writes.push({ ...write, entry })
+      if (dryRun && neoOut) {
+        await writeFile(neoOut, write.value)
+        console.log(`  saved ${KEY_ORRERY_NEO} to ${neoOut} (${String(write.value.length)} bytes)`)
       }
     }
   }

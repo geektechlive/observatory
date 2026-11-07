@@ -35,6 +35,7 @@ export type SourceName =
   | 'neo'
   | 'nws'
   | 'orrery-bodies'
+  | 'orrery-neo'
   | 'people-in-space'
   | 'planets'
   | 'quakes'
@@ -146,6 +147,14 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: false,
     maxAgeMs: 72 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'bodies'),
+  },
+  'orrery-neo': {
+    // Not headline: only the orrery page asks for it (#92). CAD finds dozens of objects
+    // inside 0.05 au in any 20-day window, so an empty list means a broken refresh.
+    label: 'Orrery Close Approaches',
+    headline: false,
+    maxAgeMs: 36 * HOUR,
+    required: (data) => nonEmptyArrayField(data, 'approaches'),
   },
   'people-in-space': {
     label: 'People In Space',

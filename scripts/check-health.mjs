@@ -100,6 +100,15 @@ export const CHECKS = [
       b.bodies.length > 0 &&
       b.bodies.every((x) => x?.fine !== undefined && x?.coarse !== undefined),
   },
+  // The orrery's close approaches, Scout and NEOCC (#92): KV-only, written by the refresh job.
+  {
+    path: '/api/orrery-neo',
+    requires: 'non-empty approaches array, each with its CAD close approach',
+    check: (b) =>
+      Array.isArray(b?.approaches) &&
+      b.approaches.length > 0 &&
+      b.approaches.every((x) => typeof x?.closeApproach?.distAu === 'number' && x?.fine !== undefined),
+  },
 ]
 
 /**

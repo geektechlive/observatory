@@ -356,6 +356,15 @@ describe('probed endpoints (#42, #61)', () => {
     expect(donki?.check({ flares: [], cmes: [], geomagneticStorms: [], seps: [] })).toBe(true)
     expect(donki?.check({ flares: [] })).toBe(false)
   })
+
+  it('probes orrery close approaches: a non-empty list, each with its CAD row (#92)', () => {
+    const neo = byPath('/api/orrery-neo')
+    expect(neo).toBeDefined()
+    const approach = { closeApproach: { distAu: 0.01 }, fine: null }
+    expect(neo?.check({ approaches: [approach] })).toBe(true)
+    expect(neo?.check({ approaches: [] })).toBe(false)
+    expect(neo?.check({ approaches: [{ fine: null }] })).toBe(false)
+  })
 })
 
 describe('exit code (#120)', () => {
