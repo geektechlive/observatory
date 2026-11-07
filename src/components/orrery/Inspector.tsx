@@ -6,6 +6,7 @@ import type { DsnLink } from '@/lib/dsn'
 import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orrery'
 import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
+import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
@@ -14,6 +15,7 @@ import type { OrreryNeo } from '@/schemas/orreryNeo'
 import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
 import { ImageryFacts } from './ImageryFacts'
+import { LookupFacts } from './LookupFacts'
 import { MoonFacts } from './MoonFacts'
 import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './NearFacts'
 import styles from './orrery.module.css'
@@ -21,6 +23,7 @@ import { SatFacts } from './SatFacts'
 import { formatSimUtc } from './simDate'
 import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
+import type { LookupView } from './useLookupTrack'
 
 interface InspectorProps {
   /** The page measures the drawer to keep the focused body out from under it. */
@@ -44,6 +47,9 @@ interface InspectorProps {
   cme?: L1Cme | null | undefined
   /** The chosen satellite's details (#98), or null while its group loads. */
   satellite?: SatInfo | null | undefined
+  /** An object looked up at JPL and shown (#145), and how to remove it. */
+  lookup?: LookupView | undefined
+  onRemoveLookup?: (() => void) | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -71,8 +77,33 @@ export function Inspector({
   wind,
   cme,
   satellite,
+  lookup,
+  onRemoveLookup,
 }: InspectorProps) {
   const headingId = useId()
+  if (isLookupKey(body)) {
+    return (
+      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+        <div className={styles.inspectorHead ?? ''}>
+          <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
+            {lookup?.object?.name ?? 'Looked up at JPL'}
+          </h2>
+          <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <LookupFacts
+          object={lookup?.object ?? null}
+          trajectory={lookup?.trajectory ?? null}
+          earth={tracks?.find((t) => t.naifId === '399') ?? null}
+          simMs={simMs}
+          problem={lookup?.problem ?? null}
+          loading={lookup?.loading ?? false}
+          onRemove={onRemoveLookup ?? onClose}
+        />
+      </aside>
+    )
+  }
   if (isSatKey(body)) {
     return (
       <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>

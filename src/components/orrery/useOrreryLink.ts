@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { lookupSpkid } from '@/lib/orrery/lookupTrack'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 
 import { DEFAULT_PRESET } from './defaultView'
@@ -17,7 +18,8 @@ const CLOCK_SETTLE_MS = 400
 
 interface LinkOptions {
   renderer: OrreryRenderer | null
-  catalog: readonly { key: string; label: string }[]
+  /** `available`: data covers the date (catalog.ts); a looked-up object waits for it. */
+  catalog: readonly { key: string; label: string; available?: boolean }[]
   /**
    * The bodies have arrived and the close approaches have answered or failed: a focus
    * not in the catalog now is unknown. A failed bodies fetch is not settled, so a shared
@@ -28,6 +30,12 @@ interface LinkOptions {
   preset: FocusPreset | null
   select: (key: SceneKey) => void
   applyPreset: (preset: FocusPreset) => void
+  /**
+   * A link to an object looked up at JPL (`lookup:<SPK-ID>`, #145) asks for it here; its
+   * catalog entry appears once JPL answers. `lookupFailed`: JPL said no for good.
+   */
+  requestLookup: (spkid: string) => void
+  lookupFailed: boolean
 }
 
 const onOrrery = () => /^#\/?orrery(\?|$)/i.test(window.location.hash)
@@ -91,12 +99,20 @@ export function useOrreryLink(o: LinkOptions): void {
     }
   }, [])
 
-  const { renderer, catalog, settled } = o
+  const { renderer, catalog, settled, lookupFailed } = o
   useEffect(() => {
     const want = pending.current
     if (!want || !renderer) return
+    // A looked-up object is fetched for the link (#145), and waits until JPL's samples
+    // cover the link's date, so the camera has somewhere to fly; or until JPL says no.
+    const spkid = want.focus === null ? null : lookupSpkid(want.focus)
+    if (spkid !== null) {
+      latest.current.requestLookup(spkid)
+      const ready = catalog.some((i) => i.key === want.focus && i.available)
+      if (!ready && !lookupFailed) return
+    }
     const key = want.focus === null ? null : resolveFocus(want.focus, catalog)
-    if (want.focus !== null && key === null && !settled) return // its source may still be loading
+    if (spkid === null && want.focus !== null && key === null && !settled) return // still loading
     pending.current = null
     const { select, applyPreset } = latest.current
     // Select first: selecting clears the preset, and a link with both means the camera
@@ -105,7 +121,7 @@ export function useOrreryLink(o: LinkOptions): void {
     if (want.preset !== null) applyPreset(want.preset)
     // An unknown focus, or a preset already showing, changes no state: write now.
     write.current()
-  }, [renderer, catalog, settled, linkSeq])
+  }, [renderer, catalog, settled, lookupFailed, linkSeq])
 
   const { selected, preset } = o
   const shown = useRef({ selected, preset })

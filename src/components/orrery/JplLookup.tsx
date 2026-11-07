@@ -5,6 +5,7 @@ import { trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
 import type { LookupObject } from '@/schemas/jplLookup'
 
 import styles from './jpl-lookup.module.css'
+import { useLookupStore } from './lookupStore'
 import { useSimTime } from './useSimTime'
 
 // The orrery search's answer for a name the orrery doesn't carry (#100): what JPL's
@@ -21,6 +22,39 @@ const UNAVAILABLE: Record<Unavailable, string> = {
   busy: 'JPL is busy right now. Try again in a minute.',
   failed: 'The JPL lookup didn’t work this time.',
   'out-of-range': 'JPL positions are asked for 1900 to 2100 only.',
+  'not-found': 'JPL has no object by that name or number.',
+}
+
+/** "Show in orrery" (#145): hand the object to the orrery, which draws it and flies there. */
+function ShowInOrrery({ object }: { object: LookupObject }) {
+  const shownId = useLookupStore((s) => s.shown?.spkid ?? null)
+  if (shownId === object.spkid) {
+    return (
+      <p className={styles.shown ?? ''}>
+        <span>Shown in the orrery.</span>
+        <button
+          type="button"
+          className={styles.close ?? ''}
+          onClick={() => {
+            useLookupStore.getState().clear()
+          }}
+        >
+          Remove from orrery
+        </button>
+      </p>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className={styles.show ?? ''}
+      onClick={() => {
+        useLookupStore.getState().show(object)
+      }}
+    >
+      Show in orrery
+    </button>
+  )
 }
 
 const fmt = (n: number, digits: number) => n.toFixed(digits)
@@ -62,9 +96,7 @@ function ObjectCard({ object }: { object: LookupObject }) {
         </p>
       )}
       <Position object={object} />
-      <p className={styles.muted ?? ''}>
-        Not drawn in the 3D scene yet: the orrery draws only the objects it loads ahead.
-      </p>
+      <ShowInOrrery object={object} />
     </>
   )
 }

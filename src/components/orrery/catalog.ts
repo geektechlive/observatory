@@ -11,8 +11,9 @@ import type { MoonBody } from '@/lib/orrery/moonState'
 import { ISS_NORAD_ID, satKey } from '@/lib/orrery/satView'
 import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
+/** 'lookup': an object looked up at JPL and shown (#145). */
 export type CatalogKind =
-  'star' | 'planet' | 'moon' | 'craft' | 'asteroid' | 'scout' | 'marker' | 'satellite'
+  'star' | 'planet' | 'moon' | 'craft' | 'asteroid' | 'scout' | 'marker' | 'satellite' | 'lookup'
 
 export interface CatalogItem {
   /** A planet's name, or a namespaced id for the Moon and craft (`naif:-31`). */

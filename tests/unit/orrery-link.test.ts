@@ -87,6 +87,13 @@ describe('serialiseOrreryLink (#108)', () => {
     for (const c of cases) expect(parseOrreryLink(serialiseOrreryLink(c))).toEqual(c)
   })
 
+  it('round-trips a looked-up object’s key (#145)', () => {
+    const link = { t: null, focus: 'lookup:20099942', preset: null }
+    const hash = serialiseOrreryLink(link)
+    expect(hash).toBe('#orrery?focus=lookup:20099942')
+    expect(parseOrreryLink(hash)).toEqual(link)
+  })
+
   it('writes whole seconds', () => {
     expect(serialiseOrreryLink({ t: V1_HELIOPAUSE + 999, focus: null, preset: null })).toBe(
       '#orrery?t=2012-08-25T00:00:00Z',
