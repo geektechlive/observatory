@@ -52,6 +52,18 @@
   text-transform: uppercase;
 }
 
+.switchField {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* What a switch covers (#122): visible, since phones have no hover. */
+.switchHint {
+  margin: 0;
+  color: var(--bone-faint);
+  font: 400 var(--text-xs) / 1.4 var(--font-body);
+}
+
 .switchRow {
   display: flex;
   align-items: center;

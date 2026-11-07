@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 import { SOURCES } from '@/lib/orrery/sources'
 
 import type { CatalogItem } from './catalog'
@@ -39,26 +41,38 @@ interface ControlRailProps {
 
 function Switch({
   label,
+  hint,
   on,
   onChange,
 }: {
   label: string
+  /** A visible one-line explanation; phones have no hover, so no tooltip (#122). */
+  hint?: string
   on: boolean
   onChange: (on: boolean) => void
 }) {
+  const hintId = useId()
   return (
-    <div className={styles.switchRow ?? ''}>
-      <span>{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        className={styles.switch ?? ''}
-        onClick={() => {
-          onChange(!on)
-        }}
-      />
+    <div className={styles.switchField ?? ''}>
+      <div className={styles.switchRow ?? ''}>
+        <span>{label}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label={label}
+          aria-describedby={hint ? hintId : undefined}
+          className={styles.switch ?? ''}
+          onClick={() => {
+            onChange(!on)
+          }}
+        />
+      </div>
+      {hint && (
+        <p id={hintId} className={styles.switchHint ?? ''}>
+          {hint}
+        </p>
+      )}
     </div>
   )
 }
@@ -131,6 +145,7 @@ export function ControlRail({
           </h2>
           <Switch
             label="Deep space"
+            hint="Voyager 1, Voyager 2 and New Horizons, beyond the planets"
             on={craftFilter['deep-space']}
             onChange={(on) => {
               onCraftFilter({ ...craftFilter, 'deep-space': on })
@@ -138,6 +153,7 @@ export function ControlRail({
           />
           <Switch
             label="Missions"
+            hint="Parker, Juno, Europa Clipper, Psyche, Lucy, Solar Orbiter and BepiColombo, on their way or at work"
             on={craftFilter.mission}
             onChange={(mission) => {
               onCraftFilter({ ...craftFilter, mission })
@@ -145,13 +161,15 @@ export function ControlRail({
           />
           <Switch
             label="L1 & L2 observatories"
+            hint="JWST, SOHO, DSCOVR, ACE and Wind, parked about 1.5 million km from Earth"
             on={craftFilter.l1}
             onChange={(l1) => {
               onCraftFilter({ ...craftFilter, l1 })
             }}
           />
           <Switch
-            label={`Only in DSN contact (${String(dsnCount ?? 0)})`}
+            label={`Only those talking to Earth now (${String(dsnCount ?? 0)})`}
+            hint="In radio contact with NASA's Deep Space Network: the big dishes at Goldstone, Madrid and Canberra"
             on={craftFilter.dsnOnly}
             onChange={(dsnOnly) => {
               onCraftFilter({ ...craftFilter, dsnOnly })

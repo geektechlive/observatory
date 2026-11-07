@@ -525,7 +525,7 @@ export class OrreryRenderer {
     this.markDirty()
   }
 
-  /** Craft DSN is talking to now, by NAIF id (the "In DSN contact" filter). */
+  /** Craft DSN is talking to now, by NAIF id (the "Only those talking to Earth now" filter). */
   setDsnIds(ids: ReadonlySet<string>): void {
     this.craft.setDsnIds(ids)
     this.updateBodies(true)

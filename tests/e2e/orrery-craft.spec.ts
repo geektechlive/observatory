@@ -145,7 +145,7 @@ test.describe('Spacecraft in the orrery (#93)', () => {
     await openOrrery(page)
     await page.getByRole('button', { name: 'Heliosphere', exact: true }).click()
     await expect(craftLabel(page, 'Voyager 1')).toHaveAttribute('data-dsn', 'contact')
-    await page.getByRole('switch', { name: /Only in DSN contact \(1\)/ }).click()
+    await page.getByRole('switch', { name: /Only those talking to Earth now \(1\)/ }).click()
     await expect(canvas(page)).toHaveAttribute('data-orrery-craft', '1')
   })
 
