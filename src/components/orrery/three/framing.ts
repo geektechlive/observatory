@@ -268,6 +268,94 @@ export function earthPresetView(
 }
 
 /**
+ * How far from the target the free part of the stage reaches, in NDC (1 = the canvas
+ * edge): the inspector drawer narrows `x`, the time bar or the phone's sheet `down`.
+ */
+export interface FocusRoom {
+  x: number
+  up: number
+  down: number
+}
+
+/** The largest share of the free room any point takes; Infinity behind the camera. */
+function roomExtent(
+  camera: PerspectiveCamera,
+  points: readonly Vector3[],
+  room: FocusRoom,
+): number {
+  let max = 0
+  const p = new Vector3()
+  for (const point of points) {
+    p.copy(point).project(camera)
+    if (p.z > 1) return Infinity
+    max = Math.max(max, Math.abs(p.x) / room.x, p.y >= 0 ? p.y / room.up : -p.y / room.down)
+  }
+  return max
+}
+
+/** A looked-up object's focus view looks from this high over the ecliptic, degrees. */
+export const LOOKUP_FOCUS_ELEVATION_DEG = 25
+
+/**
+ * The focus view for an object looked up at JPL (#145): aimed at the object, holding the
+ * Sun (and Earth, when the caller passes it) in the free part of the stage, from the
+ * azimuth (of 24) that sets them farthest apart on screen. A far visitor like 3I/ATLAS
+ * at 13 au otherwise filled the view alone, with nothing to say where it is.
+ */
+export function lookupFocusView(
+  target: Vector3,
+  others: readonly Vector3[],
+  aspect: number,
+  room: FocusRoom,
+): FrameView {
+  const points = [target, ...others]
+  const camera = new PerspectiveCamera(FOV, Math.max(0.1, aspect), 0.0001, 1e7)
+  camera.updateProjectionMatrix()
+  const size = Math.max(1e-6, ...others.map((o) => o.distanceTo(target)))
+  const el = (LOOKUP_FOCUS_ELEVATION_DEG * Math.PI) / 180
+  const v = new Vector3()
+  let best: FrameView | null = null
+  let bestGap = -Infinity
+  for (let k = 0; k < AZIMUTH_STEPS; k += 1) {
+    const az = (k / AZIMUTH_STEPS) * Math.PI * 2
+    const dir = new Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az))
+    // Bisect for the distance where the points fill FILL of the free room.
+    let near = size * 0.02
+    let far = size * 200
+    for (let i = 0; i < 50; i += 1) {
+      const mid = Math.sqrt(near * far)
+      camera.position.copy(target).addScaledVector(dir, mid)
+      camera.lookAt(target)
+      camera.updateMatrixWorld()
+      if (roomExtent(camera, points, room) > FILL) near = mid
+      else far = mid
+    }
+    camera.position.copy(target).addScaledVector(dir, far)
+    camera.lookAt(target)
+    camera.updateMatrixWorld()
+    const ndc = points.map((p) => {
+      v.copy(p).project(camera)
+      return { x: v.x * aspect, y: v.y }
+    })
+    let gap = Infinity
+    for (let i = 0; i < ndc.length; i += 1) {
+      for (let j = i + 1; j < ndc.length; j += 1) {
+        const a = ndc[i]
+        const b = ndc[j]
+        if (a && b) gap = Math.min(gap, Math.hypot(a.x - b.x, a.y - b.y))
+      }
+    }
+    if (gap > bestGap) {
+      bestGap = gap
+      best = { position: camera.position.clone(), target: target.clone() }
+    }
+  }
+  return (
+    best ?? { position: target.clone().add(new Vector3(0, size, size)), target: target.clone() }
+  )
+}
+
+/**
  * A focused planet is seen at no more than this phase angle (Sun-planet-camera), so it
  * shows its lit face. Jupiter from Earth never passes about 12°; 35° leaves the
  * terminator in view for shape (#116).

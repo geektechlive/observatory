@@ -75,6 +75,11 @@ export class LookupLayer {
     return this.data?.key === key
   }
 
+  /** Its heliocentric position now, au, or null where no sample covers the date. */
+  helioNow(): Vec3 | null {
+    return this.helio
+  }
+
   /** Place the marker for a date and (re)build the line if the object or mode changed. */
   place(jd: number, toScene: (p: Vec3) => Vector3, mode: string): void {
     const s = this.data ? stateAt({ fine: this.data.fine, coarse: null }, jd) : null

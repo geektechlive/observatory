@@ -66,7 +66,15 @@ import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
 import { EarthNeighbourhood } from './earthNeighbourhood'
-import { earthPresetView, type FocusPreset, FOV, frameView, sunlitFocusDirection } from './framing'
+import {
+  earthPresetView,
+  type FocusPreset,
+  type FocusRoom,
+  FOV,
+  frameView,
+  lookupFocusView,
+  sunlitFocusDirection,
+} from './framing'
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
@@ -133,6 +141,8 @@ const L1_MIN_PX = 3.5
 const SAT_MARKER_MIN_PX = 4
 /** A looked-up object's marker never draws smaller than this, px (#145). */
 const LOOKUP_MIN_PX = 3.5
+/** A looked-up object this close to Earth, au, is framed with Earth as well as the Sun (#145). */
+const LOOKUP_WITH_EARTH_AU = 3
 /** Asteroid and L1 labels show once the Earth frame is this open (or the object is chosen). */
 const NEAR_LABEL_OPEN = 0.5
 /** The Earth–Moon/L1 preset holds this many Earth radii (as drawn) around Earth: L2 at 12.8. */
@@ -856,8 +866,15 @@ export class OrreryRenderer {
    * shifting the projection window rather than the camera (#91).
    */
   setViewInset(right: number, bottom: number): void {
-    this.inset = { right: Math.max(0, right), bottom: Math.max(0, bottom) }
+    const next = { right: Math.max(0, right), bottom: Math.max(0, bottom) }
+    const changed = next.right !== this.inset.right || next.bottom !== this.inset.bottom
+    this.inset = next
     this.applyInset()
+    // The inspector opens after a looked-up object is focused: refit it to the room left.
+    const focus = this.focusBody
+    if (changed && this.lookupFramed && focus && this.lookup.has(focus)) {
+      this.focusLookup(focus, this.reducedMotion)
+    }
     this.markDirty()
   }
 
@@ -1007,6 +1024,10 @@ export class OrreryRenderer {
     // A focused craft draws as its 3D model (#115); anything else drops the model.
     const craftNaif = isBody(name) ? null : this.craft.naifIdOf(name)
     this.models.show(craftNaif ? name : null, craftNaif)
+    if (this.lookup.has(name)) {
+      this.focusLookup(name, instant)
+      return
+    }
     const target = this.bodyPosition(name)
     const r = this.radiusOf(name)
     // A craft is a marker, not a body: stand back far enough that it stays a few px and
@@ -1043,6 +1064,44 @@ export class OrreryRenderer {
     this.flyTo(target.clone().add(dir.multiplyScalar(distance)), target, instant)
   }
 
+  /**
+   * A looked-up object (#145) is seen with the Sun, and Earth when within a few au, apart
+   * on screen in the part of the stage the inspector and time bar leave free: alone, a far
+   * visitor like 3I/ATLAS at 13 au read as nowhere.
+   */
+  private focusLookup(name: SceneKey, instant: boolean): void {
+    const others = [this.bodyPosition('Sun')]
+    const helio = this.lookup.helioNow()
+    if (helio) {
+      const e = earthState(this.earthTrack, this.lastJd).position
+      if (Math.hypot(helio.x - e.x, helio.y - e.y, helio.z - e.z) <= LOOKUP_WITH_EARTH_AU) {
+        others.push(this.bodyPosition('Earth'))
+      }
+    }
+    const aspect = this.width / Math.max(1, this.height)
+    const view = lookupFocusView(this.bodyPosition(name), others, aspect, this.focusRoom())
+    this.flyTo(view.position, view.target, instant)
+    this.lookupFramed = true
+  }
+
+  /** The focus view was fitted for the inspector as it was: refit when it changes. */
+  private lookupFramed = false
+
+  /** How far the free part of the stage reaches from a focus centred in it, NDC (#145). */
+  private focusRoom(): FocusRoom {
+    const w = Math.max(1, this.width)
+    const h = Math.max(1, this.height)
+    const { right, bottom } = this.inset
+    // The time bar, or the phone's sheet over it, whichever reaches higher.
+    const blocked = Math.max(bottom, this.reserveBottomPx)
+    const floor = 0.2
+    return {
+      x: Math.max(floor, (w - right) / w),
+      up: Math.max(floor, (h - bottom) / h),
+      down: Math.max(floor, ((h - bottom) / 2 - (blocked - bottom)) / (h / 2)),
+    }
+  }
+
   private flyTo(toPos: Vector3, toTarget: Vector3, instant: boolean): void {
     if (instant) {
       this.flight = null
@@ -1076,6 +1135,7 @@ export class OrreryRenderer {
   private readonly onUserCamera = () => {
     this.flight = null
     this.presetPristine = false
+    this.lookupFramed = false
   }
 
   /** Nearest body or craft to a canvas point within `radius` px, or null. */

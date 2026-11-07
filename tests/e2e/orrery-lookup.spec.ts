@@ -175,6 +175,11 @@ test.describe('JPL lookup from the orrery search (#100)', () => {
     await expect(canvas).toHaveAttribute('data-orrery-focus', 'lookup:20099942')
     // The whole osculating ellipse: 256 points, closed.
     await expect(canvas).toHaveAttribute('data-orrery-lookup-path', '257')
+    // Framed in context: the Sun, and Earth for an object within a few au of it.
+    await expect(canvas).toHaveAttribute('data-orrery-animating', 'false')
+    await expect
+      .poll(async () => ((await canvas.getAttribute('data-orrery-onscreen')) ?? '').split(','))
+      .toEqual(expect.arrayContaining(['lookup:20099942', 'Sun', 'Earth']))
     const inspector = page.getByRole('complementary', { name: apophis.name })
     await expect(inspector).toContainText('From the Sun')
     await expect(inspector).toContainText(/asked on demand from JPL Horizons/i)
