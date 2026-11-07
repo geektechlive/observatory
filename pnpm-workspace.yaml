@@ -1,7 +1,15 @@
 # Not a workspace definition: pnpm settings for this repo. Since pnpm 11 this is
 # the only place pnpm reads settings from (it ignores package.json's `pnpm` field).
-# Forced versions (`overrides:`) go here too, each with why and when it can go;
-# #96 removed the last one once wrangler shipped the fix.
+# Forced versions (`overrides:`) go here too, each with why and when it can go.
+
+# minimatch ReDoS GHSA-g3hv-75wg-m249 (#102): vulnerable >=7.0.0 <11.0.1, fixed in
+# 11.0.1. eslint 10.14 and @eslint/config-array 0.23.5 still ask for ^10.2.4. Both
+# call only `new Minimatch()`, `.match(path, partial)` and `.pattern`, which 11
+# keeps (11 removed makeRe, regexp, AST, debug and matchOne). jsx-a11y's 3.x is
+# outside the range and untouched. Drop this once eslint ships minimatch 11
+# (eslint#21492, eslint/rewrite#535, both open on 2026-11-07).
+overrides:
+  'minimatch@>=7.0.0 <11.0.1': ^11.0.1
 
 # Packages allowed to run install scripts (pnpm 11 replaced `onlyBuiltDependencies`
 # with this, and fails on an undeclared one). esbuild and workerd fetch their

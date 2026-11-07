@@ -6,10 +6,10 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': resolve(import.meta.dirname, 'src'),
       // satellite.js 7's multi-thread WASM build (top-level await, needs COOP/COEP)
       // is never used; a stub keeps it out of the module graph (#97).
-      '#wasm-multi-thread': resolve(__dirname, 'src/lib/orbit/bulk/noMultiThread.ts'),
+      '#wasm-multi-thread': resolve(import.meta.dirname, 'src/lib/orbit/bulk/noMultiThread.ts'),
     },
   },
   css: {

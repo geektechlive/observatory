@@ -119,3 +119,14 @@ describe('workflow contract', () => {
     ).toEqual([])
   })
 })
+
+describe('Vite configs', () => {
+  // Vite's future native config loader has no CommonJS globals; it warned on every
+  // build and test run until #95.
+  it.each(['vite.config.ts', 'vitest.config.ts'])(
+    '%s uses import.meta.dirname, not __dirname',
+    (file) => {
+      expect(readFileSync(join(ROOT, file), 'utf8')).not.toMatch(/\b__dirname\b/)
+    },
+  )
+})
