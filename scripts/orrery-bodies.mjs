@@ -28,7 +28,7 @@ const JD_UNIX_EPOCH = 2440587.5
 /** Pause between Horizons requests. */
 const DEFAULT_PAUSE_MS = 1000
 /** The whole step stays well inside the workflow's 10-minute limit. */
-const DEFAULT_BUDGET_MS = 4 * 60_000
+export const DEFAULT_BUDGET_MS = 4 * 60_000
 /** Reuse the whole-mission spans while they are younger than this. */
 const COARSE_MAX_AGE_MS = DAY_MS
 /** A span that hits an ephemeris limit is clamped and asked again, at most this often. */

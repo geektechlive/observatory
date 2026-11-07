@@ -40,9 +40,12 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 import { celestrakFetchText, refreshSatGroups } from './celestrak-groups.mjs'
-import { buildOrreryBodies } from './orrery-bodies.mjs'
-import { buildOrreryNeo } from './orrery-neo.mjs'
-import { buildOrrerySmallBodies } from './orrery-smallbodies.mjs'
+import { buildOrreryBodies, DEFAULT_BUDGET_MS as BODIES_BUDGET_MS } from './orrery-bodies.mjs'
+import { buildOrreryNeo, DEFAULT_BUDGET_MS as NEO_BUDGET_MS } from './orrery-neo.mjs'
+import {
+  buildOrrerySmallBodies,
+  DEFAULT_BUDGET_MS as SMALLBODIES_BUDGET_MS,
+} from './orrery-smallbodies.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(HERE, '..')
@@ -78,6 +81,28 @@ const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
 const FETCH_RETRIES = 3
+
+/**
+ * The whole job's time (#128). data-refresh.yml kills the job at timeout-minutes, and
+ * a killed job writes no incident report, so its failures would go unreported. Every
+ * step draws from this one deadline: the JPL steps' own budgets (4, 2 and 1.5 min)
+ * are capped by what is left of it, and nothing starts a new fetch once it has passed.
+ * A source cut short ships what it has or is judged by its KV copy's age, as on any
+ * other failure. The step took 2 min 13 s on 2026-11-07 (run 42385111275).
+ */
+export const JOB_DEADLINE_MS = 6 * 60_000
+/**
+ * The longest one fetch can still run once the deadline passes: CelesTrak's first try,
+ * then fetchWithRetry's three attempts and its 5 s and 15 s waits (100 s). A Horizons
+ * fetch is one fetchWithRetry (80 s).
+ */
+export const WORST_FETCH_MS = FETCH_TIMEOUT_MS + FETCH_RETRIES * FETCH_TIMEOUT_MS + 5_000 + 15_000
+/**
+ * Checkout, setup-node, the KV writes and the reporter. On 2026-11-07 they took
+ * 5 s, about 1 s and 1 s; the KV calls have no deadline of their own beyond their
+ * 20 s timeouts, so this is margin for normal runs, not a bound on a broken KV API.
+ */
+export const RUN_MARGIN_MS = 60_000
 const TLE_LINE_LENGTH = 69
 const HOUR_MS = 3_600_000
 const PAYLOAD_EXCERPT_CHARS = 300
@@ -150,10 +175,21 @@ export function isValidLaunchesPayload(value) {
 // still scrapes the old page (2026-10-25: title "NASA Science", the NASA logo as url).
 // Each day is an article at /image-article/apod-<year>-<month>-<day>-<slug>/.
 const MONTHS = [
-  'january', 'february', 'march', 'april', 'may', 'june',
-  'july', 'august', 'september', 'october', 'november', 'december',
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
 ]
-const APOD_ARTICLE = /https:\/\/science\.nasa\.gov\/image-article\/apod-(\d{4})-([a-z]+)-(\d{1,2})-[a-z0-9-]+\//g
+const APOD_ARTICLE =
+  /https:\/\/science\.nasa\.gov\/image-article\/apod-(\d{4})-([a-z]+)-(\d{1,2})-[a-z0-9-]+\//g
 const APOD_IMAGE_HOST = 'https://assets.science.nasa.gov/'
 const MIN_EXPLANATION_CHARS = 50
 
@@ -181,7 +217,8 @@ const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp:
 function decodeEntities(text) {
   return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code) => {
     if (code[0] !== '#') return NAMED_ENTITIES[code.toLowerCase()] ?? whole
-    const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : Number(code.slice(1))
+    const n =
+      code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : Number(code.slice(1))
     return Number.isFinite(n) ? String.fromCodePoint(n) : whole
   })
 }
@@ -205,13 +242,22 @@ export function parseApodArticle(html, articleUrl) {
 
   const image = /<meta property="og:image" content="([^"]+)"/.exec(html)?.[1]
   const url = image ? decodeEntities(image) : ''
-  if (!url.startsWith(APOD_IMAGE_HOST)) throw new Error(`APOD article has no image on ${APOD_IMAGE_HOST}`)
+  if (!url.startsWith(APOD_IMAGE_HOST))
+    throw new Error(`APOD article has no image on ${APOD_IMAGE_HOST}`)
 
   const descHtml = /<p[^>]*media-detail-hero__description[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1]
   const explanation = descHtml ? plainText(descHtml).replace(/^Explanation:\s*/, '') : ''
   if (explanation.length < MIN_EXPLANATION_CHARS) throw new Error('APOD article has no explanation')
 
-  return { date, title, explanation, url, hdurl: url, media_type: 'image', service_version: 'science.nasa.gov' }
+  return {
+    date,
+    title,
+    explanation,
+    url,
+    hdurl: url,
+    media_type: 'image',
+    service_version: 'science.nasa.gov',
+  }
 }
 
 /**
@@ -367,7 +413,9 @@ async function fetchApod() {
       return url
     },
   })
-  return fetchWithRetry(articleUrl, html, { validate: (text) => parseApodArticle(text, articleUrl) })
+  return fetchWithRetry(articleUrl, html, {
+    validate: (text) => parseApodArticle(text, articleUrl),
+  })
 }
 
 function envelope(source, data) {
@@ -395,7 +443,10 @@ export function kvPutInit(value, metadata, token) {
 }
 
 async function putKv(key, value, config, metadata) {
-  const res = await fetch(kvUrl(key, config), kvPutInit(value, metadata, config.token))
+  const res = await fetch(kvUrl(key, config), {
+    ...kvPutInit(value, metadata, config.token),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  })
   const body = await res.text()
   if (!res.ok) throw new Error(`KV PUT ${key} failed: HTTP ${res.status} ${body.slice(0, 300)}`)
   console.log(`  wrote ${key} (${value.length} bytes)`)
@@ -432,12 +483,53 @@ function readConfig() {
   return { token, accountId, namespaceId }
 }
 
+// ---------------------------------------------------------------- job deadline (#128)
+
+/** The job's deadline, counted from now. */
+export function createDeadline({ budgetMs = JOB_DEADLINE_MS, clock = Date.now } = {}) {
+  const ends = clock() + budgetMs
+  return {
+    remaining: () => ends - clock(),
+    passed: () => clock() >= ends,
+  }
+}
+
+/**
+ * A JPL step's budget: its own, or what is left of the job's if less. Past the
+ * deadline it is negative, because the steps stop when elapsed > budget and elapsed
+ * starts at 0: a budget of 0 would still let one request through.
+ */
+export function stepBudget(ownMs, deadline) {
+  const left = deadline.remaining()
+  return left <= 0 ? -1 : Math.min(ownMs, left)
+}
+
+/** `fetch`, refused once the deadline has passed (the caller then judges by KV age). */
+export function beforeDeadline(fetch, deadline) {
+  return (...args) => {
+    if (deadline.passed()) return Promise.reject(new Error('job deadline reached (#128)'))
+    return fetch(...args)
+  }
+}
+
+/** The optional budget and clock a JPL step was given, for its build function. */
+function budgetDeps(deps) {
+  return {
+    ...(deps.budgetMs === undefined ? {} : { budgetMs: deps.budgetMs }),
+    ...(deps.clock === undefined ? {} : { clock: deps.clock }),
+  }
+}
+
 // ---------------------------------------------------------------- main
 
 /** Fetch every tracked satellite; fails only if none validate. */
-async function fetchSatellites() {
+async function fetchSatellites(deadline) {
   const records = []
   for (const sat of await loadSats()) {
+    if (deadline?.passed()) {
+      console.error(`FAIL sat     stopped at ${sat.label}: job deadline reached (#128)`)
+      break
+    }
     try {
       const tle = await fetchTle(sat.catnr)
       records.push({ label: sat.label, catnr: sat.catnr, ...tle })
@@ -486,9 +578,9 @@ const SOURCES = [
   },
 ]
 
-async function refreshSource(spec, config) {
+async function refreshSource(spec, config, deadline) {
   try {
-    const data = await spec.fetch()
+    const data = await beforeDeadline(spec.fetch, deadline)(deadline)
     const detail = `ok ${spec.signature} ${spec.summary(data)}`
     console.log(detail)
     return {
@@ -544,6 +636,7 @@ export async function refreshOrreryBodies(config, deps = {}) {
       fetchText: deps.fetchText ?? fetchHorizonsText,
       previous,
       ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+      ...budgetDeps(deps),
     })
     if (payload.bodies.length === 0) throw new Error('Horizons returned no bodies')
     const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
@@ -604,6 +697,7 @@ export async function refreshOrreryNeo(config, deps = {}) {
       fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
       fetchNeoccText: deps.fetchNeoccText ?? fetchNeoccText,
       ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+      ...budgetDeps(deps),
     })
     const placed = payload.approaches.filter((a) => a.fine !== null).length
     const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
@@ -656,6 +750,7 @@ export async function refreshOrrerySmallBodies(config, deps = {}) {
       fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
       previous,
       ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+      ...budgetDeps(deps),
     })
     const all = [...payload.comets, ...payload.interstellar]
     const placed = all.filter((b) => b.fine !== null || b.coarse !== null).length
@@ -706,21 +801,26 @@ async function main(argv) {
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
+  const deadline = createDeadline()
 
   for (const spec of only ? [] : SOURCES) {
-    const { entry, write } = await refreshSource(spec, config)
+    const { entry, write } = await refreshSource(spec, config, deadline)
     report.push(entry)
     if (write) writes.push({ key: spec.key, value: write, entry })
   }
 
   if (!only || only === 'orrery-bodies') {
-    const { entry, write } = await refreshOrreryBodies(config)
+    const { entry, write } = await refreshOrreryBodies(config, {
+      budgetMs: stepBudget(BODIES_BUDGET_MS, deadline),
+    })
     report.push(entry)
     if (write) {
       writes.push({ ...write, entry })
       if (dryRun && bodiesOut) {
         await writeFile(bodiesOut, write.value)
-        console.log(`  saved ${KEY_ORRERY_BODIES} to ${bodiesOut} (${String(write.value.length)} bytes)`)
+        console.log(
+          `  saved ${KEY_ORRERY_BODIES} to ${bodiesOut} (${String(write.value.length)} bytes)`,
+        )
       }
     }
   }
@@ -728,7 +828,9 @@ async function main(argv) {
   // After the craft step, never beside it: both ask JPL, one request at a time (#88).
   if (!only || only === 'orrery-neo') {
     const began = Date.now()
-    const { entry, write } = await refreshOrreryNeo(config)
+    const { entry, write } = await refreshOrreryNeo(config, {
+      budgetMs: stepBudget(NEO_BUDGET_MS, deadline),
+    })
     console.log(`  ${NEO_SIGNATURE} took ${String(Math.round((Date.now() - began) / 1000))} s`)
     report.push(entry)
     if (write) {
@@ -743,7 +845,9 @@ async function main(argv) {
   // After the close-approach step, never beside it: JPL takes one request at a time.
   if (!only || only === 'orrery-smallbodies') {
     const began = Date.now()
-    const { entry, write } = await refreshOrrerySmallBodies(config)
+    const { entry, write } = await refreshOrrerySmallBodies(config, {
+      budgetMs: stepBudget(SMALLBODIES_BUDGET_MS, deadline),
+    })
     console.log(
       `  ${SMALLBODIES_SIGNATURE} took ${String(Math.round((Date.now() - began) / 1000))} s`,
     )
@@ -763,7 +867,10 @@ async function main(argv) {
     // The orrery's satellites (#98), one KV key per group; see celestrak-groups.mjs.
     const { entry, writes: satWrites } = await refreshSatGroups({
       now: Date.now(),
-      fetchText: (url) => celestrakFetchText(url, { retrying: (u) => fetchWithRetry(u) }),
+      fetchText: beforeDeadline(
+        (url) => celestrakFetchText(url, { retrying: (u) => fetchWithRetry(u) }),
+        deadline,
+      ),
       readPrevious: (key) => readKv(key, config),
       classifyFailure,
     })

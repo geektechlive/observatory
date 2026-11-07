@@ -36,7 +36,7 @@ const RISK_LIST_TOP = 50
 /** Pause before each JPL request (the craft step's last one may have just ended). */
 const DEFAULT_PAUSE_MS = 1000
 /** Inside the workflow's 10 minutes, after the craft step's own 4. */
-const DEFAULT_BUDGET_MS = 2 * 60_000
+export const DEFAULT_BUDGET_MS = 2 * 60_000
 
 const ymd = (ms) => new Date(ms).toISOString().slice(0, 10)
 

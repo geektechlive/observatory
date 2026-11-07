@@ -30,7 +30,7 @@ const COARSE_MAX_AGE_MS = DAY_MS
 /** Pause before each JPL request (the close-approach step's last one may have just ended). */
 const DEFAULT_PAUSE_MS = 1000
 /** Inside the workflow's 10 minutes, after the craft step's 4 and the close-approach step's 2. */
-const DEFAULT_BUDGET_MS = 90_000
+export const DEFAULT_BUDGET_MS = 90_000
 
 const reasonOf = (err) => (err instanceof Error ? err.message : String(err))
 

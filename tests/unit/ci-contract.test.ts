@@ -143,6 +143,25 @@ describe('health alerting (#120)', () => {
   })
 })
 
+describe('refresh job time (#128)', () => {
+  // A job killed at timeout-minutes writes no incident report, so its failures go
+  // unreported. The job's deadline, one fetch still running past it, and the time for
+  // setup, KV writes and the reporter must fit inside the limit.
+  const workflow = readFileSync(join(WORKFLOW_DIR, 'data-refresh.yml'), 'utf8')
+  const refreshJob = workflow.slice(workflow.indexOf('  refresh:'), workflow.indexOf('  health:'))
+
+  it('finishes inside the refresh job timeout, with margin', async () => {
+    const minutes = Number(/timeout-minutes: (\d+)/.exec(refreshJob)?.[1])
+    expect(minutes).toBeGreaterThan(0)
+    // @ts-expect-error plain ESM script, no type declarations
+    const job = (await import('../../scripts/refresh-data.mjs')) as Record<string, number>
+    const worst =
+      Number(job['JOB_DEADLINE_MS']) + Number(job['WORST_FETCH_MS']) + Number(job['RUN_MARGIN_MS'])
+    expect(worst).toBeGreaterThan(0)
+    expect(worst).toBeLessThanOrEqual(minutes * 60_000)
+  })
+})
+
 describe('Vite configs', () => {
   // Vite's future native config loader has no CommonJS globals; it warned on every
   // build and test run until #95.

@@ -18,7 +18,7 @@ export interface InterstellarSpec {
   readonly kind: SmallBodyKind
   /**
    * Discovery date (UTC day), for the inspector. SBDB's `discovery` block is empty for
-   * all three, so these come from press coverage (Science News, CBC, ORF; 2026-11-07).
+   * all three, so each is cited on its entry below (checked 2026-11-07, #129).
    */
   readonly discovered: string
   /**
@@ -41,6 +41,10 @@ export const INTERSTELLAR: readonly InterstellarSpec[] = [
     des: 'A/2017 U1',
     spkid: '50788063',
     kind: 'asteroid',
+    // NASA: "discovered Oct. 19, 2017 by the University of Hawaii's Pan-STARRS1
+    // telescope" (science.nasa.gov/solar-system/comets/oumuamua). MPEC 2017-U181
+    // (minorplanetcenter.net/mpec/K17/K17UI1.html) lists Pan-STARRS1 (F51) frames
+    // from Oct. 18.47 onwards; the object was found in them on the 19th.
     discovered: '2017-10-19',
     maxCoarseStepDays: 5,
   },
@@ -49,6 +53,8 @@ export const INTERSTELLAR: readonly InterstellarSpec[] = [
     des: 'C/2019 Q4',
     spkid: '1003639',
     kind: 'comet',
+    // MPEC 2019-R106 (minorplanetcenter.net/mpec/K19/K19RA6.html): "reported as a
+    // comet candidate by G. Borisov (L51) on Aug. 30 UTC"; discovery frame 2019 08 30.04.
     discovered: '2019-08-30',
     maxCoarseStepDays: 10,
   },
@@ -57,6 +63,8 @@ export const INTERSTELLAR: readonly InterstellarSpec[] = [
     des: 'C/2025 N1',
     spkid: '1004083',
     kind: 'comet',
+    // MPEC 2025-N12 (minorplanetcenter.net/mpec/K25/K25N12.html): "discovered by ATLAS
+    // Chile (W68) in four 30-second survey images taken on July 1 UT".
     discovered: '2025-07-01',
     maxCoarseStepDays: 5,
   },

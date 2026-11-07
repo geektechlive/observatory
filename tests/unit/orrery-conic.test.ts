@@ -114,6 +114,7 @@ describe('conicPosition', () => {
 
 describe('interstellar objects', () => {
   it('gives each its speed far from the Sun, v∞', () => {
+    // 1I: Mamajek 2017 (arXiv:1710.11364) gives v∞ = 26.3209 ± 0.0099 km/s from JPL-13.
     expect(vInfinityKms(OUMUAMUA)).toBeCloseTo(26.3, 0)
     expect(vInfinityKms(BORISOV)).toBeCloseTo(32.3, 0)
     expect(vInfinityKms(ATLAS_3I)).toBeCloseTo(58, 0)
@@ -135,8 +136,10 @@ describe('interstellar objects', () => {
   })
 
   it("puts 1I/'Oumuamua's inbound asymptote near Vega, where it came from", () => {
-    // JPL#16's elements (fixtures/smallbodies/horizons-1i.txt). The radiant published in
-    // 2017 is RA 279.8°, Dec +34.0°; this computes RA 279.55°, Dec +33.90°.
+    // JPL#16's elements (fixtures/smallbodies/horizons-1i.txt). Mamajek 2017 (RNAAS 1, 21;
+    // arXiv:1710.11364), from solution JPL-13 with no non-gravitational forces: "entered
+    // the solar system from the direction αICRS, δICRS = 279°.804, +33°.997 (±0°.032,
+    // ±0°.015; 1σ)". This computes RA 279.55°, Dec +33.90° from a later solution.
     const { inbound } = asymptoteDirections({
       e: 1.201133796102373,
       q: 0.2559115812959116,
@@ -150,8 +153,8 @@ describe('interstellar objects', () => {
     const ze = inbound.y * Math.sin(eps) + inbound.z * Math.cos(eps)
     const ra = ((Math.atan2(ye, inbound.x) * 180) / Math.PI + 360) % 360
     const dec = (Math.asin(ze) * 180) / Math.PI
-    expect(Math.abs(ra - 279.8)).toBeLessThan(1)
-    expect(Math.abs(dec - 34.0)).toBeLessThan(1)
+    expect(Math.abs(ra - 279.804)).toBeLessThan(1)
+    expect(Math.abs(dec - 33.997)).toBeLessThan(1)
   })
 
   it('has no asymptotes on an ellipse', () => {
