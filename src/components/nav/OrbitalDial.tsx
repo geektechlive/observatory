@@ -22,6 +22,27 @@ const META: Record<ConsoleView, { label: string; sub: string; glyph: ReactNode }
       </g>
     ),
   },
+  orrery: {
+    label: 'ORRERY',
+    sub: 'Solar System · 3D',
+    glyph: (
+      <g>
+        <circle cx="0" cy="0" r="2.2" fill="currentColor" />
+        <circle cx="0" cy="0" r="5" fill="none" stroke="currentColor" strokeWidth="0.9" />
+        <circle
+          cx="0"
+          cy="0"
+          r="8.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="0.9"
+          opacity="0.7"
+        />
+        <circle cx="3.5" cy="-3.6" r="1.3" fill="currentColor" />
+        <circle cx="-7.2" cy="4.5" r="1.5" fill="currentColor" />
+      </g>
+    ),
+  },
   sun: {
     label: 'SUN',
     sub: 'Space Weather',
@@ -79,6 +100,7 @@ export function OrbitalDial() {
   const setView = useUiStore((s) => s.setView)
   const tabRefs = useRef<Record<ConsoleView, HTMLButtonElement | null>>({
     earth: null,
+    orrery: null,
     sun: null,
     sky: null,
     orbit: null,

@@ -27,6 +27,10 @@ import consoleStyles from './components/consoles/console.module.css'
 const WorldMap = lazy(() =>
   import('@/components/world-map/WorldMap').then((m) => ({ default: m.WorldMap })),
 )
+// The orrery (#91) takes the whole page and loads only when its tab is opened.
+const OrreryPage = lazy(() =>
+  import('@/components/orrery/OrreryPage').then((m) => ({ default: m.OrreryPage })),
+)
 
 /**
  * The page (#63), laid out like the approved ROCI v2 prototype: a header plate, then
@@ -41,7 +45,8 @@ export function App() {
 
   const lens = useRef<HTMLElement>(null)
   const { expanded, toggle, buttonRef } = useLensExpand()
-  const size = useLensSize(lens, expanded)
+  const orrery = view === 'orrery'
+  const size = useLensSize(lens, expanded, orrery)
   const expand = <ExpandButton ref={buttonRef} expanded={expanded} onToggle={toggle} />
   const subsolar = useRef<SubsolarPlateHandle>(null)
   const onFacing = useCallback((lon: number) => {
@@ -49,119 +54,159 @@ export function App() {
   }, [])
 
   const stageKind = view === 'sun' ? 'sun' : view === 'sky' ? 'sky' : 'globe'
-  const parts = CONSOLE_PARTS[view]
 
   return (
     <>
       <StarField />
       {/* Expanded (#89), the lens covers the screen and everything else is inert. */}
-      <div className={styles.page ?? ''} data-expanded={expanded || undefined}>
+      <div
+        className={styles.page ?? ''}
+        data-expanded={expanded || undefined}
+        data-view={orrery ? 'orrery' : undefined}
+      >
         <div className={styles.contents ?? ''} inert={expanded}>
           <HeaderPlate />
         </div>
 
-        <main id="main-content" className={styles.main ?? ''}>
-          <div className={styles.dial ?? ''} inert={expanded}>
-            <OrbitalDial />
-          </div>
-
-          <section
-            ref={lens}
-            className={styles.lens ?? ''}
-            aria-label="Instrument"
-            data-expanded={expanded || undefined}
-          >
-            <div
-              className={styles.stage ?? ''}
-              data-stage={stageKind === 'globe' ? mapMode : stageKind}
-            >
-              {stageKind === 'globe' && (
-                <div className={styles.layers ?? ''}>
-                  <LayerControl showMapLayers={mapMode === 'map'} />
-                </div>
-              )}
-              {/* The globe carries the button beside Pause; every other stage, top right. */}
-              {!(stageKind === 'globe' && mapMode === 'globe') && (
-                <div className={styles.tools ?? ''}>{expand}</div>
-              )}
-              <div className={styles.stageMorph ?? ''} key={stageKind}>
-                {stageKind === 'sun' ? (
-                  <SunStage size={size} expanded={expanded} />
-                ) : stageKind === 'sky' ? (
-                  <SkyStage size={size} />
-                ) : mapMode === 'globe' ? (
-                  <GlobeHost
-                    size={size}
-                    {...globeProps}
-                    autoRotate={true}
-                    census={census}
-                    onFacing={onFacing}
-                    tools={expand}
-                  />
-                ) : (
-                  <Suspense fallback={null}>
-                    <WorldMap />
-                  </Suspense>
-                )}
-              </div>
+        {orrery ? (
+          <main id="main-content" className={styles.mainOrrery ?? ''}>
+            <div className={styles.dial ?? ''}>
+              <OrbitalDial />
             </div>
-
-            {stageKind === 'globe' && (
-              <div className={styles.plates ?? ''}>
-                {mapMode === 'globe' ? <SubsolarPlate ref={subsolar} /> : <span />}
-                <IssPlate
-                  lat={issPos?.lat}
-                  lon={issPos?.lon}
-                  altKm={issPos?.alt}
-                  velKmH={issPos?.vel}
-                  intervalMs={issIntervalMs}
-                  mapMode={mapMode}
-                  onMapMode={setMapMode}
-                />
+            <ErrorBoundary label="Orrery">
+              {/* OrbitalDial's tabs (id console-tab-<view>) control this panel. */}
+              <div
+                id="console-panel"
+                role="tabpanel"
+                aria-labelledby="console-tab-orrery"
+                className={styles.orrery ?? ''}
+              >
+                <Suspense fallback={null}>
+                  <OrreryPage />
+                </Suspense>
               </div>
-            )}
-          </section>
-
-          <ErrorBoundary label="Console">
-            {/* OrbitalDial's tabs (id console-tab-<view>) control this panel. */}
-            <section
-              id="console-panel"
-              role="tabpanel"
-              aria-labelledby={`console-tab-${view}`}
-              className={`${styles.console ?? ''} ${consoleStyles.lead ?? ''}`}
-              key={`lead-${view}`}
-              inert={expanded}
-            >
-              <ConsoleVoice view={view} />
-              <p className={consoleStyles.sub ?? ''}>{parts.sub}</p>
-              <parts.Lead />
-            </section>
-          </ErrorBoundary>
-
-          <ErrorBoundary label="More panels">
-            <section
-              aria-label={`More ${view} panels`}
-              className={`${styles.rest ?? ''} ${consoleStyles.rest ?? ''}`}
-              key={`rest-${view}`}
-              inert={expanded}
-            >
-              <Suspense fallback={null}>
-                <parts.Rest />
-              </Suspense>
-            </section>
-          </ErrorBoundary>
-
-          <div className={styles.footer ?? ''} inert={expanded}>
-            <Footer />
-          </div>
-        </main>
+            </ErrorBoundary>
+          </main>
+        ) : (
+          renderColumns()
+        )}
       </div>
 
-      <div className={styles.contents ?? ''} inert={expanded}>
-        <ErrorBoundary>
-          <Ticker />
-        </ErrorBoundary>
-      </div>
+      {/* The orrery's time bar takes the bottom edge, so the ticker steps aside there. */}
+      {!orrery && (
+        <div className={styles.contents ?? ''} inert={expanded}>
+          <ErrorBoundary>
+            <Ticker />
+          </ErrorBoundary>
+        </div>
+      )}
     </>
   )
+
+  /**
+   * The lens and console columns (#63), for every view but the orrery. Called as a
+   * function, not used as a component, so React never sees a new component type per
+   * render (which would remount the globe each time).
+   */
+  function renderColumns() {
+    if (view === 'orrery') return null
+    const parts = CONSOLE_PARTS[view]
+    return (
+      <main id="main-content" className={styles.main ?? ''}>
+        <div className={styles.dial ?? ''} inert={expanded}>
+          <OrbitalDial />
+        </div>
+
+        <section
+          ref={lens}
+          className={styles.lens ?? ''}
+          aria-label="Instrument"
+          data-expanded={expanded || undefined}
+        >
+          <div
+            className={styles.stage ?? ''}
+            data-stage={stageKind === 'globe' ? mapMode : stageKind}
+          >
+            {stageKind === 'globe' && (
+              <div className={styles.layers ?? ''}>
+                <LayerControl showMapLayers={mapMode === 'map'} />
+              </div>
+            )}
+            {/* The globe carries the button beside Pause; every other stage, top right. */}
+            {!(stageKind === 'globe' && mapMode === 'globe') && (
+              <div className={styles.tools ?? ''}>{expand}</div>
+            )}
+            <div className={styles.stageMorph ?? ''} key={stageKind}>
+              {stageKind === 'sun' ? (
+                <SunStage size={size} expanded={expanded} />
+              ) : stageKind === 'sky' ? (
+                <SkyStage size={size} />
+              ) : mapMode === 'globe' ? (
+                <GlobeHost
+                  size={size}
+                  {...globeProps}
+                  autoRotate={true}
+                  census={census}
+                  onFacing={onFacing}
+                  tools={expand}
+                />
+              ) : (
+                <Suspense fallback={null}>
+                  <WorldMap />
+                </Suspense>
+              )}
+            </div>
+          </div>
+
+          {stageKind === 'globe' && (
+            <div className={styles.plates ?? ''}>
+              {mapMode === 'globe' ? <SubsolarPlate ref={subsolar} /> : <span />}
+              <IssPlate
+                lat={issPos?.lat}
+                lon={issPos?.lon}
+                altKm={issPos?.alt}
+                velKmH={issPos?.vel}
+                intervalMs={issIntervalMs}
+                mapMode={mapMode}
+                onMapMode={setMapMode}
+              />
+            </div>
+          )}
+        </section>
+
+        <ErrorBoundary label="Console">
+          {/* OrbitalDial's tabs (id console-tab-<view>) control this panel. */}
+          <section
+            id="console-panel"
+            role="tabpanel"
+            aria-labelledby={`console-tab-${view}`}
+            className={`${styles.console ?? ''} ${consoleStyles.lead ?? ''}`}
+            key={`lead-${view}`}
+            inert={expanded}
+          >
+            <ConsoleVoice view={view} />
+            <p className={consoleStyles.sub ?? ''}>{parts.sub}</p>
+            <parts.Lead />
+          </section>
+        </ErrorBoundary>
+
+        <ErrorBoundary label="More panels">
+          <section
+            aria-label={`More ${view} panels`}
+            className={`${styles.rest ?? ''} ${consoleStyles.rest ?? ''}`}
+            key={`rest-${view}`}
+            inert={expanded}
+          >
+            <Suspense fallback={null}>
+              <parts.Rest />
+            </Suspense>
+          </section>
+        </ErrorBoundary>
+
+        <div className={styles.footer ?? ''} inert={expanded}>
+          <Footer />
+        </div>
+      </main>
+    )
+  }
 }

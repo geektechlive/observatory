@@ -3,9 +3,12 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 
 import type { SourceName, SourceState } from '@/lib/health'
 
-export type ConsoleView = 'earth' | 'sun' | 'sky' | 'orbit'
+export type ConsoleView = 'earth' | 'orrery' | 'sun' | 'sky' | 'orbit'
 
-export const CONSOLE_VIEWS: ConsoleView[] = ['earth', 'sun', 'sky', 'orbit']
+export const CONSOLE_VIEWS: ConsoleView[] = ['earth', 'orrery', 'sun', 'sky', 'orbit']
+
+/** The views laid out as lens + console columns; the orrery takes the whole page (#91). */
+export type ConsoleColumnView = Exclude<ConsoleView, 'orrery'>
 
 /** Globe vs flat map for the EARTH stage. */
 export type MapMode = 'globe' | 'map'

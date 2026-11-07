@@ -30,7 +30,12 @@ function contentWidth(el: HTMLElement): number {
  * height, so the instrument dominates the page without pushing the plates off screen.
  * Expanded (#89), the cap is the screen itself.
  */
-export function useLensSize(ref: RefObject<HTMLElement | null>, expanded = false): number {
+export function useLensSize(
+  ref: RefObject<HTMLElement | null>,
+  expanded = false,
+  /** Re-measure when this changes: the lens unmounts while the orrery has the page (#91). */
+  remountKey?: unknown,
+): number {
   const [size, setSize] = useState(DEFAULT_GLOBE_PX)
   useEffect(() => {
     const el = ref.current
@@ -46,6 +51,6 @@ export function useLensSize(ref: RefObject<HTMLElement | null>, expanded = false
       observer.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [ref, expanded])
+  }, [ref, expanded, remountKey])
   return size
 }

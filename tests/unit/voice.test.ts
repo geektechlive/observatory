@@ -19,6 +19,7 @@ function input(overrides: Partial<VoiceInput> = {}): VoiceInput {
     neo: ok({ countThisWeek: 4 }),
     people: ok({ count: 11 }),
     launch: ok({ name: 'Starship Flight 12', hoursUntil: 72 }),
+    nearest: ok({ name: 'Venus', au: 0.284, rateKmS: -3.2, model: true }),
     ...overrides,
   }
 }
@@ -191,5 +192,29 @@ describe('voiceFor orbit', () => {
     expect(voiceFor('orbit', input({ launch: ok({ name: 'X', hoursUntil: -2 }) }))).toBe(
       '11 people are in space.',
     )
+  })
+})
+
+describe('voiceFor orrery (#91)', () => {
+  it('names the nearest planet, its distance and whether it is closing', () => {
+    expect(voiceFor('orrery', input())).toBe(
+      'Venus is the nearest planet, 0.28 au away and closing at 3.2 km/s.',
+    )
+    expect(
+      voiceFor(
+        'orrery',
+        input({ nearest: ok({ name: 'Mars', au: 1.52, rateKmS: 8.04, model: true }) }),
+      ),
+    ).toBe('Mars is the nearest planet, 1.52 au away and pulling away at 8.0 km/s.')
+  })
+
+  it('says the date is outside every table instead of claiming a position', () => {
+    expect(
+      voiceFor('orrery', input({ nearest: ok({ name: 'Mars', au: 1, rateKmS: 1, model: false }) })),
+    ).toBe('This date is outside the planet tables; positions here are rough.')
+  })
+
+  it('is neutral while loading', () => {
+    expect(voiceFor('orrery', input({ nearest: loading }))).toBe('Reading the instruments…')
   })
 })

@@ -23,6 +23,9 @@ export const BUDGETS = {
   entryGzip: 190_000,
   lazyThreeGzip: 160_000,
   worldMapGzip: 294_000,
+  // #91 measured OrreryPage 11.4 kB and OrreryRenderer 7.0 kB gzip with the planets
+  // only; #92/#93/#98 add asteroids, craft and satellites, so each gets room to 30 kB.
+  orreryGzip: 30_000,
   textureBytes: 1_500_000,
 }
 
@@ -31,6 +34,9 @@ const THREE_MARKER = 'WebGLRenderer'
 // orbit to propagate, not with the page (#97): in the first load it cost ~5 kB gzip
 // and split the first-load code into 18 chunks.
 const SGP4_MARKER = 'SemiLatusRectumBelowZero'
+// The orrery (#91) is a whole page behind its tab: its page and renderer name these in
+// markup and on the canvas, and neither may reach the first load.
+const ORRERY_MARKERS = ['data-orrery-page', 'orreryWebgl']
 const gz = (buf) => gzipSync(buf, { level: 9 }).length
 const kb = (n) => `${(n / 1000).toFixed(1)} kB`
 
@@ -70,10 +76,22 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       : 'satellite.js not in first-load chunks',
   )
 
+  const withOrrery = initial.filter((_, i) => ORRERY_MARKERS.some((m) => bodies[i].includes(m)))
+  add(
+    'entry-has-no-orrery',
+    withOrrery.length === 0,
+    withOrrery.length > 0
+      ? `${withOrrery.join(', ')} contains orrery code: it must load with its tab (App.tsx lazy OrreryPage)`
+      : 'orrery not in first-load chunks',
+  )
+
   for (const name of readdirSync(join(distDir, 'assets'))) {
     if (!name.endsWith('.js') || initial.includes(`assets/${name}`)) continue
     const body = readFileSync(join(distDir, 'assets', name))
-    if (body.includes(THREE_MARKER)) {
+    if (name.startsWith('OrreryPage-') || name.startsWith('OrreryRenderer-')) {
+      const size = gz(body)
+      add('orrery-gzip', size <= budgets.orreryGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGzip)})`)
+    } else if (body.includes(THREE_MARKER)) {
       const size = gz(body)
       add('lazy-three-gzip', size <= budgets.lazyThreeGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.lazyThreeGzip)})`)
     } else if (name.startsWith('WorldMap-')) {

@@ -78,7 +78,8 @@ export const BODY_HEX: Readonly<Record<string, string>> = {
   Mars: hexOf('oklch(0.68 0.17 40)'),
   Jupiter: hexOf('oklch(0.78 0.09 70)'),
   Saturn: hexOf('oklch(0.85 0.08 95)'),
-  Uranus: hexOf('oklch(0.82 0.1 200)'),
+  // Pale green-blue, Chris's call (#91): at hue 200 it read as spacecraft cyan (#72dfff).
+  Uranus: hexOf('oklch(0.86 0.06 180)'),
   Neptune: hexOf('oklch(0.65 0.15 250)'),
 }
 

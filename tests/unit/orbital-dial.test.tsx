@@ -27,6 +27,21 @@ describe('OrbitalDial', () => {
 
   it('draws each glyph on the shared tick ring (the same primitive as the globe bezel)', () => {
     const { container } = render(<OrbitalDial />)
-    expect(container.querySelectorAll('[data-tick="major"]').length).toBe(4 * 4)
+    expect(container.querySelectorAll('[data-tick="major"]').length).toBe(5 * 4)
+  })
+
+  it('puts the orrery between Earth and Sun (#91)', () => {
+    render(<OrbitalDial />)
+    const names = screen.getAllByRole('tab').map((t) => t.textContent)
+    // textContent runs the label into its sub-line ("EARTHHazards"), so match the label.
+    expect(names.map((n) => /^(EARTH|ORRERY|SUN|SKY|ORBIT)/.exec(n)?.[0])).toEqual([
+      'EARTH',
+      'ORRERY',
+      'SUN',
+      'SKY',
+      'ORBIT',
+    ])
+    fireEvent.keyDown(screen.getByRole('tab', { name: /EARTH/ }), { key: 'ArrowRight' })
+    expect(useUiStore.getState().view).toBe('orrery')
   })
 })

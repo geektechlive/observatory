@@ -1,0 +1,140 @@
+import { type Ref, useId } from 'react'
+
+import { Label } from '@/components/ui/Label'
+import { Readout } from '@/components/ui/Readout'
+import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI } from '@/lib/orrery'
+import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
+
+import styles from './orrery.module.css'
+import { formatSimUtc } from './simDate'
+
+interface InspectorProps {
+  /** The page measures the drawer to keep the focused body out from under it. */
+  ref?: Ref<HTMLElement> | undefined
+  body: BodyName
+  simMs: number
+  onClose: () => void
+}
+
+const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
+const fmtKm = (km: number) =>
+  km >= 1e9 ? `${(km / 1e9).toFixed(2)} billion` : `${(km / 1e6).toFixed(1)} million`
+
+/**
+ * What the orrery knows about the selected body (#91; spec Parts 10 and 16). Concise
+ * first, with the state vector behind a disclosure. Planet positions are a model
+ * (JPL's approximate elements), and the panel says so.
+ */
+export function Inspector({ ref, body, simMs, onClose }: InspectorProps) {
+  const headingId = useId()
+  const object = ORRERY_BODIES.find((b) => b.name === body)?.object
+  const jd = jdFromDate(new Date(simMs))
+
+  return (
+    <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+      <div className={styles.inspectorHead ?? ''}>
+        <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
+          {body}
+        </h2>
+        <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <p className={styles.inspectorMeta ?? ''}>
+        <Label>{object?.category === 'star' ? 'Star' : 'Planet'}</Label>{' '}
+        <Label>{object?.id ?? ''}</Label>
+      </p>
+      {body === 'Sun' ? (
+        <p className={styles.inspectorText ?? ''}>
+          The origin of this view: positions are heliocentric, measured from the Sun’s centre (the
+          outer planets from the solar-system barycentre, within 0.01 au of it).
+        </p>
+      ) : (
+        <PlanetFacts body={body} jd={jd} simMs={simMs} />
+      )}
+    </aside>
+  )
+}
+
+function PlanetFacts({
+  body,
+  jd,
+  simMs,
+}: {
+  body: Exclude<BodyName, 'Sun'>
+  jd: number
+  simMs: number
+}) {
+  const d = describePlanet(body, jd)
+  const { state } = d
+  const earthKm = d.earthDistanceAu === null ? null : d.earthDistanceAu * AU_KM
+
+  return (
+    <>
+      <dl className={styles.facts ?? ''}>
+        <dt>From the Sun</dt>
+        <dd>
+          <Readout value={fmtAu(d.sunDistanceAu)} unit="au" />{' '}
+          <Label>{fmtKm(d.sunDistanceAu * AU_KM)} km</Label>
+        </dd>
+        {earthKm !== null && d.earthDistanceAu !== null && (
+          <>
+            <dt>From Earth</dt>
+            <dd>
+              <Readout value={fmtAu(d.earthDistanceAu)} unit="au" />{' '}
+              <Label>
+                {fmtKm(earthKm)} km · {fmtKm(earthKm * KM_TO_MI)} mi
+              </Label>
+            </dd>
+            <dt>Light time</dt>
+            <dd>
+              <Readout value={formatLightTime(d.lightTimeFromEarthS ?? 0)} />
+            </dd>
+          </>
+        )}
+        {d.rangeRateKmS !== null && (
+          <>
+            <dt>Seen from Earth</dt>
+            <dd>
+              <Readout value={Math.abs(d.rangeRateKmS).toFixed(1)} unit="km/s" />{' '}
+              <Label>{d.rangeRateKmS < 0 ? 'approaching' : 'receding'}</Label>
+            </dd>
+          </>
+        )}
+        <dt>Source</dt>
+        <dd className={styles.inspectorText ?? ''}>{state.sourceProvider}</dd>
+        <dt>Position type</dt>
+        <dd className={styles.inspectorText ?? ''}>
+          Kepler approximation (a model, not an observation) · confidence {state.confidence}
+        </dd>
+        <dt>Sample time</dt>
+        <dd className={styles.inspectorText ?? ''}>{formatSimUtc(simMs)}</dd>
+      </dl>
+      <ul className={styles.reasons ?? ''} aria-label="Why this confidence">
+        {state.confidenceReasons.map((r) => (
+          <li key={r}>{r}</li>
+        ))}
+      </ul>
+      <details className={styles.science ?? ''}>
+        <summary>Scientific data</summary>
+        <dl className={styles.facts ?? ''}>
+          <dt>Frame</dt>
+          <dd>
+            {state.referenceFrame}, centre {state.referenceCenter}
+          </dd>
+          <dt>Time scale</dt>
+          <dd>{state.timeScale}</dd>
+          <dt>Julian date</dt>
+          <dd>{jd.toFixed(5)}</dd>
+          <dt>Position (au)</dt>
+          <dd>
+            x {state.positionAu.x.toFixed(6)} · y {state.positionAu.y.toFixed(6)} · z{' '}
+            {state.positionAu.z.toFixed(6)}
+          </dd>
+          <dt>Accuracy</dt>
+          <dd>{state.accuracyDescription}</dd>
+        </dl>
+      </details>
+    </>
+  )
+}

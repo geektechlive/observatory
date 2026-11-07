@@ -114,14 +114,11 @@ describe('solveKepler (#90)', () => {
   })
 })
 
-describe('validity window (#90)', () => {
-  it('flags a date outside 1800–2050, where JPL says the elements are not valid', () => {
-    expect(heliocentric('Earth', jdFromDate(new Date('2075-01-01T00:00:00Z'))).outOfRange).toBe(
-      true,
-    )
-    expect(heliocentric('Earth', jdFromDate(new Date('1750-01-01T00:00:00Z'))).outOfRange).toBe(
-      true,
-    )
+describe('validity window (#90, #91)', () => {
+  it('leaves Table 1 outside 1800–2050, where JPL says its elements are not valid', () => {
+    // Table 2 (3000 BC – 3000 AD) takes over there since #91; see orrery-table2.test.ts.
+    expect(heliocentric('Earth', jdFromDate(new Date('2075-01-01T00:00:00Z'))).table).toBe(2)
+    expect(heliocentric('Earth', jdFromDate(new Date('1750-01-01T00:00:00Z'))).table).toBe(2)
   })
 
   it('does not flag today', () => {

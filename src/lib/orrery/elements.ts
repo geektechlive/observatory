@@ -109,3 +109,123 @@ export const ELEMENTS: Readonly<Record<PlanetName, Elements>> = {
 /** Table 1's window, 1800-01-01 to 2050-01-01, as Julian dates. */
 export const VALID_FROM_JD = 2378496.5
 export const VALID_TO_JD = 2469807.5
+
+/**
+ * Table 2a (#91): the long window, 3000 BC – 3000 AD, same source and frame. Coarser than
+ * Table 1 inside 1800–2050, so it is used only outside that window.
+ */
+export const ELEMENTS_T2: Readonly<Record<PlanetName, Elements>> = {
+  Mercury: {
+    a: [0.38709843, 0.0],
+    e: [0.20563661, 0.00002123],
+    I: [7.00559432, -0.00590158],
+    L: [252.25166724, 149472.67486623],
+    peri: [77.45771895, 0.15940013],
+    node: [48.33961819, -0.12214182],
+  },
+  Venus: {
+    a: [0.72332102, -0.00000026],
+    e: [0.00676399, -0.00005107],
+    I: [3.39777545, 0.00043494],
+    L: [181.9797085, 58517.8156026],
+    peri: [131.76755713, 0.05679648],
+    node: [76.67261496, -0.27274174],
+  },
+  Earth: {
+    a: [1.00000018, -0.00000003],
+    e: [0.01673163, -0.00003661],
+    I: [-0.00054346, -0.01337178],
+    L: [100.46691572, 35999.37306329],
+    peri: [102.93005885, 0.3179526],
+    node: [-5.11260389, -0.24123856],
+  },
+  Mars: {
+    a: [1.52371243, 0.00000097],
+    e: [0.09336511, 0.00009149],
+    I: [1.85181869, -0.00724757],
+    L: [-4.56813164, 19140.29934243],
+    peri: [-23.91744784, 0.45223625],
+    node: [49.71320984, -0.26852431],
+  },
+  Jupiter: {
+    a: [5.20248019, -0.00002864],
+    e: [0.0485359, 0.00018026],
+    I: [1.29861416, -0.00322699],
+    L: [34.33479152, 3034.90371757],
+    peri: [14.27495244, 0.18199196],
+    node: [100.29282654, 0.13024619],
+  },
+  Saturn: {
+    a: [9.54149883, -0.00003065],
+    e: [0.05550825, -0.00032044],
+    I: [2.49424102, 0.00451969],
+    L: [50.07571329, 1222.11494724],
+    peri: [92.86136063, 0.54179478],
+    node: [113.63998702, -0.25015002],
+  },
+  Uranus: {
+    a: [19.18797948, -0.00020455],
+    e: [0.0468574, -0.0000155],
+    I: [0.77298127, -0.00180155],
+    L: [314.20276625, 428.49512595],
+    peri: [172.43404441, 0.09266985],
+    node: [73.96250215, 0.05739699],
+  },
+  Neptune: {
+    a: [30.06952752, 0.00006447],
+    e: [0.00895439, 0.00000818],
+    I: [1.7700552, 0.000224],
+    L: [304.22289287, 218.46515314],
+    peri: [46.68158724, 0.01009938],
+    node: [131.78635853, -0.00606302],
+  },
+}
+
+/** Table 2b: terms added to M for Jupiter–Neptune, M += b T² + c cos(f T) + s sin(f T). */
+export interface ExtraTerms {
+  readonly b: number
+  readonly c: number
+  readonly s: number
+  /** Degrees per Julian century. */
+  readonly f: number
+}
+
+export const EXTRA_T2: Readonly<Partial<Record<PlanetName, ExtraTerms>>> = {
+  Jupiter: { b: -0.00012452, c: 0.0606406, s: -0.35635438, f: 38.35125 },
+  Saturn: { b: 0.00025899, c: -0.13434469, s: 0.87320147, f: 38.35125 },
+  Uranus: { b: 0.00058331, c: -0.97731848, s: 0.17689245, f: 7.67025 },
+  Neptune: { b: -0.00041348, c: 0.68346318, s: -0.10162547, f: 7.67025 },
+}
+
+/** Table 2's window, 3000 BC Jan 1 (Julian calendar) to 3000 AD Jan 1, as Julian dates. */
+export const VALID_T2_FROM_JD = 625673.5
+export const VALID_T2_TO_JD = 2816787.5
+
+/**
+ * JPL's nominal errors per table: heliocentric longitude (arcsec) and distance (1000 km).
+ * Shown as the confidence reason in the inspector.
+ */
+export const NOMINAL_ERROR: Readonly<
+  Record<1 | 2, Readonly<Record<PlanetName, readonly [number, number]>>>
+> = {
+  1: {
+    Mercury: [15, 1],
+    Venus: [20, 4],
+    Earth: [20, 6],
+    Mars: [40, 25],
+    Jupiter: [400, 600],
+    Saturn: [600, 1500],
+    Uranus: [50, 1000],
+    Neptune: [10, 200],
+  },
+  2: {
+    Mercury: [20, 1],
+    Venus: [40, 8],
+    Earth: [40, 15],
+    Mars: [100, 30],
+    Jupiter: [600, 1000],
+    Saturn: [1000, 4000],
+    Uranus: [2000, 8000],
+    Neptune: [400, 4000],
+  },
+}

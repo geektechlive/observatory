@@ -1,6 +1,6 @@
 import { type ComponentType, lazy } from 'react'
 
-import type { ConsoleView } from '@/store/ui'
+import type { ConsoleColumnView } from '@/store/ui'
 
 import { EarthConsoleLead } from './EarthConsole'
 import { OrbitConsoleLead } from './OrbitConsole'
@@ -31,7 +31,8 @@ export interface ConsoleParts {
   Rest: ComponentType
 }
 
-export const CONSOLE_PARTS: Record<ConsoleView, ConsoleParts> = {
+/** The orrery has no console columns: it takes the whole page (#91). */
+export const CONSOLE_PARTS: Record<ConsoleColumnView, ConsoleParts> = {
   earth: {
     sub: 'Hazards and systems · toggle live layers on the globe',
     Lead: EarthConsoleLead,

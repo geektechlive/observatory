@@ -178,6 +178,12 @@
   .orbitLine {
     display: none;
   }
+
+  /* Five tabs (#91) don't fit the bar with their sub-lines between 641 and 899 px; the
+     label alone names the console here, as it already did below 640 px. */
+  .nodeSub {
+    display: none;
+  }
 }
 
 @media (width <= 640px) {
@@ -191,9 +197,5 @@
   .glyphRing {
     width: 38px;
     height: 38px;
-  }
-
-  .nodeSub {
-    display: none;
   }
 }

@@ -4,7 +4,16 @@
  * puts the error at 10–600 arcsec in longitude depending on the planet: far below a
  * pixel on any orrery we draw. Pure: callers pass the date.
  */
-import { ELEMENTS, type PlanetName, VALID_FROM_JD, VALID_TO_JD } from './elements'
+import {
+  ELEMENTS,
+  ELEMENTS_T2,
+  EXTRA_T2,
+  type PlanetName,
+  VALID_FROM_JD,
+  VALID_T2_FROM_JD,
+  VALID_T2_TO_JD,
+  VALID_TO_JD,
+} from './elements'
 
 const RAD = Math.PI / 180
 const DEG = 180 / Math.PI
@@ -19,7 +28,9 @@ export interface Heliocentric {
   readonly x: number
   readonly y: number
   readonly z: number
-  /** Outside 1800–2050, where JPL says the elements are not valid. Still computed. */
+  /** Which JPL table: 1 inside 1800–2050, 2 (3000 BC – 3000 AD) outside it (#91). */
+  readonly table: 1 | 2
+  /** Outside 3000 BC – 3000 AD, where no table is valid. Still computed. */
   readonly outOfRange: boolean
 }
 
@@ -52,9 +63,13 @@ export function solveKepler(meanAnomalyDeg: number, e: number): number {
   return E
 }
 
-/** Where a planet is at a Julian date (TDB), heliocentric, in au. */
+/**
+ * Where a planet is at a Julian date (TDB), heliocentric, in au. Table 1 inside
+ * 1800–2050, where it is the more accurate; Table 2 (3000 BC – 3000 AD) outside it (#91).
+ */
 export function heliocentric(planet: PlanetName, jd: number): Heliocentric {
-  const el = ELEMENTS[planet]
+  const table: 1 | 2 = jd >= VALID_FROM_JD && jd <= VALID_TO_JD ? 1 : 2
+  const el = table === 1 ? ELEMENTS[planet] : ELEMENTS_T2[planet]
   const T = (jd - J2000) / DAYS_PER_CENTURY
   const at = ([v, rate]: readonly [number, number]) => v + rate * T
   const a = at(el.a)
@@ -66,8 +81,10 @@ export function heliocentric(planet: PlanetName, jd: number): Heliocentric {
 
   const omega = (peri - node) * RAD
   const Om = node * RAD
-  // Table 1 needs no b, c, s, f terms; those belong to Table 2's longer window.
-  const E = solveKepler(wrap180(L - peri), e) * RAD
+  // Table 2 adds b T² + c cos(fT) + s sin(fT) to M for Jupiter–Neptune; Table 1 needs none.
+  const x = table === 2 ? EXTRA_T2[planet] : undefined
+  const extra = x ? x.b * T * T + x.c * Math.cos(x.f * T * RAD) + x.s * Math.sin(x.f * T * RAD) : 0
+  const E = solveKepler(wrap180(L - peri + extra), e) * RAD
 
   const xp = a * (Math.cos(E) - e)
   const yp = a * Math.sqrt(1 - e * e) * Math.sin(E)
@@ -83,6 +100,7 @@ export function heliocentric(planet: PlanetName, jd: number): Heliocentric {
     x: (cw * cO - sw * sO * cI) * xp + (-sw * cO - cw * sO * cI) * yp,
     y: (cw * sO + sw * cO * cI) * xp + (-sw * sO + cw * cO * cI) * yp,
     z: sw * sI * xp + cw * sI * yp,
-    outOfRange: jd < VALID_FROM_JD || jd > VALID_TO_JD,
+    table,
+    outOfRange: jd < VALID_T2_FROM_JD || jd > VALID_T2_TO_JD,
   }
 }

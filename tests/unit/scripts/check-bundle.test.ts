@@ -13,7 +13,13 @@ interface Finding {
   detail: string
 }
 
-const BUDGETS = { entryGzip: 4_000, lazyThreeGzip: 4_000, worldMapGzip: 4_000, textureBytes: 2_000 }
+const BUDGETS = {
+  entryGzip: 4_000,
+  lazyThreeGzip: 4_000,
+  worldMapGzip: 4_000,
+  orreryGzip: 4_000,
+  textureBytes: 2_000,
+}
 
 /** A fake dist/ with an index.html that loads `entry` and modulepreloads `preloads`. */
 function fakeDist(
@@ -36,6 +42,30 @@ function fakeDist(
 const failures = (findings: Finding[]) => findings.filter((f) => !f.ok).map((f) => f.rule)
 
 describe('checkBundle', () => {
+  // #91: the orrery is a whole page behind its tab; none of it belongs in the first load.
+  it('fails when the orrery lands in the first load', () => {
+    const dir = fakeDist(
+      { 'assets/index-abc.js': 'x', 'assets/shared-1.js': 'canvas.dataset.orreryWebgl=""' },
+      'index-abc.js',
+      ['shared-1.js'],
+    )
+    expect(failures(checkBundle(dir, BUDGETS))).toContain('entry-has-no-orrery')
+  })
+
+  it('budgets each lazy orrery chunk', () => {
+    const noise = Array.from({ length: 20_000 }, (_, i) =>
+      ((i * 2654435761) % 4093).toString(36),
+    ).join('')
+    const dir = fakeDist({
+      'assets/index-abc.js': 'x',
+      'assets/OrreryPage-zz.js': `data-orrery-page ${noise}`,
+      'assets/OrreryRenderer-yy.js': 'small',
+    })
+    const findings = checkBundle(dir, BUDGETS) as Finding[]
+    expect(failures(findings)).toEqual(['orrery-gzip'])
+    expect(findings.filter((f) => f.rule === 'orrery-gzip')).toHaveLength(2)
+  })
+
   it('passes a small entry chunk with no three.js in it', () => {
     const dir = fakeDist({ 'assets/index-abc.js': 'console.log("app")' })
     expect(failures(checkBundle(dir, BUDGETS))).toEqual([])

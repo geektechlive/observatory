@@ -7,7 +7,7 @@ import { useSolarActivity } from '@/hooks/useSolarActivity'
 import { useSolarWind } from '@/hooks/useSolarWind'
 import { useSunMoon } from '@/hooks/useSunMoon'
 import { type Feed, toFeed, voiceFor, type VoiceInput, type VoiceView } from '@/lib/voice'
-import type { ConsoleView } from '@/store/ui'
+import type { ConsoleColumnView } from '@/store/ui'
 
 import styles from './console.module.css'
 
@@ -24,6 +24,7 @@ const EMPTY: VoiceInput = {
   neo: LOADING,
   people: LOADING,
   launch: LOADING,
+  nearest: LOADING,
 }
 
 function Line({ view, input }: { view: VoiceView; input: VoiceInput }) {
@@ -107,7 +108,8 @@ function OrbitVoice() {
   )
 }
 
-const VOICES: Record<ConsoleView, () => React.JSX.Element> = {
+// The orrery writes its own line from the planet math, inside its lazy chunk (#91).
+const VOICES: Record<ConsoleColumnView, () => React.JSX.Element> = {
   earth: EarthVoice,
   sun: SunVoice,
   sky: SkyVoice,
@@ -115,7 +117,7 @@ const VOICES: Record<ConsoleView, () => React.JSX.Element> = {
 }
 
 /** The console's one Fraunces sentence (tokens rule 7), written from live data. */
-export function ConsoleVoice({ view }: { view: ConsoleView }) {
+export function ConsoleVoice({ view }: { view: ConsoleColumnView }) {
   const Voice = VOICES[view]
   return <Voice />
 }

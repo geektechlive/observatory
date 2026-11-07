@@ -5,7 +5,7 @@
  */
 import { flareStatus, kpStatus } from './severity'
 
-export type VoiceView = 'earth' | 'sun' | 'sky' | 'orbit'
+export type VoiceView = 'earth' | 'orrery' | 'sun' | 'sky' | 'orbit'
 
 export type Feed<T> = { state: 'loading' } | { state: 'error' } | { state: 'ok'; data: T }
 
@@ -20,6 +20,12 @@ export interface VoiceInput {
   neo: Feed<{ countThisWeek: number }>
   people: Feed<{ count: number }>
   launch: Feed<{ name: string | null; hoursUntil: number | null }>
+  /**
+   * The planet nearest Earth at the orrery's time (#91). The orrery page computes it, so
+   * the planet math stays out of this module (and the entry). `model` is false outside
+   * every JPL table, where positions are rough.
+   */
+  nearest: Feed<{ name: string; au: number; rateKmS: number; model: boolean }>
 }
 
 const QUAKE_MIN_MAG = 5
@@ -114,7 +120,22 @@ function orbit({ people, launch }: VoiceInput): string {
   return `${head}, and the next launch, ${name}, is in ${countdown(hoursUntil)}.`
 }
 
-const WRITERS: Record<VoiceView, (input: VoiceInput) => string> = { earth, sun, sky, orbit }
+function orrery({ nearest }: VoiceInput): string {
+  if (nearest.state === 'loading') return LOADING
+  if (nearest.state === 'error') return 'The planet positions could not be computed.'
+  const { name, au, rateKmS, model } = nearest.data
+  if (!model) return 'This date is outside the planet tables; positions here are rough.'
+  const motion = rateKmS < 0 ? 'closing' : 'pulling away'
+  return `${name} is the nearest planet, ${au.toFixed(2)} au away and ${motion} at ${Math.abs(rateKmS).toFixed(1)} km/s.`
+}
+
+const WRITERS: Record<VoiceView, (input: VoiceInput) => string> = {
+  earth,
+  orrery,
+  sun,
+  sky,
+  orbit,
+}
 
 export function voiceFor(view: VoiceView, input: VoiceInput): string {
   return WRITERS[view](input)
