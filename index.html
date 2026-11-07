@@ -3,9 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>observatory</title>
-    <meta name="description" content="NASA live-data dashboard, inspired by cosmo-tui" />
-    <meta name="theme-color" content="#04060f" />
+    <title>Observatory</title>
+    <meta name="description" content="Live NASA and NOAA data, from the Earth to the edge of the solar system: the ISS, quakes and fires, the live Sun, tonight's sky, and the planets and spacecraft in 3D." />
+    <!-- --void from src/styles/tokens.css, as hex (#110) -->
+    <meta name="theme-color" content="#030101" />
     <link rel="canonical" href="https://observatory.geektechlive.com/" />
 
     <!-- Favicon -->
@@ -16,19 +17,24 @@
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="observatory" />
-    <meta property="og:title" content="observatory — NASA Live Data Dashboard" />
-    <meta property="og:description" content="Real-time NASA data: ISS tracker, EONET events, near-Earth asteroids, space weather, and more." />
+    <!-- Share preview (#110). The image is built by scripts/og-image.mjs; regenerate it
+         after a visual change. tests/unit/share-meta.test.ts keeps og and twitter in step. -->
+    <meta property="og:site_name" content="Observatory" />
+    <meta property="og:title" content="Observatory: live NASA and NOAA data, from Earth to the heliopause" />
+    <meta property="og:description" content="Five views on one instrument. Earth: the ISS live, quakes, fires and aurora. Orrery: the planets, Voyagers and New Horizons in 3D. Sun: today's Sun from SDO, flares and the solar wind. Sky: tonight's planets and passing asteroids. Orbit: who's in space, Deep Space Network contacts and launches." />
     <meta property="og:url" content="https://observatory.geektechlive.com" />
     <meta property="og:image" content="https://observatory.geektechlive.com/og-image.png" />
-    <meta property="og:image:alt" content="observatory dashboard: globe with live ISS track and event markers" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="Observatory: a copper globe lit by the Sun, with city lights on its night side" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="observatory — NASA Live Data Dashboard" />
-    <meta name="twitter:description" content="Real-time NASA data: ISS tracker, EONET events, near-Earth asteroids, space weather, and more." />
+    <meta name="twitter:title" content="Observatory: live NASA and NOAA data, from Earth to the heliopause" />
+    <meta name="twitter:description" content="Five views on one instrument. Earth: the ISS live, quakes, fires and aurora. Orrery: the planets, Voyagers and New Horizons in 3D. Sun: today's Sun from SDO, flares and the solar wind. Sky: tonight's planets and passing asteroids. Orbit: who's in space, Deep Space Network contacts and launches." />
     <meta name="twitter:image" content="https://observatory.geektechlive.com/og-image.png" />
-    <meta name="twitter:image:alt" content="observatory dashboard: globe with live ISS track and event markers" />
+    <meta name="twitter:image:alt" content="Observatory: a copper globe lit by the Sun, with city lights on its night side" />
 
     <!-- Self-hosted font preloads (critical weights only) -->
     <link rel="preload" href="/fonts/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin />
@@ -51,8 +57,9 @@
           align-items: center;
           justify-content: center;
           min-height: 100dvh;
-          background: #04060f;
-          color: #94a3b8;
+          /* --void and --bone-dim as hex; no tokens before the app's CSS loads */
+          background: #030101;
+          color: #a9a49c;
           font-family: 'IBM Plex Mono', ui-monospace, monospace;
           font-size: 0.875rem;
           letter-spacing: 0.05em;
@@ -60,12 +67,14 @@
           gap: 12px;
         }
         .noscript-title {
-          color: #e2e8f0;
+          color: #c46b39;
           font-size: 1.1rem;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
         }
       </style>
       <div class="noscript">
-        <span class="noscript-title">observatory</span>
+        <span class="noscript-title">Observatory</span>
         <span>JavaScript is required to display live NASA data.</span>
       </div>
     </noscript>

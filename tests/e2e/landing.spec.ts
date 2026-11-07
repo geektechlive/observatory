@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test'
 test.describe('Landing page', () => {
   test('loads and has correct title', async ({ page }) => {
     await page.goto('/')
-    await expect(page).toHaveTitle('observatory')
+    // Matches the header's <h1> (#110).
+    await expect(page).toHaveTitle('Observatory')
   })
 
   test('status bar is visible', async ({ page }) => {
