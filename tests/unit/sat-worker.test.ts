@@ -1,0 +1,196 @@
+/**
+ * The satellite worker's message handling (#98), run here in Node: groups load from the
+ * fetched body, frames come back in group order with reusable buffers, and the JS path
+ * takes over if the WASM runtime will not load.
+ */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { bulkRuntime } from '@/lib/orbit/bulk/bulkEci'
+import { SAT_OK } from '@/lib/orbit/bulk/satField'
+import { createSatHandler, type SatReply } from '@/lib/orbit/bulk/satHandler'
+import { createSatWorker } from '@/lib/orbit/bulk/satsClient'
+import { type SatRow, toRow } from '@/lib/orbit/satCatalog'
+
+type Omm = Record<string, unknown>
+const SAMPLES = JSON.parse(
+  readFileSync(join(__dirname, 'fixtures', 'celestrak-omm.json'), 'utf8'),
+) as Record<string, Omm[]>
+const rowsOf = (g: string) => (SAMPLES[g] ?? []).map(toRow).filter((r): r is SatRow => r !== null)
+const FIELDS = [
+  'name',
+  'id',
+  'cospar',
+  'epoch',
+  'meanMotion',
+  'eccentricity',
+  'inclination',
+  'raan',
+  'argPericenter',
+  'meanAnomaly',
+  'bstar',
+  'meanMotionDot',
+  'meanMotionDdot',
+]
+const body = (group: string, rows: SatRow[]) =>
+  new TextEncoder().encode(
+    JSON.stringify({
+      group,
+      label: group,
+      category: 'x',
+      source: 'celestrak',
+      celestrakGroup: group,
+      generatedAt: '2026-11-07T06:00:00.000Z',
+      fields: FIELDS,
+      count: rows.length,
+      rows,
+    }),
+  ).buffer
+const AT = Date.parse('2026-11-06T12:57:30Z')
+
+function expectType<T extends SatReply['type']>(
+  reply: SatReply,
+  type: T,
+): Extract<SatReply, { type: T }> {
+  expect(reply.type).toBe(type)
+  return reply as Extract<SatReply, { type: T }>
+}
+
+describe('createSatHandler (#98)', () => {
+  it('loads groups and answers a frame in load order, with each group’s span', async () => {
+    const handle = createSatHandler({ runtime: bulkRuntime })
+    const a = expectType(
+      (await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })).reply,
+      'loaded',
+    )
+    expect(a).toMatchObject({ group: 'stations', count: 2, dropped: 0 })
+    await handle({ type: 'load', id: 2, body: body('gps-ops', rowsOf('gps-ops')) })
+    const { reply, transfer } = await handle({ type: 'propagate', id: 3, dateMs: AT })
+    const frame = expectType(reply, 'frame')
+    expect(frame.groups).toEqual([
+      { group: 'stations', start: 0, count: 2 },
+      { group: 'gps-ops', start: 2, count: 1 },
+    ])
+    expect(frame.ids).toEqual(['25544', expect.any(String), expect.any(String)])
+    expect(frame.positions).toHaveLength(9)
+    expect(frame.status[0]).toBe(SAT_OK)
+    expect(frame.engine).toBe('wasm')
+    expect(frame.ms).toBeGreaterThanOrEqual(0)
+    // The buffers are transferred, not copied.
+    expect(transfer).toEqual([frame.positions.buffer, frame.status.buffer])
+  })
+
+  it('reloading a group replaces it; unloading removes it', async () => {
+    const handle = createSatHandler({ runtime: bulkRuntime })
+    await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
+    await handle({ type: 'load', id: 2, body: body('stations', rowsOf('stations').slice(0, 1)) })
+    let frame = expectType((await handle({ type: 'propagate', id: 3, dateMs: AT })).reply, 'frame')
+    expect(frame.groups).toEqual([{ group: 'stations', start: 0, count: 1 }])
+    await handle({ type: 'unload', id: 4, group: 'stations' })
+    frame = expectType((await handle({ type: 'propagate', id: 5, dateMs: AT })).reply, 'frame')
+    expect(frame.groups).toEqual([])
+    expect(frame.positions).toHaveLength(0)
+  })
+
+  it('writes into returned buffers rather than allocating new ones', async () => {
+    const handle = createSatHandler({ runtime: bulkRuntime })
+    await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
+    const first = expectType(
+      (await handle({ type: 'propagate', id: 2, dateMs: AT })).reply,
+      'frame',
+    )
+    const second = expectType(
+      (
+        await handle({
+          type: 'propagate',
+          id: 3,
+          dateMs: AT + 1000,
+          reuse: { positions: first.positions, status: first.status },
+        })
+      ).reply,
+      'frame',
+    )
+    expect(second.positions).toBe(first.positions)
+  })
+
+  it('falls back to JS propagate when the WASM runtime fails to load', async () => {
+    const handle = createSatHandler({ runtime: () => Promise.reject(new Error('no wasm')) })
+    await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
+    const frame = expectType(
+      (await handle({ type: 'propagate', id: 2, dateMs: AT })).reply,
+      'frame',
+    )
+    expect(frame.engine).toBe('js')
+    expect(frame.status[0]).toBe(SAT_OK)
+  })
+
+  it('answers a bad body with an error naming the request, not a crash', async () => {
+    const handle = createSatHandler({ runtime: bulkRuntime })
+    const reply = (
+      await handle({ type: 'load', id: 7, body: new TextEncoder().encode('nope').buffer })
+    ).reply
+    expect(expectType(reply, 'error').id).toBe(7)
+  })
+})
+
+class FakeWorker {
+  static last: FakeWorker | null = null
+  onmessage: ((e: MessageEvent) => void) | null = null
+  posted: { msg: { type: string; id: number }; transfer: Transferable[] }[] = []
+  constructor() {
+    FakeWorker.last = this
+  }
+  postMessage(msg: { type: string; id: number }, transfer: Transferable[] = []) {
+    this.posted.push({ msg, transfer })
+  }
+  terminate() {
+    return undefined
+  }
+  reply(data: unknown) {
+    this.onmessage?.({ data } as MessageEvent)
+  }
+}
+
+describe('createSatWorker (#98)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('transfers the fetched body, matches replies by id, and rejects on an error reply', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const sats = createSatWorker()
+    const fake = FakeWorker.last
+    const buffer = new ArrayBuffer(8)
+    const loading = sats.load(buffer)
+    const sent = fake?.posted[0]
+    expect(sent?.msg.type).toBe('load')
+    expect(sent?.transfer).toEqual([buffer])
+    fake?.reply({
+      type: 'loaded',
+      id: sent?.msg.id,
+      group: 'stations',
+      count: 2,
+      dropped: 0,
+      ms: 1,
+    })
+    await expect(loading).resolves.toMatchObject({ group: 'stations', count: 2 })
+
+    const failing = sats.load(new ArrayBuffer(1))
+    fake?.reply({ type: 'error', id: fake.posted[1]?.msg.id, message: 'bad body' })
+    await expect(failing).rejects.toThrow('bad body')
+  })
+
+  it('hands a released frame back to the worker with the next request (double buffering)', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const sats = createSatWorker()
+    const fake = FakeWorker.last
+    const frame = { positions: new Float32Array(3), status: new Uint8Array(1) }
+    sats.release(frame)
+    void sats.propagate(new Date(AT))
+    const sent = fake?.posted[0]
+    expect(sent?.msg).toMatchObject({ type: 'propagate', dateMs: AT, reuse: frame })
+    expect(sent?.transfer).toEqual([frame.positions.buffer, frame.status.buffer])
+  })
+})

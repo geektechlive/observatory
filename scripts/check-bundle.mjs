@@ -30,6 +30,9 @@ export const BUDGETS = {
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses
   // the globe's day-2048). They load with the orrery tab, never with the page.
   planetTextureTotal: 700_000,
+  // #98 measured the satellite worker at 69.3 kB gzip: satellite.js with its embedded
+  // single-thread WASM (the #97 bulk worker alone was ~44 kB) plus zod for the body check.
+  satWorkerGzip: 80_000,
 }
 
 const THREE_MARKER = 'WebGLRenderer'
@@ -40,6 +43,9 @@ const SGP4_MARKER = 'SemiLatusRectumBelowZero'
 // The orrery (#91) is a whole page behind its tab: its page and renderer name these in
 // markup and on the canvas, and neither may reach the first load.
 const ORRERY_MARKERS = ['data-orrery-page', 'orreryWebgl']
+// The satellite worker (#98) and its catalogue load with the orrery's satellite layer:
+// the client names the worker file, the catalogue names its debris groups.
+const SAT_MARKERS = ['sats.worker', 'fengyun-1c-debris']
 const gz = (buf) => gzipSync(buf, { level: 9 }).length
 const kb = (n) => `${(n / 1000).toFixed(1)} kB`
 
@@ -88,10 +94,22 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       : 'orrery not in first-load chunks',
   )
 
+  const withSats = initial.filter((_, i) => SAT_MARKERS.some((m) => bodies[i].includes(m)))
+  add(
+    'entry-has-no-sat-worker',
+    withSats.length === 0,
+    withSats.length > 0
+      ? `${withSats.join(', ')} contains satellite worker or catalogue code: it must load on first use (loadSatWorker.ts)`
+      : 'satellite worker and catalogue not in first-load chunks',
+  )
+
   for (const name of readdirSync(join(distDir, 'assets'))) {
     if (!name.endsWith('.js') || initial.includes(`assets/${name}`)) continue
     const body = readFileSync(join(distDir, 'assets', name))
-    if (name.startsWith('OrreryPage-') || name.startsWith('OrreryRenderer-')) {
+    if (name.startsWith('sats.worker-')) {
+      const size = gz(body)
+      add('sat-worker-gzip', size <= budgets.satWorkerGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`)
+    } else if (name.startsWith('OrreryPage-') || name.startsWith('OrreryRenderer-')) {
       const size = gz(body)
       add('orrery-gzip', size <= budgets.orreryGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGzip)})`)
     } else if (body.includes(THREE_MARKER)) {

@@ -25,6 +25,7 @@
 //                                            just the orrery step, payload saved locally
 //   ... --dry-run --only=orrery-neo --neo-out=/tmp/neo.json
 //                                            just the close-approach step (#92)
+//   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
 //
 // Env (write mode only):
 //   CLOUDFLARE_API_TOKEN   token with "Workers KV Storage: Edit" on the account
@@ -35,6 +36,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
+import { celestrakFetchText, refreshSatGroups } from './celestrak-groups.mjs'
 import { buildOrreryBodies } from './orrery-bodies.mjs'
 import { buildOrreryNeo } from './orrery-neo.mjs'
 
@@ -671,6 +673,18 @@ async function main(argv) {
         console.log(`  saved ${KEY_ORRERY_NEO} to ${neoOut} (${String(write.value.length)} bytes)`)
       }
     }
+  }
+
+  if (!only || only === 'celestrak-groups') {
+    // The orrery's satellites (#98), one KV key per group; see celestrak-groups.mjs.
+    const { entry, writes: satWrites } = await refreshSatGroups({
+      now: Date.now(),
+      fetchText: (url) => celestrakFetchText(url, { retrying: (u) => fetchWithRetry(u) }),
+      readPrevious: (key) => readKv(key, config),
+      classifyFailure,
+    })
+    report.push(entry)
+    for (const write of satWrites) writes.push({ ...write, entry })
   }
 
   if (dryRun) {

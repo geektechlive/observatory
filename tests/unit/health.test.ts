@@ -42,6 +42,13 @@ describe('SOURCES', () => {
     expect(SOURCES['orrery-neo'].required({ approaches: [{ id: 'sb:524522' }] })).toBe(true)
   })
 
+  it('grades orrery satellites by non-empty rows, 36 h before degraded (#98)', () => {
+    expect(SOURCES['orrery-sats'].headline).toBe(false)
+    expect(SOURCES['orrery-sats'].maxAgeMs).toBe(36 * 3_600_000)
+    expect(SOURCES['orrery-sats'].required({ rows: [] })).toBe(false)
+    expect(SOURCES['orrery-sats'].required({ rows: [['ISS (ZARYA)', '25544']] })).toBe(true)
+  })
+
   it('gives every source a label and a positive max age', () => {
     for (const name of SOURCE_NAMES) {
       const contract = SOURCES[name]

@@ -109,6 +109,16 @@ export const CHECKS = [
       b.approaches.length > 0 &&
       b.approaches.every((x) => typeof x?.closeApproach?.distAu === 'number' && x?.fine !== undefined),
   },
+  // The orrery's satellites (#98): KV-only, one CelesTrak group per request. The small
+  // stations group proves the pipeline without pulling Starlink's 1.7 MB every run.
+  {
+    path: '/api/orrery-sats?group=stations',
+    requires: 'non-empty rows, each with the 13 catalogue fields',
+    check: (b) =>
+      Array.isArray(b?.rows) &&
+      b.rows.length > 0 &&
+      b.rows.every((r) => Array.isArray(r) && r.length === 13 && typeof r[1] === 'string'),
+  },
 ]
 
 /**

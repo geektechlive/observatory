@@ -365,6 +365,16 @@ describe('probed endpoints (#42, #61)', () => {
     expect(neo?.check({ approaches: [] })).toBe(false)
     expect(neo?.check({ approaches: [{ fine: null }] })).toBe(false)
   })
+
+  it('probes orrery satellites through the small stations group, rows of 13 fields (#98)', () => {
+    const sats = byPath('/api/orrery-sats?group=stations')
+    expect(sats).toBeDefined()
+    const iss = ['ISS (ZARYA)', '25544', '1998-067A', '2026-11-06T11:57:30.503808']
+    const row = [...iss, 15.49, 0.0006, 51.63, 6.9, 314.9, 45.1, 0.0001, 0.00005, 0]
+    expect(sats?.check({ fields: Array(13).fill('f'), rows: [row] })).toBe(true)
+    expect(sats?.check({ rows: [] })).toBe(false)
+    expect(sats?.check({ rows: [['ISS (ZARYA)']] })).toBe(false)
+  })
 })
 
 describe('exit code (#120)', () => {

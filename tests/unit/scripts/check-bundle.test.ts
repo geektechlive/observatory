@@ -214,4 +214,35 @@ describe('checkBundle', () => {
     writeFileSync(join(dir, 'index.html'), '<html></html>')
     expect(failures(checkBundle(dir, BUDGETS))).toContain('entry-found')
   })
+
+  // #98: the satellite worker and its catalogue load with the orrery's satellite layer.
+  describe('satellites', () => {
+    const budgets = { ...BUDGETS, satWorkerGzip: 4_000 }
+    const noise = Array.from({ length: 20_000 }, (_, i) =>
+      ((i * 2654435761) % 4093).toString(36),
+    ).join('')
+
+    it('budgets the built satellite worker', () => {
+      const big = fakeDist({ 'assets/index-abc.js': 'x', 'assets/sats.worker-q1.js': noise })
+      expect(failures(checkBundle(big, budgets))).toEqual(['sat-worker-gzip'])
+      const small = fakeDist({ 'assets/index-abc.js': 'x', 'assets/sats.worker-q1.js': 'w' })
+      const findings = checkBundle(small, budgets) as Finding[]
+      expect(failures(findings)).toEqual([])
+      expect(findings.some((f) => f.rule === 'sat-worker-gzip')).toBe(true)
+    })
+
+    it('fails when the worker client or the catalogue reaches the first load', () => {
+      for (const body of [
+        'new Worker(new URL("/assets/sats.worker-q1.js", import.meta.url))',
+        'const g = ["cosmos-2251-debris","fengyun-1c-debris"]',
+      ]) {
+        const dir = fakeDist(
+          { 'assets/index-abc.js': 'x', 'assets/shared-1.js': body },
+          'index-abc.js',
+          ['shared-1.js'],
+        )
+        expect(failures(checkBundle(dir, budgets))).toContain('entry-has-no-sat-worker')
+      }
+    })
+  })
 })

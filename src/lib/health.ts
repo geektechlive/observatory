@@ -36,6 +36,7 @@ export type SourceName =
   | 'nws'
   | 'orrery-bodies'
   | 'orrery-neo'
+  | 'orrery-sats'
   | 'people-in-space'
   | 'planets'
   | 'quakes'
@@ -155,6 +156,14 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: false,
     maxAgeMs: 36 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'approaches'),
+  },
+  'orrery-sats': {
+    // Not headline: only the orrery page asks for it (#98). One CelesTrak group per
+    // request, refreshed every 6 h; SGP4 elements are good for days, so 36 h is sound.
+    label: 'Orrery Satellites',
+    headline: false,
+    maxAgeMs: 36 * HOUR,
+    required: (data) => nonEmptyArrayField(data, 'rows'),
   },
   'people-in-space': {
     label: 'People In Space',

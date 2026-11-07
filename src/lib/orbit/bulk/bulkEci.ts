@@ -24,9 +24,15 @@ export function bulkRuntime(): Promise<Runtime> {
 /**
  * ECI positions (km, TEME) for every satellite at every date, packed as
  * [x, y, z] per satellite per date, satellite-major. A satellite SGP4 cannot place
- * (decayed, bad elements) comes back as NaN, never as a made-up position.
+ * (decayed, bad elements) comes back as NaN, never as a made-up position. `out`, when
+ * it is the right length, is written in place (the #98 worker double-buffers).
  */
-export function propagateBulk(rt: Runtime, satrecs: SatRec[], dates: Date[]): Float32Array {
+export function propagateBulk(
+  rt: Runtime,
+  satrecs: SatRec[],
+  dates: Date[],
+  out?: Float32Array,
+): Float32Array {
   const propagator = new BulkPropagator({
     runtime: rt,
     calculators: [new EciBaseCalculator()],
@@ -38,14 +44,14 @@ export function propagateBulk(rt: Runtime, satrecs: SatRec[], dates: Date[]): Fl
     propagator.setDates(dates)
     propagator.run()
     const { position, error } = propagator.getRawOutput().eci
-    const out = new Float32Array(position.length)
+    const target = out?.length === position.length ? out : new Float32Array(position.length)
     for (let i = 0; i < error.length; i++) {
       // Any SGP4 error (SatRecError, 0 = none) leaves the slot NaN: no made-up position.
       const ok = error[i] === 0
       for (let c = 0; c < 3; c++)
-        out[i * 3 + c] = ok ? (position[i * 3 + c] ?? Number.NaN) : Number.NaN
+        target[i * 3 + c] = ok ? (position[i * 3 + c] ?? Number.NaN) : Number.NaN
     }
-    return out
+    return target
   } finally {
     propagator.dispose()
   }
