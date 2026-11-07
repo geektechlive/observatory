@@ -33,7 +33,9 @@
 //   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
 //   ... --dry-run --only=spacetrack --spacetrack-out=/tmp/st.json
 //                                            just Space-Track (#101); needs SPACETRACK_USER
-//                                            and SPACETRACK_PASS, else it is skipped
+//                                            and SPACETRACK_PASS, else it is skipped;
+//                                            DISCOSweb runs after it (--discos-out=path),
+//                                            or alone with --only=discos (DISCOSWEB_TOKEN)
 //
 // Env (write mode only):
 //   CLOUDFLARE_API_TOKEN   token with "Workers KV Storage: Edit" on the account
@@ -41,6 +43,7 @@
 //   KV_NAMESPACE_ID        optional override, defaults to the observatory namespace
 // Env (any mode, optional):
 //   SPACETRACK_USER, SPACETRACK_PASS  the Space-Track.org account (#101); never logged
+//   DISCOSWEB_TOKEN                   the ESA DISCOSweb token (#101); never logged
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -53,6 +56,8 @@ import {
   buildOrrerySmallBodies,
   DEFAULT_BUDGET_MS as SMALLBODIES_BUDGET_MS,
 } from './orrery-smallbodies.mjs'
+import { HISTORY_OBJECTS } from '../src/lib/spacetrack.ts'
+import { buildDiscos, discosToken } from './discos.mjs'
 import {
   buildSpaceTrack,
   DEFAULT_BUDGET_MS as SPACETRACK_BUDGET_MS,
@@ -99,6 +104,11 @@ export const SPACETRACK_SATCAT_KEY = (shard) => `spacetrack:satcat:v1:${String(s
 const SPACETRACK_SIGNATURE = 'refresh:spacetrack'
 /** TIP is asked every run; /api/spacetrack calls a catalogue past 36 h degraded. */
 const SPACETRACK_MAX_AGE_MS = 36 * 3_600_000
+/** ESA DISCOSweb (#101): mass, size and operator; see discos.mjs. */
+export const KEY_DISCOS = 'discos:objects:v1'
+const DISCOS_SIGNATURE = 'refresh:discos'
+/** Each object is asked weekly, so a copy is sound for a fortnight. */
+const DISCOS_MAX_AGE_MS = 14 * 86_400_000
 const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
@@ -898,6 +908,84 @@ export async function refreshSpaceTrack(config, deps = {}) {
   }
 }
 
+/**
+ * The satellites DISCOSweb is asked about: the space stations group (its last KV copy),
+ * the GP_HISTORY objects, and whatever Space-Track predicts is coming down. In order,
+ * each once.
+ */
+export function discosTargets(stationsText, catalog) {
+  const stations = parseJsonOrNull(stationsText)?.rows ?? []
+  const ids = [
+    ...stations.map((r) => r?.[1]),
+    ...HISTORY_OBJECTS.map((o) => o.noradId),
+    ...(catalog?.tip?.reentries ?? []).map((r) => r.noradId),
+  ].filter((id) => typeof id === 'string' && /^\d+$/.test(id))
+  return [...new Set(ids)]
+}
+
+/**
+ * DISCOSweb (#101): one finished body, written when it changed. Skipped with a warning
+ * when the token isn't configured. A failure is judged by the copy's age (14 days).
+ */
+export async function refreshDiscos(config, deps = {}) {
+  const token = discosToken(deps.env ?? process.env)
+  if (!token) {
+    const detail = `${DISCOS_SIGNATURE} skipped: DISCOSWEB_TOKEN not set`
+    console.warn(detail)
+    return { entry: { signature: DISCOS_SIGNATURE, ok: true, warning: true, detail }, writes: [] }
+  }
+  const now = deps.now ?? Date.now()
+  const previousText =
+    deps.previousText !== undefined ? deps.previousText : await readKv(KEY_DISCOS, config)
+  const previous = parseJsonOrNull(previousText)
+  try {
+    if ((deps.budgetMs ?? 1) <= 0) throw new Error('job deadline reached (#128)')
+    const { payload, changed, requests, rateLimit } = await buildDiscos({
+      now,
+      token,
+      satnos: deps.satnos ?? [],
+      previous,
+      ...(deps.http === undefined ? {} : { http: deps.http }),
+      ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+    })
+    const failedAll = requests > 0 && !changed
+    if (failedAll) throw new Error(payload.missing.map((m) => m.reason).join('; ') || 'no answer')
+    const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    const detail =
+      `ok ${DISCOS_SIGNATURE} ${String(Object.keys(payload.craft).length)} craft, ` +
+      `${String(Object.keys(payload.satellites).length)} satellites, ${String(requests)} requests` +
+      (rateLimit?.limit ? `, rate limit ${rateLimit.limit} (${rateLimit.remaining ?? '?'} left)` : '') +
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+    console.log(detail)
+    return {
+      entry: { signature: DISCOS_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      writes: changed
+        ? [
+            {
+              key: KEY_DISCOS,
+              value: JSON.stringify(payload),
+              metadata: {
+                fetchedAt: payload.generatedAt,
+                craft: Object.keys(payload.craft).length,
+                satellites: Object.keys(payload.satellites).length,
+              },
+            },
+          ]
+        : [],
+    }
+  } catch (err) {
+    const verdict = classifyFailure({
+      err,
+      envelopeText: previous ? JSON.stringify({ fetchedAt: previous.generatedAt }) : previousText,
+      maxAgeMs: DISCOS_MAX_AGE_MS,
+      now,
+    })
+    const detail = `${DISCOS_SIGNATURE} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    return { entry: { ...verdict, signature: DISCOS_SIGNATURE, detail }, writes: [] }
+  }
+}
+
 async function main(argv) {
   const dryRun = argv.includes('--dry-run')
   // Local runs: --only=orrery-bodies skips the other sources; --bodies-out=path saves
@@ -909,6 +997,7 @@ async function main(argv) {
     .find((a) => a.startsWith('--smallbodies-out='))
     ?.slice('--smallbodies-out='.length)
   const stOut = argv.find((a) => a.startsWith('--spacetrack-out='))?.slice('--spacetrack-out='.length)
+  const discosOut = argv.find((a) => a.startsWith('--discos-out='))?.slice('--discos-out='.length)
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
@@ -989,6 +1078,7 @@ async function main(argv) {
     for (const write of satWrites) writes.push({ ...write, entry })
   }
 
+  let stCatalog = null
   if (!only || only === 'spacetrack') {
     // Space-Track (#101): its own account and pace, inside what is left of the job.
     const began = Date.now()
@@ -1002,6 +1092,7 @@ async function main(argv) {
     for (const write of stWrites) {
       writes.push({ ...write, entry })
       console.log(`  ${write.key}: ${String(write.value.length)} bytes`)
+      if (write.key === KEY_SPACETRACK_CATALOG) stCatalog = JSON.parse(write.value)
     }
     if (dryRun && stOut && stWrites.length > 0) {
       await writeFile(
@@ -1009,6 +1100,25 @@ async function main(argv) {
         JSON.stringify(Object.fromEntries(stWrites.map((w) => [w.key, JSON.parse(w.value)]))),
       )
       console.log(`  saved the Space-Track bodies to ${stOut}`)
+    }
+  }
+
+  if (!only || only === 'spacetrack' || only === 'discos') {
+    // DISCOSweb (#101) after Space-Track, so this run's re-entries are among its targets.
+    const stationsWrite = writes.find((w) => w.key === 'celestrak:gp:stations:v1')
+    const stationsText = stationsWrite?.value ?? (await readKv('celestrak:gp:stations:v1', config))
+    const { entry, writes: dWrites } = await refreshDiscos(config, {
+      satnos: discosTargets(stationsText, stCatalog),
+      budgetMs: deadline.remaining(),
+    })
+    report.push(entry)
+    for (const write of dWrites) {
+      writes.push({ ...write, entry })
+      console.log(`  ${write.key}: ${String(write.value.length)} bytes`)
+    }
+    if (dryRun && discosOut && dWrites.length > 0) {
+      await writeFile(discosOut, dWrites[0].value)
+      console.log(`  saved ${KEY_DISCOS} to ${discosOut}`)
     }
   }
 

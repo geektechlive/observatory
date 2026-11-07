@@ -6,8 +6,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  discosTargets,
+  KEY_DISCOS,
   KEY_SPACETRACK_CATALOG,
   KEY_SPACETRACK_HISTORY,
+  refreshDiscos,
   refreshSpaceTrack,
   SPACETRACK_SATCAT_KEY,
   // @ts-expect-error plain ESM script, no type declarations
@@ -119,5 +122,53 @@ describe('refreshSpaceTrack (#101)', () => {
     expect(asked).toBe(0)
     expect(entry.ok).toBe(true)
     expect(writes).toEqual([])
+  })
+})
+
+describe('refreshDiscos (#101)', () => {
+  const discosHttp = (url: string) => {
+    const filter = new URL(url).searchParams.get('filter') ?? ''
+    const ids = filter.startsWith('in(satno')
+      ? (/\(([\d,]+)\)/.exec(filter)?.[1]?.split(',') ?? [])
+      : []
+    const data = ids.map((n) => ({
+      type: 'object',
+      id: n,
+      attributes: { satno: Number(n), name: `SAT ${n}`, mass: 1 },
+      relationships: { operators: { data: [] } },
+    }))
+    return Promise.resolve(new Response(JSON.stringify({ data, included: [] })))
+  }
+
+  it('skips with a warning when the token is not configured', async () => {
+    const { entry, writes } = await refreshDiscos(null, { env: {}, now: NOW, satnos: ['25544'] })
+    expect(entry).toMatchObject({ signature: 'refresh:discos', ok: true, warning: true })
+    expect(writes).toEqual([])
+  })
+
+  it('writes discos:objects:v1 when it changed, without the token', async () => {
+    const { entry, writes } = await refreshDiscos(null, {
+      env: { DISCOSWEB_TOKEN: 'tok-not-real' },
+      now: NOW,
+      http: discosHttp,
+      satnos: ['25544'],
+      previousText: null,
+      pauseMs: 0,
+    })
+    expect(entry.ok).toBe(true)
+    expect(writes.map((w: { key: string }) => w.key)).toEqual([KEY_DISCOS])
+    expect(writes[0].value).not.toContain('tok-not-real')
+    expect(JSON.parse(writes[0].value).satellites['25544'].name).toBe('SAT 25544')
+  })
+
+  it('takes its satellites from the stations group, the history objects and the re-entries', () => {
+    const stations = JSON.stringify({
+      rows: [
+        ['ISS (ZARYA)', '25544'],
+        ['CSS (TIANHE)', '48274'],
+      ],
+    })
+    const catalog = { tip: { reentries: [{ noradId: '45700' }] } }
+    expect(discosTargets(stations, catalog)).toEqual(['25544', '48274', '20580', '45700'])
   })
 })
