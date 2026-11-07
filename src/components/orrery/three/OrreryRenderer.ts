@@ -67,12 +67,14 @@ import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
 import { EarthNeighbourhood } from './earthNeighbourhood'
 import { earthPresetView, type FocusPreset, FOV, frameView, sunlitFocusDirection } from './framing'
+import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
 export type { CraftFilter } from '../craftFilter'
 export type { FocusPreset } from './framing'
+export type { LookupData } from './lookupLayer'
 export type { SatInfo, SatMode, SatViewState } from './satLayer'
 export type { SunImageState } from './sunImage'
 export type ScaleMode = 'exaggerated' | 'log' | 'proportional'
@@ -94,9 +96,10 @@ export interface ProjectedBody {
   /**
    * 'ring': the heliopause marker's label anchor (#93), not a body. 'asteroid': a close
    * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92). 'satellite': the
-   * chosen satellite (#98); the others have no labels.
+   * chosen satellite (#98); the others have no labels. 'lookup': an object looked up at
+   * JPL and shown (#145).
    */
-  kind: 'body' | 'craft' | 'moon' | 'ring' | 'asteroid' | 'marker' | 'satellite'
+  kind: 'body' | 'craft' | 'moon' | 'ring' | 'asteroid' | 'marker' | 'satellite' | 'lookup'
   /** Screen position, px; may lie outside the canvas (rim markers use that). */
   x: number
   y: number
@@ -128,6 +131,8 @@ const ASTEROID_MIN_PX = 2.5
 const L1_MIN_PX = 3.5
 /** The chosen satellite's marker never draws smaller than this, px (#98). */
 const SAT_MARKER_MIN_PX = 4
+/** A looked-up object's marker never draws smaller than this, px (#145). */
+const LOOKUP_MIN_PX = 3.5
 /** Asteroid and L1 labels show once the Earth frame is this open (or the object is chosen). */
 const NEAR_LABEL_OPEN = 0.5
 /** The Earth–Moon/L1 preset holds this many Earth radii (as drawn) around Earth: L2 at 12.8. */
@@ -264,6 +269,8 @@ export class OrreryRenderer {
   )
   /** Earth's neighbourhood (#92): the Earth frame, close approaches, Sun–Earth line, L1. */
   private readonly near = new EarthNeighbourhood()
+  /** An object looked up at JPL and shown (#145): its marker and orbit line. */
+  private readonly lookup = new LookupLayer()
   /** Satellites in the Earth frame (#98); a pass or a group arriving asks for a frame. */
   private readonly sats: SatLayer
   private onSatState: ((s: SatViewState) => void) | null = null
@@ -371,8 +378,10 @@ export class OrreryRenderer {
       this.models.group,
       this.near.group,
       this.sats.group,
+      this.lookup.marker,
     )
-    this.orbitGroup.add(this.heliopause)
+    // Its orbit line is an orbit: the Orbits switch hides it with the planets' (#145).
+    this.orbitGroup.add(this.heliopause, this.lookup.path)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
     // they sit with the planets' orbit lines under the Orbits switch too.
     this.bodyGroup.add(this.moons.group)
@@ -462,6 +471,7 @@ export class OrreryRenderer {
     for (const a of this.near.asteroids.visible()) this.floorPx(a.mesh, ASTEROID_MIN_PX)
     if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX)
     if (this.sats.marker.visible) this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX)
+    if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
       c.mesh.scale.setScalar(craftIconScale(this.unitsPerPx(depth)))
@@ -527,6 +537,7 @@ export class OrreryRenderer {
     // Any craft near Earth (the L1/L2 ones; Europa Clipper on its Earth flyby) goes into
     // the frame with the Moon and the close approaches, so they share one scale.
     this.craft.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
+    this.lookup.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
     this.near.place(this.lastJd, frame)
   }
 
@@ -716,6 +727,7 @@ export class OrreryRenderer {
     }
     this.skins.orient(jd)
     this.craft.place(jd)
+    this.lookup.place(jd, (p) => this.toScene(p), this.mode)
   }
 
   /** Where a body or craft is drawn now, scene space. */
@@ -723,6 +735,8 @@ export class OrreryRenderer {
     if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? new Vector3()
     const near = this.nearPosition(name)
     if (near) return near
+    const looked = this.lookup.position(name)
+    if (looked) return looked
     if (this.moons.has(name)) {
       const parent = this.moons.parentOf(name)
       return this.moons.position(name) ?? (parent ? this.bodyPosition(parent) : new Vector3())
@@ -746,6 +760,13 @@ export class OrreryRenderer {
   /** The close-approach filters (#92): window, hazardous only, risk-listed only. */
   setNeoFilter(filter: NeoFilter): void {
     this.near.asteroids.setFilter(filter)
+    this.updateBodies(true)
+    this.markDirty()
+  }
+
+  /** An object looked up at JPL to draw (#145), or null to remove it. */
+  setLookup(data: LookupData | null): void {
+    this.lookup.set(data)
     this.updateBodies(true)
     this.markDirty()
   }
@@ -972,7 +993,14 @@ export class OrreryRenderer {
       this.craft.visible().some((c) => c.key === name && c.group === 'l1')
     if (nearEarth && this.mode !== 'proportional') this.placeEarthFrame(true)
     // A craft or close approach with no data at this date is hidden: nowhere to fly to.
-    if (!isBody(name) && !this.craft.position(name) && !this.nearPosition(name)) return
+    if (
+      !isBody(name) &&
+      !this.craft.position(name) &&
+      !this.nearPosition(name) &&
+      !this.lookup.position(name)
+    ) {
+      return
+    }
     this.focusBody = name
     this.preset = null
     this.canvas.dataset['orreryFocus'] = name
@@ -1154,6 +1182,15 @@ export class OrreryRenderer {
     if (this.near.l1.visible && (open || this.chosen === L1_KEY)) {
       out.push({ name: L1_KEY, label: L1_KEY, kind: 'marker', ...this.projectOne(this.near.l1) })
     }
+    const looked = this.lookup.labelled()
+    if (looked) {
+      out.push({
+        name: looked.key,
+        label: looked.label,
+        kind: 'lookup',
+        ...this.projectOne(this.lookup.marker),
+      })
+    }
     const sat = this.sats.selectedLabel()
     if (sat) {
       out.push({
@@ -1311,6 +1348,9 @@ export class OrreryRenderer {
     d['orreryAsteroids'] = String(this.near.asteroids.visible().length)
     d['orreryAsteroidPath'] = String(this.near.asteroids.pathPoints())
     d['orreryL1'] = String(this.near.l1.visible)
+    // The looked-up object (#145): its key while drawn, and its orbit line's points.
+    d['orreryLookup'] = this.lookup.labelled()?.key ?? ''
+    d['orreryLookupPath'] = String(this.lookup.pathPoints())
     // Satellites (#98): how they show, objects loaded, drawn and hidden past their epoch
     // window, the groups loaded, and the last worker pass (the phone target is ≤ 300 ms).
     const sats = this.sats.snapshot()
@@ -1348,6 +1388,7 @@ export class OrreryRenderer {
     }
     this.craft.dispose()
     this.near.dispose()
+    this.lookup.dispose()
     this.sats.dispose()
     this.models.dispose()
     this.moons.dispose()
