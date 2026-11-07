@@ -1,0 +1,5 @@
+  soho_2023                   2023-Jan-01  2023-Jan-01 (prediction > Dec 13)
+  soho_2024                   2024-Jan-01  2025-Jan-01 (prediction > Dec 16)
+  soho_2025                   2025-Jan-01  2026-Jan-01 (prediction > Nov 04)
+  soho_2026                   2026-Jan-01  2026-Dec-14 (prediction > Oct 05)
+No ephemeris for target "SOHO (spacecraft)" after A.D. 2026-DEC-14 23:51:09.1834 TDB

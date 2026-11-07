@@ -10,6 +10,8 @@ export interface DsnSignal {
 
 export interface DsnContact {
   spacecraft: string
+  /** DSN's spacecraftID: the NAIF id JPL Horizons uses (e.g. "-32" for Voyager 2). */
+  spacecraftId: string | null
   /** Round-trip light time, seconds (−1 when unknown/idle). */
   rtlt: number
   bands: string[]
@@ -83,6 +85,7 @@ export function parseDsn(xml: string): DsnData {
       const band = sig.getAttribute('band') ?? ''
       const contact = byCraft.get(craft) ?? {
         spacecraft: craft,
+        spacecraftId: sig.getAttribute('spacecraftID'),
         rtlt: rtltByName.get(craft) ?? -1,
         bands: [],
         hasUp: false,
@@ -105,4 +108,24 @@ export function parseDsn(xml: string): DsnData {
   }
 
   return { stations }
+}
+
+export interface DsnLink {
+  station: string
+  dish: string
+  bands: string[]
+}
+
+/** Craft in contact right now, by NAIF id (the orrery's highlight, #93). */
+export function dsnContactsById(data: DsnData | undefined): Map<string, DsnLink> {
+  const out = new Map<string, DsnLink>()
+  for (const station of data?.stations ?? []) {
+    for (const dish of station.dishes) {
+      for (const c of dish.contacts) {
+        if (!c.spacecraftId || out.has(c.spacecraftId)) continue
+        out.set(c.spacecraftId, { station: station.friendlyName, dish: dish.name, bands: c.bands })
+      }
+    }
+  }
+  return out
 }

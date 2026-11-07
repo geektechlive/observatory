@@ -11,6 +11,7 @@ import {
   Group,
   Line,
   LineBasicMaterial,
+  LineDashedMaterial,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
@@ -25,18 +26,27 @@ import {
   AU_KM,
   ELEMENTS,
   heliocentric,
+  HELIOPAUSE_LABEL,
+  HELIOPAUSE_V1_AU,
   jdFromDate,
   place3d,
   type PlanetName,
   PLANETS,
 } from '@/lib/orrery'
 import type { BodyName } from '@/lib/orrery/bodies'
+import { earthState } from '@/lib/orrery/craftState'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
+import type { OrreryTrack } from '@/schemas/orreryBodies'
 
-import { type FocusPreset, FOV, framePreset } from './framing'
+import type { CraftFilter } from '../craftFilter'
+import { CraftLayer } from './craftLayer'
+import { type FocusPreset, FOV, frameView } from './framing'
 
+export type { CraftFilter } from '../craftFilter'
 export type { FocusPreset } from './framing'
 export type ScaleMode = 'exaggerated' | 'log' | 'proportional'
+/** A planet or the Sun by name, or a craft by its namespaced id (`naif:-31`). */
+export type SceneKey = string
 
 export interface Visibility {
   planets: boolean
@@ -46,14 +56,36 @@ export interface Visibility {
 
 /** A body's screen position this frame, for the DOM labels and picking. */
 export interface ProjectedBody {
-  name: BodyName
+  /** Its key: a planet's name, or a craft's id. */
+  name: SceneKey
+  /** What its label says. */
+  label: string
+  /** 'ring': the heliopause marker's label anchor (#93), not a body. */
+  kind: 'body' | 'craft' | 'ring'
+  /** Screen position, px; may lie outside the canvas (rim markers use that). */
   x: number
   y: number
   /** In front of the camera and inside the canvas. */
   visible: boolean
+  /** Behind the camera: its projected position is mirrored. */
+  behind: boolean
   /** The body's drawn radius on screen, px, so a label can sit beside its disc. */
   radiusPx: number
+  /** Craft: distance from the Sun now, au (for a rim marker's label). */
+  sunAu?: number
+  /** Craft: its group and NAIF id. */
+  group?: string
+  naifId?: string
 }
+
+/** Craft markers: tiny in the scene, a few px on screen. */
+const CRAFT_RADIUS = { exaggerated: 0.02, log: 0.012, proportional: 0.0005 } as const
+const CRAFT_MIN_PX = 3
+const HELIOPAUSE_SAMPLES = 180
+/** Heliosphere refits to hold the craft once the sim date has moved this far, days. */
+const HELIOSPHERE_REFIT_DAYS = 180
+/** Camera distance when focusing a craft, scene units, per scale mode. */
+const CRAFT_FOCUS_DISTANCE = { exaggerated: 4, log: 4, proportional: 40 } as const
 
 /** Scene units per au in the proportional (linear) mode. */
 const LINEAR_K = 10
@@ -139,9 +171,24 @@ export class OrreryRenderer {
   private readonly orbits = new Map<PlanetName, Line>()
   private readonly orbitGroup = new Group()
   private readonly bodyGroup = new Group()
+  /** Spacecraft from JPL Horizons (#93); placed through the same scale as the planets. */
+  private readonly craft = new CraftLayer((pos) => this.toScene(pos))
+  /** Faint dashed ring where Voyager 1 crossed the heliopause (#93), approximate. */
+  private readonly heliopause = new Line(
+    new BufferGeometry(),
+    new LineDashedMaterial({
+      color: new Color(HUD_HEX),
+      transparent: true,
+      opacity: 0.35,
+      dashSize: 0.4,
+      gapSize: 0.3,
+    }),
+  )
+  /** Earth's Horizons samples, used for Earth where they cover the date (#93). */
+  private earthTrack: OrreryTrack | null = null
   private mode: ScaleMode = 'exaggerated'
   private visibility: Visibility = { planets: true, orbits: true, labels: true }
-  private focusBody: BodyName | null = null
+  private focusBody: SceneKey | null = null
   private orbitJd = Number.NaN
   private onFrame: ((items: readonly ProjectedBody[]) => void) | null = null
   private width: number
@@ -200,7 +247,14 @@ export class OrreryRenderer {
   }
 
   private buildScene(): void {
-    this.scene.add(this.orbitGroup, this.bodyGroup)
+    this.scene.add(
+      this.orbitGroup,
+      this.bodyGroup,
+      this.craft.paths,
+      this.craft.stalks,
+      this.craft.markers,
+    )
+    this.orbitGroup.add(this.heliopause)
     for (const name of ['Sun', ...PLANETS] as BodyName[]) {
       const mesh = new Mesh(
         new SphereGeometry(1, 24, 16),
@@ -234,13 +288,15 @@ export class OrreryRenderer {
   }
 
   /** A body's radius in scene units before the minimum on-screen size is applied. */
-  private radiusOf(name: BodyName): number {
+  private radiusOf(name: SceneKey): number {
+    if (!isBody(name)) return CRAFT_RADIUS[this.mode]
     if (this.mode === 'exaggerated') return EXAGGERATED_RADIUS[name]
     if (this.mode === 'log') return EXAGGERATED_RADIUS[name] * 0.45
     return (TRUE_RADIUS_KM[name] / AU_KM) * LINEAR_K
   }
 
-  private minPx(name: BodyName): number {
+  private minPx(name: SceneKey): number {
+    if (!isBody(name)) return CRAFT_MIN_PX
     if (this.mode === 'proportional') return MIN_PX_PROPORTIONAL
     return this.mode === 'log' ? MIN_PX[name] * 0.6 : MIN_PX[name]
   }
@@ -255,6 +311,10 @@ export class OrreryRenderer {
     for (const [name, mesh] of this.bodies) {
       const depth = mesh.position.distanceTo(this.camera.position)
       mesh.scale.setScalar(Math.max(this.radiusOf(name), this.minPx(name) * this.unitsPerPx(depth)))
+    }
+    for (const c of this.craft.visible()) {
+      const depth = c.mesh.position.distanceTo(this.camera.position)
+      c.mesh.scale.setScalar(Math.max(this.radiusOf(c.key), CRAFT_MIN_PX * this.unitsPerPx(depth)))
     }
   }
 
@@ -277,20 +337,93 @@ export class OrreryRenderer {
       geometry.setAttribute('position', new Float32BufferAttribute(points, 3))
       line.geometry = geometry
     }
+    // The heliopause marker (#93): a ring in the ecliptic where Voyager 1 crossed. Dashed,
+    // because it is approximate: the real boundary is neither a sphere nor fixed.
+    const r = this.sceneRadius(HELIOPAUSE_V1_AU)
+    const ring: number[] = []
+    for (let i = 0; i <= HELIOPAUSE_SAMPLES; i += 1) {
+      const a = (i / HELIOPAUSE_SAMPLES) * Math.PI * 2
+      ring.push(r * Math.cos(a), 0, r * Math.sin(a))
+    }
+    this.heliopause.geometry.dispose()
+    const ringGeometry = new BufferGeometry()
+    ringGeometry.setAttribute('position', new Float32BufferAttribute(ring, 3))
+    this.heliopause.geometry = ringGeometry
+    this.heliopause.computeLineDistances()
     this.orbitJd = jd
+  }
+
+  /**
+   * Where the heliopause ring's label goes: its leftmost point in view (the label runs
+   * right, into the stage; from the rightmost it ran off the edge), or null.
+   */
+  private heliopauseAnchor(): Pick<ProjectedBody, 'x' | 'y'> | null {
+    const r = this.sceneRadius(HELIOPAUSE_V1_AU)
+    let best: { x: number; y: number } | null = null
+    for (let i = 0; i < HELIOPAUSE_SAMPLES; i += 1) {
+      const a = (i / HELIOPAUSE_SAMPLES) * Math.PI * 2
+      this.scratch.set(r * Math.cos(a), 0, r * Math.sin(a)).project(this.camera)
+      if (this.scratch.z > 1 || Math.abs(this.scratch.x) > 0.8 || Math.abs(this.scratch.y) > 0.8) {
+        continue
+      }
+      const x = ((this.scratch.x + 1) / 2) * this.width
+      const y = ((1 - this.scratch.y) / 2) * this.height
+      if (!best || x < best.x) best = { x, y }
+    }
+    return best
   }
 
   private placeBodies(jd: number): void {
     for (const [name, mesh] of this.bodies) {
-      const pos = name === 'Sun' ? { x: 0, y: 0, z: 0 } : heliocentric(name, jd)
+      // Earth from the same Horizons answer as the craft where it covers the date, so a
+      // craft at L1 sits where it should relative to Earth (#93); Kepler elsewhere.
+      const pos =
+        name === 'Sun'
+          ? { x: 0, y: 0, z: 0 }
+          : name === 'Earth' && this.earthTrack
+            ? earthState(this.earthTrack, jd).position
+            : heliocentric(name, jd)
       mesh.position.copy(this.toScene(pos))
       mesh.scale.setScalar(this.radiusOf(name))
     }
+    this.craft.place(jd, this.radiusOf('craft'))
   }
 
-  /** Where a body is drawn now, scene space. */
-  bodyPosition(name: BodyName): Vector3 {
-    return this.bodies.get(name)?.position.clone() ?? new Vector3()
+  /** Where a body or craft is drawn now, scene space. */
+  bodyPosition(name: SceneKey): Vector3 {
+    if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? new Vector3()
+    return this.craft.position(name) ?? new Vector3()
+  }
+
+  /** The orrery's craft, Earth and Moon from /api/orrery-bodies (#93). */
+  setTracks(tracks: readonly OrreryTrack[]): void {
+    this.earthTrack = tracks.find((t) => t.naifId === '399') ?? null
+    this.craft.setTracks(tracks)
+    this.updateBodies(true)
+    // Craft that arrive after the first frame still get a Heliosphere frame that holds them.
+    if (this.preset === 'heliosphere') this.refitPreset()
+    this.markDirty()
+  }
+
+  setCraftFilter(filter: CraftFilter): void {
+    this.craft.setFilter(filter)
+    this.updateBodies(true)
+    if (this.preset === 'heliosphere') this.refitPreset()
+    this.markDirty()
+  }
+
+  /** Craft DSN is talking to now, by NAIF id (the "In DSN contact" filter). */
+  setDsnIds(ids: ReadonlySet<string>): void {
+    this.craft.setDsnIds(ids)
+    this.updateBodies(true)
+    this.markDirty()
+  }
+
+  /** Draw a craft's whole-mission path (spec Part 14), or none. */
+  setTrajectory(key: SceneKey | null): void {
+    this.craft.setTrajectory(key && this.craft.has(key) ? key : null)
+    this.updateBodies(true)
+    this.markDirty()
   }
 
   attach(el: HTMLElement): void {
@@ -357,6 +490,7 @@ export class OrreryRenderer {
     this.mode = mode
     this.canvas.dataset['orreryScale'] = mode
     this.orbitJd = Number.NaN
+    this.craft.rebuildTrajectory()
     this.updateBodies(true)
     if (this.focusBody) this.focusOn(this.focusBody, true)
     else this.applyPreset(this.preset ?? 'inner', true)
@@ -366,28 +500,63 @@ export class OrreryRenderer {
     this.visibility = v
     this.bodyGroup.visible = v.planets
     this.orbitGroup.visible = v.orbits
+    // Out-of-plane stalks are orbit furniture: the same switch (#93).
+    this.craft.setStalksVisible(v.orbits)
     this.markDirty()
   }
 
-  /** Frame a region around the Sun so its edge orbit nearly fills the stage (framing.ts). */
+  /**
+   * Frame a region around the Sun so its edge orbit nearly fills the stage (framing.ts).
+   * Heliosphere also holds every deep-space craft drawn, in 3D and above the time bar
+   * (#93: Voyager 2, 90 au south of the ecliptic, fell below a ring-only frame).
+   */
   applyPreset(preset: FocusPreset, instant = this.reducedMotion): void {
     this.preset = preset
     this.presetPristine = true
     this.focusBody = null
     this.canvas.dataset['orreryFocus'] = preset
-    const toPos = framePreset(preset, this.width / Math.max(1, this.height), this.sceneRadius)
-    this.flyTo(toPos, new Vector3(0, 0, 0), instant)
+    const points =
+      preset === 'heliosphere'
+        ? this.craft
+            .visible()
+            .filter((c) => c.group === 'deep-space')
+            .map((c) => c.mesh.position.clone())
+        : []
+    this.fitJd = this.lastJd
+    const view = frameView(preset, this.width / Math.max(1, this.height), this.sceneRadius, {
+      points,
+      bottomReserveNdc: (2 * this.reserveBottomPx) / Math.max(1, this.height),
+    })
+    this.flyTo(view.position, view.target, instant)
   }
 
-  /** Fly to a body and keep following it as it moves. */
-  focusOn(name: BodyName, instant = this.reducedMotion): void {
+  /** The stage's bottom strip the time bar covers, px: framing keeps craft above it. */
+  setFrameReserve(bottomPx: number): void {
+    if (Math.abs(bottomPx - this.reserveBottomPx) < 1) return
+    this.reserveBottomPx = Math.max(0, bottomPx)
+    this.refitPreset()
+  }
+
+  /** Refit the current preset while the user hasn't moved the camera. */
+  private refitPreset(): void {
+    if (this.preset && this.presetPristine) this.applyPreset(this.preset, true)
+  }
+
+  /** Fly to a body or craft and keep following it as it moves. */
+  focusOn(name: SceneKey, instant = this.reducedMotion): void {
+    this.updateBodies(true)
+    // A craft with no data at this date is hidden: there is nowhere to fly to.
+    if (!isBody(name) && !this.craft.position(name)) return
     this.focusBody = name
     this.preset = null
     this.canvas.dataset['orreryFocus'] = name
-    this.updateBodies(true)
     const target = this.bodyPosition(name)
     const r = this.radiusOf(name)
-    const distance = Math.max(r * FOCUS_RADII, FOCUS_MIN_DISTANCE)
+    // A craft is a marker, not a body: stand back far enough that it stays a few px and
+    // its trajectory reads around it (#93), instead of filling the view.
+    const distance = isBody(name)
+      ? Math.max(r * FOCUS_RADII, FOCUS_MIN_DISTANCE)
+      : CRAFT_FOCUS_DISTANCE[this.mode]
     const dir = this.camera.position.clone().sub(this.controls.target).normalize()
     if (dir.lengthSq() === 0) dir.set(0, 0.5, 1).normalize()
     this.flyTo(target.clone().add(dir.multiplyScalar(distance)), target, instant)
@@ -419,12 +588,12 @@ export class OrreryRenderer {
     this.presetPristine = false
   }
 
-  /** Nearest body to a canvas point within `radius` px, or null. */
-  pick(x: number, y: number, radius = 12): BodyName | null {
-    let best: BodyName | null = null
+  /** Nearest body or craft to a canvas point within `radius` px, or null. */
+  pick(x: number, y: number, radius = 12): SceneKey | null {
+    let best: SceneKey | null = null
     let bestD = radius
     for (const item of this.project()) {
-      if (!item.visible) continue
+      if (!item.visible || item.kind === 'ring') continue
       const d = Math.hypot(item.x - x, item.y - y)
       if (d <= bestD) {
         bestD = d
@@ -434,16 +603,48 @@ export class OrreryRenderer {
     return best
   }
 
+  private projectOne(
+    mesh: Mesh,
+  ): Pick<ProjectedBody, 'x' | 'y' | 'visible' | 'behind' | 'radiusPx'> {
+    const depth = mesh.position.distanceTo(this.camera.position)
+    this.scratch.copy(mesh.position).project(this.camera)
+    const x = ((this.scratch.x + 1) / 2) * this.width
+    const y = ((1 - this.scratch.y) / 2) * this.height
+    const behind = this.scratch.z > 1
+    const visible = !behind && x >= 0 && x <= this.width && y >= 0 && y <= this.height
+    const radiusPx = depth > 0 ? mesh.scale.x / this.unitsPerPx(depth) : 0
+    return { x, y, visible, behind, radiusPx }
+  }
+
   private project(): ProjectedBody[] {
     const out: ProjectedBody[] = []
-    for (const [name, mesh] of this.bodies) {
-      const depth = mesh.position.distanceTo(this.camera.position)
-      this.scratch.copy(mesh.position).project(this.camera)
-      const x = ((this.scratch.x + 1) / 2) * this.width
-      const y = ((1 - this.scratch.y) / 2) * this.height
-      const visible = this.scratch.z < 1 && x >= 0 && x <= this.width && y >= 0 && y <= this.height
-      const radiusPx = depth > 0 ? mesh.scale.x / this.unitsPerPx(depth) : 0
-      out.push({ name, x, y, visible, radiusPx })
+    if (this.visibility.planets) {
+      for (const [name, mesh] of this.bodies) {
+        out.push({ name, label: name, kind: 'body', ...this.projectOne(mesh) })
+      }
+    }
+    for (const c of this.craft.visible()) {
+      out.push({
+        name: c.key,
+        label: c.label,
+        kind: 'craft',
+        sunAu: c.sunAu,
+        group: c.group,
+        naifId: c.naifId,
+        ...this.projectOne(c.mesh),
+      })
+    }
+    const anchor = this.visibility.orbits ? this.heliopauseAnchor() : null
+    if (anchor) {
+      out.push({
+        name: 'heliopause',
+        label: HELIOPAUSE_LABEL,
+        kind: 'ring',
+        ...anchor,
+        visible: true,
+        behind: false,
+        radiusPx: 0,
+      })
     }
     return out
   }
@@ -487,6 +688,9 @@ export class OrreryRenderer {
   }
 
   private lastJd = Number.NaN
+  /** The sim date Heliosphere was last fitted at: craft drift, so it refits when far. */
+  private fitJd = Number.NaN
+  private reserveBottomPx = 0
 
   private updateBodies(force = false): void {
     const jd = jdFromDate(new Date(this.clock.simTime()))
@@ -494,6 +698,9 @@ export class OrreryRenderer {
     this.lastJd = jd
     if (!(Math.abs(jd - this.orbitJd) < ORBIT_RESAMPLE_DAYS)) this.sampleOrbits(jd)
     this.placeBodies(jd)
+    if (this.preset === 'heliosphere' && !(Math.abs(jd - this.fitJd) < HELIOSPHERE_REFIT_DAYS)) {
+      this.refitPreset()
+    }
     if (this.focusBody) {
       const target = this.bodyPosition(this.focusBody)
       const shift = target.clone().sub(this.controls.target)
@@ -556,6 +763,10 @@ export class OrreryRenderer {
     d['orreryTextures'] = String(memory.textures)
     d['orreryPrograms'] = String(programs?.length ?? 0)
     d['orreryCalls'] = String(render.calls)
+    // Craft drawn now, and the selected craft's path split (#93), for the e2e checks.
+    d['orreryCraft'] = String(this.craft.visible().length)
+    const path = this.craft.trajectoryCounts()
+    d['orreryTrajectory'] = path ? `${String(path.past)},${String(path.future)}` : ''
   }
 
   private readonly handleContextLost = (e: Event) => {
@@ -577,9 +788,19 @@ export class OrreryRenderer {
       line.geometry.dispose()
       ;(line.material as LineBasicMaterial).dispose()
     }
+    this.craft.dispose()
+    this.heliopause.geometry.dispose()
+    this.heliopause.material.dispose()
     this.renderer.dispose()
     this.canvas.remove()
   }
+}
+
+const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
+
+/** A planet or the Sun (drawn from the elements), as opposed to a craft key. */
+function isBody(name: SceneKey): name is BodyName {
+  return BODY_NAMES.has(name)
 }
 
 /** Orbital period from Kepler's third law, years, using Table 1's semi-major axis. */

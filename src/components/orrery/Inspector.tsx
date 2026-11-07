@@ -2,19 +2,30 @@ import { type Ref, useId } from 'react'
 
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
-import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI } from '@/lib/orrery'
+import type { DsnLink } from '@/lib/dsn'
+import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orrery'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
+import type { OrreryTrack } from '@/schemas/orreryBodies'
 
+import { CraftFacts } from './CraftFacts'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
 
 interface InspectorProps {
   /** The page measures the drawer to keep the focused body out from under it. */
   ref?: Ref<HTMLElement> | undefined
-  body: BodyName
+  /** A planet's name, 'Sun', or a craft or Moon id (`naif:-31`). */
+  body: string
   simMs: number
   onClose: () => void
+  /** Craft, Earth and Moon from /api/orrery-bodies (#93). */
+  tracks?: readonly OrreryTrack[] | undefined
+  /** Craft DSN is talking to now, by NAIF id. */
+  dsn?: ReadonlyMap<string, DsnLink> | undefined
 }
+
+const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
+const isBodyName = (key: string): key is BodyName => BODY_NAMES.has(key)
 
 const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
 const fmtKm = (km: number) =>
@@ -25,10 +36,36 @@ const fmtKm = (km: number) =>
  * first, with the state vector behind a disclosure. Planet positions are a model
  * (JPL's approximate elements), and the panel says so.
  */
-export function Inspector({ ref, body, simMs, onClose }: InspectorProps) {
+export function Inspector({ ref, body, simMs, onClose, tracks, dsn }: InspectorProps) {
   const headingId = useId()
-  const object = ORRERY_BODIES.find((b) => b.name === body)?.object
   const jd = jdFromDate(new Date(simMs))
+  if (!isBodyName(body)) {
+    const track = tracks?.find((t) => t.id === body)
+    return (
+      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+        <div className={styles.inspectorHead ?? ''}>
+          <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
+            {track?.name ?? body}
+          </h2>
+          <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        {track ? (
+          <CraftFacts
+            track={track}
+            earth={tracks?.find((t) => t.naifId === '399') ?? null}
+            jd={jd}
+            simMs={simMs}
+            link={dsn?.get(track.naifId)}
+          />
+        ) : (
+          <p className={styles.inspectorText ?? ''}>Not in the current data.</p>
+        )}
+      </aside>
+    )
+  }
+  const object = ORRERY_BODIES.find((b) => b.name === body)?.object
 
   return (
     <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>

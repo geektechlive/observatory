@@ -5,7 +5,10 @@ import {
   describePayload,
   fetchWithRetry,
   isValidLaunchesPayload,
+  KEY_ORRERY_BODIES,
+  kvPutInit,
   parseTle,
+  refreshOrreryBodies,
   tleChecksumOk,
   // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/refresh-data.mjs'
@@ -184,5 +187,99 @@ describe('classifyFailure', () => {
     const out = classifyFailure({ err, envelopeText: undefined, maxAgeMs: 36 * HOUR, now })
     expect(out.ok).toBe(false)
     expect(out.detail).toMatch(/age unknown/)
+  })
+})
+
+describe('kvPutInit (#93)', () => {
+  it('sends a plain text body when there is no metadata', () => {
+    const init = kvPutInit('v', undefined, 't')
+    expect(init.headers['Content-Type']).toBe('text/plain')
+    expect(init.body).toBe('v')
+  })
+
+  it('sends value and metadata in one multipart write', async () => {
+    const init = kvPutInit('{"a":1}', { fetchedAt: '2026-11-06T12:00:00.000Z' }, 't')
+    const form = init.body as FormData
+    expect(form.get('value')).toBe('{"a":1}')
+    expect(JSON.parse(form.get('metadata') as string)).toEqual({
+      fetchedAt: '2026-11-06T12:00:00.000Z',
+    })
+    // fetch sets the multipart boundary itself; a hand-set Content-Type would break it.
+    expect(init.headers['Content-Type']).toBeUndefined()
+  })
+})
+
+describe('refreshOrreryBodies (#93)', () => {
+  const NOW = Date.UTC(2026, 10, 6, 12)
+  /** Any span answered with uniform samples, so every body succeeds. */
+  const anySpan = async (url: string) => {
+    const p = new URL(url).searchParams
+    const num = (v: string | null) => Number((v ?? '').replace(/'|JD/g, ''))
+    const stepRaw = (p.get('STEP_SIZE') ?? '').replace(/'/g, '')
+    const step = stepRaw.endsWith(' h')
+      ? Number(stepRaw.slice(0, -2)) / 24
+      : Number(stepRaw.slice(0, -2))
+    const start = num(p.get('START_TIME'))
+    const n = Math.round((num(p.get('STOP_TIME')) - start) / step) + 1
+    const id = (p.get('COMMAND') ?? '').replace(/'/g, '')
+    const rows = Array.from(
+      { length: n },
+      (_, i) => `${String(start + i * step)}, A.D. x, 1, 0.5, 0, 0, 0.017, 0,`,
+    )
+    return `Target body name: X (${id})\n$$SOE\n${rows.join('\n')}\n$$EOE\n`
+  }
+
+  it('writes the finished body with its age as KV metadata', async () => {
+    const { entry, write } = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: anySpan,
+      previousText: null,
+      pauseMs: 0,
+    })
+    expect(entry.ok).toBe(true)
+    expect(write.key).toBe(KEY_ORRERY_BODIES)
+    expect(write.metadata.fetchedAt).toBe(new Date(NOW).toISOString())
+    expect(JSON.parse(write.value).bodies.length).toBe(write.metadata.bodies)
+  })
+
+  it('ships a partial refresh, with the missing objects as a warning', async () => {
+    const fetchText = async (url: string) =>
+      new URL(url).searchParams.get('COMMAND') === "'-49'" ? 'no data' : anySpan(url)
+    const { entry, write } = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText,
+      previousText: null,
+      pauseMs: 0,
+    })
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(true)
+    expect(entry.detail).toMatch(/missing naif:-49/)
+    expect(write.metadata.missing).toBe(1)
+  })
+
+  it('judges a total failure by the age of the copy it would replace', async () => {
+    const fail = async () => {
+      throw new Error('HTTP 503')
+    }
+    const young = JSON.stringify({
+      generatedAt: new Date(NOW - 10 * HOUR).toISOString(),
+      bodies: [],
+    })
+    const old = JSON.stringify({ generatedAt: new Date(NOW - 80 * HOUR).toISOString(), bodies: [] })
+    const a = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: fail,
+      previousText: young,
+      pauseMs: 0,
+    })
+    expect(a.entry.ok).toBe(true)
+    expect(a.write).toBeUndefined()
+    const b = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: fail,
+      previousText: old,
+      pauseMs: 0,
+    })
+    expect(b.entry.ok).toBe(false)
   })
 })

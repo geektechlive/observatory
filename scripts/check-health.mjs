@@ -91,6 +91,15 @@ export const CHECKS = [
     check: (b) =>
       ['flares', 'cmes', 'geomagneticStorms', 'seps'].every((k) => Array.isArray(b?.[k])),
   },
+  // The orrery's craft, Earth and Moon (#93): KV-only, written by the refresh job.
+  {
+    path: '/api/orrery-bodies',
+    requires: 'non-empty bodies array with sampled spans',
+    check: (b) =>
+      Array.isArray(b?.bodies) &&
+      b.bodies.length > 0 &&
+      b.bodies.every((x) => x?.fine !== undefined && x?.coarse !== undefined),
+  },
 ]
 
 /**

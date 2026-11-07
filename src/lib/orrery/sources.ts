@@ -53,7 +53,7 @@ export const SOURCES: readonly Source[] = [
     provides: 'Ephemerides: planets, moons, small bodies, spacecraft',
     status: 'operational',
     terms: 'JPL Fair Use: one request at a time, cache results',
-    note: 'Sky tab planets today; spacecraft and asteroid tracks in #92/#93',
+    note: 'Sky tab planets; the orrery’s 15 spacecraft, Earth and Moon (#93), sampled every 6 h by the refresh job; asteroid tracks in #92',
   },
   {
     id: 'celestrak',

@@ -2,12 +2,18 @@
  * The orrery's controls (#91): the time bar (spec Part 7), the body search combobox and
  * the inspector (Parts 10, 16).
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { buildCatalog } from '@/components/orrery/catalog'
 import { Inspector } from '@/components/orrery/Inspector'
 import { SearchBox } from '@/components/orrery/SearchBox'
 import { TimeBar } from '@/components/orrery/TimeBar'
+import { parseHorizonsVectors } from '@/lib/horizons'
+import type { OrreryTrack } from '@/schemas/orreryBodies'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 
 const T0 = Date.parse('2026-11-06T00:00:00Z')
@@ -103,5 +109,102 @@ describe('Inspector (#91)', () => {
     render(<Inspector body="Sun" simMs={T0} onClose={() => undefined} />)
     expect(screen.getByRole('heading', { name: 'Sun' })).toBeTruthy()
     expect(screen.getByText(/origin of this view/i)).toBeTruthy()
+  })
+})
+
+/** Real Horizons samples (2026-11-05..07) as a track, for the craft inspector (#93). */
+function fixtureTrack(
+  file: string,
+  naifId: string,
+  name: string,
+  extra: Partial<OrreryTrack> = {},
+) {
+  const samples =
+    parseHorizonsVectors(
+      readFileSync(join(__dirname, 'fixtures', 'horizons', `${file}.txt`), 'utf8'),
+    )?.samples ?? []
+  const track: OrreryTrack = {
+    id: `naif:${naifId}`,
+    naifId,
+    name,
+    mission: 'Voyager (NASA/JPL)',
+    category: 'spacecraft',
+    group: 'deep-space',
+    target: `${name} (spacecraft) (${naifId})`,
+    observedUntil: '1992-04-24',
+    availableFrom: null,
+    availableTo: null,
+    fine: {
+      start: samples[0]?.jd ?? 0,
+      step: 0.5,
+      samples: samples.flatMap((s) => [s.x, s.y, s.z, s.vx, s.vy, s.vz]),
+    },
+    coarse: null,
+    ...extra,
+  }
+  return track
+}
+
+describe('SearchBox with spacecraft (#93)', () => {
+  const items = buildCatalog(
+    [
+      fixtureTrack('voyager1', '-31', 'Voyager 1'),
+      fixtureTrack('jwst', '-170', 'JWST', { fine: null }),
+    ],
+    2461350.5,
+  )
+
+  it('finds a craft and selects it by its id', () => {
+    const onSelect = vi.fn()
+    render(<SearchBox items={items} onSelect={onSelect} />)
+    const box = screen.getByRole('combobox', { name: /find/i })
+    fireEvent.change(box, { target: { value: 'voy' } })
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Voyager 1' }))
+    expect(onSelect).toHaveBeenCalledWith('naif:-31')
+  })
+
+  it('keeps a craft with no data at the date, marked', () => {
+    render(<SearchBox items={items} onSelect={() => undefined} />)
+    fireEvent.change(screen.getByRole('combobox', { name: /find/i }), { target: { value: 'jw' } })
+    expect(screen.getByRole('option').textContent).toMatch(/JWST · no data for this date/)
+  })
+})
+
+describe('Inspector for a spacecraft (#93)', () => {
+  const v1 = fixtureTrack('voyager1', '-31', 'Voyager 1')
+  const earth = fixtureTrack('earth', '399', 'Earth', { category: 'planet', group: 'planet' })
+  const SIM = Date.parse('2026-11-06T00:00:00Z')
+
+  it('shows Horizons as the source, a prediction label, light time and DSN contact', () => {
+    render(
+      <Inspector
+        body="naif:-31"
+        simMs={SIM}
+        tracks={[earth, v1]}
+        dsn={new Map([['-31', { station: 'Canberra', dish: 'DSS43', bands: ['X'] }]])}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('heading', { name: 'Voyager 1' })).toBeTruthy()
+    expect(screen.getByText('JPL Horizons')).toBeTruthy()
+    expect(screen.getByText(/a prediction past tracking data/i)).toBeTruthy()
+    expect(screen.getByText('Light time')).toBeTruthy()
+    // About 23.7 hours of light from Earth.
+    expect(screen.getByText(/^23 h \d+ min$/)).toBeTruthy()
+    expect(screen.getAllByText(/^(approaching|receding)$/)).toHaveLength(1)
+    expect(screen.getByText(/In contact now: Canberra, DSS43/)).toBeTruthy()
+  })
+
+  it('says there is no data for a date the samples do not cover', () => {
+    render(
+      <Inspector
+        body="naif:-31"
+        simMs={SIM + 30 * DAY}
+        tracks={[earth, v1]}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('status').textContent).toMatch(/No data for this date/)
+    expect(screen.queryByText('Light time')).toBeNull()
   })
 })

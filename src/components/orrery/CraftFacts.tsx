@@ -1,0 +1,158 @@
+import { Label } from '@/components/ui/Label'
+import { Readout } from '@/components/ui/Readout'
+import type { DsnLink } from '@/lib/dsn'
+import { describeCraft } from '@/lib/orrery/craftState'
+import { AU_KM, formatLightTime, KM_TO_MI } from '@/lib/orrery/units'
+import type { OrreryTrack } from '@/schemas/orreryBodies'
+
+import styles from './orrery.module.css'
+import { formatSimUtc } from './simDate'
+
+const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
+const fmtKm = (km: number) =>
+  km >= 1e9
+    ? `${(km / 1e9).toFixed(2)} billion`
+    : km >= 1e6
+      ? `${(km / 1e6).toFixed(1)} million`
+      : Math.round(km).toLocaleString('en-US')
+
+const CATEGORY: Record<OrreryTrack['category'], string> = {
+  spacecraft: 'Spacecraft',
+  space_telescope: 'Space telescope',
+  planet: 'Planet',
+  moon: 'Moon',
+}
+
+/** First and last sampled dates of a track, YYYY-MM-DD, for "data covers ...". */
+function coverage(track: OrreryTrack): string | null {
+  const spans = [track.fine, track.coarse].filter((s) => s !== null)
+  if (spans.length === 0) return null
+  const stride = (s: NonNullable<OrreryTrack['fine']>) => (s === track.fine ? 6 : 3)
+  const first = Math.min(...spans.map((s) => s.start))
+  const last = Math.max(...spans.map((s) => s.start + (s.samples.length / stride(s) - 1) * s.step))
+  const day = (jd: number) => new Date((jd - 2440587.5) * 86_400_000).toISOString().slice(0, 10)
+  return `${day(first)} to ${day(last)}`
+}
+
+interface CraftFactsProps {
+  track: OrreryTrack
+  earth: OrreryTrack | null
+  jd: number
+  simMs: number
+  link: DsnLink | undefined
+}
+
+/**
+ * A spacecraft (or the Moon) in the inspector (#93; spec Parts 10, 16): where JPL
+ * Horizons puts it, how far, light time, approaching or receding, whether DSN is
+ * talking to it now, and how far to trust the position. Never a position past the data.
+ */
+export function CraftFacts({ track, earth, jd, simMs, link }: CraftFactsProps) {
+  const d = describeCraft(track, earth, jd)
+  const closeToEarth = track.group === 'l1' || track.group === 'moon'
+
+  return (
+    <>
+      <p className={styles.inspectorMeta ?? ''}>
+        <Label>{CATEGORY[track.category]}</Label> <Label>{`NAIF ${track.naifId}`}</Label>
+      </p>
+      <p className={styles.inspectorText ?? ''}>{track.mission}</p>
+      {closeToEarth && (
+        <p className={styles.inspectorText ?? ''}>
+          At this scale it is drawn inside Earth’s marker; the Earth frame (#92) will separate them.
+        </p>
+      )}
+      {d === null ? (
+        <p className={styles.inspectorText ?? ''} role="status">
+          No data for this date. JPL Horizons samples here cover {coverage(track) ?? 'no dates'}.
+          Positions are never extrapolated past them.
+        </p>
+      ) : (
+        <>
+          <dl className={styles.facts ?? ''}>
+            <dt>From the Sun</dt>
+            <dd>
+              <Readout value={fmtAu(d.sunDistanceAu)} unit="au" />{' '}
+              <Label>{fmtKm(d.sunDistanceAu * AU_KM)} km</Label>
+            </dd>
+            <dt>From Earth</dt>
+            <dd>
+              <Readout value={fmtAu(d.earthDistanceAu)} unit="au" />{' '}
+              <Label>
+                {fmtKm(d.earthDistanceAu * AU_KM)} km ·{' '}
+                {fmtKm(d.earthDistanceAu * AU_KM * KM_TO_MI)} mi
+              </Label>
+            </dd>
+            <dt>Light time</dt>
+            <dd>
+              <Readout value={formatLightTime(d.lightTimeFromEarthS)} />
+            </dd>
+            <dt>Seen from Earth</dt>
+            <dd>
+              <Readout value={Math.abs(d.rangeRateKmS).toFixed(1)} unit="km/s" />{' '}
+              <Label>{d.rangeRateKmS < 0 ? 'approaching' : 'receding'}</Label>
+            </dd>
+            {track.category !== 'moon' && (
+              <>
+                <dt>Deep Space Network</dt>
+                <dd className={styles.inspectorText ?? ''} data-dsn={link ? 'contact' : 'none'}>
+                  {link
+                    ? `In contact now: ${link.station}, ${link.dish}${link.bands.length ? ` (${link.bands.join(', ')} band)` : ''}`
+                    : 'Not in contact now'}
+                </dd>
+              </>
+            )}
+            <dt>Source</dt>
+            <dd className={styles.inspectorText ?? ''}>{d.state.sourceProvider}</dd>
+            <dt>Position type</dt>
+            <dd className={styles.inspectorText ?? ''}>
+              {d.predicted
+                ? `Ephemeris: a prediction past tracking data (to ${String(track.observedUntil)})`
+                : 'Ephemeris: JPL’s reconstructed trajectory'}{' '}
+              · confidence {d.state.confidence}
+            </dd>
+            <dt>Sample time</dt>
+            <dd className={styles.inspectorText ?? ''}>{formatSimUtc(simMs)}</dd>
+          </dl>
+          <ul className={styles.reasons ?? ''} aria-label="Why this confidence">
+            {d.state.confidenceReasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+          <details className={styles.science ?? ''}>
+            <summary>Scientific data</summary>
+            <dl className={styles.facts ?? ''}>
+              <dt>Frame</dt>
+              <dd>
+                {d.state.referenceFrame}, centre {d.state.referenceCenter}
+              </dd>
+              <dt>Time scale</dt>
+              <dd>{d.state.timeScale}</dd>
+              <dt>Julian date</dt>
+              <dd>{jd.toFixed(5)}</dd>
+              <dt>Position (au)</dt>
+              <dd>
+                x {d.state.positionAu.x.toFixed(6)} · y {d.state.positionAu.y.toFixed(6)} · z{' '}
+                {d.state.positionAu.z.toFixed(6)}
+              </dd>
+              {d.state.velocityAuPerDay && (
+                <>
+                  <dt>Velocity (au/day)</dt>
+                  <dd>
+                    x {d.state.velocityAuPerDay.x.toExponential(4)} · y{' '}
+                    {d.state.velocityAuPerDay.y.toExponential(4)} · z{' '}
+                    {d.state.velocityAuPerDay.z.toExponential(4)}
+                  </dd>
+                </>
+              )}
+              <dt>Horizons target</dt>
+              <dd>{track.target ?? 'not stated'}</dd>
+              <dt>Accuracy</dt>
+              <dd>{d.state.accuracyDescription}</dd>
+            </dl>
+          </details>
+        </>
+      )}
+    </>
+  )
+}

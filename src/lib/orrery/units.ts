@@ -13,6 +13,16 @@ export const C_KM_S = 299_792.458
 /** Statute miles per km. */
 export const KM_TO_MI = 0.6213711922
 
+/**
+ * Where Voyager 1 crossed the heliopause, au: an approximate marker, since the boundary
+ * is not a sphere and moves. NASA/JPL (2013-09-12 release, "NASA Spacecraft Embarks on
+ * Historic Journey Into Interstellar Space") give the crossing as Aug. 25, 2012; JPL
+ * Horizons puts Voyager 1 at 121.60 au from the Sun that day (checked 2026-11-07).
+ */
+export const HELIOPAUSE_V1_AU = 121.6
+/** The ring's label in the orrery: approximate, and says so. */
+export const HELIOPAUSE_LABEL = 'Heliopause ≈ 122 au · approx.'
+
 /** One-way light travel time over a distance, seconds. */
 export function lightTimeSeconds(km: number): number {
   return km / C_KM_S

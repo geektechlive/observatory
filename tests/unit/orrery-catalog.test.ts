@@ -1,0 +1,154 @@
+/**
+ * What the orrery can find and where off-screen craft point (#93): the search catalogue
+ * with a "no data for this date" flag, and rim markers for craft beyond the view.
+ */
+import { describe, expect, it } from 'vitest'
+
+import { buildCatalog } from '@/components/orrery/catalog'
+import { rimPoint, spreadRim } from '@/components/orrery/labelLayout'
+import type { OrreryTrack } from '@/schemas/orreryBodies'
+
+const JD = 2461350.5
+
+function track(naifId: string, name: string, extra: Partial<OrreryTrack> = {}): OrreryTrack {
+  return {
+    id: `naif:${naifId}`,
+    naifId,
+    name,
+    mission: 'm',
+    category: 'spacecraft',
+    group: 'deep-space',
+    target: null,
+    observedUntil: null,
+    availableFrom: null,
+    availableTo: null,
+    // Two samples a day apart around JD.
+    fine: { start: JD - 0.5, step: 1, samples: [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0] },
+    coarse: null,
+    ...extra,
+  }
+}
+
+describe('buildCatalog', () => {
+  const tracks = [
+    track('399', 'Earth', { category: 'planet', group: 'planet' }),
+    track('301', 'Moon', { category: 'moon', group: 'moon' }),
+    track('-31', 'Voyager 1'),
+    track('-21', 'SOHO', { category: 'space_telescope', group: 'l1', fine: null }),
+  ]
+
+  it('lists the Sun, the planets, the Moon and the craft, Earth once', () => {
+    const labels = buildCatalog(tracks, JD).map((i) => i.label)
+    expect(labels.slice(0, 9)).toEqual([
+      'Sun',
+      'Mercury',
+      'Venus',
+      'Earth',
+      'Mars',
+      'Jupiter',
+      'Saturn',
+      'Uranus',
+      'Neptune',
+    ])
+    expect(labels.filter((l) => l === 'Earth')).toHaveLength(1)
+    expect(labels).toContain('Moon')
+    expect(labels).toContain('Voyager 1')
+  })
+
+  it('keys craft and the Moon by NAIF id, and groups them as the controls do (Part 19)', () => {
+    const v1 = buildCatalog(tracks, JD).find((i) => i.label === 'Voyager 1')
+    expect(v1).toMatchObject({ key: 'naif:-31', kind: 'craft', group: 'Deep space' })
+    const soho = buildCatalog(tracks, JD).find((i) => i.label === 'SOHO')
+    expect(soho?.group).toBe('L1 & L2 observatories')
+  })
+
+  it('marks a craft with no data at the date, rather than dropping it', () => {
+    const items = buildCatalog(tracks, JD)
+    expect(items.find((i) => i.label === 'Voyager 1')?.available).toBe(true)
+    expect(items.find((i) => i.label === 'SOHO')?.available).toBe(false)
+    expect(buildCatalog(tracks, JD + 10).find((i) => i.label === 'Voyager 1')?.available).toBe(
+      false,
+    )
+  })
+
+  it('always has the planets, even with no payload', () => {
+    expect(buildCatalog([], JD).every((i) => i.available)).toBe(true)
+  })
+})
+
+describe('rimPoint', () => {
+  const W = 800
+  const H = 600
+
+  it('pins a point off the right edge to the right rim, at the same height line', () => {
+    const p = rimPoint(1600, 300, false, W, H, 10)
+    expect(p.x).toBe(W - 10)
+    expect(p.y).toBeCloseTo(300, 6)
+  })
+
+  it('pins a point far above to the top rim along the line from the centre', () => {
+    const p = rimPoint(400, -2000, false, W, H, 10)
+    expect(p.y).toBe(10)
+    expect(p.x).toBeCloseTo(400, 6)
+  })
+
+  it('mirrors a point behind the camera', () => {
+    const p = rimPoint(1600, 300, true, W, H, 10)
+    expect(p.x).toBe(10)
+  })
+
+  it('keeps clear of the time bar at the bottom', () => {
+    const p = rimPoint(400, 5000, false, W, H, 10, 110)
+    expect(p.y).toBe(H - 110)
+  })
+})
+
+describe('spreadRim', () => {
+  it('moves overlapping markers on the bottom rim apart along it', () => {
+    const out = spreadRim([
+      { key: 'a', text: 'Voyager 1 · 172 au', x: 400, y: 590, alongX: true },
+      { key: 'b', text: 'New Horizons · 66 au', x: 420, y: 590, alongX: true },
+    ])
+    const a = out.get('a')
+    const b = out.get('b')
+    expect(a?.y).toBe(590)
+    expect(b?.y).toBe(590)
+    expect(Math.abs((b?.x ?? 0) - (a?.x ?? 0))).toBeGreaterThan(100)
+  })
+
+  it('moves overlapping markers on a side rim apart vertically', () => {
+    const out = spreadRim([
+      { key: 'a', text: 'Voyager 1', x: 10, y: 300, alongX: false },
+      { key: 'b', text: 'Voyager 2', x: 10, y: 305, alongX: false },
+    ])
+    expect(Math.abs((out.get('b')?.y ?? 0) - (out.get('a')?.y ?? 0))).toBeGreaterThanOrEqual(18)
+  })
+
+  it('keeps a top or bottom marker whole inside the stage', () => {
+    const out = spreadRim(
+      [{ key: 'a', text: 'New Horizons · 66 au', x: 795, y: 590, alongX: true }],
+      { left: 10, right: 790 },
+    )
+    const w = 'New Horizons · 66 au'.length * 7 + 28
+    expect((out.get('a')?.x ?? 0) + w / 2).toBeLessThanOrEqual(790)
+  })
+
+  it('slides the other way when the rim runs out', () => {
+    const out = spreadRim(
+      [
+        { key: 'a', text: 'Voyager 1 · 172 au', x: 700, y: 590, alongX: true },
+        { key: 'b', text: 'Voyager 2 · 144 au', x: 700, y: 590, alongX: true },
+      ],
+      { left: 10, right: 790 },
+    )
+    expect(out.get('b')?.x ?? 0).toBeLessThan(out.get('a')?.x ?? 0)
+  })
+
+  it('leaves markers that do not touch where they are', () => {
+    const out = spreadRim([
+      { key: 'a', text: 'A', x: 10, y: 100, alongX: false },
+      { key: 'b', text: 'B', x: 10, y: 400, alongX: false },
+    ])
+    expect(out.get('b')?.y).toBe(400)
+  })
+})

@@ -32,6 +32,12 @@ describe('SOURCES (#91)', () => {
     expect(SOURCES.find((s) => s.id === 'll2')?.url).toContain('2.3.0')
   })
 
+  it('says Horizons now serves the orrery’s spacecraft (#93)', () => {
+    const horizons = SOURCES.find((s) => s.id === 'horizons')
+    expect(horizons?.status).toBe('operational')
+    expect(horizons?.note).toMatch(/spacecraft/)
+  })
+
   it('says which need an account or key', () => {
     expect(SOURCES.find((s) => s.id === 'space-track')?.auth).toBe('account')
     expect(SOURCES.find((s) => s.id === 'horizons')?.auth).toBe('none')

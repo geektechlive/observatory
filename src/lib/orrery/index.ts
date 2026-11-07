@@ -21,4 +21,13 @@ export {
   sqrtScale,
   type Vec3,
 } from './scale'
-export { AU_KM, C_KM_S, formatLightTime, KM_TO_MI, LD_KM, lightTimeSeconds } from './units'
+export {
+  AU_KM,
+  C_KM_S,
+  formatLightTime,
+  HELIOPAUSE_LABEL,
+  HELIOPAUSE_V1_AU,
+  KM_TO_MI,
+  LD_KM,
+  lightTimeSeconds,
+} from './units'

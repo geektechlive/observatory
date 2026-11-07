@@ -108,8 +108,21 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
 })
 
 test('dragging and zooming the camera does not re-render the page', async ({ page }) => {
+  // Settle the page's network first (#93: the spacecraft and DSN fetches). Unanswered,
+  // the spacecraft fetch retries with backoff inside the measured window, and each
+  // retry renders the page: that is the network, not the drags this test is about.
+  await page.route('**/api/orrery-bodies', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"test"}' }),
+  )
+  await page.route('https://eyes.nasa.gov/dsn/data/dsn.xml*', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/xml', body: '<dsn></dsn>' }),
+  )
   await page.goto('/#orrery')
   await expect(page.locator('[data-orrery-mode]')).toHaveAttribute('data-orrery-mode', 'webgl', {
+    timeout: 20_000,
+  })
+  // Retries exhausted (the page then shows why there are no craft).
+  await expect(page.getByText('Spacecraft positions are unavailable right now.')).toBeVisible({
     timeout: 20_000,
   })
   await page.waitForTimeout(500)

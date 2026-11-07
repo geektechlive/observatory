@@ -1,9 +1,9 @@
-import type { BodyName } from '@/lib/orrery/bodies'
 import { SOURCES } from '@/lib/orrery/sources'
 
+import type { CatalogItem } from './catalog'
 import styles from './orrery.module.css'
 import { SearchBox } from './SearchBox'
-import type { FocusPreset, ScaleMode, Visibility } from './three/OrreryRenderer'
+import type { CraftFilter, FocusPreset, ScaleMode, Visibility } from './three/OrreryRenderer'
 
 const PRESETS: { id: FocusPreset; label: string }[] = [
   { id: 'sun', label: 'Sun' },
@@ -26,7 +26,15 @@ interface ControlRailProps {
   onScale: (s: ScaleMode) => void
   preset: FocusPreset | null
   onPreset: (p: FocusPreset) => void
-  onSelect: (name: BodyName) => void
+  onSelect: (key: string) => void
+  /** What search can find (#93: planets, Moon and craft). */
+  items?: readonly CatalogItem[] | undefined
+  craftFilter?: CraftFilter | undefined
+  onCraftFilter?: ((f: CraftFilter) => void) | undefined
+  /** How the craft data is doing: a count once loaded, or why there is none. */
+  craftStatus?: string | undefined
+  /** Craft in DSN contact now. */
+  dsnCount?: number | undefined
 }
 
 function Switch({
@@ -68,6 +76,11 @@ export function ControlRail({
   preset,
   onPreset,
   onSelect,
+  items,
+  craftFilter,
+  onCraftFilter,
+  craftStatus,
+  dsnCount,
 }: ControlRailProps) {
   return (
     <div
@@ -81,7 +94,7 @@ export function ControlRail({
         <h2 id="orrery-find" className={styles.groupTitle ?? ''}>
           Find
         </h2>
-        <SearchBox onSelect={onSelect} />
+        <SearchBox items={items} onSelect={onSelect} />
       </section>
 
       <section className={styles.group ?? ''} aria-labelledby="orrery-solar">
@@ -110,6 +123,47 @@ export function ControlRail({
           }}
         />
       </section>
+
+      {craftFilter && onCraftFilter && (
+        <section className={styles.group ?? ''} aria-labelledby="orrery-craft">
+          <h2 id="orrery-craft" className={styles.groupTitle ?? ''}>
+            Spacecraft
+          </h2>
+          <Switch
+            label="Deep space"
+            on={craftFilter['deep-space']}
+            onChange={(on) => {
+              onCraftFilter({ ...craftFilter, 'deep-space': on })
+            }}
+          />
+          <Switch
+            label="Missions"
+            on={craftFilter.mission}
+            onChange={(mission) => {
+              onCraftFilter({ ...craftFilter, mission })
+            }}
+          />
+          <Switch
+            label="L1 & L2 observatories"
+            on={craftFilter.l1}
+            onChange={(l1) => {
+              onCraftFilter({ ...craftFilter, l1 })
+            }}
+          />
+          <Switch
+            label={`Only in DSN contact (${String(dsnCount ?? 0)})`}
+            on={craftFilter.dsnOnly}
+            onChange={(dsnOnly) => {
+              onCraftFilter({ ...craftFilter, dsnOnly })
+            }}
+          />
+          {craftStatus && (
+            <p className={styles.craftStatus ?? ''} role="status">
+              {craftStatus}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className={styles.group ?? ''} aria-labelledby="orrery-view">
         <h2 id="orrery-view" className={styles.groupTitle ?? ''}>

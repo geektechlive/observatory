@@ -131,6 +131,46 @@ This runs on the Cloudflare free plan and must stay there. Treat these as rules,
   - **The inspector's footprint** is passed to `setViewInset`, which shifts the projection window so the focused body sits in the free part of the stage.
   - **Bundle rules:** `entry-has-no-orrery` (markers `data-orrery-page`, `orreryWebgl`) and `orrery-gzip` (each orrery chunk, 30 kB).
   - **Five dial tabs** don't fit the 641–899 px bar with their sub-lines, so `.nodeSub` hides below 900 px.
+- **The orrery's spacecraft, Earth and Moon (#93) come from JPL Horizons, sampled by the refresh job, never on the request path.**
+  - **The job:** `scripts/orrery-bodies.mjs`, called from `refresh-data.mjs`, asks Horizons for heliocentric ecliptic J2000 vectors, one request at a time with a 1 s pause and a 4-minute budget. That's 44 requests and about 55 s.
+    - It covers the 17 bodies in `src/lib/orrery/craft.ts`.
+    - Each body gets a fine span, 30 days either side of now, position and velocity.
+    - Each craft also gets a whole-mission span, positions only, refetched once a day. Fast loopers cap its step with `maxCoarseStepDays`: Parker every 3 days, because its 88-day orbit drew as a jagged polygon at 25-day steps.
+    - A span past the ephemeris is clamped to Horizons' "No ephemeris … after/prior to" limit and asked again.
+    - A reply naming the wrong target is rejected, and a failed object goes into `missing` while the rest still ship.
+  - **One KV write, value and metadata together** (`kvPutInit`'s multipart form): key `horizons:bodies:v1`, about 240 KB (100 KB gzip), about 4 writes a day.
+  - **The Function streams that body through without parsing it** (10 ms of CPU). `/api/orrery-bodies` gets its age from the metadata via `getWithMetadata`.
+    - Up to 72 h old: fresh.
+    - Older or undated: degraded with `X-Error-Kind: upstream`.
+    - Missing: our 503.
+  - **`src/lib/horizons.ts` and `src/lib/orrery/craft.ts` have no imports and use erasable syntax only,** because the `.mjs` job imports them under Node's type stripping (Node 26). Keep them that way.
+  - **The client interpolates; it never extrapolates** (`src/lib/orrery/ephemeris.ts`).
+    - Hermite on the fine span reproduces Horizons' own 12 h samples to within 1–15 km.
+    - Catmull-Rom on the coarse span is marked coarse.
+    - Outside both: "no data for this date". The craft is hidden but stays in search.
+  - **Earth is drawn from the same Horizons answer when it covers the date,** so the L1 craft sit where they should; outside it, Earth is Kepler, and the inspector says so.
+  - **The L1 & L2 group is off by default:** at the solar-system scale those craft sit inside Earth's marker. The Moon is in search and the inspector but not drawn, for the same reason. The Earth frame (#92) will separate them.
+  - **DSN `spacecraftID` is the NAIF id.** `dsnContactsById` gives the ring on a craft in contact and the "Only in DSN contact" filter.
+  - **Deep-space craft outside the view become rim markers** (`rimPoint`, `spreadRim`), kept clear of the time bar and of each other.
+  - **Heliosphere with craft is its own view (`frameView` in `three/framing.ts`):**
+    - Low, 20° above the ecliptic, so north and south of the plane read as up and down.
+    - Aimed at the centre of Neptune's orbit plus the deep-space craft, not at the Sun.
+    - At the azimuth (of 24 tried) that puts the craft farthest from the Sun on screen relative to Neptune's orbit.
+    - At the distance that keeps them all in view and above the time bar; the page passes the bar's height through `setFrameReserve`.
+    - Why: from 30° up, aimed at the Sun, Voyager 1 (99 au north) projected right beside the Sun and read as "near the Sun". Before that, Voyager 2 (90 au south) fell below a ring-only frame.
+    - It refits when craft arrive, when the filter changes, and when the sim date moves 180 days, as long as the camera hasn't been moved. With no craft data it falls back to the Sun-centred 200 au ring.
+    - Rim markers are left only for craft genuinely out of view.
+  - **Stalks** (`craftLayer.ts`): a craft more than 1 au off the ecliptic gets a thin line to the plane (dashed when south) and a cross where it lands. The classic orrery cue. They follow the Orbits switch.
+  - **The heliopause ring** is a faint dashed circle at 121.6 au, labelled "approx.".
+    - Source: NASA/JPL date Voyager 1's crossing to Aug. 25, 2012 (2013-09-12 release), and JPL Horizons puts it 121.60 au from the Sun that day (`HELIOPAUSE_V1_AU`).
+    - The label hides on stages under 600 px, where it ran across the planets.
+  - **Craft labels get priority:** craft in DSN contact and the deep-space ones rank just after the voice line's subject (`labelOrder`'s `boosted`). On a phone, Voyager 1's label used to lose to Juno's.
+  - **Checked against Horizons' own observer quantities on 2026-11-07:**
+
+    | Craft     | Horizons                           | Inspector                                  |
+    | --------- | ---------------------------------- | ------------------------------------------ |
+    | Voyager 1 | 172.953 au, 29.75 km/s, 1438.4 min | 172.96 au, 29.8 km/s receding, 23 h 58 min |
+    | Parker    | 0.9544 au, 0.16 km/s               | 0.954 au, 0.2 km/s                         |
 - **The `entry-gzip` budget is first-load JavaScript: the entry plus every chunk `index.html` modulepreloads (#75).** Lazy-loading part of the app makes Vite split the code it shares with the entry into a chunk the entry imports statically, so measuring the entry file alone under-reported by about 40 kB. The console `Rest` panels (`*ConsoleRest.tsx`) and the SVG globe's land data (`markers/landRings.ts`) load lazily. A new below-the-fold panel goes in a `Rest` file, not a `Lead` one
 - **The Earth textures start with the page, small pair first (#85).** `index.html` preloads `day-2048.webp` and `night-2048.webp` on screens 900px and wider only (`media`): on a 4G phone the early 310 kB delayed the app's first paint by ~160 ms. For the same reason there is no `Link` header for them, which can't be limited by screen size, so they get no Early Hint. Narrower screens get the same links from `preloadTextures` (`src/lib/texturePreload.ts`) when GlobeHost starts the renderer import (#87): that is after first paint, and without it the pictures waited ~430 ms for the chunk to finish. An SVG-only visitor never downloads them. Every tier draws 2048 first; only the high tier then loads 4096 and swaps it in (`globeTextures` in `src/lib/globe3d.ts`, `upgradeTextures` in `GlobeRenderer`). Never preload 4096: the tier is picked at runtime. The preloads carry `crossorigin` because three's `TextureLoader` requests in CORS mode; drop either side and every visitor downloads the file twice. `texture-preload.test.ts` pins all of this. The canvas's `data-globe-textures` says which pair is drawn
 - **Component tests (`*.test.tsx`) must call `afterEach(cleanup)`.** Vitest runs with `globals: false`, so Testing Library's auto-cleanup never registers and renders pile up between tests.

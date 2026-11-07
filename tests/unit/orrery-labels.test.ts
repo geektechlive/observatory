@@ -22,6 +22,19 @@ describe('labelOrder (#91)', () => {
   it('without a selection the voice subject leads', () => {
     expect(labelOrder(names, null, 'Venus')[0]?.name).toBe('Venus')
   })
+
+  it('puts boosted craft (DSN contact, farthest out) after the voice subject, before the rest (#93)', () => {
+    const items = [
+      { name: 'Sun' },
+      { name: 'Jupiter' },
+      { name: 'naif:-61' }, // Juno
+      { name: 'naif:-31' }, // Voyager 1
+      { name: 'Venus' },
+    ]
+    const order = labelOrder(items, null, 'Venus', new Set(['naif:-31'])).map((n) => n.name)
+    expect(order.slice(0, 3)).toEqual(['Venus', 'naif:-31', 'Sun'])
+    expect(order.indexOf('naif:-31')).toBeLessThan(order.indexOf('naif:-61'))
+  })
 })
 
 describe('layoutLabels (#91)', () => {

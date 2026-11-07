@@ -34,6 +34,7 @@ export type SourceName =
   | 'mars-weather'
   | 'neo'
   | 'nws'
+  | 'orrery-bodies'
   | 'people-in-space'
   | 'planets'
   | 'quakes'
@@ -138,6 +139,14 @@ export const SOURCES: Record<SourceName, SourceContract> = {
   },
   neo: { label: 'Near-Earth Objects', headline: true, maxAgeMs: 2 * DAY, required: hasContent },
   nws: { label: 'NWS Alerts', headline: false, maxAgeMs: HOUR, required: hasContent },
+  'orrery-bodies': {
+    // Not headline: only the orrery page asks for it (#93). Sampled from JPL Horizons by
+    // the refresh job every 6 h; spans run 30 days either side, so 72 h is still sound.
+    label: 'Orrery Bodies',
+    headline: false,
+    maxAgeMs: 72 * HOUR,
+    required: (data) => nonEmptyArrayField(data, 'bodies'),
+  },
   'people-in-space': {
     label: 'People In Space',
     headline: false,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseDsn, rtltToDistanceKm } from '@/lib/dsn'
+import { dsnContactsById, parseDsn, rtltToDistanceKm } from '@/lib/dsn'
 
 const FIXTURE = `<dsn>
   <station name="gdscc" friendlyName="Goldstone" timeUTC="1" timeZoneOffset="-25200000.0"/>
@@ -42,6 +42,24 @@ describe('parseDsn', () => {
 
   it('returns empty stations for malformed xml', () => {
     expect(parseDsn('<nope/>').stations).toEqual([])
+  })
+
+  it('keeps spacecraftID, which is the NAIF id Horizons uses (#93)', () => {
+    const canberra = parseDsn(FIXTURE).stations[1]
+    expect(canberra?.dishes[0]?.contacts[0]?.spacecraftId).toBe('-32')
+  })
+})
+
+describe('dsnContactsById (#93)', () => {
+  it('maps each craft in contact to its station and dish', () => {
+    const map = dsnContactsById(parseDsn(FIXTURE))
+    expect(map.get('-32')).toEqual({ station: 'Canberra', dish: 'DSS43', bands: ['X'] })
+    expect(map.get('-74')?.station).toBe('Goldstone')
+    expect(map.has('-31')).toBe(false)
+  })
+
+  it('is empty when there is no feed', () => {
+    expect(dsnContactsById(undefined).size).toBe(0)
   })
 })
 

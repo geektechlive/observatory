@@ -90,7 +90,14 @@ describe('DsnPanel', () => {
               name: 'DSS24',
               activity: 'track',
               contacts: [
-                { spacecraft: 'VGR1', rtlt: 10, bands: ['X', 'Ka'], hasUp: true, hasDown: true },
+                {
+                  spacecraft: 'VGR1',
+                  spacecraftId: '-31',
+                  rtlt: 10,
+                  bands: ['X', 'Ka'],
+                  hasUp: true,
+                  hasDown: true,
+                },
               ],
             },
           ],

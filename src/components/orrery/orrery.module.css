@@ -202,6 +202,70 @@
   background: var(--scrim);
 }
 
+/* Spacecraft (#93): cyan is reserved for them (palette.ts). */
+.craftLabel {
+  color: var(--signal);
+}
+
+/* A deep-space craft beyond the view, pinned to the rim with its true distance; the
+   arrow points the way it lies. Top and bottom markers are centred on their point. */
+.craftLabel[data-rim='top'],
+.craftLabel[data-rim='right'],
+.craftLabel[data-rim='bottom'],
+.craftLabel[data-rim='left'] {
+  background: var(--scrim);
+  border: 1px solid var(--plate-edge);
+  transform: translate(-50%, -50%);
+}
+
+.craftLabel[data-rim='left'] {
+  transform: translate(0, -50%);
+}
+
+.craftLabel[data-rim='right'] {
+  transform: translate(-100%, -50%);
+}
+
+.craftLabel[data-rim='left']::before {
+  content: '◂ ';
+}
+
+.craftLabel[data-rim='top']::before {
+  content: '▴ ';
+}
+
+.craftLabel[data-rim='right']::after {
+  content: ' ▸';
+}
+
+.craftLabel[data-rim='bottom']::after {
+  content: ' ▾';
+}
+
+/* The heliopause marker's label (#93): faint housing text, not data. */
+.ringLabel {
+  position: absolute;
+  transform: translate(6px, -50%);
+  color: var(--bone-faint);
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  letter-spacing: var(--track-label);
+  white-space: nowrap;
+  pointer-events: auto;
+  text-shadow: 0 1px 2px var(--void);
+}
+
+/* Craft the Deep Space Network is talking to now: a ring on the marker. */
+.dsnRing {
+  position: absolute;
+  inline-size: 16px;
+  block-size: 16px;
+  border: 1px solid var(--signal);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px var(--signal-2);
+  pointer-events: none;
+}
+
 .badge {
   position: absolute;
   top: var(--space-4);
@@ -329,6 +393,20 @@
   background: var(--hull-2);
 }
 
+.option[data-kind='craft'] {
+  color: var(--signal);
+}
+
+/* Listed but no data at the sim date (#93): greyed, still selectable. */
+.option[data-available='false'] {
+  color: var(--bone-faint);
+}
+
+.optionNote {
+  color: var(--bone-faint);
+  font: 500 var(--text-xs) / 1.2 var(--font-mono);
+}
+
 .inspector {
   position: absolute;
   top: var(--space-4);
@@ -424,6 +502,14 @@
 .sourceNote {
   grid-column: 1 / -1;
   color: var(--bone-faint);
+}
+
+/* How the spacecraft data is doing (#93): count and age, or why there is none. */
+.craftStatus {
+  margin: 0;
+  color: var(--bone-faint);
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  letter-spacing: var(--track-label);
 }
 
 .status {

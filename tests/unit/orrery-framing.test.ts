@@ -10,6 +10,7 @@ import {
   type FocusPreset,
   FOV,
   framePreset,
+  frameView,
   ringExtent,
   ringMinReach,
 } from '@/components/orrery/three/framing'
@@ -73,6 +74,79 @@ describe('framePreset (#91)', () => {
         const cam = cameraFor('sun', aspect)
         expect(ringExtent(cam, toScene(ORBIT.Mercury[1]))).toBeGreaterThan(0.75)
       })
+    })
+  }
+})
+
+describe('Heliosphere holds the deep-space craft in 3D (#93)', () => {
+  // Heliocentric ecliptic J2000 au, from JPL Horizons on 2026-11-06. Voyager 2 is 90 au
+  // south of the ecliptic, Voyager 1 99 au north: a 200 au ring alone missed Voyager 2.
+  const CRAFT = {
+    'Voyager 1': { x: -32.2, y: -137.1, z: 99.2 },
+    'Voyager 2': { x: 40.0, y: -105.7, z: -89.9 },
+    'New Horizons': { x: 63.8, y: -17.5, z: 2.4 },
+  }
+  const points = Object.values(CRAFT).map((p) => {
+    const s = place3d(p)
+    return new Vector3(s.x, s.y, s.z)
+  })
+  /** Share of the view's height the time bar covers at the bottom (about 100 of 680 px). */
+  const RESERVE = 0.3
+
+  /** A camera placed as frameView says, at a stage aspect. */
+  function viewAt(aspect: number) {
+    const view = frameView('heliosphere', aspect, toScene, { points, bottomReserveNdc: RESERVE })
+    const camera = new PerspectiveCamera(FOV, aspect, 0.001, 1e7)
+    camera.updateProjectionMatrix()
+    camera.position.copy(view.position)
+    camera.lookAt(view.target)
+    camera.updateMatrixWorld()
+    return { camera, view }
+  }
+  /** Screen position in px-like units (NDC x scaled by aspect, so distances are true). */
+  const screen = (p: Vector3, camera: PerspectiveCamera, aspect: number) => {
+    const v = p.clone().project(camera)
+    return { x: v.x * aspect, y: v.y }
+  }
+  const NEPTUNE = Array.from({ length: 72 }, (_, i) => {
+    const a = (i / 72) * Math.PI * 2
+    const r = toScene(ORBIT.Neptune[1])
+    return new Vector3(r * Math.cos(a), 0, r * Math.sin(a))
+  })
+
+  for (const aspect of [1.55, 1.43, 0.8]) {
+    it(`at aspect ${String(aspect)}: every craft and Neptune's orbit in view, above the time bar`, () => {
+      const { camera } = viewAt(aspect)
+      for (const p of [...points, ...NEPTUNE]) {
+        const v = p.clone().project(camera)
+        expect(v.z).toBeLessThan(1)
+        expect(Math.abs(v.x)).toBeLessThanOrEqual(0.9)
+        expect(v.y).toBeLessThanOrEqual(0.9)
+        // Above the time bar: NDC -1 is the stage's bottom edge.
+        expect(v.y).toBeGreaterThanOrEqual(-1 + RESERVE)
+      }
+    })
+
+    it(`at aspect ${String(aspect)}: a low view, so north and south of the plane read as up and down`, () => {
+      const { view } = viewAt(aspect)
+      const d = view.position.clone().sub(view.target)
+      const elevation = (Math.asin(d.y / d.length()) * 180) / Math.PI
+      expect(elevation).toBeGreaterThanOrEqual(15)
+      expect(elevation).toBeLessThanOrEqual(25)
+      // Aimed at the framed objects, not the Sun, so the frame is used.
+      expect(view.target.length()).toBeGreaterThan(0)
+    })
+
+    it(`at aspect ${String(aspect)}: Voyager 1 reads far from the Sun, beyond Neptune's orbit`, () => {
+      const { camera } = viewAt(aspect)
+      const sun = screen(new Vector3(), camera, aspect)
+      const gap = (p: Vector3) => {
+        const s = screen(p, camera, aspect)
+        return Math.hypot(s.x - sun.x, s.y - sun.y)
+      }
+      const neptuneNearest = Math.min(...NEPTUNE.map(gap))
+      const v1 = points[0] ?? new Vector3()
+      expect(gap(v1)).toBeGreaterThan(neptuneNearest)
     })
   }
 })

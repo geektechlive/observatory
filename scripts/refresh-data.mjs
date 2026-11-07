@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Refresh the durable Workers KV snapshots that back /api/iss-tle, /api/satellites,
 // /api/launches and /api/apod (APOD from science.nasa.gov, #72: too big a page to
-// parse inside the Worker's 10 ms CPU budget).
+// parse inside the Worker's 10 ms CPU budget), and /api/orrery-bodies (#93: craft,
+// Earth and Moon from JPL Horizons, which refuses overlapping requests, so it is asked
+// here one request at a time, never on the request path; see orrery-bodies.mjs).
 //
 // Why this exists: CelesTrak returns HTTP 522 to Cloudflare Workers egress (observed
 // from about 2026-09-03), so the Pages Functions cannot fetch TLEs themselves. An
@@ -17,6 +19,8 @@
 // Usage:
 //   node scripts/refresh-data.mjs            fetch, validate, write to KV
 //   node scripts/refresh-data.mjs --dry-run  fetch and validate only, no credentials needed
+//   ... --dry-run --only=orrery-bodies --bodies-out=/tmp/bodies.json
+//                                            just the orrery step, payload saved locally
 //
 // Env (write mode only):
 //   CLOUDFLARE_API_TOKEN   token with "Workers KV Storage: Edit" on the account
@@ -26,6 +30,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+
+import { buildOrreryBodies } from './orrery-bodies.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(HERE, '..')
@@ -42,6 +48,11 @@ const KEY_ISS = 'tle:iss:v1'
 const KEY_SATELLITES = 'tle:satellites:v1'
 const KEY_LAUNCHES_BACKUP = 'rll:launches:next:v1:backup'
 const KEY_APOD = 'apod:science:v1'
+/** The orrery's craft, Earth and Moon (#93): a finished body, with metadata. */
+export const KEY_ORRERY_BODIES = 'horizons:bodies:v1'
+const ORRERY_SIGNATURE = 'refresh:orrery-bodies'
+/** /api/orrery-bodies serves a copy up to 72 h old before calling it degraded. */
+const ORRERY_MAX_AGE_MS = 72 * 3_600_000
 const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
@@ -346,15 +357,24 @@ function kvUrl(key, config) {
   return `${CF_API_BASE}/accounts/${config.accountId}/storage/kv/namespaces/${config.namespaceId}/values/${encodeURIComponent(key)}`
 }
 
-async function putKv(key, value, config) {
-  const res = await fetch(kvUrl(key, config), {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'text/plain',
-    },
-    body: value,
-  })
+/**
+ * The PUT for a KV write. With `metadata`, the REST API's multipart form: one write
+ * stores both, and the Function reads them together with getWithMetadata (#93), so a
+ * value it passes through unparsed still says how old it is.
+ */
+export function kvPutInit(value, metadata, token) {
+  const headers = { Authorization: `Bearer ${token}` }
+  if (metadata === undefined) {
+    return { method: 'PUT', headers: { ...headers, 'Content-Type': 'text/plain' }, body: value }
+  }
+  const form = new FormData()
+  form.append('value', value)
+  form.append('metadata', JSON.stringify(metadata))
+  return { method: 'PUT', headers, body: form }
+}
+
+async function putKv(key, value, config, metadata) {
+  const res = await fetch(kvUrl(key, config), kvPutInit(value, metadata, config.token))
   const body = await res.text()
   if (!res.ok) throw new Error(`KV PUT ${key} failed: HTTP ${res.status} ${body.slice(0, 300)}`)
   console.log(`  wrote ${key} (${value.length} bytes)`)
@@ -463,16 +483,105 @@ async function refreshSource(spec, config) {
   }
 }
 
+/** A KV value as JSON, or null when absent, unreadable or not JSON. */
+function parseJsonOrNull(text) {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+/** Horizons answers 200 with a JSON envelope whose `result` is the text table. */
+function fetchHorizonsText(url) {
+  return fetchWithRetry(
+    url,
+    { headers: { Accept: 'application/json' } },
+    {
+      validate: (text) => {
+        const json = JSON.parse(text)
+        if (typeof json?.result !== 'string') throw new Error('Horizons answer has no result')
+        return json.result
+      },
+    },
+  )
+}
+
+/**
+ * The orrery's bodies (#93): one finished body plus metadata in a single KV write. A
+ * partial refresh still ships (missing objects are listed in it); only a refresh that
+ * got nothing at all is a failure, judged by the age of the copy it would replace.
+ */
+export async function refreshOrreryBodies(config, deps = {}) {
+  const now = deps.now ?? Date.now()
+  const previousText = deps.previousText ?? (await readKv(KEY_ORRERY_BODIES, config))
+  const previous = parseJsonOrNull(previousText)
+  try {
+    const { payload, requests } = await buildOrreryBodies({
+      now,
+      fetchText: deps.fetchText ?? fetchHorizonsText,
+      previous,
+      ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+    })
+    if (payload.bodies.length === 0) throw new Error('Horizons returned no bodies')
+    const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    const detail =
+      `ok ${ORRERY_SIGNATURE} ${String(payload.bodies.length)} bodies, ${String(requests)} requests` +
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+    console.log(detail)
+    const value = JSON.stringify(payload)
+    return {
+      entry: { signature: ORRERY_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      write: {
+        key: KEY_ORRERY_BODIES,
+        value,
+        metadata: {
+          fetchedAt: payload.generatedAt,
+          bodies: payload.bodies.length,
+          missing: payload.missing.length,
+        },
+      },
+    }
+  } catch (err) {
+    const verdict = classifyFailure({
+      err,
+      envelopeText: previous ? JSON.stringify({ fetchedAt: previous.generatedAt }) : previousText,
+      maxAgeMs: ORRERY_MAX_AGE_MS,
+      now,
+    })
+    const detail = `${ORRERY_SIGNATURE} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    return { entry: { ...verdict, signature: ORRERY_SIGNATURE, detail } }
+  }
+}
+
 async function main(argv) {
   const dryRun = argv.includes('--dry-run')
+  // Local runs: --only=orrery-bodies skips the other sources; --bodies-out=path saves
+  // the payload a dry run would have written.
+  const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length)
+  const bodiesOut = argv.find((a) => a.startsWith('--bodies-out='))?.slice('--bodies-out='.length)
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
 
-  for (const spec of SOURCES) {
+  for (const spec of only ? [] : SOURCES) {
     const { entry, write } = await refreshSource(spec, config)
     report.push(entry)
     if (write) writes.push({ key: spec.key, value: write, entry })
+  }
+
+  if (!only || only === 'orrery-bodies') {
+    const { entry, write } = await refreshOrreryBodies(config)
+    report.push(entry)
+    if (write) {
+      writes.push({ ...write, entry })
+      if (dryRun && bodiesOut) {
+        await writeFile(bodiesOut, write.value)
+        console.log(`  saved ${KEY_ORRERY_BODIES} to ${bodiesOut} (${String(write.value.length)} bytes)`)
+      }
+    }
   }
 
   if (dryRun) {
@@ -483,7 +592,7 @@ async function main(argv) {
     console.log(`\nwriting ${writes.length} key(s) to namespace ${config.namespaceId}`)
     for (const write of writes) {
       try {
-        await putKv(write.key, write.value, config)
+        await putKv(write.key, write.value, config, write.metadata)
       } catch (err) {
         console.error(err.message)
         write.entry.ok = false

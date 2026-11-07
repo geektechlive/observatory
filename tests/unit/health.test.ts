@@ -28,6 +28,13 @@ describe('SOURCES', () => {
     expect(SOURCES['satellites'].headline).toBe(false)
   })
 
+  it('grades orrery bodies by a non-empty bodies list, 72 h before degraded (#93)', () => {
+    expect(SOURCES['orrery-bodies'].headline).toBe(false)
+    expect(SOURCES['orrery-bodies'].maxAgeMs).toBe(72 * 3_600_000)
+    expect(SOURCES['orrery-bodies'].required({ bodies: [] })).toBe(false)
+    expect(SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }] })).toBe(true)
+  })
+
   it('gives every source a label and a positive max age', () => {
     for (const name of SOURCE_NAMES) {
       const contract = SOURCES[name]
