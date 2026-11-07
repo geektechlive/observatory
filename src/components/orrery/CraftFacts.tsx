@@ -1,6 +1,7 @@
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import type { DsnLink } from '@/lib/dsn'
+import { craftModelFor } from '@/lib/orrery/craftModels'
 import { describeCraft } from '@/lib/orrery/craftState'
 import { AU_KM, formatLightTime, KM_TO_MI } from '@/lib/orrery/units'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
@@ -50,6 +51,8 @@ interface CraftFactsProps {
 export function CraftFacts({ track, earth, jd, simMs, link }: CraftFactsProps) {
   const d = describeCraft(track, earth, jd)
   const closeToEarth = track.group === 'l1' || track.group === 'moon'
+  // How the craft is drawn up close, and whose model it is (#115).
+  const model = craftModelFor(track.naifId)
 
   return (
     <>
@@ -113,6 +116,22 @@ export function CraftFacts({ track, earth, jd, simMs, link }: CraftFactsProps) {
             </dd>
             <dt>Sample time</dt>
             <dd className={styles.inspectorText ?? ''}>{formatSimUtc(simMs)}</dd>
+            {model && (
+              <>
+                <dt>Shape</dt>
+                <dd className={styles.inspectorText ?? ''}>
+                  {model.kind === 'nasa' ? (
+                    <a href={model.sourceUrl} target="_blank" rel="noreferrer">
+                      {`3D model: ${model.credit}`}
+                    </a>
+                  ) : (
+                    'Simplified model: no NASA model published to reuse'
+                  )}
+                  <br />
+                  {`${model.attitudeNote} · not to scale`}
+                </dd>
+              </>
+            )}
           </dl>
           <ul className={styles.reasons ?? ''} aria-label="Why this confidence">
             {d.state.confidenceReasons.map((r) => (

@@ -1,8 +1,8 @@
 /**
- * Spacecraft in the orrery (#93): one cyan marker per craft (cyan is for spacecraft only,
- * palette.ts), placed from JPL Horizons samples, and the selected craft's whole-mission
- * trajectory (spec Part 14): the past solid, the future dashed. A craft with no sample
- * covering the date is hidden, never extrapolated.
+ * Spacecraft in the orrery (#93): one cyan silhouette per craft (cyan is for spacecraft
+ * only, palette.ts; the outlines are #115's), placed from JPL Horizons samples, and the
+ * selected craft's whole-mission trajectory (spec Part 14): the past solid, the future
+ * dashed. A craft with no sample covering the date is hidden, never extrapolated.
  */
 import {
   BufferGeometry,
@@ -13,18 +13,20 @@ import {
   LineBasicMaterial,
   LineDashedMaterial,
   LineSegments,
-  Mesh,
-  MeshBasicMaterial,
-  SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+  type Texture,
   Vector3,
 } from 'three'
 
+import { craftModelFor, type SilhouetteKey } from '@/lib/orrery/craftModels'
 import { stateAt, trajectoryPoints } from '@/lib/orrery/ephemeris'
 import type { Vec3 } from '@/lib/orrery/scale'
 import { ISS_HEX } from '@/lib/palette'
 import type { OrreryBodyGroup, OrreryTrack } from '@/schemas/orreryBodies'
 
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from '../craftFilter'
+import { silhouetteTexture } from './craftSilhouettes'
 
 interface CraftEntry {
   key: string
@@ -32,7 +34,9 @@ interface CraftEntry {
   naifId: string
   group: OrreryBodyGroup
   track: OrreryTrack
-  mesh: Mesh
+  mesh: Sprite
+  /** Drawn now (data covers the date and the filter passes), model or silhouette. */
+  on: boolean
   /** Sampled position now (au), or null when no data covers the date. */
   helio: Vec3 | null
   stalk: Stalk
@@ -56,18 +60,19 @@ export interface StalkView {
   foot: Vector3
 }
 
-/** A craft marker never draws smaller or larger than these radii, px. */
-export const CRAFT_MIN_PX = 3
-export const CRAFT_MAX_PX = 5
-
 /**
- * A craft marker's radius, scene units: its scene size, kept between CRAFT_MIN_PX and
- * CRAFT_MAX_PX on screen. Without the cap, a planet focused close up drew a nearby
- * craft's marker 20 px across (#107: Psyche beside Mars).
+ * A craft's silhouette is this many px across at any distance (#115). The #107 sphere
+ * dots needed a 3-5 px clamp (Psyche drew 20 px across beside Mars); an icon is a
+ * fixed size: big enough to read its shape, never a disc.
  */
-export function craftRadius(sceneRadius: number, unitsPerPx: number): number {
-  return Math.min(CRAFT_MAX_PX * unitsPerPx, Math.max(sceneRadius, CRAFT_MIN_PX * unitsPerPx))
+export const CRAFT_ICON_PX = 18
+
+/** A craft sprite's scale, scene units, at `unitsPerPx` scene units per px. */
+export function craftIconScale(unitsPerPx: number): number {
+  return CRAFT_ICON_PX * unitsPerPx
 }
+
+const GENERIC: SilhouetteKey = 'dscovr'
 
 /** A stalk is drawn only for craft more than this far off the ecliptic, au. */
 export const STALK_MIN_OFFSET_AU = 1
@@ -79,7 +84,7 @@ export interface CraftMarker {
   label: string
   naifId: string
   group: OrreryBodyGroup
-  mesh: Mesh
+  mesh: Sprite
   /** Distance from the Sun now, au. */
   sunAu: number
 }
@@ -93,8 +98,8 @@ export class CraftLayer {
   /** Out-of-plane stalks (#93), shown and hidden with the Orbits switch. */
   readonly stalks = new Group()
   private readonly entries = new Map<string, CraftEntry>()
-  private readonly geometry = new SphereGeometry(1, 12, 8)
-  private readonly material = new MeshBasicMaterial({ color: new Color(ISS_HEX) })
+  /** One material (and texture) per silhouette, shared by craft of the same design. */
+  private readonly materials = new Map<SilhouetteKey, SpriteMaterial>()
   private readonly stalkMaterial = new LineBasicMaterial({
     color: new Color(ISS_HEX),
     transparent: true,
@@ -108,6 +113,8 @@ export class CraftLayer {
     gapSize: 0.1,
   })
   private filter: CraftFilter = DEFAULT_CRAFT_FILTER
+  /** The craft drawn as a 3D model now (#115): its silhouette steps aside. */
+  private modelKey: string | null = null
   private dsnIds: ReadonlySet<string> = new Set()
   private trajectoryKey: string | null = null
   private trajectory: { past: Line; future: Line; jds: number[] } | null = null
@@ -129,7 +136,9 @@ export class CraftLayer {
         existing.track = track
         continue
       }
-      const mesh = new Mesh(this.geometry, this.material)
+      const silhouette = craftModelFor(track.naifId)?.silhouette ?? GENERIC
+      const mesh = new Sprite(this.materialFor(silhouette))
+      mesh.userData['silhouette'] = silhouette
       mesh.name = track.id
       mesh.visible = false
       this.markers.add(mesh)
@@ -142,6 +151,7 @@ export class CraftLayer {
         group: track.group,
         track,
         mesh,
+        on: false,
         helio: null,
         stalk,
       })
@@ -156,6 +166,22 @@ export class CraftLayer {
       this.entries.delete(key)
     }
     this.rebuildTrajectory()
+  }
+
+  private materialFor(key: SilhouetteKey): SpriteMaterial {
+    const existing = this.materials.get(key)
+    if (existing) return existing
+    const map: Texture | null = silhouetteTexture(key)
+    const material = new SpriteMaterial({
+      map,
+      // The silhouette is drawn in cyan already; without one (no 2D canvas) the plain
+      // sprite takes the colour itself.
+      color: map ? new Color(1, 1, 1) : new Color(ISS_HEX),
+      transparent: true,
+      depthWrite: false,
+    })
+    this.materials.set(key, material)
+    return material
   }
 
   setFilter(filter: CraftFilter): void {
@@ -196,7 +222,7 @@ export class CraftLayer {
   /** Point a craft's stalk from its marker straight to the ecliptic (scene y = 0). */
   private placeStalk(entry: CraftEntry): void {
     const { stalk, helio, mesh } = entry
-    const show = mesh.visible && helio !== null && Math.abs(helio.z) > STALK_MIN_OFFSET_AU
+    const show = entry.on && helio !== null && Math.abs(helio.z) > STALK_MIN_OFFSET_AU
     const south = helio !== null && helio.z < 0
     stalk.north.visible = show && !south
     stalk.south.visible = show && south
@@ -242,23 +268,41 @@ export class CraftLayer {
   }
 
   /** Move every craft to a Julian date; hide those with no data or filtered out. */
-  place(jd: number, radius: number): void {
+  place(jd: number): void {
     for (const entry of this.entries.values()) {
       const s = stateAt(entry.track, jd)
       entry.helio = s ? s.position : null
-      entry.mesh.visible = s !== null && this.passes(entry)
+      entry.on = s !== null && this.passes(entry)
+      entry.mesh.visible = entry.on && entry.key !== this.modelKey
       if (s) entry.mesh.position.copy(this.toScene(s.position))
-      entry.mesh.scale.setScalar(radius)
       this.placeStalk(entry)
     }
     this.updateSplit(jd)
   }
 
-  /** The craft drawn now. */
+  /** The craft whose 3D model is drawn now, or null: its silhouette steps aside (#115). */
+  setModelKey(key: string | null): void {
+    if (key === this.modelKey) return
+    this.modelKey = key
+    for (const e of this.entries.values()) e.mesh.visible = e.on && e.key !== key
+  }
+
+  /** A craft's NAIF id, or null for an unknown key. */
+  naifIdOf(key: string): string | null {
+    return this.entries.get(key)?.naifId ?? null
+  }
+
+  /** A drawn craft's sampled position now, heliocentric ecliptic au, or null. */
+  helioOf(key: string): Vec3 | null {
+    const e = this.entries.get(key)
+    return e?.on ? e.helio : null
+  }
+
+  /** The craft drawn now, as a model or a silhouette. */
   visible(): CraftMarker[] {
     const out: CraftMarker[] = []
     for (const e of this.entries.values()) {
-      if (!e.mesh.visible || !e.helio) continue
+      if (!e.on || !e.helio) continue
       out.push({
         key: e.key,
         label: e.label,
@@ -274,7 +318,7 @@ export class CraftLayer {
   /** Where a craft is drawn now, or null when it is hidden. */
   position(key: string): Vector3 | null {
     const e = this.entries.get(key)
-    return e?.mesh.visible ? e.mesh.position.clone() : null
+    return e?.on ? e.mesh.position.clone() : null
   }
 
   has(key: string): boolean {
@@ -360,8 +404,10 @@ export class CraftLayer {
     for (const e of this.entries.values()) {
       for (const line of [e.stalk.north, e.stalk.south, e.stalk.tick]) line.geometry.dispose()
     }
-    this.geometry.dispose()
-    this.material.dispose()
+    for (const material of this.materials.values()) {
+      material.map?.dispose()
+      material.dispose()
+    }
     this.stalkMaterial.dispose()
     this.stalkSouthMaterial.dispose()
   }

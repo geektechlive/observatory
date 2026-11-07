@@ -89,6 +89,17 @@ export const MOON_DISC_HEX = {
   lit: hexOf('oklch(0.92 0.03 95)'),
 }
 
+/**
+ * The orrery's simplified spacecraft models (#115), for craft with no NASA model to
+ * reuse: gold foil blanket, bare structure, solar cells and white radiators.
+ */
+export const CRAFT_MODEL_HEX = {
+  foil: hexOf('oklch(0.74 0.12 80)'),
+  structure: hexOf('oklch(0.78 0.01 250)'),
+  cells: hexOf('oklch(0.32 0.08 265)'),
+  white: hexOf('oklch(0.93 0.005 250)'),
+}
+
 /** StarField canvas: emissive points in the void, so a cool star is fine (they aren't structure). */
 export const STAR_HEX = { warm: hexOf('oklch(0.82 0.1 70)'), cool: hexOf('oklch(0.85 0.08 220)') }
 /** Aurora is a field with a single-hue ramp, not a marker lane. */

@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest'
 
-import { robustCentreRadius } from '@/lib/orrery/craftModelFit'
+import { robustCentreRadius, threeQuarterView } from '@/lib/orrery/craftModelFit'
+
+describe('threeQuarterView (#115)', () => {
+  const dot = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
+    a.x * b.x + a.y * b.y + a.z * b.z
+
+  it('looks at the face the attitude axis points to, from the side and above', () => {
+    for (const facing of [
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 0, z: -1 },
+      { x: 0.6, y: 0, z: 0.8 },
+      { x: 0, y: 1, z: 0 }, // straight up: the side is chosen another way
+    ]) {
+      const v = threeQuarterView(facing)
+      expect(Math.hypot(v.x, v.y, v.z)).toBeCloseTo(1, 9)
+      // In front of the face, but well off its axis, so its shape shows.
+      expect(dot(v, facing)).toBeGreaterThan(0.2)
+      expect(dot(v, facing)).toBeLessThan(0.8)
+    }
+    expect(threeQuarterView({ x: 1, y: 0, z: 0 }).y).toBeGreaterThan(0)
+  })
+})
 
 /** A unit cube's 8 corners centred on (cx, cy, cz), flat xyz. */
 function cube(cx: number, cy: number, cz: number, half = 1): number[] {

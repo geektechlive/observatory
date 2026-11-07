@@ -3,31 +3,45 @@
  * south of the ecliptic. A thin line from the craft to the plane with a tick where it
  * lands; dashed when the craft is south. Only for craft more than 1 au off the plane.
  */
-import { Vector3 } from 'three'
+import { Sprite, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_CRAFT_FILTER } from '@/components/orrery/craftFilter'
-import {
-  CRAFT_MAX_PX,
-  CRAFT_MIN_PX,
-  CraftLayer,
-  craftRadius,
-} from '@/components/orrery/three/craftLayer'
+import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from '@/components/orrery/three/craftLayer'
+import { craftModelFor } from '@/lib/orrery/craftModels'
 import { place3d } from '@/lib/orrery/scale'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
-describe('craftRadius (#107)', () => {
-  // Measured on the preview (2026-11-07): focusing Mars drew Psyche's 0.02-unit marker
-  // about 20 px across, and Earth drew Europa Clipper the same. A craft is a marker.
-  it('never draws a craft larger than CRAFT_MAX_PX close up', () => {
-    const unitsPerPx = 0.0007 // a planet focused at about 1.1 units
-    expect(craftRadius(0.02, unitsPerPx) / unitsPerPx).toBeCloseTo(CRAFT_MAX_PX, 6)
+describe('craft silhouettes in the layer (#115)', () => {
+  // #107 capped the old sphere dots at 5 px after Psyche drew 20 px across beside Mars.
+  // A silhouette is a fixed-size icon at any distance: never a disc, never a speck.
+  it('draws every craft at CRAFT_ICON_PX on screen, near or far', () => {
+    for (const unitsPerPx of [0.0007, 0.05, 3]) {
+      expect(craftIconScale(unitsPerPx) / unitsPerPx).toBeCloseTo(CRAFT_ICON_PX, 9)
+    }
   })
 
-  it('keeps its CRAFT_MIN_PX floor far away, and its scene size in between', () => {
-    expect(craftRadius(0.02, 0.05) / 0.05).toBeCloseTo(CRAFT_MIN_PX, 6)
-    const between = 0.02 / ((CRAFT_MIN_PX + CRAFT_MAX_PX) / 2)
-    expect(craftRadius(0.02, between)).toBeCloseTo(0.02, 9)
+  it('draws each craft as a sprite of its own silhouette', () => {
+    const l = layer()
+    for (const marker of l.visible()) {
+      expect(marker.mesh).toBeInstanceOf(Sprite)
+      expect(marker.mesh.userData['silhouette']).toBe(craftModelFor(marker.naifId)?.silhouette)
+    }
+    expect(l.visible().length).toBe(3)
+  })
+
+  it("steps a craft's silhouette aside for its 3D model, keeping its label, pick and stalk", () => {
+    const l = layer()
+    l.setModelKey('naif:-31')
+    const v1 = l.visible().find((m) => m.key === 'naif:-31')
+    expect(v1?.mesh.visible).toBe(false)
+    expect(l.position('naif:-31')).not.toBeNull()
+    expect(l.helioOf('naif:-31')?.z).toBeCloseTo(99.2)
+    expect(l.stalkFor('naif:-31')?.visible).toBe(true)
+    l.place(JD)
+    expect(l.visible().find((m) => m.key === 'naif:-31')?.mesh.visible).toBe(false)
+    l.setModelKey(null)
+    expect(l.visible().find((m) => m.key === 'naif:-31')?.mesh.visible).toBe(true)
   })
 })
 
@@ -67,7 +81,7 @@ function layer() {
     track('-32', 'deep-space', [40.0, -105.7, -89.9]), // Voyager 2, south
     track('-96', 'mission', [0.2, 0.15, 0.01]), // Parker, in the plane
   ])
-  l.place(JD, 0.02)
+  l.place(JD)
   return l
 }
 
@@ -97,10 +111,10 @@ describe('CraftLayer stalks (#93)', () => {
   it('hides a stalk with its craft, and all of them with the Orbits switch', () => {
     const l = layer()
     l.setFilter({ ...DEFAULT_CRAFT_FILTER, 'deep-space': false })
-    l.place(JD, 0.02)
+    l.place(JD)
     expect(l.stalkFor('naif:-31')?.visible).toBe(false)
     l.setFilter(DEFAULT_CRAFT_FILTER)
-    l.place(JD, 0.02)
+    l.place(JD)
     expect(l.stalkFor('naif:-31')?.visible).toBe(true)
     l.setStalksVisible(false)
     expect(l.stalks.visible).toBe(false)
@@ -108,7 +122,7 @@ describe('CraftLayer stalks (#93)', () => {
 
   it('hides the stalk when the craft has no data at the date', () => {
     const l = layer()
-    l.place(JD + 30, 0.02)
+    l.place(JD + 30)
     expect(l.stalkFor('naif:-31')?.visible).toBe(false)
   })
 })
