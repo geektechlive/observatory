@@ -8,9 +8,11 @@ import { shortName } from '@/lib/orrery/asteroids'
 import { PLANETS } from '@/lib/orrery/elements'
 import { stateAt } from '@/lib/orrery/ephemeris'
 import type { MoonBody } from '@/lib/orrery/moonState'
+import { ISS_NORAD_ID, satKey } from '@/lib/orrery/satView'
 import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
-export type CatalogKind = 'star' | 'planet' | 'moon' | 'craft' | 'asteroid' | 'scout' | 'marker'
+export type CatalogKind =
+  'star' | 'planet' | 'moon' | 'craft' | 'asteroid' | 'scout' | 'marker' | 'satellite'
 
 export interface CatalogItem {
   /** A planet's name, or a namespaced id for the Moon and craft (`naif:-31`). */
@@ -76,6 +78,8 @@ export function buildCatalog(
   moons: readonly MoonBody[] = [],
   /** Close approaches and Scout's objects (#92). */
   near?: NearCatalog,
+  /** The loaded space stations (#98); the ISS is listed even before they load. */
+  stations: readonly { key: string; name: string }[] = [],
 ): CatalogItem[] {
   const moonKeys = new Set(moons.map((m) => m.key))
   const items: CatalogItem[] = [
@@ -106,6 +110,19 @@ export function buildCatalog(
       kind: 'moon',
       group: GROUP_LABEL.moon,
       available: m.relative(jd) !== null,
+    })
+  }
+  // Choosing a station opens the Earth orbit view, where its group loads (#98). Only the
+  // stations are listed: search over 19,000 satellites would bury everything else.
+  const iss = satKey(ISS_NORAD_ID)
+  const listed = stations.length > 0 ? stations : [{ key: iss, name: 'ISS' }]
+  for (const s of [...listed].sort((a, b) => Number(b.key === iss) - Number(a.key === iss))) {
+    items.push({
+      key: s.key,
+      label: s.name,
+      kind: 'satellite',
+      group: 'Space stations',
+      available: true,
     })
   }
   if (!near) return items

@@ -23,16 +23,39 @@ export type SatRequest =
   /** `reuse`: a frame the caller is done with, to be written in place. */
   | { type: 'propagate'; id: number; dateMs: number; reuse?: SatFrame }
 
+/**
+ * What the main thread needs to know about the loaded field, sent once per change
+ * (load or unload) rather than with every frame: 19,540 names each second cost the main
+ * thread a structured clone it doesn't need.
+ */
+export interface SatFieldInfo {
+  /** Bumped on every change; each frame says which field it was computed for. */
+  version: number
+  groups: SatField['groups']
+  /** NORAD ids and names in field order, for picking, search and the inspector. */
+  ids: string[]
+  names: string[]
+  /** Each object's element epoch, ms (the inspector's "orbit data from"). */
+  epochMs: Float64Array
+}
+
 export type SatReply =
-  | { type: 'loaded'; id: number; group: SatGroupId; count: number; dropped: number; ms: number }
-  | { type: 'unloaded'; id: number; group: SatGroupId }
+  | {
+      type: 'loaded'
+      id: number
+      group: SatGroupId
+      count: number
+      dropped: number
+      ms: number
+      field: SatFieldInfo
+    }
+  | { type: 'unloaded'; id: number; group: SatGroupId; field: SatFieldInfo }
   | {
       type: 'frame'
       id: number
       dateMs: number
-      groups: SatField['groups']
-      ids: string[]
-      names: string[]
+      /** The field version these positions belong to (SatFieldInfo.version). */
+      version: number
       positions: Float32Array
       status: Uint8Array
       /** Time for the pass, ms: the spec's iPhone target is ≤ 300 ms with Starlink on. */
@@ -48,12 +71,21 @@ export interface SatHandlerDeps {
 export function createSatHandler(deps: SatHandlerDeps) {
   const loaded = new Map<SatGroupId, SatRow[]>()
   let field: SatField = buildSatField([])
+  let version = 0
   // null: the WASM runtime failed once, so every pass uses the JS path.
   let runtime: Promise<Runtime | null> | null = null
 
   const rebuild = () => {
     field = buildSatField([...loaded].map(([group, rows]) => ({ group, rows })))
+    version += 1
   }
+  const info = (): SatFieldInfo => ({
+    version,
+    groups: field.groups,
+    ids: field.ids,
+    names: field.names,
+    epochMs: field.epochMs.slice(),
+  })
   const wasm = () => {
     runtime ??= deps.runtime().catch(() => null)
     return runtime
@@ -70,16 +102,29 @@ export function createSatHandler(deps: SatHandlerDeps) {
         rebuild()
         const ms = performance.now() - began
         return {
-          reply: { type: 'loaded', id: req.id, group, count: rows.length, dropped, ms },
+          reply: {
+            type: 'loaded',
+            id: req.id,
+            group,
+            count: rows.length,
+            dropped,
+            ms,
+            field: info(),
+          },
           transfer: [],
         }
       }
       if (req.type === 'unload') {
         loaded.delete(req.group)
         rebuild()
-        return { reply: { type: 'unloaded', id: req.id, group: req.group }, transfer: [] }
+        return {
+          reply: { type: 'unloaded', id: req.id, group: req.group, field: info() },
+          transfer: [],
+        }
       }
       const rt = await wasm()
+      // Read after the await: a load handled meanwhile has already changed the field.
+      const at = version
       const began = performance.now()
       const frame = rt
         ? propagateField(rt, field, req.dateMs, req.reuse)
@@ -90,9 +135,7 @@ export function createSatHandler(deps: SatHandlerDeps) {
           type: 'frame',
           id: req.id,
           dateMs: req.dateMs,
-          groups: field.groups,
-          ids: field.ids,
-          names: field.names,
+          version: at,
           positions: frame.positions,
           status: frame.status,
           ms,

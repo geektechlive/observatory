@@ -14,10 +14,12 @@ const PRESETS: { id: FocusPreset; label: string }[] = [
   { id: 'outer', label: 'Outer' },
   { id: 'heliosphere', label: 'Heliosphere' },
   { id: 'earth', label: 'Earth–Moon' },
+  { id: 'orbit', label: 'Earth orbit' },
 ]
 /**
  * Spec Part 10's scale modes. Near Earth the Earth frame (#92) takes over on its own as you
- * zoom in; an Earth-orbit mode for the satellites waits on #98.
+ * zoom in, and inside geostationary orbit it is true scale, which is the Earth-orbit
+ * scale the satellites (#98) are drawn at.
  */
 const SCALES: { id: ScaleMode; label: string; hint: string }[] = [
   { id: 'exaggerated', label: 'Big bodies', hint: 'Log distances, enlarged bodies' },
@@ -44,6 +46,8 @@ interface ControlRailProps {
   dsnCount?: number | undefined
   /** The near-Earth groups (#92): close approaches, Scout, the Sun–Earth line. */
   nearEarth?: ReactNode
+  /** The Earth orbit group (#98): the satellite switches. */
+  earthOrbit?: ReactNode
 }
 
 /**
@@ -65,6 +69,7 @@ export function ControlRail({
   craftStatus,
   dsnCount,
   nearEarth,
+  earthOrbit,
 }: ControlRailProps) {
   return (
     <div
@@ -155,6 +160,8 @@ export function ControlRail({
 
       {nearEarth}
 
+      {earthOrbit}
+
       <section className={styles.group ?? ''} aria-labelledby="orrery-view">
         <h2 id="orrery-view" className={styles.groupTitle ?? ''}>
           View
@@ -173,14 +180,6 @@ export function ControlRail({
               {p.label}
             </button>
           ))}
-          <button
-            type="button"
-            className={styles.chipBtn ?? ''}
-            disabled
-            title="Arrives with the satellites (#98)"
-          >
-            Earth orbit
-          </button>
         </div>
         <div className={styles.chipRow ?? ''} role="radiogroup" aria-label="Scale">
           {SCALES.map((s) => (

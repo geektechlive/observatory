@@ -27,6 +27,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
+import type { SatGroupId } from '@/lib/orbit/satCatalog'
 import {
   AU_KM,
   ELEMENTS,
@@ -44,12 +45,15 @@ import { threeQuarterView } from '@/lib/orrery/craftModelFit'
 import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
 import {
+  cameraMinDistance,
   EARTH_FRAME_UNIT,
   earthFrameBlend,
   earthFrameRadius,
   L1_DISTANCE_KM,
 } from '@/lib/orrery/earthFrame'
 import type { MoonBody } from '@/lib/orrery/moonState'
+import type { SatSource } from '@/lib/orrery/satController'
+import { ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
@@ -64,10 +68,12 @@ import { CraftModelLayer } from './craftModelLayer'
 import { EarthNeighbourhood } from './earthNeighbourhood'
 import { earthPresetView, type FocusPreset, FOV, frameView, sunlitFocusDirection } from './framing'
 import { MoonLayer } from './moonLayer'
+import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
 export type { CraftFilter } from '../craftFilter'
 export type { FocusPreset } from './framing'
+export type { SatInfo, SatMode, SatViewState } from './satLayer'
 export type { SunImageState } from './sunImage'
 export type ScaleMode = 'exaggerated' | 'log' | 'proportional'
 /** A planet or the Sun by name, or a craft by its namespaced id (`naif:-31`). */
@@ -87,9 +93,10 @@ export interface ProjectedBody {
   label: string
   /**
    * 'ring': the heliopause marker's label anchor (#93), not a body. 'asteroid': a close
-   * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92).
+   * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92). 'satellite': the
+   * chosen satellite (#98); the others have no labels.
    */
-  kind: 'body' | 'craft' | 'moon' | 'ring' | 'asteroid' | 'marker'
+  kind: 'body' | 'craft' | 'moon' | 'ring' | 'asteroid' | 'marker' | 'satellite'
   /** Screen position, px; may lie outside the canvas (rim markers use that). */
   x: number
   y: number
@@ -119,10 +126,14 @@ const MOON_MIN_PX = 2.5
 /** Close approaches and the L1 marker never draw smaller than these, px (#92). */
 const ASTEROID_MIN_PX = 2.5
 const L1_MIN_PX = 3.5
+/** The chosen satellite's marker never draws smaller than this, px (#98). */
+const SAT_MARKER_MIN_PX = 4
 /** Asteroid and L1 labels show once the Earth frame is this open (or the object is chosen). */
 const NEAR_LABEL_OPEN = 0.5
 /** The Earth–Moon/L1 preset holds this many Earth radii (as drawn) around Earth: L2 at 12.8. */
 const EARTH_PRESET_RADII = 13.5
+/** Geostationary orbit's radius, km: the Earth orbit preset's extent in the proportional mode. */
+const GEO_KM = 42_164
 /** A close approach, L1 or an L1/L2 craft is focused from this many frame units, inside the open frame. */
 const NEAR_FOCUS_UNITS = 40
 /** Craft within this distance of Earth, au, are drawn in the Earth frame (#92). */
@@ -216,6 +227,12 @@ export interface OrreryRendererOptions {
   reducedMotion: boolean
   onContextLost: () => void
   clock: ClockReader
+  /**
+   * The satellites' data (#98): /api/orrery-sats and the shared worker. Passed in by the
+   * page, so the API client is never imported here: when it was, the bundler split it
+   * out of the entry into a chunk of its own, a fifth first-load request and +0.6 kB.
+   */
+  satSource: SatSource
 }
 
 export class OrreryRenderer {
@@ -247,6 +264,10 @@ export class OrreryRenderer {
   )
   /** Earth's neighbourhood (#92): the Earth frame, close approaches, Sun–Earth line, L1. */
   private readonly near = new EarthNeighbourhood()
+  /** Satellites in the Earth frame (#98); a pass or a group arriving asks for a frame. */
+  private readonly sats: SatLayer
+  private onSatState: ((s: SatViewState) => void) | null = null
+  private satStateKey = ''
   /** Faint dashed ring where Voyager 1 crossed the heliopause (#93), approximate. */
   private readonly heliopause = new Line(
     new BufferGeometry(),
@@ -317,6 +338,10 @@ export class OrreryRenderer {
     this.reducedMotion = options.reducedMotion
     this.onContextLost = options.onContextLost
     this.clock = options.clock
+    // A pass or a group arriving asks for a frame.
+    this.sats = new SatLayer(() => {
+      this.markDirty()
+    }, options.satSource)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.setSize(this.width, this.height, false)
     this.camera.aspect = this.width / Math.max(1, this.height)
@@ -325,7 +350,7 @@ export class OrreryRenderer {
     this.controls = new OrbitControls(this.camera, this.canvas)
     this.controls.enableDamping = !this.reducedMotion
     this.controls.dampingFactor = 0.08
-    this.controls.minDistance = 0.5
+    this.controls.minDistance = cameraMinDistance(Number.POSITIVE_INFINITY)
     this.controls.maxDistance = 120_000
     this.controls.addEventListener('change', this.markDirty)
     this.controls.addEventListener('start', this.onUserCamera)
@@ -345,6 +370,7 @@ export class OrreryRenderer {
       this.craft.markers,
       this.models.group,
       this.near.group,
+      this.sats.group,
     )
     this.orbitGroup.add(this.heliopause)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
@@ -432,8 +458,10 @@ export class OrreryRenderer {
       )
     }
     this.placeEarthFrame()
+    this.placeSats(t)
     for (const a of this.near.asteroids.visible()) this.floorPx(a.mesh, ASTEROID_MIN_PX)
     if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX)
+    if (this.sats.marker.visible) this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX)
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
       c.mesh.scale.setScalar(craftIconScale(this.unitsPerPx(depth)))
@@ -494,15 +522,74 @@ export class OrreryRenderer {
     if (!earth || Number.isNaN(this.lastJd)) return
     // Forced open: where things will be once a focus flight arrives (it ends inside it).
     const t = forceOpen && this.near.coversEarth(this.lastJd) ? 1 : this.earthOpenness()
-    const radius = Math.max(
-      this.drawnRadius('Earth', t),
-      this.minPx('Earth') * this.unitsPerPx(earth.position.distanceTo(this.camera.position)),
-    )
+    const radius = this.earthFrameRadius(earth, t)
     const frame = this.near.view(this.lastJd, earth.position, radius, t, (p) => this.toScene(p))
     // Any craft near Earth (the L1/L2 ones; Europa Clipper on its Earth flyby) goes into
     // the frame with the Moon and the close approaches, so they share one scale.
     this.craft.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
     this.near.place(this.lastJd, frame)
+  }
+
+  /** Earth's radius as drawn this frame, the Earth frame's unit, with its px floor. */
+  private earthFrameRadius(earth: Mesh, t: number): number {
+    return Math.max(
+      this.drawnRadius('Earth', t),
+      this.minPx('Earth') * this.unitsPerPx(earth.position.distanceTo(this.camera.position)),
+    )
+  }
+
+  /**
+   * The satellites (#98), once per drawn frame: around Earth as drawn, by the camera's
+   * distance and the clock's rate. The page hears when their state changes.
+   */
+  private placeSats(t: number): void {
+    const earth = this.bodies.get('Earth')
+    if (!earth || Number.isNaN(this.lastJd)) return
+    const clock = this.clock.motion()
+    this.sats.place({
+      jd: this.lastJd,
+      simMs: this.clock.simTime(),
+      wallMs: performance.now(),
+      rate: clock.playing ? clock.rate : 0,
+      earth: earth.position,
+      radius: this.earthFrameRadius(earth, t),
+      openness: this.mode === 'proportional' ? 0 : t,
+      camera: this.camera.position,
+      pixelRatio: this.renderer.getPixelRatio(),
+      aspect: this.width / Math.max(1, this.height),
+    })
+    const state = this.satState()
+    const key = `${JSON.stringify(state.groups)}|${String(state.total)}|${String(state.drawn)}|${String(state.outOfWindow)}|${state.mode}`
+    if (key !== this.satStateKey) {
+      this.satStateKey = key
+      this.onSatState?.(state)
+    }
+  }
+
+  private satState(): SatViewState {
+    return { ...this.sats.snapshot(), mode: this.sats.mode() }
+  }
+
+  /** The satellite groups switched on (#98); fetched once the Earth frame opens. */
+  setSatGroups(groups: ReadonlySet<SatGroupId>): void {
+    this.sats.setEnabled(groups)
+    this.markDirty()
+  }
+
+  /** The satellites' state, for the controls and the stage notice. Called now and on change. */
+  setOnSatState(cb: ((s: SatViewState) => void) | null): void {
+    this.onSatState = cb
+    cb?.(this.satState())
+  }
+
+  /** A satellite's details for the inspector (#98), or null when it is not loaded. */
+  satellite(key: SceneKey): SatInfo | null {
+    return this.sats.info(key)
+  }
+
+  /** Every loaded object in a satellite group, for search. */
+  satellites(group: SatGroupId): { key: string; name: string }[] {
+    return this.sats.listGroup(group)
   }
 
   /** The focused craft's model at its position, its axis along its attitude (#115). */
@@ -706,6 +793,8 @@ export class OrreryRenderer {
     this.craft.setTrajectory(key && this.craft.has(key) ? key : null)
     // A chosen close approach draws its sampled pass (#92).
     this.near.asteroids.setSelected(key)
+    // A chosen satellite gets a marker and a label (#98).
+    this.sats.setSelected(key)
     this.chosen = key
     this.updateBodies(true)
     this.markDirty()
@@ -799,8 +888,8 @@ export class OrreryRenderer {
    * (#93: Voyager 2, 90 au south of the ecliptic, fell below a ring-only frame).
    */
   applyPreset(preset: FocusPreset, instant = this.reducedMotion): void {
-    if (preset === 'earth') {
-      this.applyEarthPreset(instant)
+    if (preset === 'earth' || preset === 'orbit') {
+      this.applyEarthPreset(preset, instant)
       return
     }
     this.preset = preset
@@ -825,25 +914,27 @@ export class OrreryRenderer {
 
   /**
    * Earth–Moon/L1 (#92): aimed at Earth from beside the Sun–Earth line, close enough that
-   * the Earth frame is open, holding L2. It follows Earth as the clock runs.
+   * the Earth frame is open, holding L2. Earth orbit (#98): the same, closer, holding the
+   * geostationary ring with the satellites as points. Both follow Earth as the clock runs.
    */
-  private applyEarthPreset(instant: boolean): void {
-    this.preset = 'earth'
+  private applyEarthPreset(preset: 'earth' | 'orbit', instant: boolean): void {
+    this.preset = preset
     this.presetPristine = true
     this.focusBody = 'Earth'
     this.models.show(null, null)
-    this.canvas.dataset['orreryFocus'] = 'earth'
+    this.canvas.dataset['orreryFocus'] = preset
     this.updateBodies(true)
-    const view = this.earthView()
+    const view = this.earthView(preset)
     this.flyTo(view.position, view.target, instant)
   }
 
-  /** The Earth–Moon/L1 framing (#92), also the distance for focusing Earth. */
-  private earthView() {
+  /** The Earth–Moon/L1 framing (#92), also the distance for focusing Earth; or Earth orbit. */
+  private earthView(preset: 'earth' | 'orbit' = 'earth') {
+    const km = preset === 'orbit' ? GEO_KM : L1_DISTANCE_KM
     const extent =
       this.mode === 'proportional'
-        ? (L1_DISTANCE_KM / AU_KM) * LINEAR_K * 1.1
-        : EARTH_FRAME_UNIT * EARTH_PRESET_RADII
+        ? (km / AU_KM) * LINEAR_K * 1.1
+        : EARTH_FRAME_UNIT * (preset === 'orbit' ? ORBIT_PRESET_RADII : EARTH_PRESET_RADII)
     return earthPresetView(
       this.bodyPosition('Earth'),
       this.bodyPosition('Sun'),
@@ -867,6 +958,12 @@ export class OrreryRenderer {
 
   /** Fly to a body or craft and keep following it as it moves. */
   focusOn(name: SceneKey, instant = this.reducedMotion): void {
+    // A satellite (#98): the camera stays where the points are pickable (a tap chose it
+    // there); otherwise (search) the Earth orbit view. Its marker shows which one.
+    if (isSatKey(name)) {
+      if (!this.sats.pickable()) this.applyEarthPreset('orbit', instant)
+      return
+    }
     this.updateBodies(true)
     // Near Earth, aim where the object sits once the flight is in, with the frame open.
     const nearEarth =
@@ -923,6 +1020,7 @@ export class OrreryRenderer {
       this.flight = null
       this.camera.position.copy(toPos)
       this.controls.target.copy(toTarget)
+      this.syncMinDistance()
       this.controls.update()
       this.markDirty()
       return
@@ -936,6 +1034,14 @@ export class OrreryRenderer {
       ms: 900,
     }
     this.markDirty()
+  }
+
+  /** Near Earth the camera may come in close; elsewhere it keeps the general limit (#98). */
+  private syncMinDistance(): void {
+    const earth = this.bodies.get('Earth')
+    this.controls.minDistance = cameraMinDistance(
+      earth ? earth.position.distanceTo(this.controls.target) : Number.POSITIVE_INFINITY,
+    )
   }
 
   /** The user turned or zoomed: stop any flight, and stop refitting the preset. */
@@ -956,7 +1062,16 @@ export class OrreryRenderer {
         best = item.name
       }
     }
-    return best
+    // A satellite wins only when it is nearer the tap than any body (#98).
+    const sat = this.sats.pick(x, y, bestD, (v) => {
+      this.scratch.copy(v).project(this.camera)
+      if (this.scratch.z > 1) return null
+      return {
+        x: ((this.scratch.x + 1) / 2) * this.width,
+        y: ((1 - this.scratch.y) / 2) * this.height,
+      }
+    })
+    return sat ?? best
   }
 
   private projectOne(
@@ -1038,6 +1153,15 @@ export class OrreryRenderer {
     }
     if (this.near.l1.visible && (open || this.chosen === L1_KEY)) {
       out.push({ name: L1_KEY, label: L1_KEY, kind: 'marker', ...this.projectOne(this.near.l1) })
+    }
+    const sat = this.sats.selectedLabel()
+    if (sat) {
+      out.push({
+        name: sat.key,
+        label: sat.label,
+        kind: 'satellite',
+        ...this.projectOne(this.sats.marker),
+      })
     }
   }
 
@@ -1123,6 +1247,7 @@ export class OrreryRenderer {
       this.controls.target.lerpVectors(f.fromTarget, f.toTarget, k)
       if (t >= 1) this.flight = null
     }
+    this.syncMinDistance()
     const damping = this.controls.update()
     if (this.dirty || moving || flying || damping) {
       if (now - this.lastDraw >= MIN_FRAME_MS || this.dirty || flying) {
@@ -1186,6 +1311,20 @@ export class OrreryRenderer {
     d['orreryAsteroids'] = String(this.near.asteroids.visible().length)
     d['orreryAsteroidPath'] = String(this.near.asteroids.pathPoints())
     d['orreryL1'] = String(this.near.l1.visible)
+    // Satellites (#98): how they show, objects loaded, drawn and hidden past their epoch
+    // window, the groups loaded, and the last worker pass (the phone target is ≤ 300 ms).
+    const sats = this.sats.snapshot()
+    d['orrerySatMode'] = this.sats.mode()
+    d['orrerySatDistance'] = this.sats.distance().toFixed(1)
+    d['orrerySatTotal'] = String(sats.total)
+    d['orrerySatDrawn'] = String(sats.drawn)
+    d['orrerySatHidden'] = String(sats.outOfWindow)
+    d['orrerySatGroups'] = Object.entries(sats.groups)
+      .filter(([, g]) => g.status === 'loaded')
+      .map(([id]) => id)
+      .join(',')
+    d['satPropagateMs'] = sats.passMs === null ? '' : sats.passMs.toFixed(1)
+    d['satEngine'] = sats.engine ?? ''
   }
 
   private readonly handleContextLost = (e: Event) => {
@@ -1209,6 +1348,7 @@ export class OrreryRenderer {
     }
     this.craft.dispose()
     this.near.dispose()
+    this.sats.dispose()
     this.models.dispose()
     this.moons.dispose()
     this.sunImage.stop()

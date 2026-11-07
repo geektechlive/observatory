@@ -120,6 +120,23 @@ export function earthFrameOffset(
   return { x: dir.x * r, y: dir.y * r, z: dir.z * r }
 }
 
+/** The camera never comes nearer its target than this, scene units, away from Earth. */
+const CAMERA_MIN_DISTANCE = 0.5
+/** Near Earth, nearer: this many of the frame's Earth radii (the camera stays outside Earth). */
+const CAMERA_MIN_EARTH_RADII = 2
+
+/**
+ * How near the camera may come to its target (OrbitControls' minDistance), from the
+ * target's distance to Earth, scene units. Near Earth the frame is true scale and the
+ * Earth orbit view stands about 31 Earth radii (0.26 units) off (#98), inside the
+ * general limit, which once held it at 59 and turned the satellites into a haze.
+ */
+export function cameraMinDistance(targetToEarth: number): number {
+  return targetToEarth <= EARTH_FRAME_OPEN_TARGET.closed * EARTH_FRAME_UNIT
+    ? CAMERA_MIN_EARTH_RADII * EARTH_FRAME_UNIT
+    : CAMERA_MIN_DISTANCE
+}
+
 /** Minutes the solar wind takes from L1 to Earth at a speed, km/s; null without one. */
 export function l1TransitMinutes(speedKmS: number): number | null {
   if (!(speedKmS > 0)) return null

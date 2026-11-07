@@ -25,7 +25,9 @@ export const BUDGETS = {
   worldMapGzip: 294_000,
   // #91 measured OrreryPage 11.4 kB and OrreryRenderer 7.0 kB gzip with the planets
   // only; #92/#93/#98 add asteroids, craft and satellites, so each gets room to 30 kB.
-  orreryGzip: 30_000,
+  // With the satellites (#98) OrreryPage measured 29.7 kB and OrreryRenderer 23.3 kB, so
+  // 34 kB leaves room for #99's comets.
+  orreryGzip: 34_000,
   textureBytes: 1_500_000,
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses
   // the globe's day-2048). They load with the orrery tab, never with the page.

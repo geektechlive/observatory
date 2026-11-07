@@ -6,9 +6,12 @@
  */
 import { PerspectiveCamera, Vector3 } from 'three'
 
-export type FocusPreset = 'sun' | 'inner' | 'outer' | 'heliosphere' | 'earth'
-/** The presets framed around the Sun; Earth–Moon/L1 (#92) is framed on Earth instead. */
-export type SunPreset = Exclude<FocusPreset, 'earth'>
+export type FocusPreset = 'sun' | 'inner' | 'outer' | 'heliosphere' | 'earth' | 'orbit'
+/**
+ * The presets framed around the Sun; Earth–Moon/L1 (#92) and Earth orbit (#98) are
+ * framed on Earth instead.
+ */
+export type SunPreset = Exclude<FocusPreset, 'earth' | 'orbit'>
 
 export interface PresetDef {
   /** The orbit (or distance) at the frame's edge, au. */

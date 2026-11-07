@@ -22,6 +22,7 @@ import {
   primaryCategoryCounts,
   quakeMapColor,
   renderPaletteCss,
+  SAT_CATEGORY_HEX,
   SKY_WELL_HEX,
   sstColor,
   STATUS_HEX,
@@ -231,6 +232,25 @@ describe('BODY_HEX (sky bodies shared by panels and the sky stage)', () => {
 
   it('Mars is not hazard red (rule 3)', () => {
     expect(BODY_HEX['Mars']).not.toBe(STATUS_HEX.hazard)
+  })
+})
+
+describe('SAT_CATEGORY_HEX (#98: the orrery’s satellites by category)', () => {
+  it('gives every category a hex, all different', () => {
+    const values = Object.values(SAT_CATEGORY_HEX)
+    for (const v of values) expect(v).toMatch(HEX)
+    expect(Object.keys(SAT_CATEGORY_HEX).sort()).toEqual(
+      ['debris', 'navigation', 'other', 'science', 'starlink', 'station', 'weather'].sort(),
+    )
+    expect(new Set(values).size).toBe(values.length)
+  })
+
+  it('keeps cyan for spacecraft and red for hazard only', () => {
+    for (const v of Object.values(SAT_CATEGORY_HEX)) {
+      expect(v).not.toBe(ISS_HEX)
+      expect(v).not.toBe(STATUS_HEX.hazard)
+      expect(v).not.toBe(STATUS_HEX.watch)
+    }
   })
 })
 

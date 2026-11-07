@@ -66,14 +66,23 @@ describe('createSatHandler (#98)', () => {
       'loaded',
     )
     expect(a).toMatchObject({ group: 'stations', count: 2, dropped: 0 })
-    await handle({ type: 'load', id: 2, body: body('gps-ops', rowsOf('gps-ops')) })
-    const { reply, transfer } = await handle({ type: 'propagate', id: 3, dateMs: AT })
-    const frame = expectType(reply, 'frame')
-    expect(frame.groups).toEqual([
+    const b = expectType(
+      (await handle({ type: 'load', id: 2, body: body('gps-ops', rowsOf('gps-ops')) })).reply,
+      'loaded',
+    )
+    // Names, ids and epochs cross once per change of the field, not with every frame.
+    expect(b.field.groups).toEqual([
       { group: 'stations', start: 0, count: 2 },
       { group: 'gps-ops', start: 2, count: 1 },
     ])
-    expect(frame.ids).toEqual(['25544', expect.any(String), expect.any(String)])
+    expect(b.field.ids).toEqual(['25544', expect.any(String), expect.any(String)])
+    expect(b.field.names[0]).toBe('ISS (ZARYA)')
+    expect(b.field.epochMs).toHaveLength(3)
+    expect(b.field.version).toBeGreaterThan(a.field.version)
+    const { reply, transfer } = await handle({ type: 'propagate', id: 3, dateMs: AT })
+    const frame = expectType(reply, 'frame')
+    expect(frame.version).toBe(b.field.version)
+    expect(frame).not.toHaveProperty('names')
     expect(frame.positions).toHaveLength(9)
     expect(frame.status[0]).toBe(SAT_OK)
     expect(frame.engine).toBe('wasm')
@@ -87,10 +96,14 @@ describe('createSatHandler (#98)', () => {
     await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
     await handle({ type: 'load', id: 2, body: body('stations', rowsOf('stations').slice(0, 1)) })
     let frame = expectType((await handle({ type: 'propagate', id: 3, dateMs: AT })).reply, 'frame')
-    expect(frame.groups).toEqual([{ group: 'stations', start: 0, count: 1 }])
-    await handle({ type: 'unload', id: 4, group: 'stations' })
+    expect(frame.positions).toHaveLength(3)
+    const gone = expectType(
+      (await handle({ type: 'unload', id: 4, group: 'stations' })).reply,
+      'unloaded',
+    )
+    expect(gone.field.groups).toEqual([])
     frame = expectType((await handle({ type: 'propagate', id: 5, dateMs: AT })).reply, 'frame')
-    expect(frame.groups).toEqual([])
+    expect(frame.version).toBe(gone.field.version)
     expect(frame.positions).toHaveLength(0)
   })
 

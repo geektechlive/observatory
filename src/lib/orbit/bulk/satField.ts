@@ -15,10 +15,9 @@ import { OrrerySatsSchema } from '@/schemas/orrerySats'
 import { EPOCH_WINDOW_MS, rowEpochMs, rowToOmm, type SatGroupId, type SatRow } from '../satCatalog'
 import type { bulkRuntime } from './bulkEci'
 import { propagateBulk } from './bulkEci'
+import { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW } from './satStatus'
 
-export const SAT_OK = 0
-export const SAT_FAILED = 1
-export const SAT_OUT_OF_WINDOW = 2
+export { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW }
 
 type Runtime = Awaited<ReturnType<typeof bulkRuntime>>
 

@@ -7,7 +7,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  cameraMinDistance,
   EARTH_FRAME_OPEN_CAMERA,
+  EARTH_FRAME_OPEN_TARGET,
   EARTH_FRAME_UNIT,
   EARTH_RADIUS_KM,
   earthFrameBlend,
@@ -119,5 +121,19 @@ describe('l1TransitMinutes (#92)', () => {
     expect(l1TransitMinutes(400)).toBeCloseTo(62.5, 6)
     expect(l1TransitMinutes(0)).toBeNull()
     expect(l1TransitMinutes(Number.NaN)).toBeNull()
+  })
+})
+
+describe('cameraMinDistance (#98)', () => {
+  it('lets the camera in close to Earth, where the frame is true scale', () => {
+    // The Earth orbit view stands about 31 frame units off; the controls once clamped it
+    // to 0.5 scene units (59), so the satellites read as fading, not points.
+    expect(cameraMinDistance(0)).toBeLessThan(20 * EARTH_FRAME_UNIT)
+    expect(cameraMinDistance(0)).toBeGreaterThan(EARTH_FRAME_UNIT)
+  })
+
+  it('keeps the old limit anywhere else, so nothing is zoomed into', () => {
+    expect(cameraMinDistance(EARTH_FRAME_OPEN_TARGET.closed * EARTH_FRAME_UNIT * 1.01)).toBe(0.5)
+    expect(cameraMinDistance(Number.POSITIVE_INFINITY)).toBe(0.5)
   })
 })

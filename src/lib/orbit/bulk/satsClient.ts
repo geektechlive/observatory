@@ -7,13 +7,16 @@
 import type { SatFrame } from './satField'
 import type { SatReply, SatRequest } from './satHandler'
 
-type Loaded = Extract<SatReply, { type: 'loaded' }>
-type Frame = Extract<SatReply, { type: 'frame' }>
+export type SatLoaded = Extract<SatReply, { type: 'loaded' }>
+export type SatUnloaded = Extract<SatReply, { type: 'unloaded' }>
+export type SatFrameReply = Extract<SatReply, { type: 'frame' }>
+type Loaded = SatLoaded
+type Frame = SatFrameReply
 
 export interface SatWorker {
   /** Load (or replace) a group from its /api/orrery-sats body; the buffer is transferred. */
   load(body: ArrayBuffer): Promise<Loaded>
-  unload(group: Extract<SatRequest, { type: 'unload' }>['group']): Promise<void>
+  unload(group: Extract<SatRequest, { type: 'unload' }>['group']): Promise<SatUnloaded>
   propagate(date: Date): Promise<Frame>
   /** Hand back a frame's buffers once drawn, to be reused by the next pass. */
   release(frame: SatFrame): void
@@ -51,8 +54,8 @@ export function createSatWorker(): SatWorker {
     load(body) {
       return send<Loaded>({ type: 'load', id: ++next, body }, [body])
     },
-    async unload(group) {
-      await send({ type: 'unload', id: ++next, group })
+    unload(group) {
+      return send<SatUnloaded>({ type: 'unload', id: ++next, group })
     },
     propagate(date) {
       const reuse = spare ?? undefined

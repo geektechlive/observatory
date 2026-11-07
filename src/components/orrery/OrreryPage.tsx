@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDsn } from '@/hooks/useDsn'
 import { useOrreryBodies } from '@/hooks/useOrreryBodies'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { fetchOrrerySatsBody } from '@/lib/api/orrerySats'
 import { dsnContactsById } from '@/lib/dsn'
+import { loadSatWorker } from '@/lib/orbit/bulk/loadSatWorker'
 import {
   heliocentric,
   HELIOPAUSE_LABEL,
@@ -13,6 +15,7 @@ import {
   rangeRateKmS,
 } from '@/lib/orrery'
 import { moonBodies } from '@/lib/orrery/moonState'
+import { isSatKey } from '@/lib/orrery/satView'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
 import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
@@ -26,10 +29,19 @@ import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
 import { NeoControls } from './NeoControls'
 import styles from './orrery.module.css'
+import { SatControls } from './SatControls'
+import {
+  DEFAULT_SAT_TOGGLES,
+  enabledSatGroups,
+  satHiddenNotice,
+  satStatusText,
+  type SatToggles,
+} from './satToggles'
 import type {
   FocusPreset,
   OrreryRenderer,
   ProjectedBody,
+  SatViewState,
   ScaleMode,
   SceneKey,
   SunImageState,
@@ -56,6 +68,9 @@ const CLOCK_READER = {
   },
 }
 
+/** The satellites' data (#98): the stored CelesTrak groups and the shared SGP4 worker. */
+const SAT_SOURCE = { fetchGroup: fetchOrrerySatsBody, worker: loadSatWorker }
+
 function acquire(width: number, height: number, reducedMotion: boolean, onLost: () => void) {
   if (!shared) {
     shared = import('./three/OrreryRenderer').then(
@@ -66,6 +81,7 @@ function acquire(width: number, height: number, reducedMotion: boolean, onLost: 
           reducedMotion,
           onContextLost: onLost,
           clock: CLOCK_READER,
+          satSource: SAT_SOURCE,
         }),
     )
   }
@@ -166,6 +182,9 @@ export function OrreryPage() {
   const [craftFilter, setCraftFilter] = useState<CraftFilter>(DEFAULT_CRAFT_FILTER)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sun, setSun] = useState<SunImageState | undefined>(undefined)
+  // Satellites (#98): which kinds are switched on, and what the renderer has of them.
+  const [satToggles, setSatToggles] = useState<SatToggles>(DEFAULT_SAT_TOGGLES)
+  const [satState, setSatState] = useState<SatViewState | null>(null)
   // The voice line and inspector change slowly: once a second is plenty, and keeps the
   // whole page from re-rendering at the time bar's 4 Hz (it has its own readout).
   const { sim } = useSimTime(PAGE_REFRESH_MS)
@@ -193,9 +212,14 @@ export function OrreryPage() {
   const nearCatalog = near.catalog
   // Whole days are enough for "no data for this date" in the search list.
   const catalogDay = Math.floor(jdNow)
+  // The space stations once their group has loaded (a new state each time one does).
+  const stations = useMemo(
+    () => (renderer && satState ? renderer.satellites('stations') : []),
+    [renderer, satState],
+  )
   const catalog = useMemo(
-    () => buildCatalog(tracks, catalogDay + 0.5, moons, nearCatalog),
-    [tracks, catalogDay, moons, nearCatalog],
+    () => buildCatalog(tracks, catalogDay + 0.5, moons, nearCatalog, stations),
+    [tracks, catalogDay, moons, nearCatalog, stations],
   )
 
   // The label pass runs per drawn frame, outside React: it reads these through refs.
@@ -295,6 +319,18 @@ export function OrreryPage() {
   useEffect(() => {
     renderer?.setDsnIds(dsnIds)
   }, [renderer, dsnIds])
+
+  useEffect(() => {
+    renderer?.setSatGroups(enabledSatGroups(satToggles))
+  }, [renderer, satToggles])
+
+  useEffect(() => {
+    if (!renderer) return
+    renderer.setOnSatState(setSatState)
+    return () => {
+      renderer.setOnSatState(null)
+    }
+  }, [renderer])
 
   useEffect(() => {
     renderer?.setTrajectory(selected)
@@ -464,6 +500,8 @@ export function OrreryPage() {
       setSelected(key)
       setPreset(null)
       setSheetOpen(false)
+      // A station chosen in search needs its group: the ISS is listed before it loads (#98).
+      if (isSatKey(key)) setSatToggles((t) => (t.stations ? t : { ...t, stations: true }))
       // A moon moves fast around its planet: the camera holds the planet's neighbourhood,
       // where the moon is drawn (#107).
       renderer?.focusOn(moonParent.get(key) ?? key)
@@ -536,6 +574,12 @@ export function OrreryPage() {
   const outOfRange = heliocentric('Earth', jdNow)
   // Craft and moons outside their data spans hide; the stage says so (#114).
   const noData = bodies.status === 'success' ? noDataNotice(catalog) : null
+  // Satellites past ±3 days of their orbit data are hidden (#98); said while they'd show.
+  const satHidden =
+    satState && satState.mode !== 'hidden'
+      ? satHiddenNotice(satState.outOfWindow, satState.total)
+      : null
+  const satellite = selected && isSatKey(selected) ? (renderer?.satellite(selected) ?? null) : null
   const craftStatus = craftStatusText(
     bodies.status,
     craftTracks.length,
@@ -578,6 +622,13 @@ export function OrreryPage() {
             sunLine={near.sunLine}
             onSunLine={near.setSunLine}
             onSelect={select}
+          />
+        }
+        earthOrbit={
+          <SatControls
+            toggles={satToggles}
+            onToggles={setSatToggles}
+            status={satState ? satStatusText(satState) : 'Loading…'}
           />
         }
       />
@@ -685,6 +736,22 @@ export function OrreryPage() {
             L1
             {near.wind?.speed != null ? ` · ${String(Math.round(near.wind.speed))} km/s` : ''}
           </button>
+          {satellite && (
+            <button
+              key={satellite.key}
+              type="button"
+              hidden
+              data-kind="satellite"
+              ref={(el) => {
+                if (el) labelNodes.current.set(satellite.key, el)
+                else labelNodes.current.delete(satellite.key)
+              }}
+              className={`${styles.label ?? ''} ${styles.moonLabel ?? ''}`}
+              aria-pressed
+            >
+              {satellite.name}
+            </button>
+          )}
           {moons.map((m) => (
             <button
               key={m.key}
@@ -728,6 +795,11 @@ export function OrreryPage() {
               {noData}
             </p>
           )}
+          {!failed && satHidden && (
+            <p className={styles.notice ?? ''} role="status" data-orrery-sat-notice="">
+              {satHidden}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -752,6 +824,7 @@ export function OrreryPage() {
             neo={near.neo}
             wind={near.wind}
             cme={near.cme}
+            satellite={satellite}
             onClose={() => {
               setSelected(null)
             }}

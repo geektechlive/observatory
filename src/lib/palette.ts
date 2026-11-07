@@ -100,6 +100,21 @@ export const CRAFT_MODEL_HEX = {
   white: hexOf('oklch(0.93 0.005 250)'),
 }
 
+/**
+ * The orrery's satellites by category (#98). Cyan stays spacecraft-only and red hazard-
+ * only, so the crewed stations are bone white; Starlink, the biggest group by far, is a
+ * quiet slate so it reads as a shell rather than drowning the rest; debris is dim.
+ */
+export const SAT_CATEGORY_HEX = {
+  station: hexOf(TOKEN_OKLCH.bone),
+  starlink: hexOf('oklch(0.66 0.03 255)'),
+  navigation: hexOf('oklch(0.82 0.1 168)'),
+  weather: LANES.hydro.emit,
+  science: hexOf('oklch(0.78 0.13 330)'),
+  other: hexOf('oklch(0.74 0.035 75)'),
+  debris: hexOf('oklch(0.55 0.04 50)'),
+} as const
+
 /** StarField canvas: emissive points in the void, so a cool star is fine (they aren't structure). */
 export const STAR_HEX = { warm: hexOf('oklch(0.82 0.1 70)'), cool: hexOf('oklch(0.85 0.08 220)') }
 /** Aurora is a field with a single-hue ramp, not a marker lane. */

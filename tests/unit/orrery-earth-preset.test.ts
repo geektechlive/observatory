@@ -7,7 +7,8 @@ import { PerspectiveCamera, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { earthPresetView, FILL, FOV, pointsExtent } from '@/components/orrery/three/framing'
-import { EARTH_FRAME_OPEN_CAMERA, EARTH_FRAME_UNIT } from '@/lib/orrery/earthFrame'
+import { EARTH_FRAME_OPEN_CAMERA, EARTH_FRAME_UNIT, GEO_RADII } from '@/lib/orrery/earthFrame'
+import { ORBIT_PRESET_RADII, satDisplay, satViewDistance } from '@/lib/orrery/satView'
 
 const R = EARTH_FRAME_UNIT
 const EXTENT = 13.5 * R // OrreryRenderer EARTH_PRESET_RADII
@@ -58,5 +59,32 @@ describe('earthPresetView (#92)', () => {
     const l1 = earth.clone().add(toSun).project(camera)
     const l2 = earth.clone().sub(toSun).project(camera)
     expect(Math.abs(l1.x - l2.x)).toBeGreaterThan(3 * Math.abs(l1.y - l2.y))
+  })
+})
+
+describe('the Earth orbit preset (#98)', () => {
+  for (const aspect of [0.46, 0.55, 1, 1.6, 2.4]) {
+    it(`at aspect ${String(aspect)}: holds the geostationary ring with the satellites as points`, () => {
+      const reserve = 0.3
+      const extent = ORBIT_PRESET_RADII * R
+      const view = earthPresetView(earth, sun, aspect, extent, reserve)
+      const camera = cameraAt(view, aspect)
+      expect(ORBIT_PRESET_RADII).toBeGreaterThan(GEO_RADII)
+      expect(pointsExtent(camera, neighbourhood(earth, extent), reserve)).toBeLessThanOrEqual(
+        FILL + 1e-3,
+      )
+      const re = view.position.distanceTo(earth) / R
+      expect(re).toBeLessThanOrEqual(EARTH_FRAME_OPEN_CAMERA.open)
+      // Seen across the stage's narrow side, as the renderer measures it.
+      const display = satDisplay(satViewDistance(re, aspect), 1, 1)
+      expect(display.pickable).toBe(true)
+      expect(display.pointsAlpha).toBe(1)
+    })
+  }
+
+  it('the Earth–Moon view shows the satellites fading or as haze, not as points', () => {
+    const view = earthPresetView(earth, sun, 1.6, EXTENT, 0.3)
+    const re = view.position.distanceTo(earth) / R
+    expect(satDisplay(satViewDistance(re, 1.6), 1, 1).pickable).toBe(false)
   })
 })

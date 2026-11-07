@@ -238,3 +238,28 @@ describe('spreadRim', () => {
     expect(out.get('b')?.y).toBe(400)
   })
 })
+
+describe('satellites in search (#98)', () => {
+  it('lists the space stations under their own heading, with the ISS first', () => {
+    const items = buildCatalog([], JD, [], undefined, [
+      { key: 'sat:48274', name: 'CSS (TIANHE)' },
+      { key: 'sat:25544', name: 'ISS (ZARYA)' },
+    ])
+    const sats = items.filter((i) => i.kind === 'satellite')
+    expect(sats.map((i) => i.label)).toEqual(['ISS (ZARYA)', 'CSS (TIANHE)'])
+    expect(sats.every((i) => i.group === 'Space stations' && i.available)).toBe(true)
+  })
+
+  it('keeps the ISS findable before its group has loaded', () => {
+    const items = buildCatalog([], JD, [], undefined, [])
+    expect(items.find((i) => i.key === 'sat:25544')).toMatchObject({
+      label: 'ISS',
+      kind: 'satellite',
+    })
+  })
+
+  it('never counts satellites in the stage’s "no data" notice', () => {
+    const items = buildCatalog([], JD, [], undefined, [])
+    expect(noDataNotice(items.map((i) => ({ ...i, available: i.kind !== 'satellite' })))).toBeNull()
+  })
+})

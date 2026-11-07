@@ -7,6 +7,7 @@ import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orr
 import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
 import type { MoonBody } from '@/lib/orrery/moonState'
+import { isSatKey } from '@/lib/orrery/satView'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryNeo } from '@/schemas/orreryNeo'
 
@@ -16,7 +17,9 @@ import { ImageryFacts } from './ImageryFacts'
 import { MoonFacts } from './MoonFacts'
 import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './NearFacts'
 import styles from './orrery.module.css'
+import { SatFacts } from './SatFacts'
 import { formatSimUtc } from './simDate'
+import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
 
 interface InspectorProps {
@@ -39,6 +42,8 @@ interface InspectorProps {
   /** The solar wind at L1 and the CME forecast, for the L1 marker (#92). */
   wind?: L1Wind | null | undefined
   cme?: L1Cme | null | undefined
+  /** The chosen satellite's details (#98), or null while its group loads. */
+  satellite?: SatInfo | null | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -65,8 +70,30 @@ export function Inspector({
   neo,
   wind,
   cme,
+  satellite,
 }: InspectorProps) {
   const headingId = useId()
+  if (isSatKey(body)) {
+    return (
+      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+        <div className={styles.inspectorHead ?? ''}>
+          <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
+            {satellite?.name ?? 'Satellite'}
+          </h2>
+          <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        {satellite ? (
+          <SatFacts info={satellite} simMs={simMs} />
+        ) : (
+          <p className={styles.inspectorText ?? ''} role="status">
+            Loading its orbit data from CelesTrak…
+          </p>
+        )}
+      </aside>
+    )
+  }
   const jd = jdFromDate(new Date(simMs))
   const earthTrack = tracks?.find((t) => t.naifId === '399') ?? null
   const approach = neo?.approaches.find((a) => a.id === body)
