@@ -37,6 +37,7 @@ export type SourceName =
   | 'orrery-bodies'
   | 'orrery-neo'
   | 'orrery-sats'
+  | 'orrery-smallbodies'
   | 'people-in-space'
   | 'planets'
   | 'quakes'
@@ -156,6 +157,14 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: false,
     maxAgeMs: 36 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'approaches'),
+  },
+  'orrery-smallbodies': {
+    // Not headline: only the orrery page asks for it (#99). Comets can be few or none in
+    // a quiet month, but 1I, 2I and 3I are always there, so an empty list is a fault.
+    label: 'Orrery Comets',
+    headline: false,
+    maxAgeMs: 72 * HOUR,
+    required: (data) => nonEmptyArrayField(data, 'interstellar'),
   },
   'orrery-sats': {
     // Not headline: only the orrery page asks for it (#98). One CelesTrak group per

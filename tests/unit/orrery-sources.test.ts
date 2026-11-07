@@ -25,6 +25,14 @@ describe('SOURCES (#91)', () => {
     }
   })
 
+  it('marks what the refresh job now fetches for the orrery as operational (#92, #99)', () => {
+    for (const id of ['cad', 'scout', 'neocc', 'sbdb_query']) {
+      const s = SOURCES.find((x) => x.id === id)
+      expect(s?.status).toBe('operational')
+      expect(s?.note).toMatch(/refresh job/)
+    }
+  })
+
   it('records the fact-check: sb_obs does not exist, Launch Library is 2.3.0', () => {
     const sbObs = SOURCES.find((s) => s.id === 'sb_obs')
     expect(sbObs?.status).toBe('unavailable')

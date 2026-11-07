@@ -180,3 +180,93 @@ export function parseObservedUntil(result: string, nowMs: number): string | null
   }
   return null
 }
+
+// ---------------------------------------------------------------- small-body headers
+
+export interface SmallBodyHeader {
+  /** Epoch of the osculating elements, Julian date (TDB). */
+  epochJd: number
+  /** Eccentricity, perihelion distance (au) and time (JD TDB). */
+  e: number
+  q: number
+  tp: number
+  /** Node, argument of perihelion and inclination, degrees, ecliptic J2000. */
+  om: number
+  w: number
+  i: number
+  /** A comet's total-magnitude law, T = M1 + 5 log Δ + k1 log r; null when not given. */
+  m1: number | null
+  k1: number | null
+  /** An asteroid's absolute magnitude (1I/'Oumuamua is filed as one). */
+  h: number | null
+  /** "JPL#55": which orbit solution answered. */
+  solutionRef: string | null
+  /** When that solution was computed, and on how many observations. */
+  solutionDate: string | null
+  observations: number | null
+  /** The span of observations the orbit is fitted to: outside it, it is extrapolated. */
+  dataArc: { from: string; to: string } | null
+}
+
+/** A header number: "6.12", ".7079" and "8." are numbers; "n.a." and absent are null. */
+function headerNumber(result: string, label: string): number | null {
+  const m = new RegExp(`(?:^|\\s)${label}=\\s*(-?[\\d.]+(?:E[+-]?\\d+)?)`, 'm').exec(result)
+  if (!m?.[1]) return null
+  const n = Number(m[1])
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * The observed span, as comets write it ("data arc: 2025-10-03 to 2026-10-16") or as
+ * 1I's note does ("observed data arc from 2017 October 14 to 2018 January 2").
+ */
+function dataArc(result: string): { from: string; to: string } | null {
+  const iso = /data arc: (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})/.exec(result)
+  if (iso?.[1] && iso[2]) return { from: iso[1], to: iso[2] }
+  const prose =
+    /data arc from\s+(\d{4}) ([A-Za-z]+) (\d{1,2})\s+to\s+(\d{4}) ([A-Za-z]+) (\d{1,2})/.exec(
+      result,
+    )
+  if (!prose) return null
+  const [, y1 = '', m1 = '', d1 = '', y2 = '', m2 = '', d2 = ''] = prose
+  const a = monthIndex(m1)
+  const b = monthIndex(m2)
+  if (a < 0 || b < 0) return null
+  return { from: isoDate(Number(y1), a, Number(d1)), to: isoDate(Number(y2), b, Number(d2)) }
+}
+
+/**
+ * The osculating elements and provenance in a comet's or asteroid's Horizons header
+ * (#99). Null when the answer has no elements: a planet, a craft or an error page.
+ */
+export function parseSmallBodyHeader(result: string): SmallBodyHeader | null {
+  const epochJd = headerNumber(result, 'EPOCH')
+  const e = headerNumber(result, 'EC')
+  const q = headerNumber(result, 'QR')
+  const tp = headerNumber(result, 'TP')
+  const om = headerNumber(result, 'OM')
+  const w = headerNumber(result, 'W')
+  const i = headerNumber(result, 'IN')
+  if (epochJd === null || e === null || q === null || tp === null) return null
+  if (om === null || w === null || i === null) return null
+  const soln = /Soln\.date:\s*(\d{4})-([A-Za-z]{3})-(\d{2})/.exec(result)
+  const solnMonth = monthIndex(soln?.[2] ?? '')
+  const obs = /# obs:\s*(\d+)/.exec(result)?.[1]
+  return {
+    epochJd,
+    e,
+    q,
+    tp,
+    om,
+    w,
+    i,
+    m1: headerNumber(result, 'M1'),
+    k1: headerNumber(result, 'k1'),
+    h: headerNumber(result, 'H'),
+    solutionRef: /soln ref\.=\s*([^,\s]+)/.exec(result)?.[1] ?? null,
+    solutionDate:
+      soln && solnMonth >= 0 ? isoDate(Number(soln[1]), solnMonth, Number(soln[3])) : null,
+    observations: obs === undefined ? null : Number(obs),
+    dataArc: dataArc(result),
+  }
+}

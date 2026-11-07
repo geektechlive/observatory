@@ -109,6 +109,16 @@ export const CHECKS = [
       b.approaches.length > 0 &&
       b.approaches.every((x) => typeof x?.closeApproach?.distAu === 'number' && x?.fine !== undefined),
   },
+  // The orrery's comets and interstellar objects (#99): KV-only, written by the refresh job.
+  {
+    path: '/api/orrery-smallbodies',
+    requires: 'a comets array and a non-empty interstellar array, each with its elements',
+    check: (b) =>
+      Array.isArray(b?.comets) &&
+      Array.isArray(b?.interstellar) &&
+      b.interstellar.length > 0 &&
+      b.interstellar.every((x) => typeof x?.elements?.e === 'number'),
+  },
   // The orrery's satellites (#98): KV-only, one CelesTrak group per request. The small
   // stations group proves the pipeline without pulling Starlink's 1.7 MB every run.
   {

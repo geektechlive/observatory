@@ -366,6 +366,16 @@ describe('probed endpoints (#42, #61)', () => {
     expect(neo?.check({ approaches: [{ fine: null }] })).toBe(false)
   })
 
+  it('probes orrery small bodies: the interstellar objects, each with its elements (#99)', () => {
+    const sb = byPath('/api/orrery-smallbodies')
+    expect(sb).toBeDefined()
+    const visitor = { elements: { e: 6.12 }, fine: null, coarse: null }
+    expect(sb?.check({ comets: [], interstellar: [visitor] })).toBe(true)
+    expect(sb?.check({ comets: [], interstellar: [] })).toBe(false)
+    expect(sb?.check({ interstellar: [visitor] })).toBe(false)
+    expect(sb?.check({ comets: [], interstellar: [{ fine: null }] })).toBe(false)
+  })
+
   it('probes orrery satellites through the small stations group, rows of 13 fields (#98)', () => {
     const sats = byPath('/api/orrery-sats?group=stations')
     expect(sats).toBeDefined()

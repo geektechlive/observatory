@@ -1,0 +1,138 @@
+*******************************************************************************
+JPL/HORIZONS                 Borisov (C/2019 Q4)           2026-Nov-07 06:57:03
+Rec #:90004570 (+COV) Soln.date: 2024-Jun-24_15:49:04    # obs: 964 (2019-2020)
+ 
+IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+ 
+  EPOCH=  2458853.5 ! 2020-Jan-05.0000000 (TDB)    RMSW= n.a.
+   EC= 3.356475782676596   QR= 2.006520878500843   TP= 2458826.052845906
+   OM= 308.1477292269942   W= 209.1236864378081    IN= 44.05264247909138
+   A= -.8514922551937886   MA= 34.42947030737667   ADIST= 9.999999E99
+   PER= 9.999999E99        N= 1.254391264          ANGMOM= .050859365
+   DAN= -4.52423           DDN= 2.22307            L= 149.9695468
+   B= -19.7799936          MOID= 1.09291995        TP= 2019-Dec-08.5528459060
+ 
+Comet physical (GM= km^3/s^2; RAD= km):
+   GM= n.a.                RAD= n.a.
+   M1=  13.8     M2=  n.a.     k1=  4.5    k2= n.a.     PHCOF= n.a.
+Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+   AMRAT=  0.                                      DT=  -65.1301
+   A1= 4.85958814621E-8    A2= 1.879898667336E-8   A3= 2.835503220558E-9
+ Non-standard or simulated/proxy model:
+   ALN=  1.            NK=  0.       NM=  2.       NN=  0.       R0=  1.
+
+COMET comments 
+1: soln ref.= JPL#54, data arc: 2019-02-24 to 2020-09-30
+2: k1=4.5;
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Sat Nov  7 06:57:03 2026 Pasadena, USA      / Horizons
+*******************************************************************************
+Target body name: Borisov (C/2019 Q4)             {source: JPL#54}
+Center body name: Sun (10)                        {source: DE441}
+Center-site name: BODY CENTER
+*******************************************************************************
+Start time      : A.D. 2026-Nov-01 00:00:00.0000 TDB
+Stop  time      : A.D. 2026-Nov-03 00:00:00.0000 TDB
+Step-size       : 1440 minutes
+*******************************************************************************
+Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+Small perturbers: Yes                             {source: SB441-N16}
+Output units    : AU-D
+Calendar mode   : Mixed Julian/Gregorian
+Output type     : GEOMETRIC cartesian states
+Output format   : 2 (position and velocity)
+Reference frame : Ecliptic of J2000.0
+*******************************************************************************
+Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  EPOCH=  2458853.5 ! 2020-Jan-05.0000000 (TDB)    RMSW= n.a.                  
+   EC= 3.356475782676596   QR= 2.006520878500843   TP= 2458826.052845906       
+   OM= 308.1477292269942   W= 209.1236864378081    IN= 44.05264247909138       
+  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+   X=-1.746422156220264E+00  Y= 7.994315507603348E-01  Z=-8.420898120636099E-01
+  VX=-3.266387554200373E-03 VY=-1.273246218308122E-02 VZ=-2.137606337596023E-02
+Comet physical (GM= km^3/s^2; RAD= km):                                        
+   GM= n.a.                RAD= n.a.                                           
+   M1=  13.8     M2=  n.a.     k1=  4.5    k2= n.a.     PHCOF= n.a.            
+Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
+   AMRAT=  0.                                      DT=  -65.1301               
+   A1= 4.85958814621E-8    A2= 1.879898667336E-8   A3= 2.835503220558E-9       
+ Non-standard or simulated/proxy model:                                        
+   ALN=  1.            NK=  0.       NM=  2.       NN=  0.       R0=  1.       
+*******************************************************************************
+            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,
+**************************************************************************************************************************************************************************************************
+$$SOE
+2461345.500000000, A.D. 2026-Nov-01 00:00:00.0000,  5.928924086514475E-01, -4.244945190989861E+01, -2.490053280136749E+01,  1.088364218648673E-03, -1.661123145905822E-02, -9.083904854058572E-03,
+2461346.500000000, A.D. 2026-Nov-02 00:00:00.0000,  5.939807740407590E-01, -4.246606309323619E+01, -2.490961667530494E+01,  1.088366568351639E-03, -1.661113524211383E-02, -9.083843030024789E-03,
+2461347.500000000, A.D. 2026-Nov-03 00:00:00.0000,  5.950691418060404E-01, -4.248267418043487E+01, -2.491870048744602E+01,  1.088368971743294E-03, -1.661103918128906E-02, -9.083781261412755E-03,
+$$EOE
+**************************************************************************************************************************************************************************************************
+ 
+TIME
+
+  Barycentric Dynamical Time ("TDB" or T_eph) output was requested. This
+continuous coordinate time is equivalent to the relativistic proper time
+of a clock at rest in a reference frame co-moving with the solar system
+barycenter but outside the system's gravity well. It is the independent
+variable in the solar system relativistic equations of motion.
+
+  TDB runs at a uniform rate of one SI second per second and is independent
+of irregularities in Earth's rotation.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+REFERENCE FRAME AND COORDINATES
+
+  Ecliptic at the standard reference epoch
+
+    Reference epoch: J2000.0
+    X-Y plane: adopted Earth orbital plane at the reference epoch
+               Note: IAU76 obliquity of 84381.448 arcseconds wrt ICRF X-Y plane
+    X-axis   : ICRF
+    Z-axis   : perpendicular to the X-Y plane in the directional (+ or -) sense
+               of Earth's north pole at the reference epoch.
+
+  Symbol meaning [1 au= 149597870.700 km, 1 day= 86400.0 s]:
+
+    JDTDB    Julian Day Number, Barycentric Dynamical Time
+      X      X-component of position vector (au)
+      Y      Y-component of position vector (au)
+      Z      Z-component of position vector (au)
+      VX     X-component of velocity vector (au/day)                           
+      VY     Y-component of velocity vector (au/day)                           
+      VZ     Z-component of velocity vector (au/day)                           
+
+ABERRATIONS AND CORRECTIONS
+
+ Geometric state vectors have NO corrections or aberrations applied.
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+*******************************************************************************

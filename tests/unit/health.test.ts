@@ -42,6 +42,16 @@ describe('SOURCES', () => {
     expect(SOURCES['orrery-neo'].required({ approaches: [{ id: 'sb:524522' }] })).toBe(true)
   })
 
+  it('grades orrery small bodies by the interstellar list, 72 h before degraded (#99)', () => {
+    // Comets can be few or none in a quiet month; 1I, 2I and 3I are always there.
+    expect(SOURCES['orrery-smallbodies'].headline).toBe(false)
+    expect(SOURCES['orrery-smallbodies'].maxAgeMs).toBe(72 * 3_600_000)
+    expect(SOURCES['orrery-smallbodies'].required({ comets: [], interstellar: [] })).toBe(false)
+    expect(
+      SOURCES['orrery-smallbodies'].required({ comets: [], interstellar: [{ id: 'sb:1004083' }] }),
+    ).toBe(true)
+  })
+
   it('grades orrery satellites by non-empty rows, 36 h before degraded (#98)', () => {
     expect(SOURCES['orrery-sats'].headline).toBe(false)
     expect(SOURCES['orrery-sats'].maxAgeMs).toBe(36 * 3_600_000)

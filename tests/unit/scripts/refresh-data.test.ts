@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -7,10 +10,12 @@ import {
   isValidLaunchesPayload,
   KEY_ORRERY_BODIES,
   KEY_ORRERY_NEO,
+  KEY_ORRERY_SMALLBODIES,
   kvPutInit,
   parseTle,
   refreshOrreryBodies,
   refreshOrreryNeo,
+  refreshOrrerySmallBodies,
   tleChecksumOk,
   // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/refresh-data.mjs'
@@ -379,5 +384,90 @@ describe('refreshOrreryNeo (#92)', () => {
     const b = await refreshOrreryNeo(null, { ...failing, previousText: old })
     expect(b.entry.ok).toBe(false)
     expect(b.entry.detail).toMatch(/refresh:orrery-neo/)
+  })
+})
+
+describe('refreshOrrerySmallBodies (#99)', () => {
+  const NOW = Date.UTC(2026, 10, 7, 4)
+  // 3I's real header (fixtures/smallbodies), renamed for whichever object is asked.
+  const HEADER = readFileSync(
+    join(__dirname, '..', 'fixtures', 'smallbodies', 'horizons-3i.txt'),
+    'utf8',
+  ).split('$$SOE')[0]
+  const NAMES: Record<string, string> = {
+    '50788063': "1I/'Oumuamua (A/2017 U1)",
+    '1003639': 'Borisov (C/2019 Q4)',
+    '1004083': 'ATLAS (C/2025 N1)',
+  }
+  const deps = (overrides: Record<string, unknown> = {}) => ({
+    now: NOW,
+    previousText: null,
+    pauseMs: 0,
+    // No comets today: SBDB is down. The interstellar objects still ship.
+    fetchJplJson: () => Promise.reject(new Error('HTTP 503')),
+    fetchHorizonsText: (url: string) => {
+      const p = new URL(url).searchParams
+      const spkid = /DES=(\d+);/.exec(p.get('COMMAND') ?? '')?.[1] ?? ''
+      const start = Number((p.get('START_TIME') ?? '').replace(/'|JD/g, ''))
+      const stop = Number((p.get('STOP_TIME') ?? '').replace(/'|JD/g, ''))
+      const step = Number.parseFloat((p.get('STEP_SIZE') ?? '').replace(/'/g, ''))
+      const n = Math.round((stop - start) / step) + 1
+      const rows = Array.from(
+        { length: n },
+        (_, i) => `${String(start + i * step)}, A.D. x, 1, 0.5, 0, 0, 0.017, 0,`,
+      )
+      const head = (HEADER ?? '').replace(
+        /^Target body name:.*$/m,
+        `Target body name: ${NAMES[spkid] ?? '?'}   {source: JPL#1}`,
+      )
+      return Promise.resolve(`${head}$$SOE\n${rows.join('\n')}\n$$EOE\n`)
+    },
+    ...overrides,
+  })
+
+  it('writes the finished body with its counts as KV metadata, warning on what is missing', async () => {
+    const { entry, write } = await refreshOrrerySmallBodies(null, deps())
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(true)
+    expect(entry.detail).toMatch(/0 comets, 3 interstellar/)
+    expect(entry.detail).toMatch(/missing jpl-sbdb-query/)
+    expect(write.key).toBe(KEY_ORRERY_SMALLBODIES)
+    expect(KEY_ORRERY_SMALLBODIES).toBe('horizons:smallbodies:v1')
+    expect(write.metadata).toEqual({
+      fetchedAt: new Date(NOW).toISOString(),
+      comets: 0,
+      interstellar: 3,
+      placed: 3,
+      missing: 1,
+    })
+  })
+
+  it("reuses the last copy's long spans for a day", async () => {
+    const first = await refreshOrrerySmallBodies(null, deps())
+    let asked = 0
+    const counting = deps()
+    const second = await refreshOrrerySmallBodies(null, {
+      ...counting,
+      now: NOW + 6 * HOUR,
+      previousText: first.write.value,
+      fetchHorizonsText: (url: string) => {
+        asked += 1
+        return counting.fetchHorizonsText(url)
+      },
+    })
+    expect(second.entry.ok).toBe(true)
+    expect(asked).toBe(3)
+  })
+
+  it('judges a total failure by the age of the copy it would replace (72 h)', async () => {
+    const failing = deps({ fetchHorizonsText: () => Promise.reject(new Error('HTTP 503')) })
+    const young = JSON.stringify({ generatedAt: new Date(NOW - 50 * HOUR).toISOString() })
+    const old = JSON.stringify({ generatedAt: new Date(NOW - 80 * HOUR).toISOString() })
+    const a = await refreshOrrerySmallBodies(null, { ...failing, previousText: young })
+    expect(a.entry.ok).toBe(true)
+    expect(a.write).toBeUndefined()
+    const b = await refreshOrrerySmallBodies(null, { ...failing, previousText: old })
+    expect(b.entry.ok).toBe(false)
+    expect(b.entry.detail).toMatch(/refresh:orrery-smallbodies/)
   })
 })

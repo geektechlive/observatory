@@ -5,7 +5,8 @@
 // Earth and Moon from JPL Horizons, which refuses overlapping requests, so it is asked
 // here one request at a time, never on the request path; see orrery-bodies.mjs), and
 // /api/orrery-neo (#92: close approaches placed with Horizons, JPL Scout and ESA NEOCC;
-// see orrery-neo.mjs).
+// see orrery-neo.mjs), and /api/orrery-smallbodies (#99: comets and the interstellar
+// objects; see orrery-smallbodies.mjs).
 //
 // Why this exists: CelesTrak returns HTTP 522 to Cloudflare Workers egress (observed
 // from about 2026-09-03), so the Pages Functions cannot fetch TLEs themselves. An
@@ -25,6 +26,8 @@
 //                                            just the orrery step, payload saved locally
 //   ... --dry-run --only=orrery-neo --neo-out=/tmp/neo.json
 //                                            just the close-approach step (#92)
+//   ... --dry-run --only=orrery-smallbodies --smallbodies-out=/tmp/sb.json
+//                                            just the comets and interstellar objects (#99)
 //   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
 //
 // Env (write mode only):
@@ -39,6 +42,7 @@ import { dirname, resolve } from 'node:path'
 import { celestrakFetchText, refreshSatGroups } from './celestrak-groups.mjs'
 import { buildOrreryBodies } from './orrery-bodies.mjs'
 import { buildOrreryNeo } from './orrery-neo.mjs'
+import { buildOrrerySmallBodies } from './orrery-smallbodies.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(HERE, '..')
@@ -65,6 +69,11 @@ export const KEY_ORRERY_NEO = 'horizons:neo:v1'
 const NEO_SIGNATURE = 'refresh:orrery-neo'
 /** The approach list changes daily; /api/orrery-neo calls a copy degraded past 36 h. */
 const NEO_MAX_AGE_MS = 36 * 3_600_000
+/** The orrery's comets and interstellar objects (#99): a finished body, with metadata. */
+export const KEY_ORRERY_SMALLBODIES = 'horizons:smallbodies:v1'
+const SMALLBODIES_SIGNATURE = 'refresh:orrery-smallbodies'
+/** Spans run 30 days either side, so /api/orrery-smallbodies serves a copy up to 72 h old. */
+const SMALLBODIES_MAX_AGE_MS = 72 * 3_600_000
 const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
@@ -631,6 +640,59 @@ export async function refreshOrreryNeo(config, deps = {}) {
   }
 }
 
+/**
+ * The orrery's comets and interstellar objects (#99): one finished body plus metadata
+ * in one KV write, like the craft. The last copy is read back so the interstellar
+ * objects' long spans are reused for a day. A failure is judged by the copy's age.
+ */
+export async function refreshOrrerySmallBodies(config, deps = {}) {
+  const now = deps.now ?? Date.now()
+  const previousText = deps.previousText ?? (await readKv(KEY_ORRERY_SMALLBODIES, config))
+  const previous = parseJsonOrNull(previousText)
+  try {
+    const { payload, requests } = await buildOrrerySmallBodies({
+      now,
+      fetchJplJson: deps.fetchJplJson ?? fetchJplJson,
+      fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
+      previous,
+      ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+    })
+    const all = [...payload.comets, ...payload.interstellar]
+    const placed = all.filter((b) => b.fine !== null || b.coarse !== null).length
+    const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    const detail =
+      `ok ${SMALLBODIES_SIGNATURE} ${String(payload.comets.length)} comets, ` +
+      `${String(payload.interstellar.length)} interstellar, ${String(placed)} placed, ` +
+      `${String(requests)} JPL requests` +
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+    console.log(detail)
+    return {
+      entry: { signature: SMALLBODIES_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      write: {
+        key: KEY_ORRERY_SMALLBODIES,
+        value: JSON.stringify(payload),
+        metadata: {
+          fetchedAt: payload.generatedAt,
+          comets: payload.comets.length,
+          interstellar: payload.interstellar.length,
+          placed,
+          missing: payload.missing.length,
+        },
+      },
+    }
+  } catch (err) {
+    const verdict = classifyFailure({
+      err,
+      envelopeText: previous ? JSON.stringify({ fetchedAt: previous.generatedAt }) : previousText,
+      maxAgeMs: SMALLBODIES_MAX_AGE_MS,
+      now,
+    })
+    const detail = `${SMALLBODIES_SIGNATURE} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    return { entry: { ...verdict, signature: SMALLBODIES_SIGNATURE, detail } }
+  }
+}
+
 async function main(argv) {
   const dryRun = argv.includes('--dry-run')
   // Local runs: --only=orrery-bodies skips the other sources; --bodies-out=path saves
@@ -638,6 +700,9 @@ async function main(argv) {
   const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length)
   const bodiesOut = argv.find((a) => a.startsWith('--bodies-out='))?.slice('--bodies-out='.length)
   const neoOut = argv.find((a) => a.startsWith('--neo-out='))?.slice('--neo-out='.length)
+  const smallOut = argv
+    .find((a) => a.startsWith('--smallbodies-out='))
+    ?.slice('--smallbodies-out='.length)
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
@@ -671,6 +736,25 @@ async function main(argv) {
       if (dryRun && neoOut) {
         await writeFile(neoOut, write.value)
         console.log(`  saved ${KEY_ORRERY_NEO} to ${neoOut} (${String(write.value.length)} bytes)`)
+      }
+    }
+  }
+
+  // After the close-approach step, never beside it: JPL takes one request at a time.
+  if (!only || only === 'orrery-smallbodies') {
+    const began = Date.now()
+    const { entry, write } = await refreshOrrerySmallBodies(config)
+    console.log(
+      `  ${SMALLBODIES_SIGNATURE} took ${String(Math.round((Date.now() - began) / 1000))} s`,
+    )
+    report.push(entry)
+    if (write) {
+      writes.push({ ...write, entry })
+      if (dryRun && smallOut) {
+        await writeFile(smallOut, write.value)
+        console.log(
+          `  saved ${KEY_ORRERY_SMALLBODIES} to ${smallOut} (${String(write.value.length)} bytes)`,
+        )
       }
     }
   }

@@ -3,6 +3,9 @@
  * elements (https://ssd.jpl.nasa.gov/planets/approx_pos.html). Within 1800–2050 JPL
  * puts the error at 10–600 arcsec in longitude depending on the planet: far below a
  * pixel on any orrery we draw. Pure: callers pass the date.
+ *
+ * Comets and interstellar objects, on parabolas and hyperbolas as well as ellipses, are
+ * solved in conic.ts (#99), which has no imports so the refresh job can use it too.
  */
 import {
   ELEMENTS,

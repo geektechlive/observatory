@@ -97,7 +97,8 @@ export const SOURCES: readonly Source[] = [
     url: 'https://ssd-api.jpl.nasa.gov/cad.api',
     auth: 'none',
     provides: 'Close approaches with 3-sigma distance range',
-    status: 'registered',
+    status: 'operational',
+    note: 'The refresh job asks it every 6 h for /api/orrery-neo',
     plannedIn: 92,
   },
   {
@@ -118,7 +119,8 @@ export const SOURCES: readonly Source[] = [
     url: 'https://ssd-api.jpl.nasa.gov/scout.api',
     auth: 'none',
     provides: 'Newly found objects with preliminary, uncertain orbits',
-    status: 'registered',
+    status: 'operational',
+    note: 'The refresh job asks it every 6 h for /api/orrery-neo',
     plannedIn: 92,
   },
   {
@@ -139,8 +141,8 @@ export const SOURCES: readonly Source[] = [
     url: 'https://neo.ssa.esa.int/',
     auth: 'none',
     provides: 'Risk list and close approaches (flat files)',
-    status: 'registered',
-    note: 'ESA says the interface may change without notice',
+    status: 'operational',
+    note: 'The refresh job reads it every 6 h for /api/orrery-neo; ESA says the interface may change without notice',
     plannedIn: 92,
   },
   {
@@ -252,7 +254,8 @@ export const SOURCES: readonly Source[] = [
     url: 'https://ssd-api.jpl.nasa.gov/sbdb_query.api',
     auth: 'none',
     provides: 'Catalogue-wide small-body search',
-    status: 'registered',
+    status: 'operational',
+    note: 'The refresh job picks the brightest comets with it every 6 h for /api/orrery-smallbodies',
     plannedIn: 99,
   },
   {
