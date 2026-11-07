@@ -6,3 +6,10 @@ pages_build_output_dir = "dist"
 binding = "OBSERVATORY_CACHE"
 id = "cf6fe79d1a254877937edb081d768fed"
 preview_id = "c48ee92a03584538a3479c307dfd7093"
+
+# The JPL request queue (#100), a Durable Object in its own Worker
+# (workers/jpl-queue): Pages can bind to a DO but not declare one.
+[[durable_objects.bindings]]
+name = "JPL_QUEUE"
+class_name = "JplQueue"
+script_name = "observatory-jpl-queue"

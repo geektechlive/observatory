@@ -119,6 +119,18 @@ export const CHECKS = [
       b.interstellar.length > 0 &&
       b.interstellar.every((x) => typeof x?.elements?.e === 'number'),
   },
+  // On-demand lookup (#100): JPL through the jpl-queue Durable Object. A fixed past span
+  // is cached for a day, so most runs never reach JPL. Until the Worker is deployed and
+  // bound, the endpoint says "not set up" (X-Not-Configured), which only warns.
+  {
+    path: '/api/trajectory?id=sb:20000433&start=2026-01-01&end=2026-01-03&step=1d',
+    requires: 'an object and 3 samples of position and velocity',
+    notConfiguredWarns: true,
+    check: (b) =>
+      typeof b?.object?.name === 'string' &&
+      Array.isArray(b?.fine?.samples) &&
+      b.fine.samples.length === 18,
+  },
   // The orrery's satellites (#98): KV-only, one CelesTrak group per request. The small
   // stations group proves the pipeline without pulling Starlink's 1.7 MB every run.
   {
@@ -242,6 +254,11 @@ export async function runCheck(baseUrl, spec) {
     const errorKind = res.headers.get('x-error-kind')
     const base = { path: spec.path, status: res.status, ms, cache, errorKind }
 
+    const notConfigured = res.headers.get('x-not-configured')
+    if (!res.ok && spec.notConfiguredWarns && notConfigured) {
+      const warning = `not set up (${notConfigured})`
+      return { ...base, ok: true, note: warning, warning }
+    }
     if (!res.ok) {
       const kind = errorKind ? ` ${errorKind}` : ''
       return { ...base, ok: false, note: `HTTP ${res.status}${kind}${cache ? ` (${cache})` : ''}` }

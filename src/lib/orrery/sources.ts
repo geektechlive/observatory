@@ -86,8 +86,9 @@ export const SOURCES: readonly Source[] = [
     url: 'https://ssd-api.jpl.nasa.gov/sbdb.api',
     auth: 'none',
     provides: 'Asteroid and comet orbits and physical data',
-    status: 'registered',
-    plannedIn: 99,
+    status: 'implemented',
+    plannedIn: 100,
+    note: 'On-demand search (/api/lookup, /api/trajectory) runs once the jpl-queue Worker is deployed and bound',
   },
   {
     id: 'cad',

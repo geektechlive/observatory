@@ -25,5 +25,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["functions", "tests/unit/functions/**/*.ts"]
+  "include": ["functions", "workers", "tests/unit/functions/**/*.ts"]
 }

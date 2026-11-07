@@ -1,0 +1,10 @@
+{
+  "list": [
+    { "name": "2688 Halley (1982 HG1)", "pdes": "2688" },
+    { "pdes": "1P", "name": "1P/Halley" }
+  ],
+  "signature": { "source": "NASA/JPL Small-Body Database (SBDB) API", "version": "1.3" },
+  "message": "specified query matched more than one object",
+  "count": 2,
+  "code": "300"
+}

@@ -33,6 +33,13 @@ describe('SOURCES (#91)', () => {
     }
   })
 
+  it('says SBDB lookup is built and waits on the jpl-queue Worker (#100)', () => {
+    const sbdb = SOURCES.find((s) => s.id === 'sbdb')
+    expect(sbdb?.status).toBe('implemented')
+    expect(sbdb?.plannedIn).toBe(100)
+    expect(sbdb?.note).toMatch(/jpl-queue/)
+  })
+
   it('records the fact-check: sb_obs does not exist, Launch Library is 2.3.0', () => {
     const sbObs = SOURCES.find((s) => s.id === 'sb_obs')
     expect(sbObs?.status).toBe('unavailable')

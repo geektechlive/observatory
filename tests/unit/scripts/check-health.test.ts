@@ -309,6 +309,22 @@ describe('runCheck (#71)', () => {
     expect(toReport([r])[0]).toMatchObject({ ok: true, warning: true })
   })
 
+  it('only warns about a "not set up" 503 on a probe that allows it (#100)', async () => {
+    const notSetUp = () =>
+      respond(
+        { error: 'On-demand JPL lookup is not set up yet' },
+        { 'X-Error-Kind': 'upstream', 'X-Not-Configured': 'jpl-queue' },
+        503,
+      )
+    vi.stubGlobal('fetch', notSetUp())
+    const allowed = await runCheck('https://o.test', { ...spec, notConfiguredWarns: true })
+    expect(allowed).toMatchObject({ ok: true, warning: 'not set up (jpl-queue)' })
+    vi.stubGlobal('fetch', notSetUp())
+    const strict = await runCheck('https://o.test', spec)
+    vi.unstubAllGlobals()
+    expect(strict).toMatchObject({ ok: false })
+  })
+
   it('does not warn at or under the slow threshold, or without a recorded time', async () => {
     const cases: Record<string, string>[] = [
       { 'X-Cache': 'MISS', 'X-Produce-Ms': String(SLOW_PRODUCE_MS) },
@@ -374,6 +390,21 @@ describe('probed endpoints (#42, #61)', () => {
     expect(sb?.check({ comets: [], interstellar: [] })).toBe(false)
     expect(sb?.check({ interstellar: [visitor] })).toBe(false)
     expect(sb?.check({ comets: [], interstellar: [{ fine: null }] })).toBe(false)
+  })
+
+  it('probes on-demand lookup with a fixed past span, so it is cached, not a JPL call (#100)', () => {
+    const traj = (CHECKS as (Check & { notConfiguredWarns?: boolean })[]).find((c) =>
+      c.path.startsWith('/api/trajectory?'),
+    )
+    expect(traj).toBeDefined()
+    expect(traj?.path).toBe(
+      '/api/trajectory?id=sb:20000433&start=2026-01-01&end=2026-01-03&step=1d',
+    )
+    expect(traj?.notConfiguredWarns).toBe(true)
+    const object = { name: '433 Eros (A898 PA)' }
+    expect(traj?.check({ object, fine: { samples: Array(18).fill(0.1) } })).toBe(true)
+    expect(traj?.check({ object, fine: null })).toBe(false)
+    expect(traj?.check({ object, fine: { samples: [] } })).toBe(false)
   })
 
   it('probes orrery satellites through the small stations group, rows of 13 fields (#98)', () => {

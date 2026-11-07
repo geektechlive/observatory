@@ -70,7 +70,7 @@ export default defineConfig([
   {
     // Pages Functions run in the Workers runtime, using serviceworker-flavored
     // globals, not the browser. react-refresh's export-shape rule doesn't apply here.
-    files: ['functions/**/*.ts'],
+    files: ['functions/**/*.ts', 'workers/**/*.ts'],
     languageOptions: {
       globals: {
         ...globals.serviceworker,
