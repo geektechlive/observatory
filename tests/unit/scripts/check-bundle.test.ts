@@ -209,6 +209,71 @@ describe('checkBundle', () => {
     })
   })
 
+  // #115: spacecraft models load only when a craft is focused. Each is budgeted, the set
+  // has a total, none may be preloaded with the page, and GLTFLoader is its own chunk.
+  describe('craft models', () => {
+    const models = (
+      files: Record<string, string>,
+      html = '',
+      assets: Record<string, string> = {},
+    ) => {
+      const dir = fakeDist({ 'assets/index-abc.js': 'x', ...assets })
+      mkdirSync(join(dir, 'models', 'craft'), { recursive: true })
+      for (const [name, body] of Object.entries(files)) {
+        writeFileSync(join(dir, 'models', 'craft', name), body)
+      }
+      if (html)
+        writeFileSync(
+          join(dir, 'index.html'),
+          `<script type="module" src="/assets/index-abc.js"></script>${html}`,
+        )
+      return dir
+    }
+    const budgets = {
+      ...BUDGETS,
+      craftModelBytes: 2_000,
+      craftModelTotal: 3_000,
+      gltfLoaderGzip: 1_000,
+    }
+
+    it('passes small models', () => {
+      const findings = checkBundle(
+        models({ 'voyager.glb': 'x'.repeat(1_000) }),
+        budgets,
+      ) as Finding[]
+      expect(failures(findings)).toEqual([])
+      expect(findings.filter((f) => f.rule === 'craft-model-bytes')).toHaveLength(1)
+    })
+
+    it('fails one oversized model, and a set over its total', () => {
+      expect(
+        failures(checkBundle(models({ 'clipper.glb': 'x'.repeat(2_500) }), budgets)),
+      ).toContain('craft-model-bytes')
+      const set = models({
+        'a.glb': 'x'.repeat(1_500),
+        'b.glb': 'x'.repeat(1_500),
+        'c.glb': 'x'.repeat(1_500),
+      })
+      expect(failures(checkBundle(set, budgets))).toEqual(['craft-model-total'])
+    })
+
+    it('fails when the page names a model', () => {
+      const dir = models(
+        { 'voyager.glb': 'x' },
+        '<link rel="preload" href="/models/craft/voyager.glb">',
+      )
+      expect(failures(checkBundle(dir, budgets))).toContain('entry-has-no-craft-models')
+    })
+
+    it('budgets the GLTFLoader chunk', () => {
+      const noise = Array.from({ length: 20_000 }, (_, i) =>
+        ((i * 2654435761) % 4093).toString(36),
+      ).join('')
+      const dir = models({}, '', { 'assets/GLTFLoader-x1.js': noise })
+      expect(failures(checkBundle(dir, budgets))).toContain('gltf-loader-gzip')
+    })
+  })
+
   it('fails loudly when index.html names no module script', () => {
     const dir = fakeDist({ 'assets/index-abc.js': 'x' })
     writeFileSync(join(dir, 'index.html'), '<html></html>')

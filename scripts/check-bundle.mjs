@@ -33,6 +33,12 @@ export const BUDGETS = {
   // #98 measured the satellite worker at 69.3 kB gzip: satellite.js with its embedded
   // single-thread WASM (the #97 bulk worker alone was ~44 kB) plus zod for the body check.
   satWorkerGzip: 80_000,
+  // #115 measured the ten spacecraft models at 110-426 kB each, 2.16 MB together. Only the
+  // focused craft's model loads, so the total is disk, not a visitor's download.
+  craftModelBytes: 500_000,
+  craftModelTotal: 3_000_000,
+  // three's GLTFLoader, fetched with the first craft model (#115).
+  gltfLoaderGzip: 30_000,
 }
 
 const THREE_MARKER = 'WebGLRenderer'
@@ -109,6 +115,9 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     if (name.startsWith('sats.worker-')) {
       const size = gz(body)
       add('sat-worker-gzip', size <= budgets.satWorkerGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`)
+    } else if (name.startsWith('GLTFLoader-')) {
+      const size = gz(body)
+      add('gltf-loader-gzip', size <= budgets.gltfLoaderGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.gltfLoaderGzip)})`)
     } else if (name.startsWith('OrreryPage-') || name.startsWith('OrreryRenderer-')) {
       const size = gz(body)
       add('orrery-gzip', size <= budgets.orreryGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGzip)})`)
@@ -140,6 +149,21 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     }
     add('planet-texture-total', total <= budgets.planetTextureTotal, `textures/planets ${kb(total)} (budget ${kb(budgets.planetTextureTotal)})`)
   }
+  const modelDir = join(distDir, 'models', 'craft')
+  if (existsSync(modelDir)) {
+    let total = 0
+    for (const name of readdirSync(modelDir)) {
+      const bytes = statSync(join(modelDir, name)).size
+      total += bytes
+      add('craft-model-bytes', bytes <= budgets.craftModelBytes, `models/craft/${name} ${kb(bytes)} (budget ${kb(budgets.craftModelBytes)})`)
+    }
+    add('craft-model-total', total <= budgets.craftModelTotal, `models/craft ${kb(total)} (budget ${kb(budgets.craftModelTotal)})`)
+  }
+  add(
+    'entry-has-no-craft-models',
+    !html.includes('/models/craft/'),
+    html.includes('/models/craft/') ? 'index.html names a craft model: they load with a focused craft (#115)' : 'no craft model in index.html',
+  )
   add(
     'entry-has-no-planet-textures',
     !html.includes('/textures/planets/'),
