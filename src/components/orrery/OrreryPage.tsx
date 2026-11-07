@@ -18,12 +18,13 @@ import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 
 import consoleStyles from '../consoles/console.module.css'
-import { buildCatalog, noDataNotice } from './catalog'
+import { buildCatalog, L1_KEY, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DEFAULT_PRESET } from './defaultView'
 import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
+import { NeoControls } from './NeoControls'
 import styles from './orrery.module.css'
 import type {
   FocusPreset,
@@ -35,6 +36,7 @@ import type {
   Visibility,
 } from './three/OrreryRenderer'
 import { TimeBar } from './TimeBar'
+import { useNearEarth } from './useNearEarth'
 import { useSimTime } from './useSimTime'
 
 /**
@@ -186,11 +188,14 @@ export function OrreryPage() {
   const dsnIds = useMemo(() => new Set(dsn.keys()), [dsn])
   const dsnRef = useRef(dsnIds)
   const jdNow = jdFromDate(new Date(sim))
+  // Close approaches, Scout, the Sun–Earth line and L1 (#92).
+  const near = useNearEarth(renderer, jdNow)
+  const nearCatalog = near.catalog
   // Whole days are enough for "no data for this date" in the search list.
   const catalogDay = Math.floor(jdNow)
   const catalog = useMemo(
-    () => buildCatalog(tracks, catalogDay + 0.5, moons),
-    [tracks, catalogDay, moons],
+    () => buildCatalog(tracks, catalogDay + 0.5, moons, nearCatalog),
+    [tracks, catalogDay, moons, nearCatalog],
   )
 
   // The label pass runs per drawn frame, outside React: it reads these through refs.
@@ -360,7 +365,7 @@ export function OrreryPage() {
       // off them (#107: Juno on Jupiter).
       const discs = items
         .filter((i) => i.kind === 'body' && i.visible)
-        .map((i) => ({ x: i.x, y: i.y, r: bodyLabelReach(i.name, i.radiusPx) }))
+        .map((i) => ({ key: i.name, x: i.x, y: i.y, r: bodyLabelReach(i.name, i.radiusPx) }))
       // Stage furniture labels move around, in the label layer's coordinates (#118).
       const origin = box?.getBoundingClientRect()
       const obstacles = [
@@ -374,12 +379,17 @@ export function OrreryPage() {
       const shown = layoutLabels(
         ordered.map((i) => ({
           key: i.name,
-          text: i.label,
+          // The button's own text: L1's carries the wind speed (#92).
+          text: labelNodes.current.get(i.name)?.textContent ?? i.label,
+          // Measured when shown last frame; the box estimate runs ~8% short in this font.
+          widthPx: labelNodes.current.get(i.name)?.offsetWidth,
           x: i.x + bodyLabelReach(i.name, i.radiusPx),
           y: i.y,
           visible: inView(i),
           mustShow: i.name === subjectNow,
-          avoidDiscs: i.kind === 'craft' || i.kind === 'moon',
+          priority: i.name === 'Earth' || i.name === 'Sun' || i.name === selectedRef.current,
+          avoidDiscs: i.kind !== 'body',
+          reach: bodyLabelReach(i.name, i.radiusPx),
         })),
         discs,
         obstacles,
@@ -404,6 +414,7 @@ export function OrreryPage() {
           node.style.top = `${String(p.y)}px`
           node.dataset['rim'] = edge.edge
           node.dataset['stacked'] = ''
+          node.dataset['side'] = ''
           if (distance) distance.textContent = ` · ${(item.sunAu ?? 0).toFixed(0)} au`
           node.hidden = false
           continue
@@ -416,6 +427,8 @@ export function OrreryPage() {
         // A stacked label carries a short rule back to its body (see .label[data-stacked]).
         node.dataset['stacked'] = place && place.dy !== 0 ? String(Math.sign(place.dy)) : ''
         node.style.setProperty('--leader', `${String(Math.abs(place?.dy ?? 0))}px`)
+        // Left of its body when the right ran off the stage (#92): the leader moves too.
+        node.dataset['side'] = place?.side ?? ''
         node.hidden = !place
       }
       for (const [name, node] of labelNodes.current) {
@@ -483,6 +496,8 @@ export function OrreryPage() {
 
   const onPreset = (p: FocusPreset) => {
     setPreset(p)
+    // Earth–Moon/L1 is where the L1 & L2 craft show apart from Earth (#92): turn them on.
+    if (p === 'earth') setCraftFilter((f) => (f.l1 ? f : { ...f, l1: true }))
     // On a phone the sheet covers the stage; close it so the new view can be seen.
     setSheetOpen(false)
     renderer?.applyPreset(p)
@@ -552,6 +567,19 @@ export function OrreryPage() {
         onCraftFilter={setCraftFilter}
         craftStatus={craftStatus}
         dsnCount={craftTracks.filter((t) => dsnIds.has(t.naifId)).length}
+        nearEarth={
+          <NeoControls
+            filter={near.filter}
+            onFilter={near.setFilter}
+            shown={near.shown}
+            total={near.approaches.length}
+            status={near.status}
+            scout={near.scout}
+            sunLine={near.sunLine}
+            onSunLine={near.setSunLine}
+            onSelect={select}
+          />
+        }
       />
 
       <section ref={stage} className={styles.stage ?? ''} aria-label="Orrery">
@@ -620,6 +648,43 @@ export function OrreryPage() {
               <span data-rim-distance="" />
             </button>
           ))}
+          {near.approaches.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              hidden
+              data-kind="asteroid"
+              data-pha={a.pha}
+              ref={(el) => {
+                if (el) labelNodes.current.set(a.id, el)
+                else labelNodes.current.delete(a.id)
+              }}
+              className={`${styles.label ?? ''} ${styles.asteroidLabel ?? ''}`}
+              aria-pressed={selected === a.id}
+              onClick={() => {
+                select(a.id)
+              }}
+            >
+              {catalog.find((i) => i.key === a.id)?.label ?? a.des}
+            </button>
+          ))}
+          <button
+            type="button"
+            hidden
+            data-kind="marker"
+            ref={(el) => {
+              if (el) labelNodes.current.set(L1_KEY, el)
+              else labelNodes.current.delete(L1_KEY)
+            }}
+            className={`${styles.label ?? ''} ${styles.markerLabel ?? ''}`}
+            aria-pressed={selected === L1_KEY}
+            onClick={() => {
+              select(L1_KEY)
+            }}
+          >
+            L1
+            {near.wind?.speed != null ? ` · ${String(Math.round(near.wind.speed))} km/s` : ''}
+          </button>
           {moons.map((m) => (
             <button
               key={m.key}
@@ -684,6 +749,9 @@ export function OrreryPage() {
             dsn={dsn}
             sun={sun}
             moons={moons}
+            neo={near.neo}
+            wind={near.wind}
+            cme={near.cme}
             onClose={() => {
               setSelected(null)
             }}

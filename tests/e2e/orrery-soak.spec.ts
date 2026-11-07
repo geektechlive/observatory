@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { serveMoons } from './moonPayload'
+import { serveNeo } from './neoPayload'
 import { offlineSun } from './swpc'
 
 test.beforeEach(async ({ page }) => {
@@ -71,6 +72,8 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
 
   // Moons (#107) too: focusing Mars and Jupiter draws and hides them every cycle.
   await serveMoons(page)
+  // And the close approaches (#92): the Earth–Moon preset opens the Earth frame each cycle.
+  await serveNeo(page)
   await page.goto('/#orrery')
   await expect(page.locator('[data-orrery-mode]')).toHaveAttribute('data-orrery-mode', 'webgl', {
     timeout: 20_000,
@@ -82,6 +85,7 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
   const cycle = async (i: number) => {
     await page.getByRole('button', { name: 'Inner', exact: true }).click()
     await page.getByRole('button', { name: 'Outer', exact: true }).click()
+    await page.getByRole('button', { name: 'Earth–Moon', exact: true }).click()
     await drag(page, x, y)
     await page.mouse.move(x, y)
     await page.mouse.wheel(0, i % 2 ? 120 : -120)

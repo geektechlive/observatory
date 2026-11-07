@@ -19,6 +19,7 @@ import {
   SphereGeometry,
 } from 'three'
 
+import { earthFramePosition } from '@/lib/orrery/earthFrame'
 import { type PlanetName, PLANETS } from '@/lib/orrery/elements'
 import { SATURN_RINGS } from '@/lib/orrery/imagery'
 import { MOON_ORBIT_POINTS, moonOrbit, type MoonOrbitKind } from '@/lib/orrery/moonOrbit'
@@ -89,6 +90,15 @@ interface Entry {
 
 const ORIGIN = { x: 0, y: 0, z: 0 }
 
+/**
+ * Where a moon sits around its planet as drawn. Earth's Moon uses the Earth frame (#92),
+ * the scale the L1/L2 craft and close approaches use, so their order on screen is true;
+ * the others use the moons' own log scale. Both are linear in the radius.
+ */
+function placementFor(parent: PlanetName): typeof moonScenePosition {
+  return parent === 'Earth' ? earthFramePosition : moonScenePosition
+}
+
 export class MoonLayer {
   readonly group = new Group()
   /** Moon orbit loops, which the renderer files with the planets' orbits (Orbits switch). */
@@ -154,9 +164,9 @@ export class MoonLayer {
     if (!orbit) return
     const attr = entry.line.geometry.getAttribute('position') as Float32BufferAttribute
     orbit.points.forEach((rel, i) => {
-      // moonScenePosition is linear in the radius: at radius 1 around the origin, then
+      // Both placements are linear in the radius: at radius 1 around the origin, then
       // the line's position and scale put it around the planet as drawn.
-      const p = moonScenePosition(ORIGIN, rel, 1)
+      const p = placementFor(entry.body.parent)(ORIGIN, rel, 1)
       attr.setXYZ(i, p.x, p.y, p.z)
     })
     attr.needsUpdate = true
@@ -181,7 +191,7 @@ export class MoonLayer {
       line.visible = false
       if (!state || !parent) continue
       const r = parent.radius * moonClearance(body.parent)
-      const p = moonScenePosition(parent.position, state.position, r)
+      const p = placementFor(body.parent)(parent.position, state.position, r)
       mesh.position.set(p.x, p.y, p.z)
       mesh.scale.setScalar(parent.radius * MOON_SHARE)
       // Rebuild the loop once the date has moved a grid step, so the moon stays on it.

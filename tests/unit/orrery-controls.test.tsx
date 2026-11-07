@@ -23,8 +23,9 @@ afterEach(cleanup)
 
 describe('TimeBar (#91)', () => {
   beforeEach(() => {
-    useOrreryClock.getState().setSimTime(T0)
+    // Pause first: set then pause let the running clock add a millisecond between (#121).
     useOrreryClock.getState().pause()
+    useOrreryClock.getState().setSimTime(T0)
   })
 
   const sim = () => simTimeAt(useOrreryClock.getState(), Date.now())

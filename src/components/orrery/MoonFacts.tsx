@@ -36,8 +36,9 @@ export function MoonFacts({ moon, jd, simMs }: MoonFactsProps) {
         <Label>Moon</Label> <Label>{`NAIF ${naif}`}</Label>
       </p>
       <p className={styles.inspectorText ?? ''}>
-        Drawn on an exaggerated scale around {moon.parent} so it can be seen: its distance in the
-        view is not to scale.
+        {moon.parent === 'Earth'
+          ? 'Drawn in the Earth frame, with the L1 craft and close approaches: its true direction, with distances past geostationary orbit compressed, so not to scale.'
+          : `Drawn on an exaggerated scale around ${moon.parent} so it can be seen: its distance in the view is not to scale.`}
       </p>
       {km === null ? (
         <p className={styles.inspectorText ?? ''} role="status">

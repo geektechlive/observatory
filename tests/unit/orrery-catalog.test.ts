@@ -133,6 +133,30 @@ describe('buildCatalog', () => {
     )
   })
 
+  // #92: this fortnight's close approaches, and Scout's objects with no position.
+  it('lists close approaches and Scout objects, and L1, each marked honestly', () => {
+    const span = { start: JD - 1, step: 1, samples: new Array(3 * 6).fill(0.5) }
+    const approach = {
+      id: 'sb:2026 VY2',
+      name: '(2026 VY2)',
+      fine: span,
+    }
+    const items = buildCatalog(tracks, JD, [], {
+      approaches: [approach, { ...approach, id: 'sb:old', name: '(2026 OLD)', fine: null }],
+      scout: ['6L54C21'],
+    })
+    const vy2 = items.find((i) => i.key === 'sb:2026 VY2')
+    expect(vy2).toMatchObject({ label: '2026 VY2', kind: 'asteroid', available: true })
+    expect(vy2?.group).toMatch(/close approaches/i)
+    expect(items.find((i) => i.key === 'sb:old')?.available).toBe(false)
+    const scout = items.find((i) => i.key === 'scout:6L54C21')
+    expect(scout).toMatchObject({ kind: 'scout', available: false })
+    expect(scout?.note).toMatch(/no position/i)
+    expect(items.find((i) => i.key === 'L1')).toMatchObject({ kind: 'marker', available: true })
+    // Scout's objects never had a position: they are not "hidden for want of data".
+    expect(noDataNotice(items)).toMatch(/1 close approach/)
+  })
+
   it('always has the planets, even with no payload', () => {
     expect(buildCatalog([], JD).every((i) => i.available)).toBe(true)
   })

@@ -97,7 +97,10 @@ export function SearchBox({ items = PLANETS_ONLY, onSelect }: SearchBoxProps) {
             >
               {b.label}
               {!b.available && (
-                <span className={styles.optionNote ?? ''}> · no data for this date</span>
+                <span className={styles.optionNote ?? ''}>
+                  {' '}
+                  · {b.note ?? 'no data for this date'}
+                </span>
               )}
             </li>
           ))}

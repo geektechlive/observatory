@@ -4,13 +4,17 @@ import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import type { DsnLink } from '@/lib/dsn'
 import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orrery'
+import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { OrreryNeo } from '@/schemas/orreryNeo'
 
+import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
 import { ImageryFacts } from './ImageryFacts'
 import { MoonFacts } from './MoonFacts'
+import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './NearFacts'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
 import type { SunImageState } from './three/sunImage'
@@ -30,6 +34,11 @@ interface InspectorProps {
   sun?: SunImageState | undefined
   /** Drawn moons (#107), Earth's Moon among them. */
   moons?: readonly MoonBody[] | undefined
+  /** Close approaches, Scout and ESA (#92). */
+  neo?: OrreryNeo | null | undefined
+  /** The solar wind at L1 and the CME forecast, for the L1 marker (#92). */
+  wind?: L1Wind | null | undefined
+  cme?: L1Cme | null | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -44,9 +53,51 @@ const fmtKm = (km: number) =>
  * first, with the state vector behind a disclosure. Planet positions are a model
  * (JPL's approximate elements), and the panel says so.
  */
-export function Inspector({ ref, body, simMs, onClose, tracks, dsn, sun, moons }: InspectorProps) {
+export function Inspector({
+  ref,
+  body,
+  simMs,
+  onClose,
+  tracks,
+  dsn,
+  sun,
+  moons,
+  neo,
+  wind,
+  cme,
+}: InspectorProps) {
   const headingId = useId()
   const jd = jdFromDate(new Date(simMs))
+  const earthTrack = tracks?.find((t) => t.naifId === '399') ?? null
+  const approach = neo?.approaches.find((a) => a.id === body)
+  const scout = body.startsWith('scout:')
+    ? neo?.scout?.objects.find((o) => `scout:${o.objectName}` === body)
+    : undefined
+  const near =
+    body === L1_KEY ? (
+      <L1Facts wind={wind ?? null} cme={cme ?? null} />
+    ) : approach && neo ? (
+      <AsteroidFacts approach={approach} neo={neo} earth={earthTrack} jd={jd} simMs={simMs} />
+    ) : scout ? (
+      <ScoutFacts object={scout} />
+    ) : null
+  const nearTitle =
+    body === L1_KEY ? 'L1' : approach ? shortName(approach.name) : scout ? scout.objectName : null
+  if (near) {
+    return (
+      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+        <div className={styles.inspectorHead ?? ''}>
+          <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
+            {nearTitle}
+          </h2>
+          <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        {near}
+      </aside>
+    )
+  }
   if (!isBodyName(body)) {
     const moon = moons?.find((m) => m.key === body)
     const track = tracks?.find((t) => t.id === body)
@@ -65,7 +116,7 @@ export function Inspector({ ref, body, simMs, onClose, tracks, dsn, sun, moons }
         ) : track ? (
           <CraftFacts
             track={track}
-            earth={tracks?.find((t) => t.naifId === '399') ?? null}
+            earth={earthTrack}
             jd={jd}
             simMs={simMs}
             link={dsn?.get(track.naifId)}

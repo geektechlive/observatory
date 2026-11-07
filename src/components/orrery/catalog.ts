@@ -4,12 +4,13 @@
  * controls group them (spec Part 19). A craft whose samples don't cover the date stays
  * in the list, marked: "no data for this date" is an answer, not an absence.
  */
+import { shortName } from '@/lib/orrery/asteroids'
 import { PLANETS } from '@/lib/orrery/elements'
 import { stateAt } from '@/lib/orrery/ephemeris'
 import type { MoonBody } from '@/lib/orrery/moonState'
-import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
-export type CatalogKind = 'star' | 'planet' | 'moon' | 'craft'
+export type CatalogKind = 'star' | 'planet' | 'moon' | 'craft' | 'asteroid' | 'scout' | 'marker'
 
 export interface CatalogItem {
   /** A planet's name, or a namespaced id for the Moon and craft (`naif:-31`). */
@@ -20,6 +21,18 @@ export interface CatalogItem {
   group: string
   /** Data covers the date. Planets always do. */
   available: boolean
+  /** Said instead of "no data for this date" (Scout's objects never have a position). */
+  note?: string
+}
+
+/** The L1 marker's key in the scene, search and the inspector (#92). */
+export const L1_KEY = 'L1'
+
+/** What search needs from /api/orrery-neo (#92). */
+export interface NearCatalog {
+  approaches: readonly { id: string; name: string; fine: SampledSpan | null }[]
+  /** Scout's temporary designations. */
+  scout: readonly string[]
 }
 
 const GROUP_LABEL: Record<OrreryTrack['group'], string> = {
@@ -35,18 +48,25 @@ const GROUP_LABEL: Record<OrreryTrack['group'], string> = {
  * at a year a second they leave their data spans within seconds). Null when none are.
  */
 export function noDataNotice(items: readonly CatalogItem[]): string | null {
-  const missing = items.filter((i) => !i.available && (i.kind === 'craft' || i.kind === 'moon'))
+  const missing = items.filter(
+    (i) => !i.available && (i.kind === 'craft' || i.kind === 'moon' || i.kind === 'asteroid'),
+  )
   const tail = 'Positions are never extrapolated.'
   const only = missing[0]
   if (!only) return null
   if (missing.length === 1) return `${only.label} has no data for this date and is hidden. ${tail}`
-  const craft = missing.filter((i) => i.kind === 'craft').length
-  const moons = missing.length - craft
+  const count = (kind: CatalogKind) => missing.filter((i) => i.kind === kind).length
+  const craft = count('craft')
+  const moons = count('moon')
+  const rocks = count('asteroid')
   const parts = [
     craft > 0 ? `${String(craft)} spacecraft` : '',
     moons > 0 ? `${String(moons)} ${moons === 1 ? 'moon' : 'moons'}` : '',
+    rocks > 0 ? `${String(rocks)} ${rocks === 1 ? 'close approach' : 'close approaches'}` : '',
   ].filter(Boolean)
-  return `${parts.join(' and ')} have no data for this date and are hidden. ${tail}`
+  const list =
+    parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}` : parts[0]
+  return `${list ?? ''} have no data for this date and are hidden. ${tail}`
 }
 
 export function buildCatalog(
@@ -54,6 +74,8 @@ export function buildCatalog(
   jd: number,
   /** Drawn moons (#107); Earth's Moon among them replaces its plain track entry. */
   moons: readonly MoonBody[] = [],
+  /** Close approaches and Scout's objects (#92). */
+  near?: NearCatalog,
 ): CatalogItem[] {
   const moonKeys = new Set(moons.map((m) => m.key))
   const items: CatalogItem[] = [
@@ -84,6 +106,27 @@ export function buildCatalog(
       kind: 'moon',
       group: GROUP_LABEL.moon,
       available: m.relative(jd) !== null,
+    })
+  }
+  if (!near) return items
+  items.push({ key: L1_KEY, label: 'L1', kind: 'marker', group: 'Space weather', available: true })
+  for (const a of near.approaches) {
+    items.push({
+      key: a.id,
+      label: shortName(a.name),
+      kind: 'asteroid',
+      group: 'Close approaches',
+      available: a.fine !== null && stateAt({ fine: a.fine, coarse: null }, jd) !== null,
+    })
+  }
+  for (const name of near.scout) {
+    items.push({
+      key: `scout:${name}`,
+      label: name,
+      kind: 'scout',
+      group: 'Just found (JPL Scout)',
+      available: false,
+      note: 'no position (unconfirmed)',
     })
   }
   return items

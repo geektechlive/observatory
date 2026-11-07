@@ -1,10 +1,11 @@
-import { useId } from 'react'
+import type { ReactNode } from 'react'
 
 import { SOURCES } from '@/lib/orrery/sources'
 
 import type { CatalogItem } from './catalog'
 import styles from './orrery.module.css'
 import { SearchBox } from './SearchBox'
+import { Switch } from './Switch'
 import type { CraftFilter, FocusPreset, ScaleMode, Visibility } from './three/OrreryRenderer'
 
 const PRESETS: { id: FocusPreset; label: string }[] = [
@@ -12,8 +13,12 @@ const PRESETS: { id: FocusPreset; label: string }[] = [
   { id: 'inner', label: 'Inner' },
   { id: 'outer', label: 'Outer' },
   { id: 'heliosphere', label: 'Heliosphere' },
+  { id: 'earth', label: 'Earth–Moon' },
 ]
-/** Spec Part 10's scale modes; the Earth-orbit one arrives with the Earth frame (#92). */
+/**
+ * Spec Part 10's scale modes. Near Earth the Earth frame (#92) takes over on its own as you
+ * zoom in; an Earth-orbit mode for the satellites waits on #98.
+ */
 const SCALES: { id: ScaleMode; label: string; hint: string }[] = [
   { id: 'exaggerated', label: 'Big bodies', hint: 'Log distances, enlarged bodies' },
   { id: 'log', label: 'Log distance', hint: 'Log distances, small bodies' },
@@ -37,44 +42,8 @@ interface ControlRailProps {
   craftStatus?: string | undefined
   /** Craft in DSN contact now. */
   dsnCount?: number | undefined
-}
-
-function Switch({
-  label,
-  hint,
-  on,
-  onChange,
-}: {
-  label: string
-  /** A visible one-line explanation; phones have no hover, so no tooltip (#122). */
-  hint?: string
-  on: boolean
-  onChange: (on: boolean) => void
-}) {
-  const hintId = useId()
-  return (
-    <div className={styles.switchField ?? ''}>
-      <div className={styles.switchRow ?? ''}>
-        <span>{label}</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          aria-label={label}
-          aria-describedby={hint ? hintId : undefined}
-          className={styles.switch ?? ''}
-          onClick={() => {
-            onChange(!on)
-          }}
-        />
-      </div>
-      {hint && (
-        <p id={hintId} className={styles.switchHint ?? ''}>
-          {hint}
-        </p>
-      )}
-    </div>
-  )
+  /** The near-Earth groups (#92): close approaches, Scout, the Sun–Earth line. */
+  nearEarth?: ReactNode
 }
 
 /**
@@ -95,6 +64,7 @@ export function ControlRail({
   onCraftFilter,
   craftStatus,
   dsnCount,
+  nearEarth,
 }: ControlRailProps) {
   return (
     <div
@@ -183,6 +153,8 @@ export function ControlRail({
         </section>
       )}
 
+      {nearEarth}
+
       <section className={styles.group ?? ''} aria-labelledby="orrery-view">
         <h2 id="orrery-view" className={styles.groupTitle ?? ''}>
           View
@@ -201,14 +173,6 @@ export function ControlRail({
               {p.label}
             </button>
           ))}
-          <button
-            type="button"
-            className={styles.chipBtn ?? ''}
-            disabled
-            title="Arrives with the Earth frame (#92)"
-          >
-            Earth–Moon
-          </button>
           <button
             type="button"
             className={styles.chipBtn ?? ''}

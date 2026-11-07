@@ -280,6 +280,19 @@ export class CraftLayer {
     this.updateSplit(jd)
   }
 
+  /**
+   * Move drawn craft into the Earth frame (#92): `move` gets each one's sampled
+   * heliocentric position and returns its scene position, or null to leave it where
+   * `place` put it (anything not near Earth).
+   */
+  placeNear(move: (helio: Vec3) => Vector3 | null): void {
+    for (const e of this.entries.values()) {
+      if (!e.on || !e.helio) continue
+      const p = move(e.helio)
+      if (p) e.mesh.position.copy(p)
+    }
+  }
+
   /** The craft whose 3D model is drawn now, or null: its silhouette steps aside (#115). */
   setModelKey(key: string | null): void {
     if (key === this.modelKey) return

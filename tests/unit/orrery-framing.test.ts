@@ -7,12 +7,12 @@ import { PerspectiveCamera, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import {
-  type FocusPreset,
   FOV,
   framePreset,
   frameView,
   ringExtent,
   ringMinReach,
+  type SunPreset,
 } from '@/components/orrery/three/framing'
 import { place3d } from '@/lib/orrery'
 
@@ -20,7 +20,7 @@ const toScene = (au: number) => Math.hypot(...Object.values(place3d({ x: au, y: 
 /** 1920x1080 and 1440x900 desktop stages, the 390x844 phone stage, a narrow portrait. */
 const ASPECTS = [1.55, 1.43, 0.8, 0.46]
 
-function cameraFor(preset: FocusPreset, aspect: number) {
+function cameraFor(preset: SunPreset, aspect: number) {
   const camera = new PerspectiveCamera(FOV, aspect, 0.001, 1e7)
   camera.updateProjectionMatrix()
   camera.position.copy(framePreset(preset, aspect, toScene))

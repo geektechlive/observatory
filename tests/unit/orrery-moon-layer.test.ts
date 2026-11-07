@@ -12,6 +12,7 @@ import {
   MoonLayer,
   moonsShown,
 } from '@/components/orrery/three/moonLayer'
+import { earthFrameRadii } from '@/lib/orrery/earthFrame'
 import type { PlanetName } from '@/lib/orrery/elements'
 import { type MoonBody } from '@/lib/orrery/moonState'
 import { AU_KM } from '@/lib/orrery/units'
@@ -130,6 +131,22 @@ describe('MoonLayer', () => {
         .sort(),
     ).toEqual(['naif:Enceladus', 'naif:Io', 'naif:Moon'])
     expect(layer.parentOf('naif:Io')).toBe('Jupiter')
+  })
+
+  // One scale for Earth's neighbourhood (#92): the Moon, the L1/L2 craft and the close
+  // approaches all use the Earth frame, so on screen they keep their true order.
+  it("puts Earth's Moon in the Earth frame, its loop included", () => {
+    const layer = new MoonLayer()
+    layer.setMoons([luna])
+    layer.place(5, parentAt(0.5, 40), 'Earth')
+    const earth = PARENTS.Earth ?? new Vector3()
+    expect(layer.position('naif:Moon')?.distanceTo(earth)).toBeCloseTo(
+      0.5 * earthFrameRadii(384_400),
+      6,
+    )
+    for (const p of linePoints(layer, 'naif:Moon')) {
+      expect(p.distanceTo(earth)).toBeCloseTo(0.5 * earthFrameRadii(384_400), 3)
+    }
   })
 
   it('draws a moon smaller than its planet', () => {

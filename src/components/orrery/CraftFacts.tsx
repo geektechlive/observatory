@@ -62,7 +62,9 @@ export function CraftFacts({ track, earth, jd, simMs, link }: CraftFactsProps) {
       <p className={styles.inspectorText ?? ''}>{track.mission}</p>
       {closeToEarth && (
         <p className={styles.inspectorText ?? ''}>
-          At this scale it is drawn inside Earth’s marker; the Earth frame (#92) will separate them.
+          Near Earth it is drawn in the Earth frame: its true direction, with distances past
+          geostationary orbit compressed, so it is not to scale. Zoomed out it sits on Earth’s
+          marker; choose Earth–Moon to see it apart.
         </p>
       )}
       {d === null ? (

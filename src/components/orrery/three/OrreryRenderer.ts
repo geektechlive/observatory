@@ -38,21 +38,31 @@ import {
   type PlanetName,
   PLANETS,
 } from '@/lib/orrery'
+import type { NeoFilter } from '@/lib/orrery/asteroids'
 import type { BodyName } from '@/lib/orrery/bodies'
 import { threeQuarterView } from '@/lib/orrery/craftModelFit'
 import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
+import {
+  EARTH_FRAME_UNIT,
+  earthFrameBlend,
+  earthFrameRadius,
+  L1_DISTANCE_KM,
+} from '@/lib/orrery/earthFrame'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { OrreryApproach } from '@/schemas/orreryNeo'
 
+import { L1_KEY } from '../catalog'
 import type { CraftFilter } from '../craftFilter'
 import { DEFAULT_PRESET } from '../defaultView'
 import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
-import { type FocusPreset, FOV, frameView, sunlitFocusDirection } from './framing'
+import { EarthNeighbourhood } from './earthNeighbourhood'
+import { earthPresetView, type FocusPreset, FOV, frameView, sunlitFocusDirection } from './framing'
 import { MoonLayer } from './moonLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
@@ -75,8 +85,11 @@ export interface ProjectedBody {
   name: SceneKey
   /** What its label says. */
   label: string
-  /** 'ring': the heliopause marker's label anchor (#93), not a body. */
-  kind: 'body' | 'craft' | 'moon' | 'ring'
+  /**
+   * 'ring': the heliopause marker's label anchor (#93), not a body. 'asteroid': a close
+   * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92).
+   */
+  kind: 'body' | 'craft' | 'moon' | 'ring' | 'asteroid' | 'marker'
   /** Screen position, px; may lie outside the canvas (rim markers use that). */
   x: number
   y: number
@@ -93,12 +106,27 @@ export interface ProjectedBody {
   naifId?: string
   /** Moon: the planet it circles (#107). */
   parent?: string
+  /** Asteroid: on JPL's potentially hazardous list (#92). */
+  pha?: boolean
 }
+
+export { L1_KEY } from '../catalog'
 
 /** Craft markers: tiny in the scene, a few px on screen. */
 const CRAFT_RADIUS = { exaggerated: 0.02, log: 0.012, proportional: 0.0005 } as const
 /** Moons never draw smaller than this, px (#107). */
 const MOON_MIN_PX = 2.5
+/** Close approaches and the L1 marker never draw smaller than these, px (#92). */
+const ASTEROID_MIN_PX = 2.5
+const L1_MIN_PX = 3.5
+/** Asteroid and L1 labels show once the Earth frame is this open (or the object is chosen). */
+const NEAR_LABEL_OPEN = 0.5
+/** The Earth–Moon/L1 preset holds this many Earth radii (as drawn) around Earth: L2 at 12.8. */
+const EARTH_PRESET_RADII = 13.5
+/** A close approach, L1 or an L1/L2 craft is focused from this many frame units, inside the open frame. */
+const NEAR_FOCUS_UNITS = 40
+/** Craft within this distance of Earth, au, are drawn in the Earth frame (#92). */
+const NEAR_FRAME_AU = 0.1
 const HELIOPAUSE_SAMPLES = 180
 /** Heliosphere refits to hold the craft once the sim date has moved this far, days. */
 const HELIOSPHERE_REFIT_DAYS = 180
@@ -217,6 +245,8 @@ export class OrreryRenderer {
       this.markDirty()
     },
   )
+  /** Earth's neighbourhood (#92): the Earth frame, close approaches, Sun–Earth line, L1. */
+  private readonly near = new EarthNeighbourhood()
   /** Faint dashed ring where Voyager 1 crossed the heliopause (#93), approximate. */
   private readonly heliopause = new Line(
     new BufferGeometry(),
@@ -314,6 +344,7 @@ export class OrreryRenderer {
       this.craft.stalks,
       this.craft.markers,
       this.models.group,
+      this.near.group,
     )
     this.orbitGroup.add(this.heliopause)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
@@ -393,10 +424,16 @@ export class OrreryRenderer {
 
   /** Each frame: grow any body that would draw below its minimum on-screen size. */
   private applyMinPixelSize(): void {
+    const t = this.earthOpenness()
     for (const [name, mesh] of this.bodies) {
       const depth = mesh.position.distanceTo(this.camera.position)
-      mesh.scale.setScalar(Math.max(this.radiusOf(name), this.minPx(name) * this.unitsPerPx(depth)))
+      mesh.scale.setScalar(
+        Math.max(this.drawnRadius(name, t), this.minPx(name) * this.unitsPerPx(depth)),
+      )
     }
+    this.placeEarthFrame()
+    for (const a of this.near.asteroids.visible()) this.floorPx(a.mesh, ASTEROID_MIN_PX)
+    if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX)
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
       c.mesh.scale.setScalar(craftIconScale(this.unitsPerPx(depth)))
@@ -415,6 +452,57 @@ export class OrreryRenderer {
     this.skins.faceCamera(this.camera.position)
     this.placeMoons()
     this.placeModel()
+  }
+
+  /** Grow a mesh to at least `px` in radius on screen. */
+  private floorPx(mesh: Object3D, px: number): void {
+    const depth = mesh.position.distanceTo(this.camera.position)
+    mesh.scale.setScalar(Math.max(mesh.scale.x, px * this.unitsPerPx(depth)))
+  }
+
+  /**
+   * A body's radius before the px floor, as the Earth frame opens by `t` (#92): Earth
+   * shrinks to the frame's unit, and the other bodies to dots, so the inset never
+   * crowds against an exaggerated Venus or Sun.
+   */
+  private drawnRadius(name: BodyName, t: number): number {
+    const r = this.radiusOf(name)
+    if (t <= 0) return r
+    return name === 'Earth' ? earthFrameRadius(r, t) : r * (1 - t)
+  }
+
+  /**
+   * How open the Earth frame is (#92): from the camera's and its target's distances to
+   * Earth in frame units. Closed in the proportional mode (true scale) and without
+   * Horizons' Earth for the date.
+   */
+  private earthOpenness(): number {
+    const earth = this.bodies.get('Earth')
+    if (!earth || this.mode === 'proportional' || !this.near.coversEarth(this.lastJd)) return 0
+    return earthFrameBlend(
+      earth.position.distanceTo(this.camera.position) / EARTH_FRAME_UNIT,
+      earth.position.distanceTo(this.controls.target) / EARTH_FRAME_UNIT,
+    )
+  }
+
+  /**
+   * Earth's neighbourhood for this frame (#92): the L1/L2 craft moved into the Earth
+   * frame; the close approaches, the Sun–Earth line and L1 placed in it.
+   */
+  private placeEarthFrame(forceOpen = false): void {
+    const earth = this.bodies.get('Earth')
+    if (!earth || Number.isNaN(this.lastJd)) return
+    // Forced open: where things will be once a focus flight arrives (it ends inside it).
+    const t = forceOpen && this.near.coversEarth(this.lastJd) ? 1 : this.earthOpenness()
+    const radius = Math.max(
+      this.drawnRadius('Earth', t),
+      this.minPx('Earth') * this.unitsPerPx(earth.position.distanceTo(this.camera.position)),
+    )
+    const frame = this.near.view(this.lastJd, earth.position, radius, t, (p) => this.toScene(p))
+    // Any craft near Earth (the L1/L2 ones; Europa Clipper on its Earth flyby) goes into
+    // the frame with the Moon and the close approaches, so they share one scale.
+    this.craft.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
+    this.near.place(this.lastJd, frame)
   }
 
   /** The focused craft's model at its position, its axis along its attitude (#115). */
@@ -546,11 +634,40 @@ export class OrreryRenderer {
   /** Where a body or craft is drawn now, scene space. */
   bodyPosition(name: SceneKey): Vector3 {
     if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? new Vector3()
+    const near = this.nearPosition(name)
+    if (near) return near
     if (this.moons.has(name)) {
       const parent = this.moons.parentOf(name)
       return this.moons.position(name) ?? (parent ? this.bodyPosition(parent) : new Vector3())
     }
     return this.craft.position(name) ?? new Vector3()
+  }
+
+  /** A close approach or the L1 marker as drawn now (#92), or null. */
+  private nearPosition(name: SceneKey): Vector3 | null {
+    if (name === L1_KEY) return this.near.l1.visible ? this.near.l1.position.clone() : null
+    return this.near.asteroids.position(name)
+  }
+
+  /** This fortnight's close approaches from /api/orrery-neo (#92). */
+  setApproaches(list: readonly OrreryApproach[]): void {
+    this.near.asteroids.setApproaches(list)
+    this.updateBodies(true)
+    this.markDirty()
+  }
+
+  /** The close-approach filters (#92): window, hazardous only, risk-listed only. */
+  setNeoFilter(filter: NeoFilter): void {
+    this.near.asteroids.setFilter(filter)
+    this.updateBodies(true)
+    this.markDirty()
+  }
+
+  /** The Space weather switch (#92): the Sun–Earth line and the L1 marker. */
+  setSunEarthLine(on: boolean): void {
+    this.near.setSunLineVisible(on)
+    this.updateBodies(true)
+    this.markDirty()
   }
 
   /** The moons to draw (#107): the payload's planet-centred ones and Earth's Moon. */
@@ -562,6 +679,7 @@ export class OrreryRenderer {
   /** The orrery's craft, Earth and Moon from /api/orrery-bodies (#93). */
   setTracks(tracks: readonly OrreryTrack[]): void {
     this.earthTrack = tracks.find((t) => t.naifId === '399') ?? null
+    this.near.setEarthTrack(this.earthTrack)
     this.craft.setTracks(tracks)
     this.updateBodies(true)
     // Craft that arrive after the first frame still get a Heliosphere frame that holds them.
@@ -586,6 +704,9 @@ export class OrreryRenderer {
   /** Draw a craft's whole-mission path (spec Part 14), or none. */
   setTrajectory(key: SceneKey | null): void {
     this.craft.setTrajectory(key && this.craft.has(key) ? key : null)
+    // A chosen close approach draws its sampled pass (#92).
+    this.near.asteroids.setSelected(key)
+    this.chosen = key
     this.updateBodies(true)
     this.markDirty()
   }
@@ -678,6 +799,10 @@ export class OrreryRenderer {
    * (#93: Voyager 2, 90 au south of the ecliptic, fell below a ring-only frame).
    */
   applyPreset(preset: FocusPreset, instant = this.reducedMotion): void {
+    if (preset === 'earth') {
+      this.applyEarthPreset(instant)
+      return
+    }
     this.preset = preset
     this.presetPristine = true
     this.focusBody = null
@@ -698,6 +823,36 @@ export class OrreryRenderer {
     this.flyTo(view.position, view.target, instant)
   }
 
+  /**
+   * Earth–Moon/L1 (#92): aimed at Earth from beside the Sun–Earth line, close enough that
+   * the Earth frame is open, holding L2. It follows Earth as the clock runs.
+   */
+  private applyEarthPreset(instant: boolean): void {
+    this.preset = 'earth'
+    this.presetPristine = true
+    this.focusBody = 'Earth'
+    this.models.show(null, null)
+    this.canvas.dataset['orreryFocus'] = 'earth'
+    this.updateBodies(true)
+    const view = this.earthView()
+    this.flyTo(view.position, view.target, instant)
+  }
+
+  /** The Earth–Moon/L1 framing (#92), also the distance for focusing Earth. */
+  private earthView() {
+    const extent =
+      this.mode === 'proportional'
+        ? (L1_DISTANCE_KM / AU_KM) * LINEAR_K * 1.1
+        : EARTH_FRAME_UNIT * EARTH_PRESET_RADII
+    return earthPresetView(
+      this.bodyPosition('Earth'),
+      this.bodyPosition('Sun'),
+      this.width / Math.max(1, this.height),
+      extent,
+      (2 * this.reserveBottomPx) / Math.max(1, this.height),
+    )
+  }
+
   /** The stage's bottom strip the time bar covers, px: framing keeps craft above it. */
   setFrameReserve(bottomPx: number): void {
     if (Math.abs(bottomPx - this.reserveBottomPx) < 1) return
@@ -713,8 +868,14 @@ export class OrreryRenderer {
   /** Fly to a body or craft and keep following it as it moves. */
   focusOn(name: SceneKey, instant = this.reducedMotion): void {
     this.updateBodies(true)
-    // A craft with no data at this date is hidden: there is nowhere to fly to.
-    if (!isBody(name) && !this.craft.position(name)) return
+    // Near Earth, aim where the object sits once the flight is in, with the frame open.
+    const nearEarth =
+      this.near.asteroids.has(name) ||
+      name === L1_KEY ||
+      this.craft.visible().some((c) => c.key === name && c.group === 'l1')
+    if (nearEarth && this.mode !== 'proportional') this.placeEarthFrame(true)
+    // A craft or close approach with no data at this date is hidden: nowhere to fly to.
+    if (!isBody(name) && !this.craft.position(name) && !this.nearPosition(name)) return
     this.focusBody = name
     this.preset = null
     this.canvas.dataset['orreryFocus'] = name
@@ -725,9 +886,17 @@ export class OrreryRenderer {
     const r = this.radiusOf(name)
     // A craft is a marker, not a body: stand back far enough that it stays a few px and
     // its trajectory reads around it (#93), instead of filling the view.
-    const distance = isBody(name)
-      ? Math.max(r * FOCUS_RADII, FOCUS_MIN_DISTANCE)
-      : CRAFT_FOCUS_DISTANCE[this.mode]
+    // Earth is seen from the Earth–Moon/L1 distance, where the Earth frame is open (#92):
+    // its Moon and the L1 craft show apart from it.
+    const distance =
+      name === 'Earth'
+        ? this.earthView().position.distanceTo(target)
+        : isBody(name)
+          ? Math.max(r * FOCUS_RADII, FOCUS_MIN_DISTANCE)
+          : nearEarth && this.mode !== 'proportional'
+            ? EARTH_FRAME_UNIT * NEAR_FOCUS_UNITS
+            : CRAFT_FOCUS_DISTANCE[this.mode]
+
     let dir = this.camera.position.clone().sub(this.controls.target).normalize()
     if (dir.lengthSq() === 0) dir.set(0, 0.5, 1).normalize()
     // A craft with a model is seen three-quarter on, so its shape reads (#115).
@@ -832,6 +1001,7 @@ export class OrreryRenderer {
         ...this.projectOne(c.mesh),
       })
     }
+    this.projectNear(out)
     const anchor = this.visibility.orbits ? this.heliopauseAnchor() : null
     if (anchor) {
       out.push({
@@ -845,6 +1015,30 @@ export class OrreryRenderer {
       })
     }
     return out
+  }
+
+  /** The selected object (setTrajectory), for the close-approach labels. */
+  private chosen: SceneKey | null = null
+
+  /**
+   * Close approaches and L1 (#92). With the Earth frame mostly closed they sit on Earth's
+   * dot, so their labels wait until it opens; a chosen one always shows.
+   */
+  private projectNear(out: ProjectedBody[]): void {
+    const open = this.near.openness() >= NEAR_LABEL_OPEN
+    for (const a of this.near.asteroids.visible()) {
+      if (!open && a.key !== this.chosen) continue
+      out.push({
+        name: a.key,
+        label: a.label,
+        kind: 'asteroid',
+        pha: a.pha,
+        ...this.projectOne(a.mesh),
+      })
+    }
+    if (this.near.l1.visible && (open || this.chosen === L1_KEY)) {
+      out.push({ name: L1_KEY, label: L1_KEY, kind: 'marker', ...this.projectOne(this.near.l1) })
+    }
   }
 
   private readonly markDirty = () => {
@@ -896,17 +1090,23 @@ export class OrreryRenderer {
     this.lastJd = jd
     if (!(Math.abs(jd - this.orbitJd) < ORBIT_RESAMPLE_DAYS)) this.sampleOrbits(jd)
     this.placeBodies(jd)
+    this.placeEarthFrame()
     if (this.preset === 'heliosphere' && !(Math.abs(jd - this.fitJd) < HELIOSPHERE_REFIT_DAYS)) {
       this.refitPreset()
     }
-    if (this.focusBody) {
-      const target = this.bodyPosition(this.focusBody)
-      const shift = target.clone().sub(this.controls.target)
-      if (!this.flight && shift.lengthSq() > 0) {
-        this.camera.position.add(shift)
-        this.controls.target.copy(target)
-      }
-    }
+  }
+
+  /**
+   * Keep the camera on the focused body as it moves: with the clock, and near Earth also
+   * as the Earth frame opens or closes with the camera's distance (#92).
+   */
+  private followFocus(): void {
+    if (!this.focusBody || this.flight) return
+    const target = this.bodyPosition(this.focusBody)
+    const shift = target.clone().sub(this.controls.target)
+    if (shift.lengthSq() === 0) return
+    this.camera.position.add(shift)
+    this.controls.target.copy(target)
   }
 
   private readonly frame = (now: number) => {
@@ -928,6 +1128,7 @@ export class OrreryRenderer {
       if (now - this.lastDraw >= MIN_FRAME_MS || this.dirty || flying) {
         this.updateBodies()
         this.applyMinPixelSize()
+        this.followFocus()
         this.renderer.render(this.scene, this.camera)
         this.lastDraw = now
         this.dirty = false
@@ -979,6 +1180,12 @@ export class OrreryRenderer {
     d['orreryTrajectory'] = path ? `${String(path.past)},${String(path.future)}` : ''
     // The focused craft's 3D model: loading:, model:, simplified: or failed:<naif> (#115).
     d['orreryModel'] = this.models.state()
+    // Earth's neighbourhood (#92): how open the frame is, approaches drawn, the chosen
+    // one's path points, and whether L1 is drawn.
+    d['orreryEarthFrame'] = this.near.openness().toFixed(2)
+    d['orreryAsteroids'] = String(this.near.asteroids.visible().length)
+    d['orreryAsteroidPath'] = String(this.near.asteroids.pathPoints())
+    d['orreryL1'] = String(this.near.l1.visible)
   }
 
   private readonly handleContextLost = (e: Event) => {
@@ -1001,6 +1208,7 @@ export class OrreryRenderer {
       ;(line.material as LineBasicMaterial).dispose()
     }
     this.craft.dispose()
+    this.near.dispose()
     this.models.dispose()
     this.moons.dispose()
     this.sunImage.stop()

@@ -199,6 +199,12 @@
   background: var(--bone-faint);
 }
 
+/* Left of its body (#92): the leader runs from the label's right end. */
+.label[data-side='left']::before {
+  left: auto;
+  right: -6px;
+}
+
 .label[data-stacked='-1']::before {
   top: 50%;
 }
@@ -544,6 +550,75 @@
 .sourceNote {
   grid-column: 1 / -1;
   color: var(--bone-faint);
+}
+
+/* JPL Scout's unconfirmed objects (#92): a short list, no positions. */
+.scout summary {
+  cursor: pointer;
+  color: var(--bone-dim);
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  letter-spacing: var(--track-label);
+}
+
+.scoutList {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.scoutItem {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  background: var(--plate-bg);
+  color: var(--bone-dim);
+  font: 500 var(--text-xs) / 1.3 var(--font-mono);
+  cursor: pointer;
+}
+
+.scoutItem:hover,
+.scoutItem:focus-visible {
+  color: var(--bone);
+}
+
+/* Close approaches (#92): amber, red for JPL's potentially hazardous ones; L1 quiet. */
+.asteroidLabel {
+  color: var(--amber);
+}
+
+.asteroidLabel[data-pha='true'] {
+  color: var(--mcrn);
+}
+
+.markerLabel {
+  color: var(--bone-faint);
+}
+
+/* The four impact terms (#92, spec Part 12): each yes or no, with what it means. */
+.terms {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  font: 400 var(--text-xs) / 1.4 var(--font-body);
+  color: var(--bone-dim);
+}
+
+.terms strong {
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  letter-spacing: var(--track-label);
+  color: var(--bone);
+}
+
+.terms [data-applies='true'] strong {
+  color: var(--amber);
 }
 
 /* How the spacecraft data is doing (#93): count and age, or why there is none. */

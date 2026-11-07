@@ -6,7 +6,9 @@
  */
 import { PerspectiveCamera, Vector3 } from 'three'
 
-export type FocusPreset = 'sun' | 'inner' | 'outer' | 'heliosphere'
+export type FocusPreset = 'sun' | 'inner' | 'outer' | 'heliosphere' | 'earth'
+/** The presets framed around the Sun; Earth–Moon/L1 (#92) is framed on Earth instead. */
+export type SunPreset = Exclude<FocusPreset, 'earth'>
 
 export interface PresetDef {
   /** The orbit (or distance) at the frame's edge, au. */
@@ -20,7 +22,7 @@ export interface PresetDef {
  * Heliosphere: 200 au, past Voyager 1 (172 au in 2026). Steeper views for the inner
  * system keep the near side of Jupiter's orbit from swinging into frame.
  */
-export const PRESETS: Readonly<Record<FocusPreset, PresetDef>> = {
+export const PRESETS: Readonly<Record<SunPreset, PresetDef>> = {
   sun: { edgeAu: 0.467, elevationDeg: 60 },
   inner: { edgeAu: 1.666, elevationDeg: 86 },
   outer: { edgeAu: 30.4, elevationDeg: 40 },
@@ -142,7 +144,7 @@ function bisectDistance(
  * orbit, at the distance that fits them all above the time bar.
  */
 export function frameView(
-  preset: FocusPreset,
+  preset: SunPreset,
   aspect: number,
   toScene: ToSceneRadius,
   extras: FrameExtras = {},
@@ -205,7 +207,7 @@ export function frameView(
  * the 200 au ring's view) inside it and above the time bar.
  */
 export function framePreset(
-  preset: FocusPreset,
+  preset: SunPreset,
   aspect: number,
   toScene: ToSceneRadius,
   extras: FrameExtras = {},
@@ -227,6 +229,39 @@ export function framePreset(
     else far = mid
   }
   return placeCamera(camera, elevationDeg, far).position.clone()
+}
+
+/** The Earth–Moon/L1 view looks down on the ecliptic from this high, degrees (#92). */
+export const EARTH_PRESET_ELEVATION_DEG = 25
+
+/**
+ * The Earth–Moon/L1 preset (#92): aimed at Earth, from beside the Sun–Earth line so L1
+ * (sunward) and L2 sit to either side, at the distance where a ring of `extent` around
+ * Earth fills FILL of the view above the time bar.
+ */
+export function earthPresetView(
+  earth: Vector3,
+  sun: Vector3,
+  aspect: number,
+  extent: number,
+  bottomReserveNdc = 0,
+): FrameView {
+  const toSun = sun.clone().sub(earth)
+  toSun.y = 0
+  if (toSun.lengthSq() === 0) toSun.set(1, 0, 0)
+  toSun.normalize()
+  // Across the Sun line, in the ecliptic, then raised.
+  const side = new Vector3(-toSun.z, 0, toSun.x)
+  const el = (EARTH_PRESET_ELEVATION_DEG * Math.PI) / 180
+  const dir = side.multiplyScalar(Math.cos(el)).add(new Vector3(0, Math.sin(el), 0))
+  const ring = Array.from({ length: RING_SAMPLES }, (_, i) => {
+    const a = (i / RING_SAMPLES) * Math.PI * 2
+    return new Vector3(earth.x + extent * Math.cos(a), earth.y, earth.z + extent * Math.sin(a))
+  })
+  const camera = new PerspectiveCamera(FOV, Math.max(0.1, aspect), 0.0001, 1e7)
+  camera.updateProjectionMatrix()
+  const distance = bisectDistance(camera, earth, dir, ring, bottomReserveNdc, extent)
+  return { position: earth.clone().addScaledVector(dir, distance), target: earth.clone() }
 }
 
 /**

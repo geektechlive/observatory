@@ -4,6 +4,10 @@
  * that would overlap a placed one tries stacked slots above and below; if none is free it
  * hides, unless it must show (the voice subject), in which case it takes its last slot
  * anyway. Rough box: monospace ~7 px per character, 16 px tall.
+ *
+ * #92: labels on one line keep a gap ("Mars Venus" read as one phrase), every label
+ * keeps off other bodies' dots ("Sun" sat on Saturn's), and a label that would run off
+ * the stage's right edge goes to the left of its body.
  */
 import { SATURN_RINGS } from '@/lib/orrery/imagery'
 
@@ -15,12 +19,26 @@ export interface LabelCandidate {
   visible: boolean
   /** Never hidden by a collision (the body the voice line names). */
   mustShow?: boolean
-  /** Craft and moon labels keep off planets' drawn discs (#107: Juno sat on Jupiter). */
+  /**
+   * Step right past a disc it lands on (#107: Juno sat on Jupiter). Every label keeps off
+   * other bodies' discs (#92); this only adds the sideways step.
+   */
   avoidDiscs?: boolean
+  /**
+   * A home label (Earth, the Sun, the selected body): when every slot would cover
+   * another body's dot, it shows anyway, over the dot, rather than hide.
+   */
+  priority?: boolean
+  /** Its rendered width, px, when known (a shown label); else ~7 px a character. */
+  widthPx?: number | undefined
+  /** Its body's drawn radius, px (`x` is already past it): the left side needs it. */
+  reach?: number
 }
 
 /** A planet's drawn disc on screen, px. */
 export interface LabelDisc {
+  /** Whose disc: a label never avoids its own body's. */
+  key?: string
   x: number
   y: number
   r: number
@@ -31,6 +49,8 @@ export interface LabelDisc {
 export interface LabelPlacement {
   dy: number
   dx?: number
+  /** 'left': placed to the left of its body, because the right ran off the stage (#92). */
+  side?: 'left'
 }
 
 /**
@@ -63,8 +83,12 @@ const CHAR_PX = 7
 const HEIGHT_PX = 16
 const OFFSET_X = 8
 const PAD = 2
+/** Horizontal padding each side, px: two labels on one line keep twice this apart (#92). */
+const PAD_X = 5
 /** Stacked slots tried after the default, in order. */
 const SLOTS = [0, -18, 18, -36, 36]
+/** A home label (`priority`) also tries farther rungs before it gives up (#92). */
+const PRIORITY_SLOTS = [...SLOTS, -54, 54, -72, 72]
 
 interface Box {
   readonly l: number
@@ -198,28 +222,46 @@ export function layoutLabels(
 ): Map<string, LabelPlacement> {
   const placed: Box[] = [...obstacles]
   const shown = new Map<string, LabelPlacement>()
-  const discBoxes = discs.map(discBox)
   for (const item of items) {
     if (!item.visible) continue
+    const width =
+      item.widthPx !== undefined && item.widthPx > 0 ? item.widthPx : item.text.length * CHAR_PX
     const boxAt = (dy: number, dx = 0): Box => ({
-      l: item.x + dx + OFFSET_X - PAD,
-      r: item.x + dx + OFFSET_X + item.text.length * CHAR_PX + PAD,
+      l: item.x + dx + OFFSET_X - PAD_X,
+      r: item.x + dx + OFFSET_X + width + PAD_X,
       t: item.y + dy - HEIGHT_PX / 2 - PAD,
       b: item.y + dy + HEIGHT_PX / 2 + PAD,
     })
+    const others = discs.filter((d) => d.key === undefined || d.key !== item.key).map(discBox)
     // A label on a disc steps right, past the disc's edge, before trying its slots.
     let dx = 0
     if (item.avoidDiscs) {
-      for (const d of discBoxes) {
-        if (overlaps(boxAt(0, dx), d)) dx = Math.max(dx, d.r - item.x - OFFSET_X + PAD)
+      for (const d of others) {
+        if (overlaps(boxAt(0, dx), d)) dx = Math.max(dx, d.r - item.x - OFFSET_X + PAD_X)
       }
     }
-    const blocked = (b: Box) =>
-      (bounds !== undefined && (b.t < 0 || b.b > bounds.height)) ||
+    const blockedBy = (b: Box, dots: readonly Box[]) =>
+      (bounds !== undefined && (b.t < 0 || b.b > bounds.height || b.l < 0 || b.r > bounds.width)) ||
       placed.some((p) => overlaps(b, p)) ||
-      (item.avoidDiscs === true && discBoxes.some((d) => overlaps(b, d)))
-    const free = SLOTS.find((dy) => !blocked(boxAt(dy, dx)))
-    const dy = free ?? (item.mustShow ? (SLOTS.at(-1) ?? 0) : undefined)
+      dots.some((d) => overlaps(b, d))
+    const blocked = (b: Box) => blockedBy(b, others)
+    // The left side: the label ends OFFSET_X short of the body's far edge.
+    const leftDx = -(2 * (item.reach ?? 0) + 2 * OFFSET_X + width)
+    const right = SLOTS.find((dy) => !blocked(boxAt(dy, dx)))
+    // Only when the stage's right edge is what stops it: a crowd on the right still hides it.
+    const offRight = bounds !== undefined && boxAt(0, dx).r > bounds.width
+    const left =
+      right === undefined && offRight ? SLOTS.find((dy) => !blocked(boxAt(dy, leftDx))) : undefined
+    if (right === undefined && left !== undefined) {
+      placed.push(boxAt(left, leftDx))
+      shown.set(item.key, { dy: left, dx: leftDx, side: 'left' })
+      continue
+    }
+    const overDots = item.priority
+      ? (PRIORITY_SLOTS.find((dy) => !blocked(boxAt(dy, dx))) ??
+        PRIORITY_SLOTS.find((dy) => !blockedBy(boxAt(dy, dx), [])))
+      : undefined
+    const dy = right ?? overDots ?? (item.mustShow ? (SLOTS.at(-1) ?? 0) : undefined)
     if (dy === undefined) continue
     placed.push(boxAt(dy, dx))
     shown.set(item.key, dx === 0 ? { dy } : { dy, dx })
