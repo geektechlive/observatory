@@ -151,6 +151,8 @@ test('switching the focused craft over and over leaves GPU objects and loops fla
   for (let i = 0; i < 6; i += 1) await cycle()
   await page.waitForTimeout(1500)
   expect(await stat(page, 'geometries')).toBeLessThanOrEqual(base.geometries + 2)
-  expect(await stat(page, 'textures')).toBeLessThanOrEqual(base.textures + 1)
+  // Planet maps (#105) can still arrive under load, independent of the models; a model
+  // leak would add Parker's 4 textures every cycle, 24 over these six.
+  expect(await stat(page, 'textures')).toBeLessThanOrEqual(base.textures + 4)
   await expect(canvas(page)).toHaveAttribute('data-orrery-animating', 'false')
 })
