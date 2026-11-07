@@ -407,6 +407,24 @@ describe('probed endpoints (#42, #61)', () => {
     expect(traj?.check({ object, fine: { samples: [] } })).toBe(false)
   })
 
+  it('probes Space-Track: a TIP list, each re-entry with its time (#101)', () => {
+    const st = byPath('/api/spacetrack?part=catalog')
+    expect(st).toBeDefined()
+    const reentry = { noradId: '45700', decayEpoch: '2026-11-11T20:32:00Z' }
+    expect(st?.check({ tip: { reentries: [reentry] } })).toBe(true)
+    expect(st?.check({ tip: { reentries: [] } })).toBe(true)
+    expect(st?.check({ tip: null })).toBe(false)
+    expect(st?.check({ tip: { reentries: [{ noradId: '1' }] } })).toBe(false)
+  })
+
+  it('probes DISCOS: the craft, each with a name (#101)', () => {
+    const d = byPath('/api/discos')
+    expect(d).toBeDefined()
+    expect(d?.check({ craft: { '-31': { name: 'Voyager 1' } } })).toBe(true)
+    expect(d?.check({ craft: {} })).toBe(false)
+    expect(d?.check({})).toBe(false)
+  })
+
   it('probes orrery satellites through the small stations group, rows of 13 fields (#98)', () => {
     const sats = byPath('/api/orrery-sats?group=stations')
     expect(sats).toBeDefined()
