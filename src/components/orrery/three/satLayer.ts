@@ -14,12 +14,14 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
   Group,
   Matrix3,
   Mesh,
   MeshBasicMaterial,
   NormalBlending,
   Points,
+  RingGeometry,
   ShaderMaterial,
   Sphere,
   SphereGeometry,
@@ -41,7 +43,7 @@ import {
   satViewDistance,
   temeToScene,
 } from '@/lib/orrery/satView'
-import { BONE_HEX, SAT_CATEGORY_HEX } from '@/lib/palette'
+import { BONE_HEX, SAT_CATEGORY_HEX, STATUS_HEX } from '@/lib/palette'
 
 export { isSatKey, satKey } from '@/lib/orrery/satView'
 /** Point sizes, CSS px: up close, and in the haze. */
@@ -53,6 +55,10 @@ const HAZE_PX = 7
 const HAZE_GAIN = 0.12
 /** The chosen satellite's marker, as a share of Earth's drawn radius (the renderer floors it). */
 const MARKER_SHARE = 0.04
+/** A re-entry ring's radius against the marker's (the renderer floors it in px too). */
+const RING_SHARE = MARKER_SHARE * 2
+/** At most this many rings: TIP lists a few objects a week, never hundreds. */
+const MAX_RINGS = 32
 
 const CATEGORIES: readonly SatCategory[] = [
   'station',
@@ -178,6 +184,17 @@ export class SatLayer {
   private radius = 1
   private display: SatDisplay = { pointsAlpha: 0, hazeAlpha: 0, pickable: false, cadenceMs: null }
   private selected: string | null = null
+  /** Objects Space-Track predicts will re-enter soon (#101), ringed in amber. */
+  private flagged: readonly string[] = []
+  private readonly rings: Mesh<RingGeometry, MeshBasicMaterial>[] = []
+  private readonly ringGeometry = new RingGeometry(0.78, 1, 32)
+  private readonly ringMaterial = new MeshBasicMaterial({
+    color: new Color(STATUS_HEX.watch),
+    side: DoubleSide,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
+  })
   /** The camera's distance from Earth this frame, Earth radii across the narrow side. */
   private re = Number.POSITIVE_INFINITY
 
@@ -205,6 +222,16 @@ export class SatLayer {
 
   setEnabled(groups: ReadonlySet<SatGroupId>): void {
     this.ctl.setEnabled(groups)
+  }
+
+  /** The objects to ring as predicted to re-enter soon, by NORAD id (#101). */
+  setFlagged(noradIds: readonly string[]): void {
+    this.flagged = noradIds.slice(0, MAX_RINGS)
+  }
+
+  /** The re-entry rings drawn now, for the renderer's px floor and the canvas's data. */
+  flagRings(): Mesh<RingGeometry, MeshBasicMaterial>[] {
+    return this.rings.filter((r) => r.visible)
   }
 
   /** The chosen satellite by key (`sat:25544`), or null. */
@@ -252,6 +279,38 @@ export class SatLayer {
       this.marker.position.copy(at)
       this.marker.scale.setScalar(p.radius * MARKER_SHARE)
     }
+    this.placeRings(p)
+  }
+
+  /** A ring, facing the camera, on each flagged object that is drawn as a point now. */
+  private placeRings(p: SatPlace): void {
+    let used = 0
+    if (this.display.pointsAlpha > 0) {
+      for (const id of this.flagged) {
+        const at = this.positionOf(id)
+        if (!at) continue
+        const ring = this.ring(used)
+        ring.position.copy(at)
+        ring.lookAt(p.camera)
+        ring.scale.setScalar(p.radius * RING_SHARE)
+        ring.visible = true
+        used += 1
+      }
+    }
+    for (let i = used; i < this.rings.length; i += 1) {
+      const ring = this.rings[i]
+      if (ring) ring.visible = false
+    }
+  }
+
+  private ring(i: number): Mesh<RingGeometry, MeshBasicMaterial> {
+    const had = this.rings[i]
+    if (had) return had
+    const ring = new Mesh(this.ringGeometry, this.ringMaterial)
+    ring.name = 'satellite-reentry'
+    this.rings.push(ring)
+    this.group.add(ring)
+    return ring
   }
 
   private setStrength(mat: ShaderMaterial, alpha: number, size: number): void {
@@ -314,8 +373,12 @@ export class SatLayer {
 
   /** Where the chosen satellite is drawn now, or null. */
   selectedPosition(): Vector3 | null {
-    if (!this.selected) return null
-    const teme = this.temeAt(this.indexOf(this.selected))
+    return this.selected ? this.positionOf(this.selected) : null
+  }
+
+  /** Where a loaded object is drawn now, by NORAD id, or null. */
+  positionOf(noradId: string): Vector3 | null {
+    const teme = this.temeAt(this.indexOf(noradId))
     const p = teme && satScenePosition(teme, this.teme, this.earth, this.radius)
     return p ? new Vector3(p.x, p.y, p.z) : null
   }
@@ -416,5 +479,7 @@ export class SatLayer {
     this.hazeMaterial.dispose()
     this.marker.geometry.dispose()
     this.marker.material.dispose()
+    this.ringGeometry.dispose()
+    this.ringMaterial.dispose()
   }
 }

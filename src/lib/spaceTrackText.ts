@@ -77,6 +77,28 @@ const TYPES: Readonly<Record<string, string>> = {
   UNKNOWN: 'Unknown',
 }
 
+/** SATCAT owner codes for the commonest owners; the rest show as Space-Track writes them. */
+const OWNERS: Readonly<Record<string, string>> = {
+  US: 'United States',
+  CIS: 'Russia (CIS, the former USSR)',
+  PRC: 'China',
+  ISS: 'International Space Station partners',
+  JPN: 'Japan',
+  IND: 'India',
+  ESA: 'European Space Agency',
+  FR: 'France',
+  UK: 'United Kingdom',
+  GER: 'Germany',
+  CA: 'Canada',
+  IT: 'Italy',
+}
+
+/** SATCAT's COUNTRY (the owner) in plain words, keeping the code. */
+export function ownerText(code: string): string {
+  const name = OWNERS[code.toUpperCase()]
+  return name ? `${name} (${code})` : code
+}
+
 /** SATCAT's OBJECT_TYPE in plain words. */
 export function objectTypeText(type: string): string {
   return TYPES[type.toUpperCase()] ?? type

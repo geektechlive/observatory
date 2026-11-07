@@ -5,7 +5,9 @@ import { craftModelFor } from '@/lib/orrery/craftModels'
 import { describeCraft } from '@/lib/orrery/craftState'
 import { AU_KM, formatLightTime, KM_TO_MI } from '@/lib/orrery/units'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { DiscosObject } from '@/schemas/spaceTrack'
 
+import { DiscosFacts } from './DiscosFacts'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
 
@@ -41,6 +43,8 @@ interface CraftFactsProps {
   jd: number
   simMs: number
   link: DsnLink | undefined
+  /** ESA DISCOS's mass, size and operator (#101), when the refresh job has them. */
+  physical?: DiscosObject | null | undefined
 }
 
 /**
@@ -48,7 +52,7 @@ interface CraftFactsProps {
  * Horizons puts it, how far, light time, approaching or receding, whether DSN is
  * talking to it now, and how far to trust the position. Never a position past the data.
  */
-export function CraftFacts({ track, earth, jd, simMs, link }: CraftFactsProps) {
+export function CraftFacts({ track, earth, jd, simMs, link, physical }: CraftFactsProps) {
   const d = describeCraft(track, earth, jd)
   const closeToEarth = track.group === 'l1' || track.group === 'moon'
   // How the craft is drawn up close, and whose model it is (#115).
@@ -134,6 +138,7 @@ export function CraftFacts({ track, earth, jd, simMs, link }: CraftFactsProps) {
                 </dd>
               </>
             )}
+            {physical && <DiscosFacts object={physical} />}
           </dl>
           <ul className={styles.reasons ?? ''} aria-label="Why this confidence">
             {d.state.confidenceReasons.map((r) => (

@@ -162,6 +162,23 @@ describe('SatLayer (#98)', () => {
     expect(layer.listGroup('stations')).toEqual([{ key: 'sat:25544', name: 'ISS (ZARYA)' }])
   })
 
+  it('rings the objects predicted to re-enter, where loaded and drawn (#101)', async () => {
+    const { layer, at } = await loadedLayer(['stations', 'starlink'])
+    layer.setFlagged(['44713', '99999'])
+    layer.place(at(20))
+    const rings = layer.flagRings()
+    expect(rings).toHaveLength(1)
+    expect(rings[0]?.visible).toBe(true)
+    // At the Starlink's drawn position, facing the camera.
+    const starlink = layer.positionOf('44713')
+    expect(rings[0]?.position.distanceTo(starlink ?? new Vector3())).toBeLessThan(1e-9)
+    layer.place(at(120))
+    expect(layer.flagRings()).toHaveLength(0)
+    layer.setFlagged([])
+    layer.place(at(20))
+    expect(layer.flagRings()).toHaveLength(0)
+  })
+
   it('has no position for an object outside its epoch window', async () => {
     const { layer } = await loadedLayer(['stations'], [SAT_OUT_OF_WINDOW])
     expect(layer.info(satKey('25544'))?.teme).toBeNull()

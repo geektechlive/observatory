@@ -10,6 +10,7 @@ import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryNeo } from '@/schemas/orreryNeo'
+import type { Discos, Reentry } from '@/schemas/spaceTrack'
 
 import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
@@ -17,7 +18,7 @@ import { ImageryFacts } from './ImageryFacts'
 import { MoonFacts } from './MoonFacts'
 import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './NearFacts'
 import styles from './orrery.module.css'
-import { SatFacts } from './SatFacts'
+import { SatFactsLive } from './SatFactsLive'
 import { formatSimUtc } from './simDate'
 import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
@@ -44,6 +45,10 @@ interface InspectorProps {
   cme?: L1Cme | null | undefined
   /** The chosen satellite's details (#98), or null while its group loads. */
   satellite?: SatInfo | null | undefined
+  /** ESA DISCOS facts for craft and some satellites (#101). */
+  discos?: Discos | null | undefined
+  /** Space-Track's re-entry predictions (#101). */
+  reentries?: readonly Reentry[] | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -71,6 +76,8 @@ export function Inspector({
   wind,
   cme,
   satellite,
+  discos,
+  reentries,
 }: InspectorProps) {
   const headingId = useId()
   if (isSatKey(body)) {
@@ -85,7 +92,12 @@ export function Inspector({
           </button>
         </div>
         {satellite ? (
-          <SatFacts info={satellite} simMs={simMs} />
+          <SatFactsLive
+            info={satellite}
+            simMs={simMs}
+            physical={discos?.satellites[satellite.noradId] ?? null}
+            reentry={reentries?.find((r) => r.noradId === satellite.noradId) ?? null}
+          />
         ) : (
           <p className={styles.inspectorText ?? ''} role="status">
             Loading its orbit data from CelesTrak…
@@ -147,6 +159,7 @@ export function Inspector({
             jd={jd}
             simMs={simMs}
             link={dsn?.get(track.naifId)}
+            physical={discos?.craft[track.naifId] ?? null}
           />
         ) : (
           <p className={styles.inspectorText ?? ''}>Not in the current data.</p>

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useDsn } from '@/hooks/useDsn'
+import { useNow } from '@/hooks/useNow'
 import { useOrreryBodies } from '@/hooks/useOrreryBodies'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { useDiscos } from '@/hooks/useSatelliteFacts'
+import { useSpaceTrack } from '@/hooks/useSpaceTrack'
 import { fetchOrrerySatsBody } from '@/lib/api/orrerySats'
 import { dsnContactsById } from '@/lib/dsn'
 import { loadSatWorker } from '@/lib/orbit/bulk/loadSatWorker'
@@ -16,6 +19,7 @@ import {
 } from '@/lib/orrery'
 import { moonBodies } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
+import { reentriesWithin } from '@/lib/spaceTrackText'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
 import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
@@ -92,6 +96,8 @@ function acquire(width: number, height: number, reducedMotion: boolean, onLost: 
 /** A pointer that moves further than this between down and up was a drag, not a tap. */
 const DRAG_PX = 5
 const PAGE_REFRESH_MS = 1000
+/** Re-entry predictions are judged against the wall clock, a minute at a time (#101). */
+const REENTRY_REFRESH_MS = 60_000
 /** Rim markers sit this far in from the stage edge, px. */
 const RIM_INSET = 14
 /** Below this stage width the heliopause ring keeps its line but drops its label, px. */
@@ -186,6 +192,14 @@ export function OrreryPage() {
   // Satellites (#98): which kinds are switched on, and what the renderer has of them.
   const [satToggles, setSatToggles] = useState<SatToggles>(DEFAULT_SAT_TOGGLES)
   const [satState, setSatState] = useState<SatViewState | null>(null)
+  // Space-Track and ESA DISCOS (#101): re-entries, the Box Score, physical facts.
+  const { data: spaceTrack } = useSpaceTrack()
+  const { data: discos } = useDiscos()
+  const wallNow = useNow(REENTRY_REFRESH_MS).getTime()
+  const reentries = useMemo(
+    () => (spaceTrack?.tip ? reentriesWithin(spaceTrack.tip.reentries, wallNow, 7) : []),
+    [spaceTrack, wallNow],
+  )
   // The voice line and inspector change slowly: once a second is plenty, and keeps the
   // whole page from re-rendering at the time bar's 4 Hz (it has its own readout).
   const { sim } = useSimTime(PAGE_REFRESH_MS)
@@ -324,6 +338,10 @@ export function OrreryPage() {
   useEffect(() => {
     renderer?.setSatGroups(enabledSatGroups(satToggles))
   }, [renderer, satToggles])
+
+  useEffect(() => {
+    renderer?.setReentries(reentries.map((r) => r.noradId))
+  }, [renderer, reentries])
 
   useEffect(() => {
     if (!renderer) return
@@ -641,6 +659,8 @@ export function OrreryPage() {
             toggles={satToggles}
             onToggles={setSatToggles}
             status={satState ? satStatusText(satState) : 'Loading…'}
+            boxscore={spaceTrack?.boxscore}
+            reentriesThisWeek={reentries.length}
           />
         }
       />
@@ -837,6 +857,8 @@ export function OrreryPage() {
             wind={near.wind}
             cme={near.cme}
             satellite={satellite}
+            discos={discos}
+            reentries={reentries}
             onClose={() => {
               setSelected(null)
             }}
