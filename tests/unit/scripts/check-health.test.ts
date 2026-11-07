@@ -4,6 +4,7 @@ import {
   CHECKS,
   isTransient,
   judgeStale,
+  main,
   NEG_RETRY_DELAY_MS,
   retryDelayMs,
   REVALIDATE_RECHECK_MS,
@@ -354,5 +355,37 @@ describe('probed endpoints (#42, #61)', () => {
     expect(donki).toBeDefined()
     expect(donki?.check({ flares: [], cmes: [], geomagneticStorms: [], seps: [] })).toBe(true)
     expect(donki?.check({ flares: [] })).toBe(false)
+  })
+})
+
+describe('exit code (#120)', () => {
+  // The incident reporter (issue + Discord) is the alert. A red job only made GitHub
+  // email about outages nobody could fix, every 6 h.
+  const quiet = { log: () => undefined, error: () => undefined }
+
+  it('exits 0 once a failing endpoint is written to the incident report', async () => {
+    const written: string[] = []
+    const failing = result({ path: '/api/donki', status: 200, note: 'degraded (noaa-flares)' })
+    const code = await main({
+      runAll: () => Promise.resolve([failing]),
+      writeReport: (text: string) => {
+        written.push(text)
+        return Promise.resolve()
+      },
+      ...quiet,
+    })
+    expect(code).toBe(0)
+    expect(JSON.parse(written[0] ?? '[]')).toEqual([
+      expect.objectContaining({ signature: 'health:/api/donki', ok: false }),
+    ])
+  })
+
+  it('fails when the report cannot be written: then nothing would alert', async () => {
+    const run = main({
+      runAll: () => Promise.resolve([result()]),
+      writeReport: () => Promise.reject(new Error('EACCES')),
+      ...quiet,
+    })
+    await expect(run).rejects.toThrow('EACCES')
   })
 })

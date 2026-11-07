@@ -128,6 +128,21 @@ describe('lint', () => {
   })
 })
 
+describe('health alerting (#120)', () => {
+  // check-health exits 0 with failures (the reporter is the alert), so the reporter's
+  // own exit code is what keeps a broken alert path visible: it must fail the job.
+  const workflow = readFileSync(join(WORKFLOW_DIR, 'data-refresh.yml'), 'utf8')
+
+  it('lets a failing reporter fail its job', () => {
+    expect(workflow).not.toMatch(/continue-on-error/)
+    expect(workflow.match(/run: node scripts\/report-incidents\.mjs/g)).toHaveLength(2)
+  })
+
+  it('still runs the reporter after a crashed check', () => {
+    expect(workflow.match(/if: always\(\) && steps\.check\.outcome != 'skipped'/g)).toHaveLength(2)
+  })
+})
+
 describe('Vite configs', () => {
   // Vite's future native config loader has no CommonJS globals; it warned on every
   // build and test run until #95.

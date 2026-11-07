@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   discordMessage,
   issueTitle,
+  lastComment,
   nextStreaks,
   planActions,
   UPSTREAM_THRESHOLD,
@@ -161,6 +162,107 @@ describe('upstream threshold', () => {
       nextStreaks([up('health:/api/apod')], {}),
     )
     expect(action).toMatchObject({ type: 'hold', streak: 1 })
+  })
+})
+
+describe('quiet open incidents (#120)', () => {
+  // #65 collected 79 identical "Still failing" comments, one per 6 h run, through a
+  // NASA DONKI outage nobody could fix.
+  const NOW = Date.parse('2026-11-07T12:00:00Z')
+  const HOUR = 3_600_000
+  const DONKI = 'health:/api/donki'
+  const detail = (ms: number) => `FAIL /api/donki HTTP 200 ${String(ms)}ms degraded (noaa-flares)`
+  const openWith = (body: string, hoursAgo: number) => ({
+    ...issue(DONKI, 'open'),
+    lastComment: { body, createdAt: new Date(NOW - hoursAgo * HOUR).toISOString() },
+  })
+  const stillFailing = (d: string) => `Still failing.\n\n\`\`\`\n${d}\n\`\`\`\n\nRun: ${RUN}`
+
+  it('skips an unchanged failure: response time and run link are not a change', () => {
+    const issues = [openWith(stillFailing(detail(3078)), 6)]
+    const [action] = planActions([fail(DONKI, detail(2210))], issues, RUN, {}, NOW)
+    expect(action).toMatchObject({ type: 'skip', notify: false })
+  })
+
+  it('treats a retry count as noise too', () => {
+    const issues = [openWith(stillFailing(detail(3078)), 6)]
+    const now = `${detail(9000)} (after 3 attempts)`
+    const [action] = planActions([fail(DONKI, now)], issues, RUN, {}, NOW)
+    expect(action.type).toBe('skip')
+  })
+
+  it('comments when the failure line changes', () => {
+    const issues = [openWith(stillFailing(detail(3078)), 6)]
+    const changed = 'FAIL /api/donki HTTP 503 8011ms upstream unavailable'
+    const [action] = planActions([fail(DONKI, changed)], issues, RUN, {}, NOW)
+    expect(action).toMatchObject({ type: 'comment', notify: false })
+    expect(action.comment).toContain('HTTP 503')
+  })
+
+  it('posts one heartbeat once the last comment is 24 h old', () => {
+    const issues = [openWith(stillFailing(detail(3078)), 24)]
+    const [action] = planActions([fail(DONKI, detail(2210))], issues, RUN, {}, NOW)
+    expect(action.type).toBe('comment')
+    expect(action.comment).toMatch(/no change in 24 h/i)
+  })
+
+  it('compares against the opening body when the issue has no comments yet', () => {
+    const body = `Opened automatically by the \`data-refresh\` workflow: **${DONKI}** failed.\n\n\`\`\`\n${detail(3078)}\n\`\`\`\n\nRun: ${RUN}`
+    const [action] = planActions([fail(DONKI, detail(1))], [openWith(body, 2)], RUN, {}, NOW)
+    expect(action.type).toBe('skip')
+  })
+
+  it('comments when a tolerated warning follows a failure, and skips a repeated warning', () => {
+    const warnDetail = 'WARN /api/donki HTTP 200 100ms STALE 1h (upstream)'
+    const warn = { signature: DONKI, ok: true, warning: true, detail: warnDetail }
+    const afterFail = planActions([warn], [openWith(stillFailing(detail(1)), 6)], RUN, {}, NOW)
+    expect(afterFail[0].type).toBe('comment')
+    const tolerated = `Tolerated, not yet recovered.\n\n\`\`\`\n${warnDetail}\n\`\`\`\n\nRun: ${RUN}`
+    const again = planActions([warn], [openWith(tolerated, 6)], RUN, {}, NOW)
+    expect(again[0].type).toBe('skip')
+  })
+
+  it('still comments when the last comment is unknown, as before', () => {
+    const [action] = planActions([fail(DONKI, detail(1))], [issue(DONKI, 'open')], RUN, {}, NOW)
+    expect(action.type).toBe('comment')
+  })
+
+  it('never quiets a recovery: it closes and notifies', () => {
+    const issues = [openWith(stillFailing(detail(1)), 1)]
+    const [action] = planActions([pass(DONKI)], issues, RUN, {}, NOW)
+    expect(action).toMatchObject({ type: 'close', notify: true })
+  })
+})
+
+describe('lastComment (#120)', () => {
+  it('reads the newest comment, from the last page of a long thread', async () => {
+    const calls: string[] = []
+    const gh = (_method: string, path: string) => {
+      calls.push(path)
+      return Promise.resolve([
+        { body: 'older', created_at: '2026-11-06T00:00:00Z' },
+        { body: 'newest', created_at: '2026-11-07T00:00:00Z' },
+      ])
+    }
+    const last = await lastComment(gh, 'o/r', {
+      number: 65,
+      comments: 179,
+      body: 'b',
+      created_at: 'x',
+    })
+    expect(calls[0]).toContain('/issues/65/comments?per_page=100&page=2')
+    expect(last).toEqual({ body: 'newest', createdAt: '2026-11-07T00:00:00Z' })
+  })
+
+  it('falls back to the issue body when there are no comments', async () => {
+    const gh = () => Promise.reject(new Error('should not be called'))
+    const last = await lastComment(gh, 'o/r', {
+      number: 9,
+      comments: 0,
+      body: 'opened',
+      created_at: '2026-11-07T00:00:00Z',
+    })
+    expect(last).toEqual({ body: 'opened', createdAt: '2026-11-07T00:00:00Z' })
   })
 })
 

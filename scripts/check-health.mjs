@@ -315,24 +315,32 @@ function printTable(results) {
   }
 }
 
-async function main() {
+export async function main({
+  runAll: run = runAll,
+  writeReport = (text) => writeFile(REPORT_PATH, text),
+  log = console.log,
+  error = console.error,
+} = {}) {
   const baseUrl = (process.env.BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '')
-  console.log(`health check against ${baseUrl}\n`)
+  log(`health check against ${baseUrl}\n`)
 
-  const results = await runAll(baseUrl, CHECKS, CONCURRENCY)
+  const results = await run(baseUrl, CHECKS, CONCURRENCY)
   printTable(results)
-  await writeFile(REPORT_PATH, JSON.stringify(toReport(results), null, 2))
+  await writeReport(JSON.stringify(toReport(results), null, 2))
 
   const failed = results.filter((r) => !r.ok)
   const flaky = results.filter((r) => r.ok && r.attempts > 1)
-  console.log(`\n${results.length - failed.length}/${results.length} passed`)
+  log(`\n${results.length - failed.length}/${results.length} passed`)
   if (flaky.length > 0) {
-    console.log(`recovered on retry: ${flaky.map((r) => r.path).join(', ')}`)
+    log(`recovered on retry: ${flaky.map((r) => r.path).join(', ')}`)
   }
   if (failed.length > 0) {
-    console.error(`failing endpoints: ${failed.map((r) => r.path).join(', ')}`)
-    return 1
+    error(`failing endpoints: ${failed.map((r) => r.path).join(', ')}`)
   }
+  // 0 even with failures: they are in the report, and report-incidents (the next step)
+  // turns them into the issue and Discord alert. A red job only made GitHub email about
+  // outages nobody could fix (#120). A crash, or a report that can't be written, still
+  // rejects and exits 1, and so does a failing reporter step.
   return 0
 }
 

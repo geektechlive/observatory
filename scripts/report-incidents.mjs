@@ -9,6 +9,10 @@
 //   - fails, issue open    -> comment only (no ping: you already know)
 //   - passes, issue open   -> comment + close    + Discord "recovered"
 //   - warning, issue open  -> comment only (tolerated, not yet recovered)
+// On an open issue, the fail and warning comments are posted only when the line changed
+// since the last comment (response time, retry count, KV age and run link don't count),
+// or as one heartbeat after HEARTBEAT_MS of silence (#120: #65 had 79 identical
+// "Still failing" comments through a NASA outage nobody could fix).
 // So an issue's comment log is that source's incident history (Chris's call, 2026-10-09).
 // An issue only closes when its signature reports a pass: if a check is removed or
 // renamed while its issue is open, close that issue by hand.
@@ -37,12 +41,54 @@ const AREA_LABEL = 'infra'
 const API = 'https://api.github.com'
 /** Consecutive upstream-caused failing runs before an issue opens (#71). */
 export const UPSTREAM_THRESHOLD = 4
+/** An unchanged open incident gets at most one comment in this long (#120). */
+export const HEARTBEAT_MS = 24 * 3_600_000
 
 export function issueTitle(signature) {
   return `[observatory] ${signature}`
 }
 
 const fence = (detail) => `\`\`\`\n${detail}\n\`\`\``
+
+/**
+ * Pure: what makes two reports of one source "the same": the status (failing or
+ * tolerated) and the detail line without the numbers that move every run.
+ */
+function incidentKey(kind, detail) {
+  const steady = detail
+    .replace(/\b\d+ms\b/g, '')
+    .replace(/\(after \d+ attempts\)/g, '')
+    .replace(/\b\d+h old\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return `${kind}|${steady}`
+}
+
+/** Pure: the key of an earlier comment or opening body, or null if it isn't one of ours. */
+function keyOfPosted(body) {
+  const detail = /```\n([\s\S]*?)\n```/.exec(body)?.[1]
+  if (detail === undefined) return null
+  const kind = body.startsWith('Tolerated') ? 'warn' : 'fail'
+  return incidentKey(kind, detail)
+}
+
+/**
+ * Pure: the comment for an open issue, or a `skip` when it would repeat the last one
+ * within HEARTBEAT_MS. An issue without a known lastComment always gets the comment.
+ */
+function quietComment(base, issue, kind, detail, lead, runUrl, now) {
+  const comment = `${lead}\n\n${fence(detail)}\n\nRun: ${runUrl}`
+  const last = issue.lastComment
+  const post = { ...base, type: 'comment', number: issue.number, comment, notify: false }
+  if (!last || keyOfPosted(last.body) !== incidentKey(kind, detail)) return post
+  const age = now - Date.parse(last.createdAt)
+  // `!(age < …)` so an unparseable timestamp (NaN) posts rather than goes quiet.
+  if (!(age < HEARTBEAT_MS)) {
+    const heartbeat = `${lead} No change in 24 h.\n\n${fence(detail)}\n\nRun: ${runUrl}`
+    return { ...post, comment: heartbeat }
+  }
+  return { ...base, type: 'skip', number: issue.number, ageMs: age, notify: false }
+}
 
 /**
  * Pure: each signature's run of consecutive upstream-caused failures, including this
@@ -74,10 +120,11 @@ function openBody(entry, runUrl, streak) {
 
 /**
  * Pure: decide what to do for each report entry given the existing incident issues.
- * Returns actions of type open | reopen | comment | close | hold; `notify` marks the
- * ones that should ping Discord. `streaks` is nextStreaks() for this report.
+ * Returns actions of type open | reopen | comment | close | hold | skip; `notify` marks
+ * the ones that should ping Discord. `streaks` is nextStreaks() for this report. An
+ * open issue may carry `lastComment` ({ body, createdAt }) so repeats can be skipped.
  */
-export function planActions(report, issues, runUrl, streaks = {}) {
+export function planActions(report, issues, runUrl, streaks = {}, now = Date.now()) {
   const byTitle = new Map()
   for (const issue of issues) {
     const seen = byTitle.get(issue.title)
@@ -102,16 +149,15 @@ export function planActions(report, issues, runUrl, streaks = {}) {
         const comment = `Failed again. Reopening.\n\n${fence(entry.detail)}\n\nRun: ${runUrl}`
         actions.push({ ...base, type: 'reopen', number: issue.number, comment, notify: true })
       } else {
-        const comment = `Still failing.\n\n${fence(entry.detail)}\n\nRun: ${runUrl}`
-        actions.push({ ...base, type: 'comment', number: issue.number, comment, notify: false })
+        actions.push(quietComment(base, issue, 'fail', entry.detail, 'Still failing.', runUrl, now))
       }
       continue
     }
 
     if (issue?.state !== 'open') continue
     if (entry.warning) {
-      const comment = `Tolerated, not yet recovered.\n\n${fence(entry.detail)}\n\nRun: ${runUrl}`
-      actions.push({ ...base, type: 'comment', number: issue.number, comment, notify: false })
+      const lead = 'Tolerated, not yet recovered.'
+      actions.push(quietComment(base, issue, 'warn', entry.detail, lead, runUrl, now))
     } else {
       const comment = `Recovered. Closing.\n\n${fence(entry.detail)}\n\nRun: ${runUrl}`
       actions.push({ ...base, type: 'close', number: issue.number, comment, notify: true })
@@ -177,6 +223,34 @@ async function listIncidentIssues(gh, repo) {
   return (issues ?? []).filter((i) => !i.pull_request)
 }
 
+/**
+ * The newest comment on an issue, or its opening body when it has none, as
+ * { body, createdAt }. Comments list oldest first, so read the last page.
+ */
+export async function lastComment(gh, repo, issue) {
+  if (!issue.comments) return { body: issue.body ?? '', createdAt: issue.created_at }
+  const page = Math.ceil(issue.comments / 100)
+  const path = `/repos/${repo}/issues/${String(issue.number)}/comments?per_page=100&page=${String(page)}`
+  const comments = (await gh('GET', path)) ?? []
+  const last = comments.at(-1)
+  return last ? { body: last.body ?? '', createdAt: last.created_at } : null
+}
+
+/** Each open issue with its lastComment; a failed lookup just leaves it off (= comment). */
+async function withLastComments(gh, repo, issues) {
+  return Promise.all(
+    issues.map(async (issue) => {
+      if (issue.state !== 'open') return issue
+      try {
+        return { ...issue, lastComment: await lastComment(gh, repo, issue) }
+      } catch (err) {
+        console.warn(`last comment of #${String(issue.number)} unavailable: ${err.message}`)
+        return issue
+      }
+    }),
+  )
+}
+
 /** Apply one action; returns the issue URL it touched. */
 async function apply(gh, repo, action) {
   const issuePath = `/repos/${repo}/issues/${String(action.number)}`
@@ -202,6 +276,8 @@ async function apply(gh, repo, action) {
       break
     case 'hold':
       return `upstream failure ${String(action.streak)}/${String(UPSTREAM_THRESHOLD)}, no issue yet`
+    case 'skip':
+      return `#${String(action.number)} unchanged, last comment ${String(Math.round(action.ageMs / 3_600_000))}h ago`
     default:
       throw new Error(`unknown action ${String(action.type)}`)
   }
@@ -238,7 +314,8 @@ async function main(argv) {
 
   const gh = github(token)
   await ensureLabel(gh, repo)
-  const actions = planActions(report, await listIncidentIssues(gh, repo), runUrl, streaks)
+  const issues = await withLastComments(gh, repo, await listIncidentIssues(gh, repo))
+  const actions = planActions(report, issues, runUrl, streaks)
   if (actions.length === 0) {
     console.log('no actions: nothing failing, no open incidents to update')
     return 0
