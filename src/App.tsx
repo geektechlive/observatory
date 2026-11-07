@@ -159,7 +159,7 @@ export function App() {
           </div>
 
           {stageKind === 'globe' && (
-            <div className={styles.plates ?? ''}>
+            <div className={styles.plates ?? ''} data-lens-plates="">
               {mapMode === 'globe' ? <SubsolarPlate ref={subsolar} /> : <span />}
               <IssPlate
                 lat={issPos?.lat}

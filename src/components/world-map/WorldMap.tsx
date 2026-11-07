@@ -221,9 +221,14 @@ export function WorldMap() {
       center: [0, 20],
       zoom: 1.5,
       interactive: true,
+      // MapLibre adds its own credits control unless told not to; ours below is the
+      // only one (#94).
+      attributionControl: false,
     })
 
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    // Bottom-left: in map mode that corner of the lens has no plate, and the ISS plate
+    // holds the bottom-right (#94).
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
 
     mapRef.current = map
 
