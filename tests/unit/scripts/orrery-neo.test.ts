@@ -88,11 +88,11 @@ function fake(opts: FakeOptions = {}) {
 }
 
 describe('cadUrl', () => {
-  it('asks for 0.05 au over ±10 days, with names and the PHA filter when asked', () => {
+  it('asks for 0.05 au over ±30 days (#136), with names and the PHA filter when asked', () => {
     const url = new URL(cadUrl(NOW, false))
     expect(url.origin + url.pathname).toBe('https://ssd-api.jpl.nasa.gov/cad.api')
-    expect(url.searchParams.get('date-min')).toBe('2026-10-28')
-    expect(url.searchParams.get('date-max')).toBe('2026-11-17')
+    expect(url.searchParams.get('date-min')).toBe('2026-10-08')
+    expect(url.searchParams.get('date-max')).toBe('2026-12-07')
     expect(url.searchParams.get('dist-max')).toBe('0.05')
     expect(url.searchParams.get('fullname')).toBe('true')
     expect(url.searchParams.get('pha')).toBeNull()
@@ -120,13 +120,34 @@ describe('buildOrreryNeo', () => {
     expect(payload.approaches[0].target).toBe('524522 Somebody (2002 VE68)')
   })
 
-  it('samples ±10 days at 3 h with position and velocity', async () => {
-    const { deps } = fake()
+  it('asks Horizons for ±30 days at 3 h, keeping a daily span plus 3 h around the pass (#136)', async () => {
+    const asked: URL[] = []
+    const { deps } = fake({
+      horizons: (url) => {
+        asked.push(url)
+        return horizonsAnswer(url)
+      },
+    })
     const { payload } = await buildOrreryNeo(deps)
-    const fine = payload.approaches[0].fine
-    expect(fine.step).toBe(0.125)
-    expect(fine.samples).toHaveLength(161 * 6)
-    expect(payload.window).toEqual({ from: '2026-10-28', to: '2026-11-17' })
+    expect(asked[0]?.searchParams.get('STEP_SIZE')).toBe("'3 h'")
+    const parsed = OrreryNeoSchema.parse(payload)
+    const a = parsed.approaches[0]
+    if (!a?.fine || !a.close) throw new Error('expected both spans')
+    expect(a.fine.step).toBe(1)
+    expect(a.fine.samples).toHaveLength(61 * 6)
+    expect(a.close.step).toBe(0.125)
+    expect(a.close.start).toBeGreaterThanOrEqual(a.closeApproach.jd - 3)
+    expect(a.close.start + (a.close.samples.length / 6 - 1) * 0.125).toBeLessThanOrEqual(
+      a.closeApproach.jd + 3,
+    )
+    expect(a.close.samples.length / 6).toBeGreaterThanOrEqual(47)
+    expect(parsed.window).toEqual({ from: '2026-10-08', to: '2026-12-07' })
+  })
+
+  it('keeps this week’s objects when the month holds more than the limit (#136)', async () => {
+    const { deps } = fake()
+    const { payload } = await buildOrreryNeo({ ...deps, limit: 3, nearLimit: 2 })
+    expect(payload.approaches).toHaveLength(3)
   })
 
   it('refuses an answer for the wrong object and lists it as missing', async () => {

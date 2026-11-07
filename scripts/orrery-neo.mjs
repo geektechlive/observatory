@@ -1,5 +1,5 @@
-// The orrery's close-approach step for scripts/refresh-data.mjs (#92): this fortnight's
-// close approaches to Earth from JPL's Close Approach Data, each placed in 3D with
+// The orrery's close-approach step for scripts/refresh-data.mjs (#92): this month's
+// close approaches to Earth (±30 days since #136) from JPL's Close Approach Data, each placed in 3D with
 // Horizons vectors, plus JPL Scout's unconfirmed objects and ESA NEOCC's risk list and
 // upcoming approaches. Built here so the Pages Function only passes the finished body
 // through (10 ms CPU), as for the craft (orrery-bodies.mjs).
@@ -14,7 +14,8 @@ import {
   parseNeoccCloseApproaches,
   parseNeoccRiskList,
   scoutObjects,
-  selectApproaches,
+  selectApproachesAround,
+  splitApproachSpans,
   targetMatchesDesignation,
 } from '../src/lib/orrery/closeApproach.ts'
 import { BudgetExceeded, fetchSpan, jdFromMs, toSpan } from './orrery-bodies.mjs'
@@ -23,14 +24,22 @@ const CAD = 'https://ssd-api.jpl.nasa.gov/cad.api'
 const SCOUT = 'https://ssd-api.jpl.nasa.gov/scout.api'
 const NEOCC = 'https://neo.ssa.esa.int/PSDB-portlet/download'
 const DAY_MS = 86_400_000
-/** The CAD window, and the Horizons span, either side of now. */
-export const WINDOW_DAYS = 10
+/** The CAD window, and the Horizons span, either side of now (#136: was 10). */
+export const WINDOW_DAYS = 30
 /** Closest-approach distance cut-off, au. */
 const DIST_MAX_AU = '0.05'
-/** Objects placed with Horizons: each costs one request. */
-export const MAX_APPROACHES = 25
-/** Horizons step: 3 h. */
+/**
+ * Objects placed with Horizons: each costs one request (about 1.5 s with the pause), so
+ * 40 plus CAD, its PHA filter and Scout fit the step's 2 minutes. CAD lists about 200
+ * objects over ±30 days; up to 25 are kept for ±10 days of now, as before #136, and the
+ * rest of the month fills the other 15.
+ */
+export const MAX_APPROACHES = 40
+const NEAR_DAYS = 10
+const NEAR_APPROACHES = 25
+/** Horizons step: 3 h, kept whole within ±3 days of closest approach, daily elsewhere. */
 const STEP_DAYS = 0.125
+const SPLIT = { wideEvery: 8, closeDays: 3 }
 /** ESA's risk list runs to about 2,200 objects; the payload keeps the top by Palermo scale. */
 const RISK_LIST_TOP = 50
 /** Pause before each JPL request (the craft step's last one may have just ended). */
@@ -40,7 +49,7 @@ export const DEFAULT_BUDGET_MS = 2 * 60_000
 
 const ymd = (ms) => new Date(ms).toISOString().slice(0, 10)
 
-/** CAD within 0.05 au over now ±10 days, with full names; `pha` keeps only PHAs. */
+/** CAD within 0.05 au over now ±WINDOW_DAYS, with full names; `pha` keeps only PHAs. */
 export function cadUrl(now, pha) {
   const params = new URLSearchParams({
     'date-min': ymd(now - WINDOW_DAYS * DAY_MS),
@@ -79,6 +88,7 @@ export async function buildOrreryNeo({
   budgetMs = DEFAULT_BUDGET_MS,
   clock = Date.now,
   limit = MAX_APPROACHES,
+  nearLimit = NEAR_APPROACHES,
 }) {
   const began = clock()
   let asked = 0
@@ -119,7 +129,9 @@ export async function buildOrreryNeo({
   }
   let esaApproaches = null
   try {
-    esaApproaches = parseNeoccCloseApproaches(await fetchNeoccText(neoccUrl('esa_upcoming_close_app')))
+    esaApproaches = parseNeoccCloseApproaches(
+      await fetchNeoccText(neoccUrl('esa_upcoming_close_app')),
+    )
   } catch (err) {
     missing.push({ id: 'esa-close-approaches', reason: reasonOf(err) })
   }
@@ -129,9 +141,15 @@ export async function buildOrreryNeo({
   const stop = start + 2 * WINDOW_DAYS
   const horizonsAsk = (url) => jpl(fetchHorizonsText, url)
   const approaches = []
-  for (const row of selectApproaches(rows, pha, limit)) {
+  const picked = selectApproachesAround(rows, pha, jdFromMs(now), {
+    nearDays: NEAR_DAYS,
+    nearLimit,
+    limit,
+  })
+  for (const row of picked) {
     const id = `sb:${row.des}`
     let fine = null
+    let close = null
     let target = null
     try {
       const spec = {
@@ -141,7 +159,9 @@ export async function buildOrreryNeo({
       }
       const got = await fetchSpan(spec, start, stop, STEP_DAYS, horizonsAsk, now)
       if (!got.samples) throw new Error('no samples in the window')
-      fine = toSpan(got.samples, true)
+      const split = splitApproachSpans(got.samples, row.jd, SPLIT)
+      fine = toSpan(split.wide, true)
+      close = split.close ? toSpan(split.close, true) : null
       target = got.target
     } catch (err) {
       missing.push({ id, reason: reasonOf(err) })
@@ -167,6 +187,7 @@ export async function buildOrreryNeo({
       },
       target,
       fine,
+      close,
     })
   }
 

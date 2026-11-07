@@ -155,6 +155,75 @@ export function selectApproaches(
     .slice(0, limit)
 }
 
+export interface AroundOptions {
+  /** Days either side of now that count as "near now". */
+  nearDays: number
+  /** Objects reserved for the near-now ones, ranked as in selectApproaches. */
+  nearLimit: number
+  /** Objects in all. */
+  limit: number
+}
+
+/**
+ * Up to `limit` objects over a wide window (#136) without losing this week's: up to
+ * `nearLimit` from within `nearDays` of now, then the rest of the window fills the
+ * remainder, each part ranked as selectApproaches ranks. Over ±30 days CAD lists about
+ * 200 objects, so ranking the month alone would skip most of today's.
+ */
+export function selectApproachesAround(
+  rows: CadApproach[],
+  pha: Set<string>,
+  nowJd: number,
+  opts: AroundOptions,
+): SelectedApproach[] {
+  const ranked = selectApproaches(rows, pha, Infinity)
+  const near = ranked
+    .filter((r) => Math.abs(r.jd - nowJd) <= opts.nearDays)
+    .slice(0, opts.nearLimit)
+  const taken = new Set(near.map((r) => r.des))
+  const rest = ranked
+    .filter((r) => !taken.has(r.des))
+    .slice(0, Math.max(0, opts.limit - near.length))
+  for (const r of rest) taken.add(r.des)
+  return ranked.filter((r) => taken.has(r.des))
+}
+
+/** One Horizons vector row, as orrery-bodies.mjs parses it. */
+export interface VectorSample {
+  jd: number
+  x: number
+  y: number
+  z: number
+  vx: number
+  vy: number
+  vz: number
+}
+
+export interface SplitOptions {
+  /** Keep every n-th sample over the whole window. */
+  wideEvery: number
+  /** Keep every sample within this many days of closest approach. */
+  closeDays: number
+}
+
+/**
+ * One 3 h Horizons answer split into a coarse span over the whole window and a 3 h span
+ * around closest approach (#136). Re-interpolating the live 3 h samples showed why:
+ * away from closest approach a daily Hermite step stays at the 1.5 km rounding floor,
+ * but within a day or two of a pass inside a lunar distance, Earth's pull bends the path
+ * and a 12 h step is off by up to 2,000 km (2026 VL5 at 0.14 LD). Both spans keep
+ * velocities, so both are Hermite; `close` is null when the pass lies outside the window.
+ */
+export function splitApproachSpans(
+  samples: VectorSample[],
+  caJd: number,
+  opts: SplitOptions,
+): { wide: VectorSample[]; close: VectorSample[] | null } {
+  const wide = samples.filter((_, i) => i % opts.wideEvery === 0)
+  const close = samples.filter((s) => Math.abs(s.jd - caJd) <= opts.closeDays)
+  return { wide, close: close.length >= 2 ? close : null }
+}
+
 // ---------------------------------------------------------------- Horizons naming
 
 /** A numbered object: JPL writes its number alone ("524522"). */

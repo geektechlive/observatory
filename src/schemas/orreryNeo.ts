@@ -3,14 +3,15 @@ import { z } from 'zod'
 import { SampledSpanSchema } from './orreryBodies'
 
 /**
- * /api/orrery-neo (#92): this fortnight's close approaches to Earth, placed in 3D, plus
+ * /api/orrery-neo (#92): this month's close approaches to Earth, placed in 3D, plus
  * what JPL Scout and ESA NEOCC say. Built by scripts/orrery-neo.mjs in the refresh job
  * and served straight from KV, like /api/orrery-bodies.
  *
  * Each approach comes from JPL's Close Approach Data (miss distance with its 3-sigma
  * range) and carries Horizons vectors (heliocentric ecliptic J2000, au and au/day,
- * TDB) over ±10 days at 3 h, `fine` as in orrery-bodies: [x, y, z, vx, vy, vz] per
- * sample. `fine` is null when Horizons could not be asked or answered for the wrong
+ * TDB), `fine` as in orrery-bodies: [x, y, z, vx, vy, vz] per sample. Since #136 that
+ * is ±30 days at a daily step, plus `close` at 3 h around the pass; copies written
+ * before it hold ±10 days at 3 h in `fine` alone. `fine` is null when Horizons could not be asked or answered for the wrong
  * object; the approach is still listed, with the reason in `missing`.
  */
 export const CloseApproachSchema = z.object({
@@ -47,6 +48,11 @@ export const OrreryApproachSchema = z.object({
   /** Horizons' own "Target body name", checked against `des`. */
   target: z.string().nullable(),
   fine: SampledSpanSchema.nullable(),
+  /**
+   * 3 h samples within ±3 days of closest approach (#136), where Earth bends the path
+   * too fast for `fine`'s daily step; null in copies written before #136.
+   */
+  close: SampledSpanSchema.nullable().default(null),
 })
 
 export const ScoutObjectSchema = z.object({

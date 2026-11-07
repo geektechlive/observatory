@@ -10,7 +10,12 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { AsteroidLayer, type EarthFrameView } from '@/components/orrery/three/asteroidLayer'
-import { asteroidGeocentric, DEFAULT_NEO_FILTER, shortName } from '@/lib/orrery/asteroids'
+import {
+  approachPathTimes,
+  asteroidGeocentric,
+  DEFAULT_NEO_FILTER,
+  shortName,
+} from '@/lib/orrery/asteroids'
 import { earthFrameRadii } from '@/lib/orrery/earthFrame'
 import { place3d } from '@/lib/orrery/scale'
 import { AU_KM } from '@/lib/orrery/units'
@@ -92,6 +97,33 @@ describe('AsteroidLayer (#92)', () => {
     l.setSelected('sb:524522')
     l.place(jd, frame(1))
     expect(l.pathPoints()).toBe(161)
+  })
+
+  it('draws a daily-plus-3 h pass densely around closest approach (#136)', () => {
+    const z = neo.approaches.find((a) => a.id === 'sb:524522')
+    const fine = z?.fine
+    if (!z || !fine) throw new Error('fixture lacks Zoozve')
+    const n = fine.samples.length / 6
+    const take = (idx: number[]) => idx.flatMap((i) => fine.samples.slice(i * 6, i * 6 + 6))
+    const daily = Array.from({ length: Math.floor((n - 1) / 8) + 1 }, (_, k) => k * 8)
+    const ca = Math.round((z.closeApproach.jd - fine.start) / fine.step)
+    const near = Array.from({ length: 49 }, (_, k) => ca - 24 + k).filter((i) => i >= 0 && i < n)
+    const split = {
+      ...z,
+      fine: { start: fine.start, step: 1, samples: take(daily) },
+      close: {
+        start: fine.start + (near[0] ?? 0) * fine.step,
+        step: fine.step,
+        samples: take(near),
+      },
+    }
+    const l = new AsteroidLayer()
+    l.setApproaches([split])
+    l.setEarthTrack(earth)
+    l.setSelected('sb:524522')
+    l.place(jd, frame(1))
+    expect(l.pathPoints()).toBe(approachPathTimes(split, 200).length)
+    expect(l.pathPoints()).toBeGreaterThan(daily.length + 30)
   })
 })
 

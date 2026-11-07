@@ -1,8 +1,9 @@
 /**
- * A mocked /api/orrery-neo (#92): three close approaches moving in straight lines near
+ * A mocked /api/orrery-neo (#92): four close approaches moving in straight lines near
  * moonPayload.ts's Earth (the same line, sampled ±3 days around today at 3 h), so the
  * Earth frame can place them. One is hazardous with its closest approach within a day,
- * one is on ESA's risk list two and a half days out, one passed two days ago.
+ * one is on ESA's risk list two and a half days out, one passed two days ago, and one
+ * comes twelve days out (#136).
  */
 import type { Page } from '@playwright/test'
 
@@ -79,6 +80,11 @@ export function neoPayload() {
         riskListed: true,
       }),
       approach('2026 TC3', [0.002, -0.005, 0.001], [-0.0003, 0.0001, 0], -2, {
+        pha: false,
+        riskListed: false,
+      }),
+      // Twelve days out: only "Within 30 days" keeps it (#136).
+      approach('2026 TD4', [-0.004, -0.002, 0.0008], [0.0001, 0.0002, 0], 12, {
         pha: false,
         riskListed: false,
       }),

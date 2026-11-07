@@ -18,6 +18,8 @@ import {
   parseNeoccRiskList,
   scoutObjects,
   selectApproaches,
+  selectApproachesAround,
+  splitApproachSpans,
   targetMatchesDesignation,
 } from '@/lib/orrery/closeApproach'
 
@@ -80,6 +82,80 @@ describe('selectApproaches', () => {
     const picked = selectApproaches(twice, new Set(), 25)
     expect(picked.filter((r) => r.des === first.des)).toHaveLength(1)
     expect(picked.find((r) => r.des === first.des)?.distAu).toBe(first.distAu)
+  })
+})
+
+describe('selectApproachesAround (#136)', () => {
+  const rows = cadApproaches(JSON.parse(neo('cad.json')))
+  const ue2 = rows.find((r) => r.des === '2026 UE2')
+  if (!ue2) throw new Error('fixture lacks 2026 UE2')
+
+  it('keeps the near-now objects first, then fills from the rest of the window', () => {
+    // Pretend "now" is UE2's approach: only it is within half a day, though others are closer.
+    const picked = selectApproachesAround(rows, new Set(), ue2.jd, {
+      nearDays: 0.5,
+      nearLimit: 1,
+      limit: 3,
+    })
+    expect(picked).toHaveLength(3)
+    expect(picked.map((r) => r.des)).toContain('2026 UE2')
+    // The other two are the closest of the rest, hazardous ones first as ever.
+    const rest = selectApproaches(
+      rows.filter((r) => r.des !== '2026 UE2'),
+      new Set(),
+      2,
+    ).map((r) => r.des)
+    expect(picked.map((r) => r.des).filter((d) => d !== '2026 UE2')).toEqual(rest)
+  })
+
+  it('ranks the result the usual way: hazardous first, then the closest', () => {
+    const picked = selectApproachesAround(rows, new Set(['524522']), ue2.jd, {
+      nearDays: 30,
+      nearLimit: 25,
+      limit: 40,
+    })
+    expect(picked.map((r) => r.des)).toEqual(
+      selectApproaches(rows, new Set(['524522']), 40).map((r) => r.des),
+    )
+  })
+})
+
+describe('splitApproachSpans (#136)', () => {
+  const step = 0.125
+  const start = 2461320.5
+  const samples = Array.from({ length: 481 }, (_, i) => ({
+    jd: start + i * step,
+    x: i,
+    y: 0,
+    z: 0,
+    vx: 1,
+    vy: 0,
+    vz: 0,
+  }))
+
+  it('keeps every eighth 3 h sample (daily) over the window, ends included', () => {
+    const { wide } = splitApproachSpans(samples, start + 30, { wideEvery: 8, closeDays: 3 })
+    expect(wide).toHaveLength(61)
+    expect(wide[0]?.jd).toBe(start)
+    expect(wide.at(-1)?.jd).toBe(start + 60)
+    expect((wide[1]?.jd ?? 0) - (wide[0]?.jd ?? 0)).toBe(1)
+  })
+
+  it('keeps the 3 h samples within ±3 days of closest approach', () => {
+    const ca = start + 30.3
+    const { close } = splitApproachSpans(samples, ca, { wideEvery: 8, closeDays: 3 })
+    expect(close).not.toBeNull()
+    if (!close) return
+    expect(close[0]?.jd).toBeGreaterThanOrEqual(ca - 3)
+    expect(close[0]?.jd).toBeLessThan(ca - 3 + step)
+    expect(close.at(-1)?.jd).toBeLessThanOrEqual(ca + 3)
+    expect(close.length).toBe(48)
+  })
+
+  it('clips the close span at the window edge, and drops it when nothing is left', () => {
+    const edge = splitApproachSpans(samples, start + 59.5, { wideEvery: 8, closeDays: 3 })
+    expect(edge.close?.at(-1)?.jd).toBe(start + 60)
+    expect(splitApproachSpans(samples, start + 90, { wideEvery: 8, closeDays: 3 }).close).toBeNull()
   })
 })
 

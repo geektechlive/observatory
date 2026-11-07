@@ -7,7 +7,7 @@ import { Switch } from './Switch'
 const WINDOWS: { id: NeoWindow; label: string }[] = [
   { id: 'day', label: 'Within a day' },
   { id: 'week', label: 'Within a week' },
-  { id: 'all', label: 'All' },
+  { id: 'month', label: 'Within 30 days' },
 ]
 
 interface NeoControlsProps {
@@ -54,7 +54,7 @@ export function NeoControls({
           Near-Earth objects
         </h2>
         <p className={styles.switchHint ?? ''}>
-          Asteroids passing within 0.05 au (19 lunar distances) of Earth. The data covers ±10 days
+          Asteroids passing within 0.05 au (19 lunar distances) of Earth. The data covers ±30 days
           of today; closest approach is counted from the date shown.
         </p>
         <div className={styles.chipRow ?? ''} role="radiogroup" aria-label="Closest approach">

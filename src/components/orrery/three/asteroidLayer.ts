@@ -20,6 +20,7 @@ import {
 
 import {
   approachPasses,
+  approachPathTimes,
   asteroidGeocentric,
   DEFAULT_NEO_FILTER,
   type NeoFilter,
@@ -159,14 +160,13 @@ export class AsteroidLayer {
   /** The selected object's sampled pass, through the frame as it is now. */
   private placePath(frame: EarthFrameView): void {
     const entry = this.selected ? this.entries.get(this.selected) : undefined
-    const span = entry?.approach.fine
     const attr = this.path.geometry.getAttribute('position') as Float32BufferAttribute
     let n = 0
-    if (entry && span) {
-      const count = Math.min(PATH_POINTS, Math.floor(span.samples.length / 6))
+    if (entry) {
       const p = new Vector3()
-      for (let i = 0; i < count; i += 1) {
-        if (!this.placeAt(entry.approach, span.start + i * span.step, frame, p)) continue
+      // Dense around closest approach, daily elsewhere (#136).
+      for (const t of approachPathTimes(entry.approach, PATH_POINTS)) {
+        if (!this.placeAt(entry.approach, t, frame, p)) continue
         attr.setXYZ(n, p.x, p.y, p.z)
         n += 1
       }

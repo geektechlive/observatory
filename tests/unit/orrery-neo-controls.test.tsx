@@ -60,16 +60,23 @@ const hintOf = (el: HTMLElement) =>
   document.getElementById(el.getAttribute('aria-describedby') ?? '')?.textContent ?? ''
 
 describe('NeoControls (#92)', () => {
-  it('windows the approaches around the date shown, and says the data covers ±10 days', () => {
+  it('windows the approaches around the date shown, and says the data covers ±30 days (#136)', () => {
     const { onFilter } = renderNeo()
     const group = screen.getByRole('radiogroup', { name: /closest approach/i })
-    const day = within(group).getByRole('radio', { name: /within a day/i })
-    expect(within(group).getByRole('radio', { name: /all/i }).getAttribute('aria-checked')).toBe(
-      'true',
-    )
-    fireEvent.click(day)
+    const radios = within(group).getAllByRole('radio')
+    expect(radios.map((r) => r.textContent)).toEqual([
+      'Within a day',
+      'Within a week',
+      'Within 30 days',
+    ])
+    expect(
+      within(group)
+        .getByRole('radio', { name: /within 30 days/i })
+        .getAttribute('aria-checked'),
+    ).toBe('true')
+    fireEvent.click(within(group).getByRole('radio', { name: /within a day/i }))
     expect(onFilter).toHaveBeenCalledWith({ ...DEFAULT_NEO_FILTER, window: 'day' })
-    expect(screen.getByText(/±10 days/)).toBeTruthy()
+    expect(screen.getByText(/±30 days/)).toBeTruthy()
   })
 
   it('explains hazardous and risk-listed in plain words', () => {

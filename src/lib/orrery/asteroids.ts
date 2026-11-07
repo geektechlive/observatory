@@ -1,11 +1,12 @@
 /**
- * This fortnight's close approaches in the orrery (#92; spec Part 12). Positions are
- * Hermite on each object's Horizons samples (ephemeris.ts) and never extrapolated.
+ * This month's close approaches in the orrery (#92; spec Part 12; ±30 days since #136).
+ * Positions are Hermite on each object's Horizons samples (ephemeris.ts), the 3 h span
+ * around the pass first, then the daily one, and never extrapolated.
  * Anything relative to Earth uses Horizons' own Earth from /api/orrery-bodies: the
  * Kepler model is the Earth–Moon barycentre, about 4,700 km off, which is visible at
  * these distances, so without a Horizons Earth an approach is not placed at all.
  */
-import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 import type {
   NeoccCloseApproach,
   NeoccRiskEntry,
@@ -40,9 +41,35 @@ export function shortName(full: string): string {
   return bare?.[1] ?? name
 }
 
-/** Heliocentric state from the object's samples, or null outside them. */
+/**
+ * Heliocentric state from the object's samples, or null outside them: the 3 h span
+ * around the pass where it covers the date (#136), else the daily one.
+ */
 export function asteroidState(a: OrreryApproach, jd: number) {
+  const near = a.close ? stateAt({ fine: a.close, coarse: null }, jd) : null
+  if (near) return near
   return a.fine ? stateAt({ fine: a.fine, coarse: null }, jd) : null
+}
+
+const spanTimes = (s: SampledSpan) =>
+  Array.from({ length: s.samples.length / 6 }, (_, i) => s.start + i * s.step)
+
+/**
+ * When to place the drawn pass (#136): every 3 h sample around closest approach, where
+ * the object moves fastest across the sky, and the daily span spread over what is left
+ * of `max` points. Sorted, never outside the samples.
+ */
+export function approachPathTimes(a: OrreryApproach, max: number): number[] {
+  const close = a.close ? spanTimes(a.close).slice(0, max) : []
+  if (!a.fine) return close
+  const lo = close[0] ?? Infinity
+  const hi = close.at(-1) ?? -Infinity
+  const wide = spanTimes(a.fine).filter((t) => t < lo || t > hi)
+  const room = max - close.length
+  // Thin the daily span evenly if it does not fit in the room left.
+  const every = room > 0 ? Math.ceil(wide.length / room) : Infinity
+  const kept = wide.filter((_, i) => i % every === 0)
+  return [...kept, ...close].sort((x, y) => x - y)
 }
 
 /** Where the object is relative to Horizons' Earth, or null with no data for the date. */
@@ -80,7 +107,8 @@ export function closestApproachFromSamples(
   a: OrreryApproach,
   earthTrack: OrreryTrack | null,
 ): { jd: number; distAu: number } | null {
-  const span = a.fine
+  // The 3 h span is built around CAD's closest approach (#136), so the search starts there.
+  const span = a.close ?? a.fine
   if (!span) return null
   const n = Math.floor(span.samples.length / 6)
   const dist = (jd: number) => asteroidGeocentric(a, earthTrack, jd)?.distAu ?? Infinity
@@ -117,8 +145,12 @@ export function diameterRangeM(h: number): [number, number] {
   return [d(0.25), d(0.05)]
 }
 
-/** The closest-approach window around the date shown (data covers about ±10 days). */
-export type NeoWindow = 'day' | 'week' | 'all'
+/**
+ * The closest-approach window around the date shown. The data covers ±30 days of the
+ * refresh (#136), so "month" is everything at today's date; scrubbed away from today it
+ * still means what it says.
+ */
+export type NeoWindow = 'day' | 'week' | 'month'
 
 export interface NeoFilter {
   window: NeoWindow
@@ -127,12 +159,12 @@ export interface NeoFilter {
 }
 
 export const DEFAULT_NEO_FILTER: NeoFilter = {
-  window: 'all',
+  window: 'month',
   hazardousOnly: false,
   riskListedOnly: false,
 }
 
-const WINDOW_DAYS: Record<NeoWindow, number> = { day: 1, week: 7, all: Infinity }
+const WINDOW_DAYS: Record<NeoWindow, number> = { day: 1, week: 7, month: 30 }
 
 /** Whether an approach passes the filter at a Julian date. */
 export function approachPasses(a: OrreryApproach, f: NeoFilter, jd: number): boolean {

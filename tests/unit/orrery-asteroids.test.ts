@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   approachPasses,
+  approachPathTimes,
   asteroidGeocentric,
   closestApproachFromSamples,
   DEFAULT_NEO_FILTER,
@@ -75,6 +76,56 @@ describe('asteroidGeocentric (#92)', () => {
   })
 })
 
+describe('a daily span plus 3 h around the pass (#136)', () => {
+  const base = byId('sb:2026 VY2')
+  const fine = base.fine
+  if (!fine) throw new Error('fixture lacks samples')
+  // The fixture's 3 h samples, split the way the refresh job now stores them.
+  const n = fine.samples.length / 6
+  const pick = (from: number, to: number, every: number) => {
+    const out: number[] = []
+    for (let i = from; i <= to; i += every) out.push(...fine.samples.slice(i * 6, i * 6 + 6))
+    return out
+  }
+  const caIndex = Math.round((base.closeApproach.jd - fine.start) / fine.step)
+  const lo = Math.max(0, caIndex - 24)
+  const hi = Math.min(n - 1, caIndex + 24)
+  const split = OrreryNeoSchema.parse({
+    ...neo,
+    approaches: [
+      {
+        ...base,
+        fine: { start: fine.start, step: fine.step * 8, samples: pick(0, n - 1, 8) },
+        close: { start: fine.start + lo * fine.step, step: fine.step, samples: pick(lo, hi, 1) },
+      },
+    ],
+  }).approaches[0]
+  if (!split) throw new Error('no split approach')
+
+  it('reads an old payload, with no close span, as close: null', () => {
+    expect(base.close).toBeNull()
+  })
+
+  it('places the object from the 3 h span near the pass: CAD still found within 30 min', () => {
+    const ca = closestApproachFromSamples(split, earth)
+    expect(ca).not.toBeNull()
+    expect(Math.abs((ca?.jd ?? 0) - base.closeApproach.jd) * 24 * 60).toBeLessThan(30)
+    // The daily span alone would be off by hundreds of km here; the 3 h one matches the original.
+    const mid = base.closeApproach.jd + 0.06
+    const a = asteroidGeocentric(split, earth, mid)
+    const b = asteroidGeocentric(base, earth, mid)
+    expect(Math.abs((a?.distAu ?? 0) - (b?.distAu ?? 1)) * 149_597_870.7).toBeLessThan(5)
+  })
+
+  it('samples the drawn pass densely around closest approach, within the path size', () => {
+    const times = approachPathTimes(split, 200)
+    expect(times.length).toBeLessThanOrEqual(200)
+    const near = times.filter((t) => Math.abs(t - base.closeApproach.jd) < 1)
+    expect(near.length).toBeGreaterThanOrEqual(15)
+    expect([...times].sort((x, y) => x - y)).toEqual(times)
+  })
+})
+
 describe('approachPasses (#92)', () => {
   const zoozve = byId('sb:524522')
   const vy2 = byId('sb:2026 VY2')
@@ -91,6 +142,13 @@ describe('approachPasses (#92)', () => {
     expect(approachPasses(zoozve, day, at + 1.1)).toBe(false)
     expect(approachPasses(zoozve, week, at - 6.9)).toBe(true)
     expect(approachPasses(zoozve, week, at - 7.1)).toBe(false)
+  })
+
+  it('has a 30-day window, the default, matching the data’s ±30 days (#136)', () => {
+    const month = { ...DEFAULT_NEO_FILTER, window: 'month' as const }
+    expect(DEFAULT_NEO_FILTER.window).toBe('month')
+    expect(approachPasses(zoozve, month, at + 29.9)).toBe(true)
+    expect(approachPasses(zoozve, month, at + 30.1)).toBe(false)
   })
 
   it('filters hazardous and risk-listed objects', () => {
