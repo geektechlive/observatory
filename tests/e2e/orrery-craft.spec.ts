@@ -114,6 +114,8 @@ test.describe('Spacecraft in the orrery (#93)', () => {
 
   test('a Voyager beyond the Inner view sits on the rim with its distance', async ({ page }) => {
     await openOrrery(page)
+    // The orrery opens on Heliosphere (#123); the rim is an Inner-view thing.
+    await page.getByRole('button', { name: 'Inner', exact: true }).click()
     const v1 = craftLabel(page, 'Voyager 1')
     await expect(v1).toBeVisible()
     await expect(v1).toHaveAttribute('data-rim', /top|right|bottom|left/)

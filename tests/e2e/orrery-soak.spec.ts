@@ -93,7 +93,10 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
     await page.getByRole('button', { name: 'Close', exact: true }).click()
   }
 
-  await cycle(0)
+  // Warm up every planet the cycles visit before the baseline: each one's mapped sphere
+  // and moon objects are built on its first visit and kept for reuse (#105, #107). With
+  // only Mars warmed, those one-time builds read as growth (#124).
+  for (let i = 0; i < 4; i += 1) await cycle(i)
   await page.waitForTimeout(1500)
   const base = {
     listeners: await metric('JSEventListeners'),
@@ -102,7 +105,7 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
     programs: await stat(page, 'programs'),
   }
 
-  for (let i = 1; i <= 20; i += 1) {
+  for (let i = 4; i < 24; i += 1) {
     await cycle(i)
     expect(await rafPending(page)).toBeLessThanOrEqual(3)
   }

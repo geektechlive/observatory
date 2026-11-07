@@ -18,6 +18,16 @@ async function openOrrery(page: Page) {
   await expect(stage(page)).toHaveAttribute('data-orrery-mode', 'webgl', { timeout: 20_000 })
 }
 
+/** Pick a preset and wait for the renderer to report it (it opens on Heliosphere, #123). */
+async function choosePreset(page: Page, name: string, id: string) {
+  const controls = page.getByRole('button', { name: 'Controls', exact: true })
+  if (await controls.isVisible()) await controls.click()
+  await page.getByRole('button', { name, exact: true }).click()
+  await expect
+    .poll(() => page.locator('canvas[data-orrery-webgl]').getAttribute('data-orrery-focus'))
+    .toBe(id)
+}
+
 /** Where a body's label sits now, or null when it is hidden. */
 async function labelAt(page: Page, name: string) {
   return page.evaluate((n) => {
@@ -42,15 +52,32 @@ for (const viewport of [
   test.describe(`Orrery presets at ${String(viewport.width)} px (#91)`, () => {
     test.use({ viewport })
 
-    test('Inner shows Mercury to Mars and no outer planet', async ({ page }) => {
+    test('opens on the Heliosphere view (#123)', async ({ page }) => {
       await openOrrery(page)
       await expect
-        .poll(() => onScreen(page))
-        .toEqual(expect.arrayContaining(['Sun', 'Mercury', 'Venus', 'Earth', 'Mars']))
-      const seen = await onScreen(page)
-      for (const outer of ['Jupiter', 'Saturn', 'Uranus', 'Neptune']) {
-        expect(seen).not.toContain(outer)
-      }
+        .poll(() => page.locator('canvas[data-orrery-webgl]').getAttribute('data-orrery-focus'))
+        .toBe('heliosphere')
+      if (viewport.width < 900)
+        await page.getByRole('button', { name: 'Controls', exact: true }).click()
+      await expect(page.getByRole('button', { name: 'Heliosphere', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      await expect.poll(() => onScreen(page)).toEqual(expect.arrayContaining(['Neptune']))
+    })
+
+    test('Inner shows Mercury to Mars and no outer planet', async ({ page }) => {
+      await openOrrery(page)
+      await choosePreset(page, 'Inner', 'inner')
+      // The camera flies there, so wait for the outer planets to leave the frame.
+      await expect
+        .poll(async () =>
+          (await onScreen(page)).filter((b) => /Jupiter|Saturn|Uranus|Neptune/.test(b)),
+        )
+        .toEqual([])
+      expect(await onScreen(page)).toEqual(
+        expect.arrayContaining(['Sun', 'Mercury', 'Venus', 'Earth', 'Mars']),
+      )
     })
 
     test('Outer and Heliosphere show Jupiter to Neptune', async ({ page }) => {
@@ -131,6 +158,8 @@ test.describe('Orrery (#91)', () => {
 
   test('moving the clock moves the planets', async ({ page }) => {
     await openOrrery(page)
+    // Mercury's label is hidden among the inner planets at the opening Heliosphere view.
+    await choosePreset(page, 'Inner', 'inner')
     await page.getByRole('button', { name: 'Pause' }).click()
     await expect.poll(() => labelAt(page, 'Mercury')).not.toBeNull()
     const before = await labelAt(page, 'Mercury')

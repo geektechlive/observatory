@@ -73,9 +73,27 @@ test.describe('Orrery imagery (#105)', () => {
       if (req.url().includes('/textures/planets/')) maps.push(new URL(req.url()).pathname)
     })
     await openOrrery(page)
-    // The Inner view draws every planet as a dot or out of view: no map is fetched.
     await expect.poll(() => canvas(page).getAttribute('data-orrery-draws')).not.toBeNull()
-    expect(maps).toEqual([])
+    // Maps load only for planets drawn big enough to show them. The opening Heliosphere
+    // view (#123) skins the giants but draws Mars as a dot, so its map waits.
+    // A body joins data-orrery-skins once its map has loaded, a moment after the request.
+    for (const path of [...maps]) {
+      const body = /planets\/([a-z]+)/.exec(path)?.[1] ?? ''
+      await expect
+        .poll(
+          async () => ((await canvas(page).getAttribute('data-orrery-skins')) ?? '').toLowerCase(),
+          {
+            message: `${path} fetched for a body that never shows its map`,
+          },
+        )
+        .toContain(body)
+    }
+    expect(maps).not.toContain('/textures/planets/mars.webp')
+    await inspect(page, 'Mars')
+    await expect
+      .poll(async () => (await canvas(page).getAttribute('data-orrery-skins')) ?? '')
+      .toContain('Mars')
+    expect(maps).toContain('/textures/planets/mars.webp')
     await inspect(page, 'Saturn')
     await expect
       .poll(async () => (await canvas(page).getAttribute('data-orrery-skins')) ?? '')

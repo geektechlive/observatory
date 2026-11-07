@@ -21,6 +21,7 @@ import consoleStyles from '../consoles/console.module.css'
 import { buildCatalog, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
+import { DEFAULT_PRESET } from './defaultView'
 import { Inspector } from './Inspector'
 import { labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
 import styles from './orrery.module.css'
@@ -154,7 +155,7 @@ export function OrreryPage() {
   const [failed, setFailed] = useState(lost)
   const [selected, setSelected] = useState<SceneKey | null>(null)
   const [scale, setScale] = useState<ScaleMode>('exaggerated')
-  const [preset, setPreset] = useState<FocusPreset | null>('inner')
+  const [preset, setPreset] = useState<FocusPreset | null>(DEFAULT_PRESET)
   const [visibility, setVisibility] = useState<Visibility>({
     planets: true,
     orbits: true,

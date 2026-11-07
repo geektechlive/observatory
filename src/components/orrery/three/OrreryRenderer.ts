@@ -43,6 +43,7 @@ import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
 import type { CraftFilter } from '../craftFilter'
+import { DEFAULT_PRESET } from '../defaultView'
 import { BodySkins } from './bodySkins'
 import { CRAFT_MIN_PX, CraftLayer, craftRadius } from './craftLayer'
 import { type FocusPreset, FOV, frameView } from './framing'
@@ -240,7 +241,7 @@ export class OrreryRenderer {
   private readonly onContextLost: () => void
   private readonly clock: ClockReader
   private readonly scratch = new Vector3()
-  private preset: FocusPreset | null = 'inner'
+  private preset: FocusPreset | null = DEFAULT_PRESET
   /** The view is still exactly a preset's (the user has not turned or zoomed): refit on resize. */
   private presetPristine = true
   /** Px of the stage covered by the inspector, so the focus sits in what is left (#91). */
@@ -279,7 +280,7 @@ export class OrreryRenderer {
     this.controls.addEventListener('start', this.onUserCamera)
 
     this.buildScene()
-    this.applyPreset('inner', true)
+    this.applyPreset(DEFAULT_PRESET, true)
     this.canvas.addEventListener('webglcontextlost', this.handleContextLost)
     this.canvas.dataset['orreryScale'] = this.mode
   }
@@ -608,7 +609,7 @@ export class OrreryRenderer {
     this.craft.rebuildTrajectory()
     this.updateBodies(true)
     if (this.focusBody) this.focusOn(this.focusBody, true)
-    else this.applyPreset(this.preset ?? 'inner', true)
+    else this.applyPreset(this.preset ?? DEFAULT_PRESET, true)
   }
 
   setVisibility(v: Visibility): void {
