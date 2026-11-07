@@ -228,3 +228,78 @@ export function framePreset(
   }
   return placeCamera(camera, elevationDeg, far).position.clone()
 }
+
+/**
+ * A focused planet is seen at no more than this phase angle (Sun-planet-camera), so it
+ * shows its lit face. Jupiter from Earth never passes about 12°; 35° leaves the
+ * terminator in view for shape (#116).
+ */
+export const MAX_FOCUS_PHASE_DEG = 35
+
+/** The focus camera's distance from the planet, and the Sun's drawn radius with corona. */
+export interface SunClearance {
+  readonly distance: number
+  readonly sunClearance: number
+}
+
+/** Phase angles tried, from the limit toward full night, when the Sun is in the way. */
+const PHASE_STEP_DEG = 2.5
+
+/**
+ * The camera direction (from the planet, unit) for focusing a planet (#116). Focusing
+ * used to keep any old direction, and Jupiter drew from its night side at half its map's
+ * brightness. Now:
+ * - a direction already within MAX_FOCUS_PHASE_DEG of the Sun is kept, so the camera
+ *   does not move needlessly;
+ * - else the camera turns toward the Sun, keeping the side it came from, to the smallest
+ *   phase angle (from the limit up) at which, given `clear`, the Sun's drawn corona does
+ *   not sit behind or in front of the planet. Near Mercury the focus distance is longer
+ *   than Mercury's distance from the Sun, so the full turn carried the camera past the
+ *   Sun and its live image filled the stage (seen on a real GPU).
+ * Without a clear phase it keeps the current direction.
+ */
+export function sunlitFocusDirection(
+  target: Vector3,
+  sun: Vector3,
+  current: Vector3,
+  clear?: SunClearance,
+): Vector3 {
+  const toSun = sun.clone().sub(target)
+  if (toSun.lengthSq() === 0) return current.clone().normalize()
+  toSun.normalize()
+  const dir = current.clone().normalize()
+  const limit = (MAX_FOCUS_PHASE_DEG * Math.PI) / 180
+  const sunFree = (d: Vector3) => !clear || sunClearOfTarget(target, sun, d, clear)
+  if (dir.angleTo(toSun) <= limit && sunFree(dir)) return dir
+  const across = acrossSunLine(dir, toSun)
+  for (let deg = MAX_FOCUS_PHASE_DEG; deg <= 180; deg += PHASE_STEP_DEG) {
+    const phase = (deg * Math.PI) / 180
+    const d = toSun.clone().multiplyScalar(Math.cos(phase)).addScaledVector(across, Math.sin(phase))
+    if (sunFree(d)) return d
+  }
+  return dir
+}
+
+/**
+ * Whether, from the camera at `target + d * distance`, the Sun's drawn corona stays off
+ * the planet: the camera is outside it, and the angle between Sun and planet exceeds the
+ * corona's angular radius.
+ */
+function sunClearOfTarget(target: Vector3, sun: Vector3, d: Vector3, clear: SunClearance): boolean {
+  const camera = target.clone().addScaledVector(d, clear.distance)
+  const toSun = sun.clone().sub(camera)
+  const range = toSun.length()
+  if (range <= clear.sunClearance) return false
+  const coronaAngle = Math.asin(clear.sunClearance / range)
+  return toSun.angleTo(target.clone().sub(camera)) > coronaAngle
+}
+
+/** The unit direction across the Sun line on the camera's side (+y when directly behind). */
+function acrossSunLine(dir: Vector3, toSun: Vector3): Vector3 {
+  const across = dir.clone().addScaledVector(toSun, -dir.dot(toSun))
+  if (across.lengthSq() < 1e-12) {
+    across.set(0, 1, 0).addScaledVector(toSun, -toSun.y)
+    if (across.lengthSq() < 1e-12) across.set(1, 0, 0).addScaledVector(toSun, -toSun.x)
+  }
+  return across.normalize()
+}
