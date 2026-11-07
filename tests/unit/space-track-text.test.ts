@@ -81,7 +81,7 @@ describe('catalogue words', () => {
     expect(rcsText('MEDIUM')).toBe('Medium on radar (0.1 to 1 m)')
     expect(rcsText('LARGE')).toBe('Large on radar (over 1 m)')
     expect(rcsText('')).toBeNull()
-    expect(ownerText('CIS')).toBe('Russia (CIS, the former USSR) (CIS)')
+    expect(ownerText('CIS')).toBe('Russia and the former USSR (CIS)')
     expect(ownerText('ZZZ')).toBe('ZZZ')
   })
 

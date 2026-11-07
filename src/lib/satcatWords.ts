@@ -28,7 +28,7 @@ const TYPES: Readonly<Record<string, string>> = {
 /** SATCAT owner codes for the commonest owners; the rest show as Space-Track writes them. */
 const OWNERS: Readonly<Record<string, string>> = {
   US: 'United States',
-  CIS: 'Russia (CIS, the former USSR)',
+  CIS: 'Russia and the former USSR',
   PRC: 'China',
   ISS: 'International Space Station partners',
   JPN: 'Japan',
