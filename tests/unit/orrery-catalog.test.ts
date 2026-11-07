@@ -154,7 +154,27 @@ describe('buildCatalog', () => {
     expect(scout?.note).toMatch(/no position/i)
     expect(items.find((i) => i.key === 'L1')).toMatchObject({ kind: 'marker', available: true })
     // Scout's objects never had a position: they are not "hidden for want of data".
-    expect(noDataNotice(items)).toMatch(/1 close approach/)
+    expect(noDataNotice(items)).toBe(
+      'SOHO has no data for this date and is hidden. Positions are never extrapolated.',
+    )
+  })
+
+  // #149: 2026 VO5 was in CAD before Horizons knew it, so it has no samples at all.
+  // That isn't "no data for this date": the stage said so on every view.
+  it('says a never-placed approach has no position yet, and keeps it off the stage notice', () => {
+    const span = { start: JD - 1, step: 1, samples: new Array(3 * 6).fill(0.5) }
+    const placed = { id: 'sb:2026 VY2', name: '(2026 VY2)', fine: span }
+    const never = { id: 'sb:2026 VO5', name: '(2026 VO5)', fine: null }
+    const items = buildCatalog([], JD, [], { approaches: [placed, never], scout: [] })
+    const vo5 = items.find((i) => i.key === 'sb:2026 VO5')
+    expect(vo5).toMatchObject({ kind: 'asteroid', available: false })
+    expect(vo5?.note).toMatch(/no position from JPL Horizons yet/i)
+    expect(noDataNotice(items)).toBeNull()
+    // An approach whose samples miss the date is still hidden for want of data.
+    const later = buildCatalog([], JD + 30, [], { approaches: [placed, never], scout: [] })
+    expect(noDataNotice(later)).toBe(
+      '2026 VY2 has no data for this date and is hidden. Positions are never extrapolated.',
+    )
   })
 
   it('always has the planets, even with no payload', () => {

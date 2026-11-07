@@ -48,10 +48,14 @@ const GROUP_LABEL: Record<OrreryTrack['group'], string> = {
 /**
  * The stage's line for craft and moons hidden because no sample covers the date (#114:
  * at a year a second they leave their data spans within seconds). Null when none are.
+ * An item with a `note` never had a position for any date, so it isn't counted (#149).
  */
 export function noDataNotice(items: readonly CatalogItem[]): string | null {
   const missing = items.filter(
-    (i) => !i.available && (i.kind === 'craft' || i.kind === 'moon' || i.kind === 'asteroid'),
+    (i) =>
+      !i.available &&
+      i.note === undefined &&
+      (i.kind === 'craft' || i.kind === 'moon' || i.kind === 'asteroid'),
   )
   const tail = 'Positions are never extrapolated.'
   const only = missing[0]
@@ -128,13 +132,18 @@ export function buildCatalog(
   if (!near) return items
   items.push({ key: L1_KEY, label: 'L1', kind: 'marker', group: 'Space weather', available: true })
   for (const a of near.approaches) {
-    items.push({
+    const base = {
       key: a.id,
       label: shortName(a.name),
       kind: 'asteroid',
       group: 'Close approaches',
-      available: a.fine !== null && stateAt({ fine: a.fine, coarse: null }, jd) !== null,
-    })
+    } as const
+    // In CAD before Horizons knows it (#149: 2026 VO5): no samples for any date.
+    if (a.fine === null) {
+      items.push({ ...base, available: false, note: 'no position from JPL Horizons yet' })
+      continue
+    }
+    items.push({ ...base, available: stateAt({ fine: a.fine, coarse: null }, jd) !== null })
   }
   for (const name of near.scout) {
     items.push({
