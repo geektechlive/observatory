@@ -1,5 +1,6 @@
 // The orrery's Horizons step for scripts/refresh-data.mjs (#93): spacecraft, Earth and
-// the Moon as heliocentric ecliptic J2000 state vectors, sampled here so the Pages
+// the Moon as heliocentric ecliptic J2000 state vectors, plus the major moons relative
+// to their planets (#107, src/lib/orrery/moons.ts), sampled here so the Pages
 // Function only passes the finished body through (10 ms CPU; and Horizons refuses
 // overlapping requests, #88, so it must never be on the request path).
 //
@@ -19,6 +20,7 @@ import {
   CRAFT,
   FINE_WINDOW_DAYS,
 } from '../src/lib/orrery/craft.ts'
+import { MOON_WINDOW_DAYS, MOONS, moonStepDays } from '../src/lib/orrery/moons.ts'
 
 const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 const DAY_MS = 86_400_000
@@ -45,13 +47,16 @@ export function stepSize(days) {
   return days < 1 ? `${String(Math.round(days * 24))} h` : `${String(days)} d`
 }
 
-/** A VECTORS request: heliocentric (500@10), ecliptic J2000, au and au/day, CSV. */
-export function horizonsUrl(command, startJd, stopJd, stepDays) {
+/**
+ * A VECTORS request: ecliptic J2000, au and au/day, CSV. Centred on the Sun (500@10)
+ * unless `center` names a body: a moon is asked relative to its planet (#107).
+ */
+export function horizonsUrl(command, startJd, stopJd, stepDays, center = '10') {
   const params = new URLSearchParams({
     format: 'json',
     COMMAND: `'${command}'`,
     EPHEM_TYPE: 'VECTORS',
-    CENTER: "'500@10'",
+    CENTER: `'500@${center}'`,
     REF_PLANE: 'ECLIPTIC',
     REF_SYSTEM: 'ICRF',
     OUT_UNITS: 'AU-D',
@@ -74,7 +79,7 @@ async function fetchSpan(spec, startJd, stopJd, step, ask, now) {
   const learnt = { availableFrom: null, availableTo: null, observedUntil: null, target: null }
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     if (stop < start) return { samples: null, ...learnt }
-    const text = await ask(horizonsUrl(spec.naifId, start, stop, step))
+    const text = await ask(horizonsUrl(spec.naifId, start, stop, step, spec.center))
     // The tracking note sits in the header of every answer, refusals included.
     learnt.observedUntil ??= parseObservedUntil(text, now)
     const parsed = parseHorizonsVectors(text)
@@ -191,6 +196,35 @@ export async function buildOrreryBodies({
     }
   }
 
+  // The major moons (#107): a fine span each, relative to their planet, stepped so even
+  // Io gets 14 samples an orbit. They go in `moons`, apart from the heliocentric bodies.
+  const moons = []
+  const moonStart = jdFromMs(Math.floor((now - MOON_WINDOW_DAYS * DAY_MS) / DAY_MS) * DAY_MS)
+  const moonStop = moonStart + 2 * MOON_WINDOW_DAYS
+  for (const moon of MOONS) {
+    if (only && !only.includes(moon.naifId)) continue
+    const id = `naif:${moon.naifId}`
+    try {
+      const spec = { naifId: moon.naifId, center: moon.parent.naifId }
+      const got = await fetchSpan(spec, moonStart, moonStop, moonStepDays(moon.periodDays), ask, now)
+      if (!got.samples) throw new Error('no samples in the moon window')
+      moons.push({
+        id,
+        naifId: moon.naifId,
+        name: moon.name,
+        parent: { naifId: moon.parent.naifId, name: moon.parent.name },
+        center: `500@${moon.parent.naifId}`,
+        target: got.target,
+        periodDays: moon.periodDays,
+        semiMajorAxisKm: moon.semiMajorAxisKm,
+        fine: toSpan(got.samples, true),
+      })
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
+      missing.push({ id, reason })
+    }
+  }
+
   const coarseFetchedAt = reuseCoarse ? previous.coarseFetchedAt : new Date(now).toISOString()
   return {
     payload: {
@@ -203,6 +237,7 @@ export async function buildOrreryBodies({
       sourceType: 'ephemeris',
       provider: 'jpl-horizons',
       bodies,
+      moons,
       missing,
     },
     requests: asked,

@@ -98,6 +98,95 @@ describe('stepSize and horizonsUrl', () => {
     expect(p.get('START_TIME')).toBe("'JD2461349.5'")
     expect(p.get('STEP_SIZE')).toBe("'1 d'")
   })
+
+  it('asks for planet-centred vectors when given a centre (moons, #107)', () => {
+    const p = new URL(horizonsUrl('501', 2461349.5, 2461351.5, 1 / 8, '599')).searchParams
+    expect(p.get('CENTER')).toBe("'500@599'")
+    expect(p.get('STEP_SIZE')).toBe("'3 h'")
+    expect(p.get('REF_PLANE')).toBe('ECLIPTIC')
+  })
+})
+
+describe('buildOrreryBodies: major moons (#107)', () => {
+  /** Calls carry their CENTER too, for the moon checks. */
+  function fakeWithCenter(answer: (call: Call & { center: string }) => string) {
+    const calls: (Call & { center: string })[] = []
+    let inFlight = 0
+    const fetchText = async (url: string): Promise<string> => {
+      inFlight += 1
+      try {
+        if (inFlight > 1) throw new Error('HTTP 503 (overlapping Horizons request)')
+        await new Promise((r) => setTimeout(r, 1))
+        const p = new URL(url).searchParams
+        const strip = (v: string | null) => (v ?? '').replace(/^'|'$/g, '')
+        const call = {
+          command: strip(p.get('COMMAND')),
+          start: strip(p.get('START_TIME')),
+          stop: strip(p.get('STOP_TIME')),
+          step: strip(p.get('STEP_SIZE')),
+          center: strip(p.get('CENTER')),
+        }
+        calls.push(call)
+        return answer(call)
+      } finally {
+        inFlight -= 1
+      }
+    }
+    return { calls, fetchText }
+  }
+
+  it('fetches each moon around its own planet, one request at a time', async () => {
+    const h = fakeWithCenter(anySpan)
+    const { payload } = await buildOrreryBodies({ now: NOW, fetchText: h.fetchText, pauseMs: 0 })
+    const parsed = OrreryBodiesSchema.parse(payload)
+    const io = parsed.moons.find((m) => m.naifId === '501')
+    expect(io).toMatchObject({
+      name: 'Io',
+      parent: { naifId: '599', name: 'Jupiter' },
+      center: '500@599',
+    })
+    expect(h.calls.find((c) => c.command === '501')?.center).toBe('500@599')
+    expect(h.calls.find((c) => c.command === '606')?.center).toBe('500@699')
+    // Craft and planets stay heliocentric.
+    expect(h.calls.find((c) => c.command === '-31')?.center).toBe('500@10')
+    expect(parsed.moons.length).toBeGreaterThanOrEqual(12)
+  })
+
+  it('samples Io every 3 h and Titan daily, over the moon window around now', async () => {
+    const h = fakeWithCenter(anySpan)
+    const { payload } = await buildOrreryBodies({ now: NOW, fetchText: h.fetchText, pauseMs: 0 })
+    const parsed = OrreryBodiesSchema.parse(payload)
+    expect(parsed.moons.find((m) => m.naifId === '501')?.fine.step).toBeCloseTo(1 / 8, 9)
+    expect(parsed.moons.find((m) => m.naifId === '606')?.fine.step).toBe(1)
+    const ioCall = h.calls.find((c) => c.command === '501')
+    const start = jdOf(ioCall?.start ?? '')
+    expect(start % 1).toBe(0.5) // midnight UTC
+    expect(jdOf(ioCall?.stop ?? '') - start).toBe(30)
+    // Six numbers per sample: position and velocity, for Hermite.
+    expect((parsed.moons[0]?.fine.samples.length ?? 1) % 6).toBe(0)
+  })
+
+  it('lists a moon Horizons cannot serve as missing, and keeps the bodies and other moons', async () => {
+    const h = fakeWithCenter((call) => (call.command === '608' ? 'no $$SOE here' : anySpan(call)))
+    const { payload } = await buildOrreryBodies({ now: NOW, fetchText: h.fetchText, pauseMs: 0 })
+    expect(payload.missing.map((m: { id: string }) => m.id)).toEqual(['naif:608'])
+    expect(payload.moons.some((m: { naifId: string }) => m.naifId === '608')).toBe(false)
+    expect(payload.moons.length).toBeGreaterThan(5)
+    expect(payload.bodies.length).toBeGreaterThan(10)
+  })
+
+  it('reads real planet-centred answers (Io fixture)', async () => {
+    const io = fixture('io')
+    const h = fakeWithCenter(() => io)
+    const { payload } = await buildOrreryBodies({
+      now: Date.UTC(2026, 10, 7),
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      only: ['501'],
+    })
+    expect(payload.bodies).toEqual([])
+    expect(payload.moons[0]?.target).toBe('Io (501)')
+  })
 })
 
 describe('buildOrreryBodies', () => {
@@ -185,8 +274,9 @@ describe('buildOrreryBodies', () => {
       pauseMs: 0,
       previous,
     })
-    // Only the fine spans were asked for: one call per body.
-    expect(second.calls).toHaveLength(payload.bodies.length)
+    // Only the fine spans were asked for: one call per body and one per moon.
+    const counts = payload as { bodies: unknown[]; moons: unknown[] }
+    expect(second.calls).toHaveLength(counts.bodies.length + counts.moons.length)
     expect(payload.coarseFetchedAt).toBe(previous.coarseFetchedAt)
     const v1 = payload.bodies.find((b: { naifId: string }) => b.naifId === '-31')
     expect(v1.coarse.samples.length).toBeGreaterThan(100)

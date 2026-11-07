@@ -112,8 +112,15 @@ function catmullRom(span: SampledSpan, jd: number): TrackState | null {
   }
 }
 
-/** Where a tracked body is at a Julian date (TDB), or null when no data covers it. */
-export function stateAt(track: OrreryTrack, jd: number): TrackState | null {
+/**
+ * Where a tracked body is at a Julian date (TDB), or null when no data covers it. Moons
+ * (#107) pass their planet-centred fine span with `coarse: null`; the answer is then
+ * relative to the planet.
+ */
+export function stateAt(
+  track: Pick<OrreryTrack, 'fine'> & { coarse: OrreryTrack['coarse'] },
+  jd: number,
+): TrackState | null {
   if (track.fine) {
     const fine = hermite(track.fine, jd)
     if (fine) return fine

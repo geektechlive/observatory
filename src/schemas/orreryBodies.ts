@@ -41,6 +41,25 @@ export const OrreryTrackSchema = z.object({
   coarse: SampledSpanSchema.nullable(),
 })
 
+/**
+ * A major moon (#107). Its vectors are relative to its planet (`center`, Horizons'
+ * `500@599` for Jupiter), not to the Sun, in the payload's frame and units. They live
+ * apart from `bodies` so a reader that predates moons drops them (zod strips unknown
+ * keys) instead of drawing planet-centred vectors as heliocentric ones.
+ */
+export const OrreryMoonSchema = z.object({
+  id: z.string(),
+  naifId: z.string(),
+  name: z.string(),
+  parent: z.object({ naifId: z.string(), name: z.string() }),
+  center: z.string(),
+  target: z.string().nullable(),
+  periodDays: z.number().positive(),
+  semiMajorAxisKm: z.number().positive(),
+  /** Position and velocity, six numbers per sample, as `fine` above. */
+  fine: SampledSpanSchema,
+})
+
 export const OrreryBodiesSchema = z.object({
   generatedAt: z.string(),
   /** When the whole-mission spans were last fetched (they are refetched once a day). */
@@ -52,6 +71,8 @@ export const OrreryBodiesSchema = z.object({
   sourceType: z.literal('ephemeris'),
   provider: z.literal('jpl-horizons'),
   bodies: z.array(OrreryTrackSchema),
+  /** Planet-centred moons (#107); absent in copies written before them. */
+  moons: z.array(OrreryMoonSchema).default([]),
   /** Objects the last refresh could not fetch, and why. */
   missing: z.array(z.object({ id: z.string(), reason: z.string() })),
 })
@@ -59,4 +80,5 @@ export const OrreryBodiesSchema = z.object({
 export type SampledSpan = z.infer<typeof SampledSpanSchema>
 export type OrreryBodyGroup = z.infer<typeof OrreryBodyGroupSchema>
 export type OrreryTrack = z.infer<typeof OrreryTrackSchema>
+export type OrreryMoon = z.infer<typeof OrreryMoonSchema>
 export type OrreryBodies = z.infer<typeof OrreryBodiesSchema>

@@ -527,7 +527,8 @@ export async function refreshOrreryBodies(config, deps = {}) {
     if (payload.bodies.length === 0) throw new Error('Horizons returned no bodies')
     const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
     const detail =
-      `ok ${ORRERY_SIGNATURE} ${String(payload.bodies.length)} bodies, ${String(requests)} requests` +
+      `ok ${ORRERY_SIGNATURE} ${String(payload.bodies.length)} bodies, ` +
+      `${String(payload.moons.length)} moons, ${String(requests)} requests` +
       (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
     console.log(detail)
     const value = JSON.stringify(payload)
@@ -539,6 +540,7 @@ export async function refreshOrreryBodies(config, deps = {}) {
         metadata: {
           fetchedAt: payload.generatedAt,
           bodies: payload.bodies.length,
+          moons: payload.moons.length,
           missing: payload.missing.length,
         },
       },
