@@ -160,3 +160,25 @@
   color: var(--bone-dim);
   text-align: center;
 }
+
+/* Comets tonight (#99) */
+.comet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+
+.cometName {
+  font-size: var(--text-sm);
+  color: var(--bone);
+}
+
+.cometTag {
+  color: var(--data-space-emit);
+}
+
+.cometTime {
+  font-size: var(--text-sm);
+  color: var(--data-space-emit);
+}

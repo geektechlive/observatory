@@ -15,6 +15,7 @@ import {
   twoline2satrec,
 } from 'satellite.js'
 
+import { compassPoint } from '@/lib/compass'
 import { sunAltitude } from '@/lib/tonight'
 
 export interface IssPass {
@@ -34,27 +35,6 @@ const DARK_ENOUGH = -6
 /** In shadow once Earth hides at least half the Sun's disc (#97). */
 const SHADOWED = 0.5
 const RAD = Math.PI / 180
-const COMPASS = [
-  'N',
-  'NNE',
-  'NE',
-  'ENE',
-  'E',
-  'ESE',
-  'SE',
-  'SSE',
-  'S',
-  'SSW',
-  'SW',
-  'WSW',
-  'W',
-  'WNW',
-  'NW',
-  'NNW',
-]
-
-const compass = (azDeg: number) =>
-  COMPASS[Math.round((((azDeg % 360) + 360) % 360) / 22.5) % 16] ?? 'N'
 
 /** Julian date, as satellite.js's `sunPos` takes it. */
 const julianDay = (date: Date) => date.getTime() / 86_400_000 + 2440587.5
@@ -123,8 +103,8 @@ export function visiblePasses(
         end: last.time,
         startElevation: first.elevation,
         maxElevation: peak.elevation,
-        from: compass(first.azimuth),
-        to: compass(last.azimuth),
+        from: compassPoint(first.azimuth),
+        to: compassPoint(last.azimuth),
       })
     }
     run = []

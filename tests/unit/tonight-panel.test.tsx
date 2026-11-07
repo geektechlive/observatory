@@ -26,6 +26,11 @@ vi.mock('@/hooks/useAurora', () => ({ useAurora: () => sky.aurora }))
 vi.mock('@/hooks/useSolarCycle', () => ({ useSolarCycle: () => sky.cycle }))
 // No orbit data: passes are covered in tonight-passes.test.tsx (#81).
 vi.mock('@/hooks/useIssTle', () => ({ useIssTle: () => ({ data: undefined }) }))
+// No comet data: the list is covered in comets-tonight-panel.test.tsx (#99).
+const comets = vi.hoisted(() => ({
+  useOrrerySmallBodies: vi.fn(() => ({ data: undefined, error: null })),
+}))
+vi.mock('@/hooks/useOrrerySmallBodies', () => comets)
 vi.mock('@/hooks/useSunMoon', () => ({
   useSunMoon: () => ({ data: { fracIllum: 97, curPhase: 'Waning Gibbous' } }),
 }))
@@ -181,6 +186,17 @@ describe('TonightPanel', () => {
       const row = [...document.querySelectorAll('[data-aurora]')].map((c) => c.textContent)
       expect(row[0]).toBe('—')
     })
+  })
+
+  it("adds tonight's comets once the location is known, and fetches nothing before (#99)", () => {
+    comets.useOrrerySmallBodies.mockClear()
+    render(<TonightPanel />)
+    expect(comets.useOrrerySmallBodies).not.toHaveBeenCalled()
+    cleanup()
+    useUiStore.setState({ observer: { lat: 39.1, lon: -94.6, isFallback: false } })
+    render(<TonightPanel />)
+    expect(screen.getByText('Comets tonight')).toBeTruthy()
+    expect(comets.useOrrerySmallBodies).toHaveBeenCalled()
   })
 
   it('names each hour for screen readers, with darkness and the moon', () => {

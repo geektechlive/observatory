@@ -4,8 +4,9 @@ import { fetchOrrerySmallBodiesEnvelope } from '@/lib/api/orrerySmallBodies'
 const HALF_HOUR = 30 * 60 * 1000
 
 /**
- * The orrery's comets and interstellar objects (#99). Only the orrery page calls this,
- * so the answer is fetched when the tab opens, never with the rest of the site.
+ * The comets and interstellar objects (#99). The Tonight panel calls this once the user
+ * has shared a location (`CometsTonight`), and the orrery will when it draws them, so
+ * the answer is never fetched with the rest of the site.
  */
 export function useOrrerySmallBodies() {
   return useSourceQuery('orrery-smallbodies', {

@@ -21,6 +21,7 @@ import {
   tonightStrip,
 } from '@/lib/tonight'
 
+import { CometsTonight } from './CometsTonight'
 import styles from './tonight-panel.module.css'
 
 const TITLE = 'Tonight from here'
@@ -253,6 +254,7 @@ export function TonightPanel() {
           </Label>
         )}
         {passes && tle && <IssPasses passes={passes} now={now} line1={tle.line1} />}
+        <CometsTonight coords={coords} dark={sky.dark} now={now} />
         <Label>
           Your approximate location is sent to{' '}
           <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">

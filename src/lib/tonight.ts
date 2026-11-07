@@ -23,6 +23,9 @@ function gmst(n: number): number {
   return 280.46061837 + 360.98564736629 * n
 }
 
+/** Greenwich mean sidereal time at a moment, degrees (not wrapped). */
+export const gmstAt = (date: Date) => gmst(daysSinceJ2000(date))
+
 /** Altitude (degrees) of a body at right ascension / declination (degrees). */
 function altitude(date: Date, lat: number, lon: number, ra: number, dec: number): number {
   const hourAngle = gmst(daysSinceJ2000(date)) + lon - ra
