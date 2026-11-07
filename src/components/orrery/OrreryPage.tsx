@@ -803,7 +803,7 @@ export function OrreryPage() {
                 if (lookup.key) select(lookup.key)
               }}
             >
-              {lookup.item?.label ?? ''}
+              {lookup.label}
             </button>
           )}
           {moons.map((m) => (

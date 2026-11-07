@@ -110,6 +110,7 @@ describe('useLookupTrack (#145)', () => {
     const drawn = renderer.setLookup.mock.lastCall?.[0] as { key: string; label: string } | null
     expect(drawn?.key).toBe('lookup:20099942')
     expect(drawn?.label).toBe('Apophis')
+    expect(result.current.label).toBe('Apophis')
     expect(result.current.item).toMatchObject({
       key: 'lookup:20099942',
       label: '99942 Apophis (2004 MN4)',

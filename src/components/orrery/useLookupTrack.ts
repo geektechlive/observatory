@@ -53,6 +53,8 @@ export function lookupProblem(a: LookupState<unknown> | undefined): string | nul
 export interface LookupView {
   /** The scene key while an object is shown, else null. */
   key: SceneKey | null
+  /** Its label in the scene: JPL's name shortened as the close approaches' are ("Apophis"). */
+  label: string
   object: LookupObject | null
   /** Horizons' answer for the span drawn now, once it has arrived. */
   trajectory: TrajectoryResponse | null
@@ -183,6 +185,7 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
   )
   return {
     key,
+    label,
     object,
     trajectory,
     item,
