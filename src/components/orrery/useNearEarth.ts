@@ -80,5 +80,7 @@ export function useNearEarth(renderer: OrreryRenderer | null, jd: number) {
     catalog,
     shown,
     status: neoStatus(query.status, approaches.length, query.dataAgeSeconds, query.degraded),
+    /** The close approaches have answered or failed: a link to one can be judged (#108). */
+    settled: query.status !== 'pending',
   }
 }

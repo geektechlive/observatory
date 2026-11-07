@@ -38,7 +38,26 @@ function parseHash(): HashState {
 /** Views that draw the Earth globe or map, the only ones the layers apply to. */
 const LAYER_VIEWS: ReadonlySet<ConsoleView> = new Set(['earth', 'orbit'])
 
-export function buildHash(view: ConsoleView, layers: Record<LayerKey, boolean>): string {
+/** The orrery's own deep-link params (#108; the orrery chunk reads and writes them). */
+const ORRERY_PARAMS: ReadonlySet<string> = new Set(['t', 'focus', 'preset'])
+
+/**
+ * The orrery's params from a hash that is already on the orrery, raw so their encoding
+ * stays as written. Anything else (an Earth `layers=`, #109) is dropped.
+ */
+function orreryQuery(hash: string): string {
+  const [viewPart = '', queryPart] = hash.replace(/^#\/?/, '').split('?')
+  if (viewPart.toLowerCase() !== 'orrery' || queryPart === undefined) return ''
+  const kept = queryPart.split('&').filter((p) => ORRERY_PARAMS.has(p.split('=')[0] ?? ''))
+  return kept.length > 0 ? `?${kept.join('&')}` : ''
+}
+
+export function buildHash(
+  view: ConsoleView,
+  layers: Record<LayerKey, boolean>,
+  currentHash = '',
+): string {
+  if (view === 'orrery') return `#orrery${orreryQuery(currentHash)}`
   if (!LAYER_VIEWS.has(view)) return `#${view}`
   const enabled = LAYER_KEYS.filter((k) => layers[k])
   return enabled.length > 0 ? `#${view}?layers=${enabled.join(',')}` : `#${view}`
@@ -72,7 +91,7 @@ export function useHashView(): void {
     }
     const state = useUiStore.getState()
     previousViewRef.current = state.view
-    window.history.replaceState(null, '', buildHash(state.view, state.layers))
+    window.history.replaceState(null, '', buildHash(state.view, state.layers, window.location.hash))
   }, [])
 
   // Respond to back/forward and manual hash edits.
@@ -101,7 +120,7 @@ export function useHashView(): void {
   // `view`/`layers` are the change trigger only.
   useEffect(() => {
     const { view: currentView, layers: currentLayers } = useUiStore.getState()
-    const next = buildHash(currentView, currentLayers)
+    const next = buildHash(currentView, currentLayers, window.location.hash)
     if (window.location.hash === next) {
       previousViewRef.current = currentView
       return

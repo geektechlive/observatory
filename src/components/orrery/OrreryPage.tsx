@@ -49,6 +49,7 @@ import type {
 } from './three/OrreryRenderer'
 import { TimeBar } from './TimeBar'
 import { useNearEarth } from './useNearEarth'
+import { useOrreryLink } from './useOrreryLink'
 import { useSimTime } from './useSimTime'
 
 /**
@@ -540,6 +541,17 @@ export function OrreryPage() {
     setSheetOpen(false)
     renderer?.applyPreset(p)
   }
+
+  // The address carries time, focus and preset, so a view can be shared (#108).
+  useOrreryLink({
+    renderer,
+    catalog,
+    settled: bodies.status === 'success' && near.settled,
+    selected,
+    preset,
+    select,
+    applyPreset: onPreset,
+  })
 
   // With the inspector open over the stage, centre the focus in the part it leaves free:
   // a drawer on the right on wide screens, a sheet along the bottom on phones.
