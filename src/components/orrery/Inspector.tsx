@@ -8,6 +8,7 @@ import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
+import type { SatcatEntry } from '@/lib/spacetrack'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryNeo } from '@/schemas/orreryNeo'
 import type { Discos, Reentry } from '@/schemas/spaceTrack'
@@ -18,7 +19,7 @@ import { ImageryFacts } from './ImageryFacts'
 import { MoonFacts } from './MoonFacts'
 import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './NearFacts'
 import styles from './orrery.module.css'
-import { SatFactsLive } from './SatFactsLive'
+import { SatFacts } from './SatFacts'
 import { formatSimUtc } from './simDate'
 import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
@@ -49,6 +50,8 @@ interface InspectorProps {
   discos?: Discos | null | undefined
   /** Space-Track's re-entry predictions (#101). */
   reentries?: readonly Reentry[] | undefined
+  /** The chosen satellite's Space-Track catalogue entry, once its shard loads (#101). */
+  satCatalog?: SatcatEntry | null | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -78,6 +81,7 @@ export function Inspector({
   satellite,
   discos,
   reentries,
+  satCatalog,
 }: InspectorProps) {
   const headingId = useId()
   if (isSatKey(body)) {
@@ -92,9 +96,10 @@ export function Inspector({
           </button>
         </div>
         {satellite ? (
-          <SatFactsLive
+          <SatFacts
             info={satellite}
             simMs={simMs}
+            catalog={satCatalog}
             physical={discos?.satellites[satellite.noradId] ?? null}
             reentry={reentries?.find((r) => r.noradId === satellite.noradId) ?? null}
           />

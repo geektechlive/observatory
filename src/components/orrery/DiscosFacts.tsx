@@ -1,5 +1,5 @@
 import { Readout } from '@/components/ui/Readout'
-import { discosSize } from '@/lib/spaceTrackText'
+import { discosSize } from '@/lib/satcatWords'
 import type { DiscosObject } from '@/schemas/spaceTrack'
 
 import styles from './orrery.module.css'

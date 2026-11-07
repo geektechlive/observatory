@@ -4,7 +4,7 @@ import { useDsn } from '@/hooks/useDsn'
 import { useNow } from '@/hooks/useNow'
 import { useOrreryBodies } from '@/hooks/useOrreryBodies'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
-import { useDiscos } from '@/hooks/useSatelliteFacts'
+import { useDiscos, useSatcatEntry } from '@/hooks/useSatelliteFacts'
 import { useSpaceTrack } from '@/hooks/useSpaceTrack'
 import { fetchOrrerySatsBody } from '@/lib/api/orrerySats'
 import { dsnContactsById } from '@/lib/dsn'
@@ -610,6 +610,8 @@ export function OrreryPage() {
       ? satHiddenNotice(satState.outOfWindow, satState.total)
       : null
   const satellite = selected && isSatKey(selected) ? (renderer?.satellite(selected) ?? null) : null
+  // Its Space-Track catalogue entry (#101), passed to the inspector with the rest.
+  const satCatalog = useSatcatEntry(satellite?.noradId ?? null)
   const craftStatus = craftStatusText(
     bodies.status,
     craftTracks.length,
@@ -859,6 +861,7 @@ export function OrreryPage() {
             satellite={satellite}
             discos={discos}
             reentries={reentries}
+            satCatalog={satCatalog}
             onClose={() => {
               setSelected(null)
             }}

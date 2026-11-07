@@ -1,4 +1,4 @@
-import { boxscoreLine } from '@/lib/spaceTrackText'
+import { boxscoreLine } from '@/lib/satcatWords'
 
 import styles from './orrery.module.css'
 import { SAT_TOGGLES, type SatToggles } from './satToggles'

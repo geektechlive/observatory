@@ -12,8 +12,11 @@ import {
   fetchDiscosEnvelope,
   fetchSatcatShard,
   fetchSpaceTrackEnvelope,
-  satcatEntry,
 } from '@/lib/api/spaceTrack'
+import { satcatEntryOf } from '@/lib/spacetrack'
+
+const satcatEntry = (shard: { rows: Parameters<typeof satcatEntryOf>[0] }, id: string) =>
+  satcatEntryOf(shard.rows, id)
 
 const fixture = (dir: string, name: string): unknown =>
   JSON.parse(readFileSync(join(__dirname, 'fixtures', dir, name), 'utf8'))

@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  boxscoreLine,
-  discosSize,
-  objectTypeText,
-  rcsText,
-  reentriesWithin,
-  reentryTickerItems,
-  reentryWhen,
-} from '@/lib/spaceTrackText'
+import { boxscoreLine, discosSize, objectTypeText, ownerText, rcsText } from '@/lib/satcatWords'
+import { reentriesWithin, reentryTickerItems, reentryWhen } from '@/lib/spaceTrackText'
 
 const NOW = Date.parse('2026-11-08T00:00:00Z')
 const reentry = (noradId: string, decayEpoch: string, windowMin = 780) => ({
@@ -88,6 +81,8 @@ describe('catalogue words', () => {
     expect(rcsText('MEDIUM')).toBe('Medium on radar (0.1 to 1 m)')
     expect(rcsText('LARGE')).toBe('Large on radar (over 1 m)')
     expect(rcsText('')).toBeNull()
+    expect(ownerText('CIS')).toBe('Russia (CIS, the former USSR) (CIS)')
+    expect(ownerText('ZZZ')).toBe('ZZZ')
   })
 
   it('DISCOS size as the dimensions it has', () => {
