@@ -5,6 +5,12 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
+import { offlineSun } from './swpc'
+
+test.beforeEach(async ({ page }) => {
+  await offlineSun(page)
+})
+
 const DAY_MS = 86_400_000
 const JD_UNIX = 2440587.5
 const jdNow = () => Math.floor(Date.now() / DAY_MS) + JD_UNIX

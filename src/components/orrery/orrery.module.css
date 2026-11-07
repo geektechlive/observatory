@@ -468,6 +468,12 @@
   font: 400 var(--text-xs) / 1.6 var(--font-mono);
 }
 
+/* What a body's colour means (#105), on its own line under the colour kind. */
+.imageryNote {
+  display: block;
+  color: var(--bone-faint);
+}
+
 .reasons {
   margin: var(--space-4) 0;
   padding-inline-start: var(--space-5);

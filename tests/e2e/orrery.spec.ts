@@ -5,6 +5,12 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
+import { offlineSun } from './swpc'
+
+test.beforeEach(async ({ page }) => {
+  await offlineSun(page)
+})
+
 const stage = (page: Page) => page.locator('[data-orrery-mode]')
 
 async function openOrrery(page: Page) {

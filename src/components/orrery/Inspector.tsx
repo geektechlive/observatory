@@ -8,8 +8,10 @@ import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodie
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
 import { CraftFacts } from './CraftFacts'
+import { ImageryFacts } from './ImageryFacts'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
+import type { SunImageState } from './three/sunImage'
 
 interface InspectorProps {
   /** The page measures the drawer to keep the focused body out from under it. */
@@ -22,6 +24,8 @@ interface InspectorProps {
   tracks?: readonly OrreryTrack[] | undefined
   /** Craft DSN is talking to now, by NAIF id. */
   dsn?: ReadonlyMap<string, DsnLink> | undefined
+  /** The live Sun image's state (#105). */
+  sun?: SunImageState | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -36,7 +40,7 @@ const fmtKm = (km: number) =>
  * first, with the state vector behind a disclosure. Planet positions are a model
  * (JPL's approximate elements), and the panel says so.
  */
-export function Inspector({ ref, body, simMs, onClose, tracks, dsn }: InspectorProps) {
+export function Inspector({ ref, body, simMs, onClose, tracks, dsn, sun }: InspectorProps) {
   const headingId = useId()
   const jd = jdFromDate(new Date(simMs))
   if (!isBodyName(body)) {
@@ -89,6 +93,7 @@ export function Inspector({ ref, body, simMs, onClose, tracks, dsn }: InspectorP
       ) : (
         <PlanetFacts body={body} jd={jd} simMs={simMs} />
       )}
+      <ImageryFacts body={body} sun={sun} />
     </aside>
   )
 }

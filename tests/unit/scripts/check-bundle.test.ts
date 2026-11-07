@@ -161,6 +161,54 @@ describe('checkBundle', () => {
     expect(failures(checkBundle(dir, BUDGETS))).toContain('texture-bytes')
   })
 
+  // #105: the orrery's planet maps load with its tab. Each is budgeted, the set has a
+  // total, and none may be preloaded with the page.
+  describe('planet textures', () => {
+    const planets = (files: Record<string, string>, html = '') => {
+      const dir = fakeDist({ 'assets/index-abc.js': 'x' })
+      mkdirSync(join(dir, 'textures', 'planets'))
+      for (const [name, body] of Object.entries(files)) {
+        writeFileSync(join(dir, 'textures', 'planets', name), body)
+      }
+      if (html)
+        writeFileSync(
+          join(dir, 'index.html'),
+          `<script type="module" src="/assets/index-abc.js"></script>${html}`,
+        )
+      return dir
+    }
+    const budgets = { ...BUDGETS, planetTextureTotal: 3_000 }
+
+    it('passes small maps', () => {
+      const dir = planets({ 'mars.webp': 'x'.repeat(1_000), 'saturn.webp': 'x'.repeat(1_000) })
+      const findings = checkBundle(dir, budgets) as Finding[]
+      expect(failures(findings)).toEqual([])
+      expect(findings.filter((f) => f.rule === 'planet-texture-bytes')).toHaveLength(2)
+    })
+
+    it('fails one oversized map', () => {
+      const dir = planets({ 'jupiter.webp': 'x'.repeat(2_500) })
+      expect(failures(checkBundle(dir, budgets))).toContain('planet-texture-bytes')
+    })
+
+    it('fails when the set is over its total', () => {
+      const dir = planets({
+        'a.webp': 'x'.repeat(1_500),
+        'b.webp': 'x'.repeat(1_500),
+        'c.webp': 'x'.repeat(1_500),
+      })
+      expect(failures(checkBundle(dir, budgets))).toEqual(['planet-texture-total'])
+    })
+
+    it('fails when the page preloads a planet map', () => {
+      const dir = planets(
+        { 'mars.webp': 'x' },
+        '<link rel="preload" as="image" href="/textures/planets/mars.webp">',
+      )
+      expect(failures(checkBundle(dir, budgets))).toContain('entry-has-no-planet-textures')
+    })
+  })
+
   it('fails loudly when index.html names no module script', () => {
     const dir = fakeDist({ 'assets/index-abc.js': 'x' })
     writeFileSync(join(dir, 'index.html'), '<html></html>')

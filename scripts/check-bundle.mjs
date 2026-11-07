@@ -27,6 +27,9 @@ export const BUDGETS = {
   // only; #92/#93/#98 add asteroids, craft and satellites, so each gets room to 30 kB.
   orreryGzip: 30_000,
   textureBytes: 1_500_000,
+  // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses
+  // the globe's day-2048). They load with the orrery tab, never with the page.
+  planetTextureTotal: 700_000,
 }
 
 const THREE_MARKER = 'WebGLRenderer'
@@ -103,10 +106,27 @@ export function checkBundle(distDir, budgets = BUDGETS) {
   const textureDir = join(distDir, 'textures')
   if (existsSync(textureDir)) {
     for (const name of readdirSync(textureDir)) {
-      const bytes = statSync(join(textureDir, name)).size
-      add('texture-bytes', bytes <= budgets.textureBytes, `textures/${name} ${kb(bytes)} (budget ${kb(budgets.textureBytes)})`)
+      const stat = statSync(join(textureDir, name))
+      if (!stat.isFile()) continue
+      add('texture-bytes', stat.size <= budgets.textureBytes, `textures/${name} ${kb(stat.size)} (budget ${kb(budgets.textureBytes)})`)
     }
   }
+
+  const planetDir = join(distDir, 'textures', 'planets')
+  if (existsSync(planetDir)) {
+    let total = 0
+    for (const name of readdirSync(planetDir)) {
+      const bytes = statSync(join(planetDir, name)).size
+      total += bytes
+      add('planet-texture-bytes', bytes <= budgets.textureBytes, `textures/planets/${name} ${kb(bytes)} (budget ${kb(budgets.textureBytes)})`)
+    }
+    add('planet-texture-total', total <= budgets.planetTextureTotal, `textures/planets ${kb(total)} (budget ${kb(budgets.planetTextureTotal)})`)
+  }
+  add(
+    'entry-has-no-planet-textures',
+    !html.includes('/textures/planets/'),
+    html.includes('/textures/planets/') ? 'index.html names a planet map: they load with the orrery tab (#105)' : 'no planet map in index.html',
+  )
   return findings
 }
 

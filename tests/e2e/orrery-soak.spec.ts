@@ -7,6 +7,12 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
+import { offlineSun } from './swpc'
+
+test.beforeEach(async ({ page }) => {
+  await offlineSun(page)
+})
+
 test.use({ viewport: { width: 1440, height: 900 } })
 test.setTimeout(120_000)
 

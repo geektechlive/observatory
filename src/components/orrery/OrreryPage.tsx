@@ -29,6 +29,7 @@ import type {
   ProjectedBody,
   ScaleMode,
   SceneKey,
+  SunImageState,
   Visibility,
 } from './three/OrreryRenderer'
 import { TimeBar } from './TimeBar'
@@ -160,6 +161,7 @@ export function OrreryPage() {
   })
   const [craftFilter, setCraftFilter] = useState<CraftFilter>(DEFAULT_CRAFT_FILTER)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [sun, setSun] = useState<SunImageState | undefined>(undefined)
   // The voice line and inspector change slowly: once a second is plenty, and keeps the
   // whole page from re-rendering at the time bar's 4 Hz (it has its own readout).
   const { sim } = useSimTime(PAGE_REFRESH_MS)
@@ -258,6 +260,15 @@ export function OrreryPage() {
   useEffect(() => {
     renderer?.setTracks(tracks)
   }, [renderer, tracks])
+
+  // The live Sun's frame and time, for the inspector (#105).
+  useEffect(() => {
+    if (!renderer) return
+    renderer.setOnSunImage(setSun)
+    return () => {
+      renderer.setOnSunImage(null)
+    }
+  }, [renderer])
 
   useEffect(() => {
     renderer?.setCraftFilter(craftFilter)
@@ -606,6 +617,7 @@ export function OrreryPage() {
             simMs={sim}
             tracks={tracks}
             dsn={dsn}
+            sun={sun}
             onClose={() => {
               setSelected(null)
             }}

@@ -5,6 +5,7 @@
  * while detached or hidden. Positions come from src/lib/orrery; colours from palette.ts.
  */
 import {
+  AmbientLight,
   BufferGeometry,
   Color,
   Float32BufferAttribute,
@@ -15,8 +16,10 @@ import {
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
+  PointLight,
   Scene,
   SphereGeometry,
+  TextureLoader,
   Vector3,
   WebGLRenderer,
 } from 'three'
@@ -39,11 +42,14 @@ import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
 import type { CraftFilter } from '../craftFilter'
+import { BodySkins } from './bodySkins'
 import { CraftLayer } from './craftLayer'
 import { type FocusPreset, FOV, frameView } from './framing'
+import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
 export type { CraftFilter } from '../craftFilter'
 export type { FocusPreset } from './framing'
+export type { SunImageState } from './sunImage'
 export type ScaleMode = 'exaggerated' | 'log' | 'proportional'
 /** A planet or the Sun by name, or a craft by its namespaced id (`naif:-31`). */
 export type SceneKey = string
@@ -142,6 +148,15 @@ const FOCUS_RADII = 30
 const FOCUS_MIN_DISTANCE = 1.2
 const DAYS_PER_YEAR = 365.25
 const MIN_FRAME_MS = 30
+/**
+ * Sunlight for the mapped planets (#105): a point light at the Sun with no falloff, since
+ * the scene's distances are compressed, plus enough ambient that the night side still
+ * reads. Intensities are in three's physical units (pi = full albedo face-on).
+ */
+const SUNLIGHT_INTENSITY = Math.PI * 1.1
+const AMBIENT_INTENSITY = Math.PI * 0.12
+/** A body this far past the stage edge (NDC) still counts as in view for its map. */
+const SKIN_VIEW_NDC = 1.15
 /** While the clock plays at 1x nothing moves visibly; redraw this often at most. */
 const SLOW_CLOCK_REDRAW_MS = 1000
 
@@ -184,6 +199,22 @@ export class OrreryRenderer {
       gapSize: 0.3,
     }),
   )
+  /** Real imagery on the planets and the live Sun (#105). */
+  private readonly skins = new BodySkins(
+    (url) => new TextureLoader().loadAsync(url),
+    () => {
+      this.markDirty()
+    },
+  )
+  private readonly sunImage = new SunImage({
+    fetchJson: (url) => fetch(url),
+    loadImage: loadCorsImage,
+    onChange: (state) => {
+      this.onSunImageChange(state)
+    },
+  })
+  private sunState: SunImageState = { kind: 'loading' }
+  private onSunState: ((state: SunImageState) => void) | null = null
   /** Earth's Horizons samples, used for Earth where they cover the date (#93). */
   private earthTrack: OrreryTrack | null = null
   private mode: ScaleMode = 'exaggerated'
@@ -255,6 +286,10 @@ export class OrreryRenderer {
       this.craft.markers,
     )
     this.orbitGroup.add(this.heliopause)
+    this.scene.add(
+      new AmbientLight(new Color(1, 1, 1), AMBIENT_INTENSITY),
+      new PointLight(new Color(1, 1, 1), SUNLIGHT_INTENSITY, 0, 0),
+    )
     for (const name of ['Sun', ...PLANETS] as BodyName[]) {
       const mesh = new Mesh(
         new SphereGeometry(1, 24, 16),
@@ -276,6 +311,22 @@ export class OrreryRenderer {
       this.orbits.set(planet, line)
       this.orbitGroup.add(line)
     }
+    this.skins.build(this.bodies)
+  }
+
+  private onSunImageChange(state: SunImageState): void {
+    const sun = this.bodies.get('Sun')
+    if (state.kind === 'live' && sun) this.skins.setSunImage(sun, state.image)
+    this.sunState = state
+    this.canvas.dataset['orrerySun'] = state.kind
+    this.onSunState?.(state)
+    this.markDirty()
+  }
+
+  /** The live Sun's state, for the inspector (#105). Called now and on every change. */
+  setOnSunImage(cb: ((state: SunImageState) => void) | null): void {
+    this.onSunState = cb
+    cb?.(this.sunState)
   }
 
   /** Scene position of a heliocentric ecliptic position under the current mode. */
@@ -316,6 +367,18 @@ export class OrreryRenderer {
       const depth = c.mesh.position.distanceTo(this.camera.position)
       c.mesh.scale.setScalar(Math.max(this.radiusOf(c.key), CRAFT_MIN_PX * this.unitsPerPx(depth)))
     }
+    // Maps once a planet is big enough on screen; the flat dot below that (#105).
+    // A body out of view counts as size 0, so its map is not fetched until it is seen.
+    const skinned = this.skins.apply((planet) => {
+      const mesh = this.bodies.get(planet)
+      if (!mesh) return 0
+      this.scratch.copy(mesh.position).project(this.camera)
+      const { x, y, z } = this.scratch
+      if (z > 1 || Math.abs(x) > SKIN_VIEW_NDC || Math.abs(y) > SKIN_VIEW_NDC) return 0
+      return mesh.scale.x / this.unitsPerPx(mesh.position.distanceTo(this.camera.position))
+    }, this.bodies)
+    this.canvas.dataset['orrerySkins'] = skinned.join(',')
+    this.skins.faceCamera(this.camera.position)
   }
 
   /** Scene radius of a distance from the Sun, under the current mode. */
@@ -386,6 +449,7 @@ export class OrreryRenderer {
       mesh.position.copy(this.toScene(pos))
       mesh.scale.setScalar(this.radiusOf(name))
     }
+    this.skins.orient(jd)
     this.craft.place(jd, this.radiusOf('craft'))
   }
 
@@ -430,6 +494,7 @@ export class OrreryRenderer {
     if (this.disposed) return
     el.append(this.canvas)
     this.attached = true
+    this.sunImage.start()
     this.markDirty()
   }
 
@@ -438,6 +503,7 @@ export class OrreryRenderer {
     cancelAnimationFrame(this.frameId)
     this.frameId = 0
     this.clearTick()
+    this.sunImage.stop()
     this.canvas.dataset['orreryAnimating'] = 'false'
     this.canvas.remove()
   }
@@ -789,6 +855,8 @@ export class OrreryRenderer {
       ;(line.material as LineBasicMaterial).dispose()
     }
     this.craft.dispose()
+    this.sunImage.stop()
+    this.skins.dispose()
     this.heliopause.geometry.dispose()
     this.heliopause.material.dispose()
     this.renderer.dispose()

@@ -112,6 +112,58 @@ describe('Inspector (#91)', () => {
   })
 })
 
+describe('Inspector imagery labels (#105)', () => {
+  it('says what kind of colour a planet shows, its mission and its credit', () => {
+    render(<Inspector body="Mercury" simMs={T0} onClose={() => undefined} />)
+    expect(screen.getByText('Enhanced colour')).toBeTruthy()
+    expect(screen.getByText('MESSENGER MDIS')).toBeTruthy()
+    expect(screen.getByText(/USGS Astrogeology/)).toBeTruthy()
+  })
+
+  it('credits Björn Jónsson for Saturn', () => {
+    render(<Inspector body="Saturn" simMs={T0} onClose={() => undefined} />)
+    expect(screen.getByText('True colour')).toBeTruthy()
+    expect(screen.getByText(/Björn Jónsson/)).toBeTruthy()
+  })
+
+  it('labels Uranus as shaded, not imaged', () => {
+    render(<Inspector body="Uranus" simMs={T0} onClose={() => undefined} />)
+    expect(screen.getByText('Shaded, no map')).toBeTruthy()
+  })
+
+  it('gives the live Sun’s observation time and satellite', () => {
+    const frame = {
+      url: 'https://services.swpc.noaa.gov/x.png',
+      start: new Date('2026-11-07T02:20:00Z'),
+      end: new Date('2026-11-07T02:24:00Z'),
+      satellite: 'GOES-19',
+    }
+    const image = {} as HTMLImageElement
+    render(
+      <Inspector
+        body="Sun"
+        simMs={T0}
+        onClose={() => undefined}
+        sun={{ kind: 'live', frame, image }}
+      />,
+    )
+    expect(screen.getByText('Observed 2026-11-07 02:20–02:24 UTC by GOES-19 SUVI')).toBeTruthy()
+    expect(screen.getByText(/171 Å/)).toBeTruthy()
+  })
+
+  it('says why the Sun is a flat disc when the live image failed', () => {
+    render(
+      <Inspector
+        body="Sun"
+        simMs={T0}
+        onClose={() => undefined}
+        sun={{ kind: 'fallback', reason: 'The live image did not load.' }}
+      />,
+    )
+    expect(screen.getByText(/Flat disc: The live image did not load\./)).toBeTruthy()
+  })
+})
+
 /** Real Horizons samples (2026-11-05..07) as a track, for the craft inspector (#93). */
 function fixtureTrack(
   file: string,
