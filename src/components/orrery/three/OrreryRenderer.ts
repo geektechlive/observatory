@@ -43,6 +43,7 @@ import { threeQuarterView } from '@/lib/orrery/craftModelFit'
 import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
 import type { MoonBody } from '@/lib/orrery/moonState'
+import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
@@ -51,7 +52,7 @@ import { DEFAULT_PRESET } from '../defaultView'
 import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
-import { type FocusPreset, FOV, frameView } from './framing'
+import { type FocusPreset, FOV, frameView, sunlitFocusDirection } from './framing'
 import { MoonLayer } from './moonLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
@@ -164,6 +165,8 @@ const MIN_FRAME_MS = 30
  * the scene's distances are compressed, plus enough ambient that the night side still
  * reads. Intensities are in three's physical units (pi = full albedo face-on).
  */
+/** A focus camera keeps this multiple of the Sun's drawn corona between it and the Sun. */
+const SUN_CLEARANCE_MARGIN = 1.25
 const SUNLIGHT_INTENSITY = Math.PI * 1.1
 const AMBIENT_INTENSITY = Math.PI * 0.12
 /** A body this far past the stage edge (NDC) still counts as in view for its map. */
@@ -725,13 +728,23 @@ export class OrreryRenderer {
     const distance = isBody(name)
       ? Math.max(r * FOCUS_RADII, FOCUS_MIN_DISTANCE)
       : CRAFT_FOCUS_DISTANCE[this.mode]
-    const dir = this.camera.position.clone().sub(this.controls.target).normalize()
+    let dir = this.camera.position.clone().sub(this.controls.target).normalize()
     if (dir.lengthSq() === 0) dir.set(0, 0.5, 1).normalize()
     // A craft with a model is seen three-quarter on, so its shape reads (#115).
     const facing = craftNaif ? this.craftFacing(name) : null
     if (facing) {
       const v = threeQuarterView(facing)
       dir.set(v.x, v.y, v.z)
+    } else if (isBody(name) && name !== 'Sun') {
+      // A planet is approached from its sunlit side (#116); the Sun keeps the view.
+      // The camera stays outside the Sun's drawn corona: near Mercury, the sunward view
+      // otherwise sat inside the Sun and its live image filled the stage.
+      const sun = this.bodies.get('Sun')
+      const sunClearance =
+        (sun?.scale.x ?? this.radiusOf('Sun')) *
+        (SUVI_FRAME.crop / SUVI_FRAME.discRadius) *
+        SUN_CLEARANCE_MARGIN
+      dir = sunlitFocusDirection(target, this.bodyPosition('Sun'), dir, { distance, sunClearance })
     }
     this.flyTo(target.clone().add(dir.multiplyScalar(distance)), target, instant)
   }

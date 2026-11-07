@@ -5,6 +5,8 @@
  * hides, unless it must show (the voice subject), in which case it takes its last slot
  * anyway. Rough box: monospace ~7 px per character, 16 px tall.
  */
+import { SATURN_RINGS } from '@/lib/orrery/imagery'
+
 export interface LabelCandidate {
   key: string
   text: string
@@ -65,10 +67,10 @@ const PAD = 2
 const SLOTS = [0, -18, 18, -36, 36]
 
 interface Box {
-  l: number
-  r: number
-  t: number
-  b: number
+  readonly l: number
+  readonly r: number
+  readonly t: number
+  readonly b: number
 }
 
 const overlaps = (a: Box, b: Box) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t
@@ -171,11 +173,30 @@ export function spreadRim(
 
 const discBox = (d: LabelDisc): Box => ({ l: d.x - d.r, r: d.x + d.r, t: d.y - d.r, b: d.y + d.r })
 
+/** Saturn's rings reach this many of its globe's radii (Jónsson's ring profile, #105). */
+const SATURN_RING_REACH = SATURN_RINGS.outerKm / SATURN_RINGS.saturnRadiusKm
+
+/**
+ * How far from a body's centre its label starts, and its disc reaches for other labels,
+ * px: the drawn radius, or for Saturn its rings' outer edge (#119: its label sat on the
+ * rings when the camera was close).
+ */
+export function bodyLabelReach(name: string, radiusPx: number): number {
+  return name === 'Saturn' ? radiusPx * SATURN_RING_REACH : radiusPx
+}
+
+/** A screen box no label may cover (the NOT TO SCALE badge, #118), px. */
+export type LabelObstacle = Box
+
 export function layoutLabels(
   items: readonly LabelCandidate[],
   discs: readonly LabelDisc[] = [],
+  /** Every label moves around these, trying its other slots before hiding (#118). */
+  obstacles: readonly LabelObstacle[] = [],
+  /** The stage, px: a slot above or below it is not free (it would be off-screen). */
+  bounds?: { readonly width: number; readonly height: number },
 ): Map<string, LabelPlacement> {
-  const placed: Box[] = []
+  const placed: Box[] = [...obstacles]
   const shown = new Map<string, LabelPlacement>()
   const discBoxes = discs.map(discBox)
   for (const item of items) {
@@ -194,6 +215,7 @@ export function layoutLabels(
       }
     }
     const blocked = (b: Box) =>
+      (bounds !== undefined && (b.t < 0 || b.b > bounds.height)) ||
       placed.some((p) => overlaps(b, p)) ||
       (item.avoidDiscs === true && discBoxes.some((d) => overlaps(b, d)))
     const free = SLOTS.find((dy) => !blocked(boxAt(dy, dx)))

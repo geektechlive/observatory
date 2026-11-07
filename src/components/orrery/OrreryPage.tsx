@@ -23,7 +23,7 @@ import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DEFAULT_PRESET } from './defaultView'
 import { Inspector } from './Inspector'
-import { labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
+import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
 import styles from './orrery.module.css'
 import type {
   FocusPreset,
@@ -356,21 +356,34 @@ export function OrreryPage() {
           .map((i) => i.name),
       )
       const ordered = labelOrder(items, selectedRef.current, subjectNow, boosted)
-      // Planets' drawn discs: craft and moon labels keep off them (#107: Juno on Jupiter).
+      // Planets' drawn discs (Saturn's with its rings, #119): craft and moon labels keep
+      // off them (#107: Juno on Jupiter).
       const discs = items
         .filter((i) => i.kind === 'body' && i.visible)
-        .map((i) => ({ x: i.x, y: i.y, r: i.radiusPx }))
+        .map((i) => ({ x: i.x, y: i.y, r: bodyLabelReach(i.name, i.radiusPx) }))
+      // Stage furniture labels move around, in the label layer's coordinates (#118).
+      const origin = box?.getBoundingClientRect()
+      const obstacles = [
+        ...(stage.current?.querySelectorAll<HTMLElement>('[data-label-obstacle]') ?? []),
+      ].map((el) => {
+        const r = el.getBoundingClientRect()
+        const ox = origin?.left ?? 0
+        const oy = origin?.top ?? 0
+        return { l: r.left - ox, r: r.right - ox, t: r.top - oy, b: r.bottom - oy }
+      })
       const shown = layoutLabels(
         ordered.map((i) => ({
           key: i.name,
           text: i.label,
-          x: i.x + i.radiusPx,
+          x: i.x + bodyLabelReach(i.name, i.radiusPx),
           y: i.y,
           visible: inView(i),
           mustShow: i.name === subjectNow,
           avoidDiscs: i.kind === 'craft' || i.kind === 'moon',
         })),
         discs,
+        obstacles,
+        { width, height },
       )
       const seen = new Set<SceneKey>()
       for (const item of items) {
@@ -398,7 +411,7 @@ export function OrreryPage() {
         node.dataset['rim'] = ''
         if (distance) distance.textContent = ''
         const place = shown.get(item.name)
-        node.style.left = `${String(item.x + item.radiusPx + (place?.dx ?? 0))}px`
+        node.style.left = `${String(item.x + bodyLabelReach(item.name, item.radiusPx) + (place?.dx ?? 0))}px`
         node.style.top = `${String(item.y + (place?.dy ?? 0))}px`
         // A stacked label carries a short rule back to its body (see .label[data-stacked]).
         node.dataset['stacked'] = place && place.dy !== 0 ? String(Math.sign(place.dy)) : ''
@@ -627,7 +640,11 @@ export function OrreryPage() {
             </button>
           ))}
         </div>
-        {scale !== 'proportional' && <p className={styles.badge ?? ''}>NOT TO SCALE</p>}
+        {scale !== 'proportional' && (
+          <p className={styles.badge ?? ''} data-label-obstacle="">
+            NOT TO SCALE
+          </p>
+        )}
         <div className={styles.notices ?? ''}>
           {failed && (
             <p className={styles.notice ?? ''} role="status">
