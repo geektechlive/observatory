@@ -3,10 +3,13 @@ import { useMemo } from 'react'
 import { useDonki } from '@/hooks/useDonki'
 import { useEvents } from '@/hooks/useEvents'
 import { useFireball } from '@/hooks/useFireball'
+import { useNow } from '@/hooks/useNow'
 import { useSentry } from '@/hooks/useSentry'
+import { useSpaceTrack } from '@/hooks/useSpaceTrack'
 import { formatKt, formatPalermo, formatRelativeTime } from '@/lib/format'
 import { EONET_KINDS, eonetKind, LANES } from '@/lib/palette'
 import { flareStatus, palermoStatus, statusVar } from '@/lib/severity'
+import { reentryTickerItems } from '@/lib/spaceTrackText'
 
 export interface TickerItem {
   id: string
@@ -16,6 +19,8 @@ export interface TickerItem {
   color: string
   time: Date
 }
+
+const REENTRY_TICK_MS = 5 * 60_000
 
 const DEFAULT_EVENT_META = { label: 'EVENT', color: 'var(--bone-dim)' }
 
@@ -37,9 +42,22 @@ export function useTicker(): TickerItem[] {
   const { data: donki } = useDonki()
   const { data: sentry } = useSentry()
   const { data: fireball } = useFireball()
+  const { data: spacetrack } = useSpaceTrack()
+  // Re-entry lines drop off once their time has passed; minutes are plenty for that.
+  const nowMs = useNow(REENTRY_TICK_MS).getTime()
 
   return useMemo<TickerItem[]>(() => {
     const items: TickerItem[] = []
+
+    // Space-Track re-entry predictions this week (#101), named where known.
+    if (spacetrack?.tip) {
+      items.push(
+        ...reentryTickerItems(
+          { reentries: spacetrack.tip.reentries, names: spacetrack.names },
+          nowMs,
+        ),
+      )
+    }
 
     // EONET events: newest 10 open events
     const events = eventsQuery.data?.events ?? []
@@ -127,5 +145,5 @@ export function useTicker(): TickerItem[] {
 
     // Merge: sort by time descending, take first 30
     return items.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 30)
-  }, [eventsQuery.data, donki, sentry, fireball])
+  }, [eventsQuery.data, donki, sentry, fireball, spacetrack, nowMs])
 }

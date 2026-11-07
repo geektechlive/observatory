@@ -344,6 +344,24 @@ export function parseSatcat(json: unknown): SatcatRow[] {
   })
 }
 
+export interface SatcatEntry {
+  noradId: string
+  intlDes: string
+  objectType: string
+  country: string
+  launch: string
+  site: string
+  rcsSize: string
+}
+
+/** An object's SATCAT row from a shard's rows, by name, or null when it isn't there. */
+export function satcatEntryOf(rows: readonly SatcatRow[], noradId: string): SatcatEntry | null {
+  const row = rows.find((r) => r[0] === noradId)
+  if (!row) return null
+  const [id, intlDes, objectType, country, launch, site, rcsSize] = row
+  return { noradId: id, intlDes, objectType, country, launch, site, rcsSize }
+}
+
 /** Which SATCAT shard holds an object, or null for an id that isn't a number. */
 export function satcatShardOf(noradId: string): number | null {
   if (!/^\d+$/.test(noradId)) return null
