@@ -5,10 +5,12 @@ import { Readout } from '@/components/ui/Readout'
 import type { DsnLink } from '@/lib/dsn'
 import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orrery'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
+import type { MoonBody } from '@/lib/orrery/moonState'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
 import { CraftFacts } from './CraftFacts'
 import { ImageryFacts } from './ImageryFacts'
+import { MoonFacts } from './MoonFacts'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
 import type { SunImageState } from './three/sunImage'
@@ -26,6 +28,8 @@ interface InspectorProps {
   dsn?: ReadonlyMap<string, DsnLink> | undefined
   /** The live Sun image's state (#105). */
   sun?: SunImageState | undefined
+  /** Drawn moons (#107), Earth's Moon among them. */
+  moons?: readonly MoonBody[] | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -40,22 +44,25 @@ const fmtKm = (km: number) =>
  * first, with the state vector behind a disclosure. Planet positions are a model
  * (JPL's approximate elements), and the panel says so.
  */
-export function Inspector({ ref, body, simMs, onClose, tracks, dsn, sun }: InspectorProps) {
+export function Inspector({ ref, body, simMs, onClose, tracks, dsn, sun, moons }: InspectorProps) {
   const headingId = useId()
   const jd = jdFromDate(new Date(simMs))
   if (!isBodyName(body)) {
+    const moon = moons?.find((m) => m.key === body)
     const track = tracks?.find((t) => t.id === body)
     return (
       <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
         <div className={styles.inspectorHead ?? ''}>
           <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
-            {track?.name ?? body}
+            {moon?.name ?? track?.name ?? body}
           </h2>
           <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
             Close
           </button>
         </div>
-        {track ? (
+        {moon ? (
+          <MoonFacts moon={moon} jd={jd} simMs={simMs} />
+        ) : track ? (
           <CraftFacts
             track={track}
             earth={tracks?.find((t) => t.naifId === '399') ?? null}

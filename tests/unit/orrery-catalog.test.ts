@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { buildCatalog } from '@/components/orrery/catalog'
+import { buildCatalog, noDataNotice } from '@/components/orrery/catalog'
 import { rimPoint, spreadRim } from '@/components/orrery/labelLayout'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
@@ -68,6 +68,68 @@ describe('buildCatalog', () => {
     expect(items.find((i) => i.label === 'SOHO')?.available).toBe(false)
     expect(buildCatalog(tracks, JD + 10).find((i) => i.label === 'Voyager 1')?.available).toBe(
       false,
+    )
+  })
+
+  it('lists the moons under Moons, Earth’s Moon once, flagged when no data covers the date (#107)', () => {
+    const moon = (key: string, name: string, parent: 'Earth' | 'Jupiter', ok: boolean) => ({
+      key,
+      name,
+      parent,
+      periodDays: 2,
+      semiMajorAxisKm: 1,
+      center: 'c',
+      target: null,
+      spans: [],
+      relative: () =>
+        ok
+          ? {
+              position: { x: 1, y: 0, z: 0 },
+              velocity: { x: 0, y: 0, z: 0 },
+              resolution: 'fine' as const,
+            }
+          : null,
+    })
+    const items = buildCatalog(tracks, JD, [
+      moon('naif:301', 'Moon', 'Earth', true),
+      moon('naif:501', 'Io', 'Jupiter', false),
+    ])
+    expect(items.filter((i) => i.label === 'Moon')).toHaveLength(1)
+    expect(items.find((i) => i.label === 'Moon')).toMatchObject({
+      key: 'naif:301',
+      kind: 'moon',
+      group: 'Moons',
+      available: true,
+    })
+    expect(items.find((i) => i.label === 'Io')).toMatchObject({
+      key: 'naif:501',
+      group: 'Moons',
+      available: false,
+    })
+  })
+
+  it('says how many craft and moons are hidden for want of data, or nothing (#114)', () => {
+    const item = (label: string, kind: 'craft' | 'moon' | 'planet', available: boolean) => ({
+      key: label,
+      label,
+      kind,
+      group: 'g',
+      available,
+    })
+    expect(noDataNotice([item('Mars', 'planet', true), item('Voyager 1', 'craft', true)])).toBe(
+      null,
+    )
+    expect(noDataNotice([item('Voyager 1', 'craft', false)])).toBe(
+      'Voyager 1 has no data for this date and is hidden. Positions are never extrapolated.',
+    )
+    expect(
+      noDataNotice([
+        item('Voyager 1', 'craft', false),
+        item('Io', 'moon', false),
+        item('Titan', 'moon', false),
+      ]),
+    ).toBe(
+      '1 spacecraft and 2 moons have no data for this date and are hidden. Positions are never extrapolated.',
     )
   })
 

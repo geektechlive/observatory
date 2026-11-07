@@ -7,9 +7,29 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_CRAFT_FILTER } from '@/components/orrery/craftFilter'
-import { CraftLayer } from '@/components/orrery/three/craftLayer'
+import {
+  CRAFT_MAX_PX,
+  CRAFT_MIN_PX,
+  CraftLayer,
+  craftRadius,
+} from '@/components/orrery/three/craftLayer'
 import { place3d } from '@/lib/orrery/scale'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
+
+describe('craftRadius (#107)', () => {
+  // Measured on the preview (2026-11-07): focusing Mars drew Psyche's 0.02-unit marker
+  // about 20 px across, and Earth drew Europa Clipper the same. A craft is a marker.
+  it('never draws a craft larger than CRAFT_MAX_PX close up', () => {
+    const unitsPerPx = 0.0007 // a planet focused at about 1.1 units
+    expect(craftRadius(0.02, unitsPerPx) / unitsPerPx).toBeCloseTo(CRAFT_MAX_PX, 6)
+  })
+
+  it('keeps its CRAFT_MIN_PX floor far away, and its scene size in between', () => {
+    expect(craftRadius(0.02, 0.05) / 0.05).toBeCloseTo(CRAFT_MIN_PX, 6)
+    const between = 0.02 / ((CRAFT_MIN_PX + CRAFT_MAX_PX) / 2)
+    expect(craftRadius(0.02, between)).toBeCloseTo(0.02, 9)
+  })
+})
 
 const JD = 2461350.5
 const toScene = (p: { x: number; y: number; z: number }) => {

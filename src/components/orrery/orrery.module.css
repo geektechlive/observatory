@@ -207,6 +207,11 @@
   color: var(--signal);
 }
 
+/* Moons (#107): quieter than their planets. */
+.moonLabel {
+  color: var(--bone-faint);
+}
+
 /* A deep-space craft beyond the view, pinned to the rim with its true distance; the
    arrow points the way it lies. Top and bottom markers are centred on their point. */
 .craftLabel[data-rim='top'],
@@ -280,11 +285,21 @@
   pointer-events: none;
 }
 
-.notice {
+/* Stage notices stack in the top-left corner (#114: the date-range note and the
+   no-data note can both show at once). */
+.notices {
   position: absolute;
   top: var(--space-4);
   left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   max-width: 34ch;
+  pointer-events: none;
+}
+
+.notice {
+  margin: 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius);
@@ -325,6 +340,11 @@
 .rates {
   display: flex;
   gap: var(--space-2);
+}
+
+/* Seven rates (#114): never break a label across lines. */
+.rates .rateBtn {
+  white-space: nowrap;
 }
 
 .dateField {
@@ -587,6 +607,16 @@
   .utc {
     min-width: 0;
     flex: 1 1 100%;
+  }
+
+  /* The rate row takes its own line and scrolls sideways if it must (#114). */
+  .rates {
+    flex: 1 1 100%;
+    overflow-x: auto;
+  }
+
+  .rates .rateBtn {
+    padding-inline: var(--space-2);
   }
 
   .dateField {

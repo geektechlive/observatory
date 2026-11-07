@@ -37,6 +37,18 @@ export function parseSimDate(text: string): number | null {
   return d.getTime()
 }
 
+/** The time bar's scrubber spans a year either side of its centre, in days. */
+export const SCRUB_DAYS = 365
+
+/**
+ * The scrubber's centre: today, until the clock leaves its ±1-year window (a typed date,
+ * or a year a second for a few seconds, #114); then the window moves to the clock, so
+ * the thumb is never stuck at an end.
+ */
+export function scrubCentre(centre: number, sim: number): number {
+  return Math.abs(sim - centre) > SCRUB_DAYS * DAY_MS ? sim : centre
+}
+
 /** The date-field form of a moment. */
 export function toDateField(ms: number): string {
   return formatSimUtc(ms).slice(0, -10)

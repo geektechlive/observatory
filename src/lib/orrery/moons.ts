@@ -25,6 +25,7 @@ export interface MoonSpec {
   readonly source: string
 }
 
+const MARS: MoonParent = { naifId: '499', name: 'Mars' }
 const JUPITER: MoonParent = { naifId: '599', name: 'Jupiter' }
 const SATURN: MoonParent = { naifId: '699', name: 'Saturn' }
 const URANUS: MoonParent = { naifId: '799', name: 'Uranus' }
@@ -33,6 +34,24 @@ const NEPTUNE: MoonParent = { naifId: '899', name: 'Neptune' }
 const HORIZONS = 'JPL Horizons physical data (read 2026-11-07)'
 
 export const MOONS: readonly MoonSpec[] = [
+  // Mars's moons, checked live on 2026-11-07: "Phobos (401)" / "Deimos (402)" around
+  // "Mars (499)" (Horizons mar099).
+  {
+    naifId: '401',
+    name: 'Phobos',
+    parent: MARS,
+    periodDays: 0.319,
+    semiMajorAxisKm: 9_377.2,
+    source: HORIZONS,
+  },
+  {
+    naifId: '402',
+    name: 'Deimos',
+    parent: MARS,
+    periodDays: 1.263,
+    semiMajorAxisKm: 23_463.2,
+    source: HORIZONS,
+  },
   {
     naifId: '501',
     name: 'Io',
@@ -142,12 +161,26 @@ export const MOON_WINDOW_DAYS = 15
  */
 export const MOON_SAMPLES_PER_ORBIT = 14
 
-/** Steps Horizons takes as whole hours or days, coarsest first. */
-export const MOON_STEPS_DAYS: readonly number[] = [1, 1 / 2, 1 / 4, 1 / 8, 1 / 12]
+/** Steps Horizons takes as whole days, hours or minutes, coarsest first. Phobos (7.7 h
+ *  orbit) needs the 30 min step. */
+export const MOON_STEPS_DAYS: readonly number[] = [1, 1 / 2, 1 / 4, 1 / 8, 1 / 12, 1 / 24, 1 / 48]
 
 /** The coarsest step that still samples the orbit MOON_SAMPLES_PER_ORBIT times. */
 export function moonStepDays(periodDays: number): number {
   const wanted = periodDays / MOON_SAMPLES_PER_ORBIT
   for (const step of MOON_STEPS_DAYS) if (step <= wanted) return step
-  return MOON_STEPS_DAYS[MOON_STEPS_DAYS.length - 1] ?? 1 / 12
+  return MOON_STEPS_DAYS[MOON_STEPS_DAYS.length - 1] ?? 1 / 48
+}
+
+/**
+ * Samples per moon, at most. Enceladus and Miranda at 2 h over ±15 days are 361; Phobos
+ * at 30 min would be 1,441 (about 170 kB), so a fast moon's window shrinks instead.
+ */
+export const MOON_MAX_SAMPLES = 400
+
+/** Days either side of now a moon is sampled: the full window, or fewer for a fast moon. */
+export function moonWindowDays(periodDays: number): number {
+  const step = moonStepDays(periodDays)
+  const fits = Math.floor((MOON_MAX_SAMPLES * step) / 2)
+  return Math.max(1, Math.min(MOON_WINDOW_DAYS, fits))
 }

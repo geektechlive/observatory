@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { buildCatalog } from '@/components/orrery/catalog'
@@ -14,7 +14,7 @@ import { SearchBox } from '@/components/orrery/SearchBox'
 import { TimeBar } from '@/components/orrery/TimeBar'
 import { parseHorizonsVectors } from '@/lib/horizons'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
-import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
+import { SIM_MAX_MS, simTimeAt, useOrreryClock } from '@/store/orreryClock'
 
 const T0 = Date.parse('2026-11-06T00:00:00Z')
 const DAY = 86_400_000
@@ -57,6 +57,51 @@ describe('TimeBar (#91)', () => {
     fireEvent.change(field, { target: { value: '4000-01-01' } })
     fireEvent.keyDown(field, { key: 'Enter' })
     expect(field.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('offers a week, a month and a year a second (#114)', () => {
+    render(<TimeBar now={() => T0} />)
+    fireEvent.click(screen.getByRole('radio', { name: /1 wk\/s/i }))
+    expect(useOrreryClock.getState().rate).toBe(7 * 86_400)
+    fireEvent.click(screen.getByRole('radio', { name: /1 mo\/s/i }))
+    expect(useOrreryClock.getState().rate).toBe(30 * 86_400)
+    fireEvent.click(screen.getByRole('radio', { name: /1 yr\/s/i }))
+    expect(useOrreryClock.getState().rate).toBe(365 * 86_400)
+    expect(useOrreryClock.getState().playing).toBe(true)
+  })
+
+  it('re-centres the scrubber on the clock once it leaves the ±1-year window (#114)', () => {
+    render(<TimeBar now={() => T0} />)
+    const slider = screen.getByRole('slider', { name: /date/i })
+    expect(slider.getAttribute('aria-valuetext')).not.toMatch(/beyond/)
+    act(() => {
+      useOrreryClock.getState().setSimTime(T0 + 3 * 365 * DAY)
+    })
+    // The window now sits around the clock: the thumb is mid-track, not pinned at an end.
+    expect(Number((slider as HTMLInputElement).value)).toBe(0)
+    // Dragging moves within the new window, not back to today's.
+    fireEvent.change(slider, { target: { value: '10' } })
+    expect(sim()).toBe(T0 + 3 * 365 * DAY + 10 * DAY)
+  })
+
+  it('pauses on reaching 3000 AD at 1 yr/s, with the planets at the edge (#114)', () => {
+    vi.useFakeTimers()
+    try {
+      const start = SIM_MAX_MS - 100 * DAY
+      act(() => {
+        useOrreryClock.getState().setSimTime(start)
+      })
+      render(<TimeBar now={() => T0} />)
+      fireEvent.click(screen.getByRole('radio', { name: /1 yr\/s/i }))
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+      expect(useOrreryClock.getState().playing).toBe(false)
+      expect(sim()).toBe(SIM_MAX_MS)
+      expect(screen.getByRole('button', { name: /play/i })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Now returns to the present at 1x', () => {
@@ -258,5 +303,62 @@ describe('Inspector for a spacecraft (#93)', () => {
     )
     expect(screen.getByRole('status').textContent).toMatch(/No data for this date/)
     expect(screen.queryByText('Light time')).toBeNull()
+  })
+})
+
+describe('Inspector for a moon (#107)', () => {
+  const io = {
+    key: 'naif:501',
+    name: 'Io',
+    parent: 'Jupiter' as const,
+    periodDays: 1.77,
+    semiMajorAxisKm: 422_000,
+    center: "Jupiter's centre (Horizons 500@599)",
+    target: 'Io (501)',
+    spans: [{ start: 2461340.5, step: 1, samples: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }],
+    relative: (jd: number) =>
+      jd < 2461351
+        ? {
+            position: { x: 0.00282, y: 0, z: 0 },
+            velocity: { x: 0, y: 0, z: 0 },
+            resolution: 'fine' as const,
+          }
+        : null,
+  }
+
+  it('names its planet, its distance from it, its period, the source, and that the view is not to scale', () => {
+    render(<Inspector body="naif:501" simMs={T0} moons={[io]} onClose={() => undefined} />)
+    expect(screen.getByRole('heading', { name: 'Io' })).toBeTruthy()
+    expect(screen.getByText('Jupiter')).toBeTruthy()
+    expect(screen.getByText(/421,8\d\d/)).toBeTruthy()
+    expect(screen.getByText(/1\.77 d/)).toBeTruthy()
+    expect(screen.getByText(/500@599/)).toBeTruthy()
+    expect(screen.getByText(/not to scale/i)).toBeTruthy()
+  })
+
+  it('says “no data for this date” outside its window', () => {
+    render(
+      <Inspector body="naif:501" simMs={T0 + 30 * DAY} moons={[io]} onClose={() => undefined} />,
+    )
+    expect(screen.getByRole('status').textContent).toMatch(/No data for this date/)
+  })
+
+  it('says how its orbit line is drawn: an osculating ellipse when the data is shorter than an orbit', () => {
+    // Data for one day of a 1.77-day orbit: too short to sample a whole orbit.
+    const w = (2 * Math.PI) / 1.77
+    const r = 0.00282
+    const short = {
+      ...io,
+      relative: (jd: number) =>
+        jd < 2461351
+          ? {
+              position: { x: r * Math.cos(w * jd), y: r * Math.sin(w * jd), z: 0 },
+              velocity: { x: -r * w * Math.sin(w * jd), y: r * w * Math.cos(w * jd), z: 0 },
+              resolution: 'fine' as const,
+            }
+          : null,
+    }
+    render(<Inspector body="naif:501" simMs={T0} moons={[short]} onClose={() => undefined} />)
+    expect(screen.getByText(/osculating ellipse/i)).toBeTruthy()
   })
 })

@@ -71,4 +71,32 @@ describe('layoutLabels (#91)', () => {
     const shown = layoutLabels([{ key: 'Mars', text: 'Mars', x: 10, y: 10, visible: false }])
     expect(shown.size).toBe(0)
   })
+
+  it('moves a craft label off a planet’s drawn disc (#107: Juno sat on Jupiter)', () => {
+    const jupiter = { x: 400, y: 300, r: 60 }
+    const shown = layoutLabels(
+      [{ key: 'Juno', text: 'Juno', x: 402, y: 300, visible: true, avoidDiscs: true }],
+      [jupiter],
+    )
+    const place = shown.get('Juno')
+    expect(place).toBeDefined()
+    // The label's left edge (anchor + dx + 8 px offset) clears the disc's right edge.
+    expect(402 + (place?.dx ?? 0) + 8).toBeGreaterThanOrEqual(jupiter.x + jupiter.r)
+  })
+
+  it('leaves a label alone when no disc is in the way, and planets’ own labels ignore discs', () => {
+    const disc = { x: 100, y: 100, r: 30 }
+    expect(
+      layoutLabels(
+        [{ key: 'Io', text: 'Io', x: 300, y: 100, visible: true, avoidDiscs: true }],
+        [disc],
+      ).get('Io'),
+    ).toEqual({ dy: 0 })
+    expect(
+      layoutLabels(
+        [{ key: 'Jupiter', text: 'Jupiter', x: 130, y: 100, visible: true }],
+        [disc],
+      ).get('Jupiter'),
+    ).toEqual({ dy: 0 })
+  })
 })

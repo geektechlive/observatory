@@ -13,11 +13,22 @@ export interface LabelCandidate {
   visible: boolean
   /** Never hidden by a collision (the body the voice line names). */
   mustShow?: boolean
+  /** Craft and moon labels keep off planets' drawn discs (#107: Juno sat on Jupiter). */
+  avoidDiscs?: boolean
 }
 
-/** Where a shown label goes: its vertical offset from the body, px. */
+/** A planet's drawn disc on screen, px. */
+export interface LabelDisc {
+  x: number
+  y: number
+  r: number
+}
+
+/** Where a shown label goes: its vertical offset from the body, px, and a sideways one
+ *  when it had to step off a planet's disc. */
 export interface LabelPlacement {
   dy: number
+  dx?: number
 }
 
 /**
@@ -158,22 +169,38 @@ export function spreadRim(
   return out
 }
 
-export function layoutLabels(items: readonly LabelCandidate[]): Map<string, LabelPlacement> {
+const discBox = (d: LabelDisc): Box => ({ l: d.x - d.r, r: d.x + d.r, t: d.y - d.r, b: d.y + d.r })
+
+export function layoutLabels(
+  items: readonly LabelCandidate[],
+  discs: readonly LabelDisc[] = [],
+): Map<string, LabelPlacement> {
   const placed: Box[] = []
   const shown = new Map<string, LabelPlacement>()
+  const discBoxes = discs.map(discBox)
   for (const item of items) {
     if (!item.visible) continue
-    const boxAt = (dy: number): Box => ({
-      l: item.x + OFFSET_X - PAD,
-      r: item.x + OFFSET_X + item.text.length * CHAR_PX + PAD,
+    const boxAt = (dy: number, dx = 0): Box => ({
+      l: item.x + dx + OFFSET_X - PAD,
+      r: item.x + dx + OFFSET_X + item.text.length * CHAR_PX + PAD,
       t: item.y + dy - HEIGHT_PX / 2 - PAD,
       b: item.y + dy + HEIGHT_PX / 2 + PAD,
     })
-    const free = SLOTS.find((dy) => !placed.some((p) => overlaps(boxAt(dy), p)))
+    // A label on a disc steps right, past the disc's edge, before trying its slots.
+    let dx = 0
+    if (item.avoidDiscs) {
+      for (const d of discBoxes) {
+        if (overlaps(boxAt(0, dx), d)) dx = Math.max(dx, d.r - item.x - OFFSET_X + PAD)
+      }
+    }
+    const blocked = (b: Box) =>
+      placed.some((p) => overlaps(b, p)) ||
+      (item.avoidDiscs === true && discBoxes.some((d) => overlaps(b, d)))
+    const free = SLOTS.find((dy) => !blocked(boxAt(dy, dx)))
     const dy = free ?? (item.mustShow ? (SLOTS.at(-1) ?? 0) : undefined)
     if (dy === undefined) continue
-    placed.push(boxAt(dy))
-    shown.set(item.key, { dy })
+    placed.push(boxAt(dy, dx))
+    shown.set(item.key, dx === 0 ? { dy } : { dy, dx })
   }
   return shown
 }

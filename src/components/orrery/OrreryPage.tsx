@@ -12,12 +12,13 @@ import {
   PLANETS,
   rangeRateKmS,
 } from '@/lib/orrery'
+import { moonBodies } from '@/lib/orrery/moonState'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
-import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 
 import consoleStyles from '../consoles/console.module.css'
-import { buildCatalog } from './catalog'
+import { buildCatalog, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { Inspector } from './Inspector'
@@ -77,7 +78,7 @@ const RIM_INSET = 14
 const RING_LABEL_MIN_WIDTH = 600
 const LOADING = { state: 'loading' } as const
 const NO_TRACKS: readonly OrreryTrack[] = []
-const MOON_ID = 'naif:301'
+const NO_MOONS: readonly OrreryMoon[] = []
 const VOICE_EMPTY: VoiceInput = {
   quakes: LOADING,
   kp: LOADING,
@@ -175,6 +176,10 @@ export function OrreryPage() {
     () => tracks.filter((t) => t.category === 'spacecraft' || t.category === 'space_telescope'),
     [tracks],
   )
+  // Moons (#107): the payload's planet-centred ones and Earth's Moon from Moon minus Earth.
+  const payloadMoons = bodies.data?.moons ?? NO_MOONS
+  const moons = useMemo(() => moonBodies(payloadMoons, tracks), [payloadMoons, tracks])
+  const moonParent = useMemo(() => new Map(moons.map((m) => [m.key, m.parent])), [moons])
   const dsnQuery = useDsn()
   const dsn = useMemo(() => dsnContactsById(dsnQuery.data), [dsnQuery.data])
   const dsnIds = useMemo(() => new Set(dsn.keys()), [dsn])
@@ -182,7 +187,10 @@ export function OrreryPage() {
   const jdNow = jdFromDate(new Date(sim))
   // Whole days are enough for "no data for this date" in the search list.
   const catalogDay = Math.floor(jdNow)
-  const catalog = useMemo(() => buildCatalog(tracks, catalogDay + 0.5), [tracks, catalogDay])
+  const catalog = useMemo(
+    () => buildCatalog(tracks, catalogDay + 0.5, moons),
+    [tracks, catalogDay, moons],
+  )
 
   // The label pass runs per drawn frame, outside React: it reads these through refs.
   const selectedRef = useRef<SceneKey | null>(null)
@@ -260,6 +268,10 @@ export function OrreryPage() {
   useEffect(() => {
     renderer?.setTracks(tracks)
   }, [renderer, tracks])
+
+  useEffect(() => {
+    renderer?.setMoons(moons)
+  }, [renderer, moons])
 
   // The live Sun's frame and time, for the inspector (#105).
   useEffect(() => {
@@ -343,6 +355,10 @@ export function OrreryPage() {
           .map((i) => i.name),
       )
       const ordered = labelOrder(items, selectedRef.current, subjectNow, boosted)
+      // Planets' drawn discs: craft and moon labels keep off them (#107: Juno on Jupiter).
+      const discs = items
+        .filter((i) => i.kind === 'body' && i.visible)
+        .map((i) => ({ x: i.x, y: i.y, r: i.radiusPx }))
       const shown = layoutLabels(
         ordered.map((i) => ({
           key: i.name,
@@ -351,7 +367,9 @@ export function OrreryPage() {
           y: i.y,
           visible: inView(i),
           mustShow: i.name === subjectNow,
+          avoidDiscs: i.kind === 'craft' || i.kind === 'moon',
         })),
+        discs,
       )
       const seen = new Set<SceneKey>()
       for (const item of items) {
@@ -379,7 +397,7 @@ export function OrreryPage() {
         node.dataset['rim'] = ''
         if (distance) distance.textContent = ''
         const place = shown.get(item.name)
-        node.style.left = `${String(item.x + item.radiusPx)}px`
+        node.style.left = `${String(item.x + item.radiusPx + (place?.dx ?? 0))}px`
         node.style.top = `${String(item.y + (place?.dy ?? 0))}px`
         // A stacked label carries a short rule back to its body (see .label[data-stacked]).
         node.dataset['stacked'] = place && place.dy !== 0 ? String(Math.sign(place.dy)) : ''
@@ -419,10 +437,11 @@ export function OrreryPage() {
       setSelected(key)
       setPreset(null)
       setSheetOpen(false)
-      // The Moon sits inside Earth's marker at this scale (#92 separates them).
-      renderer?.focusOn(key === MOON_ID ? 'Earth' : key)
+      // A moon moves fast around its planet: the camera holds the planet's neighbourhood,
+      // where the moon is drawn (#107).
+      renderer?.focusOn(moonParent.get(key) ?? key)
     },
-    [renderer],
+    [renderer, moonParent],
   )
 
   // Tap or click a body on the canvas to select it. A drag (the camera turning) is not a
@@ -486,6 +505,8 @@ export function OrreryPage() {
     nearest: nearest ? { state: 'ok', data: nearest } : { state: 'error' },
   })
   const outOfRange = heliocentric('Earth', jdNow)
+  // Craft and moons outside their data spans hide; the stage says so (#114).
+  const noData = bodies.status === 'success' ? noDataNotice(catalog) : null
   const craftStatus = craftStatusText(
     bodies.status,
     craftTracks.length,
@@ -585,20 +606,46 @@ export function OrreryPage() {
               <span data-rim-distance="" />
             </button>
           ))}
+          {moons.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              hidden
+              data-kind="moon"
+              ref={(el) => {
+                if (el) labelNodes.current.set(m.key, el)
+                else labelNodes.current.delete(m.key)
+              }}
+              className={`${styles.label ?? ''} ${styles.moonLabel ?? ''}`}
+              aria-pressed={selected === m.key}
+              onClick={() => {
+                select(m.key)
+              }}
+            >
+              {m.name}
+            </button>
+          ))}
         </div>
         {scale !== 'proportional' && <p className={styles.badge ?? ''}>NOT TO SCALE</p>}
-        {failed && (
-          <p className={styles.notice ?? ''} role="status">
-            The 3D view needs WebGL, which this browser could not start. Reload to try again.
-          </p>
-        )}
-        {!failed && (outOfRange.outOfRange || outOfRange.table === 2) && (
-          <p className={styles.notice ?? ''} role="status">
-            {outOfRange.outOfRange
-              ? 'Outside 3000 BC – 3000 AD: no JPL table is valid, so positions are rough.'
-              : 'Outside 1800–2050: using JPL’s long-window table (Table 2), a little less precise.'}
-          </p>
-        )}
+        <div className={styles.notices ?? ''}>
+          {failed && (
+            <p className={styles.notice ?? ''} role="status">
+              The 3D view needs WebGL, which this browser could not start. Reload to try again.
+            </p>
+          )}
+          {!failed && (outOfRange.outOfRange || outOfRange.table === 2) && (
+            <p className={styles.notice ?? ''} role="status">
+              {outOfRange.outOfRange
+                ? 'Outside 3000 BC – 3000 AD: no JPL table is valid, so positions are rough.'
+                : 'Outside 1800–2050: using JPL’s long-window table (Table 2), a little less precise.'}
+            </p>
+          )}
+          {!failed && noData && (
+            <p className={styles.notice ?? ''} role="status" data-orrery-nodata="">
+              {noData}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           className={`${styles.chipBtn ?? ''} ${styles.sheetToggle ?? ''}`}
@@ -618,6 +665,7 @@ export function OrreryPage() {
             tracks={tracks}
             dsn={dsn}
             sun={sun}
+            moons={moons}
             onClose={() => {
               setSelected(null)
             }}

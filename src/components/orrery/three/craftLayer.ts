@@ -56,6 +56,19 @@ export interface StalkView {
   foot: Vector3
 }
 
+/** A craft marker never draws smaller or larger than these radii, px. */
+export const CRAFT_MIN_PX = 3
+export const CRAFT_MAX_PX = 5
+
+/**
+ * A craft marker's radius, scene units: its scene size, kept between CRAFT_MIN_PX and
+ * CRAFT_MAX_PX on screen. Without the cap, a planet focused close up drew a nearby
+ * craft's marker 20 px across (#107: Psyche beside Mars).
+ */
+export function craftRadius(sceneRadius: number, unitsPerPx: number): number {
+  return Math.min(CRAFT_MAX_PX * unitsPerPx, Math.max(sceneRadius, CRAFT_MIN_PX * unitsPerPx))
+}
+
 /** A stalk is drawn only for craft more than this far off the ecliptic, au. */
 export const STALK_MIN_OFFSET_AU = 1
 /** Tick half-size as a share of the foot's distance from the Sun, scene units (min 0.05). */

@@ -14,11 +14,13 @@ import { type HorizonsSample, parseHorizonsVectors } from '@/lib/horizons'
 import { stateAt } from '@/lib/orrery/ephemeris'
 import { moonScenePosition } from '@/lib/orrery/moonPlacement'
 import {
+  MOON_MAX_SAMPLES,
   MOON_SAMPLES_PER_ORBIT,
   MOON_STEPS_DAYS,
   MOON_WINDOW_DAYS,
   MOONS,
   moonStepDays,
+  moonWindowDays,
 } from '@/lib/orrery/moons'
 import { AU_KM } from '@/lib/orrery/units'
 import { OrreryBodiesSchema } from '@/schemas/orreryBodies'
@@ -70,9 +72,43 @@ describe('MOONS catalogue', () => {
     expect(io?.periodDays).toBeCloseTo(1.77, 2)
     expect(io?.semiMajorAxisKm).toBe(422_000)
     for (const m of MOONS) {
-      expect(m.periodDays, m.name).toBeGreaterThan(1)
-      expect(m.semiMajorAxisKm, m.name).toBeGreaterThan(100_000)
+      expect(m.periodDays, m.name).toBeGreaterThan(0.3)
+      expect(m.semiMajorAxisKm, m.name).toBeGreaterThan(9_000)
       expect(m.source, m.name).toMatch(/Horizons/)
+    }
+  })
+
+  it("lists Mars's two moons, checked live against Horizons (Chris: no Mars moons)", () => {
+    const byName = new Map(MOONS.map((m) => [m.name, m]))
+    expect(byName.get('Phobos')).toMatchObject({
+      naifId: '401',
+      parent: { naifId: '499', name: 'Mars' },
+      periodDays: 0.319,
+      semiMajorAxisKm: 9_377.2,
+    })
+    expect(byName.get('Deimos')).toMatchObject({
+      naifId: '402',
+      parent: { naifId: '499', name: 'Mars' },
+      periodDays: 1.263,
+      semiMajorAxisKm: 23_463.2,
+    })
+  })
+})
+
+describe('moonWindowDays', () => {
+  it('keeps the slow moons on the full window', () => {
+    for (const name of ['Io', 'Enceladus', 'Miranda', 'Titan', 'Iapetus']) {
+      const m = MOONS.find((x) => x.name === name)
+      expect(moonWindowDays(m?.periodDays ?? 0), name).toBe(MOON_WINDOW_DAYS)
+    }
+  })
+
+  it("shortens a fast moon's window so no moon carries more than MOON_MAX_SAMPLES", () => {
+    expect(moonWindowDays(0.319)).toBe(4) // Phobos: 30 min steps, ±4 days
+    for (const m of MOONS) {
+      const samples = (2 * moonWindowDays(m.periodDays)) / moonStepDays(m.periodDays) + 1
+      expect(samples, m.name).toBeLessThanOrEqual(MOON_MAX_SAMPLES + 1)
+      expect(moonWindowDays(m.periodDays), m.name).toBeGreaterThanOrEqual(1)
     }
   })
 })
@@ -91,6 +127,8 @@ describe('moonStepDays', () => {
     expect(moonStepDays(1.370218)).toBe(1 / 12) // Enceladus: 2 h
     expect(moonStepDays(15.945421)).toBe(1) // Titan: 1 d
     expect(moonStepDays(79.33)).toBe(1) // Iapetus: never coarser than a day
+    expect(moonStepDays(0.319)).toBe(1 / 48) // Phobos: 30 min
+    expect(moonStepDays(1.263)).toBe(1 / 12) // Deimos: 2 h
   })
 
   it('keeps the window short enough to keep the payload small', () => {

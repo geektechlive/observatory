@@ -20,7 +20,7 @@ import {
   CRAFT,
   FINE_WINDOW_DAYS,
 } from '../src/lib/orrery/craft.ts'
-import { MOON_WINDOW_DAYS, MOONS, moonStepDays } from '../src/lib/orrery/moons.ts'
+import { MOONS, moonStepDays, moonWindowDays } from '../src/lib/orrery/moons.ts'
 
 const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 const DAY_MS = 86_400_000
@@ -42,8 +42,9 @@ const round = (value, decimals) => Number(value.toFixed(decimals))
 
 class BudgetExceeded extends Error {}
 
-/** Horizons' STEP_SIZE: "12 h" below a day, else whole days. */
+/** Horizons' STEP_SIZE: "30 m" below an hour (Phobos, #107), "12 h" below a day, else days. */
 export function stepSize(days) {
+  if (days < 1 / 24) return `${String(Math.round(days * 1440))} m`
   return days < 1 ? `${String(Math.round(days * 24))} h` : `${String(days)} d`
 }
 
@@ -198,12 +199,14 @@ export async function buildOrreryBodies({
 
   // The major moons (#107): a fine span each, relative to their planet, stepped so even
   // Io gets 14 samples an orbit. They go in `moons`, apart from the heliocentric bodies.
+  // A fast moon (Phobos) gets a shorter window so it stays under MOON_MAX_SAMPLES.
   const moons = []
-  const moonStart = jdFromMs(Math.floor((now - MOON_WINDOW_DAYS * DAY_MS) / DAY_MS) * DAY_MS)
-  const moonStop = moonStart + 2 * MOON_WINDOW_DAYS
   for (const moon of MOONS) {
     if (only && !only.includes(moon.naifId)) continue
     const id = `naif:${moon.naifId}`
+    const days = moonWindowDays(moon.periodDays)
+    const moonStart = jdFromMs(Math.floor((now - days * DAY_MS) / DAY_MS) * DAY_MS)
+    const moonStop = moonStart + 2 * days
     try {
       const spec = { naifId: moon.naifId, center: moon.parent.naifId }
       const got = await fetchSpan(spec, moonStart, moonStop, moonStepDays(moon.periodDays), ask, now)

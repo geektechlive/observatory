@@ -38,13 +38,15 @@ import {
 } from '@/lib/orrery'
 import type { BodyName } from '@/lib/orrery/bodies'
 import { earthState } from '@/lib/orrery/craftState'
+import type { MoonBody } from '@/lib/orrery/moonState'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
 import type { CraftFilter } from '../craftFilter'
 import { BodySkins } from './bodySkins'
-import { CraftLayer } from './craftLayer'
+import { CRAFT_MIN_PX, CraftLayer, craftRadius } from './craftLayer'
 import { type FocusPreset, FOV, frameView } from './framing'
+import { MoonLayer } from './moonLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
 export type { CraftFilter } from '../craftFilter'
@@ -67,7 +69,7 @@ export interface ProjectedBody {
   /** What its label says. */
   label: string
   /** 'ring': the heliopause marker's label anchor (#93), not a body. */
-  kind: 'body' | 'craft' | 'ring'
+  kind: 'body' | 'craft' | 'moon' | 'ring'
   /** Screen position, px; may lie outside the canvas (rim markers use that). */
   x: number
   y: number
@@ -82,11 +84,14 @@ export interface ProjectedBody {
   /** Craft: its group and NAIF id. */
   group?: string
   naifId?: string
+  /** Moon: the planet it circles (#107). */
+  parent?: string
 }
 
 /** Craft markers: tiny in the scene, a few px on screen. */
 const CRAFT_RADIUS = { exaggerated: 0.02, log: 0.012, proportional: 0.0005 } as const
-const CRAFT_MIN_PX = 3
+/** Moons never draw smaller than this, px (#107). */
+const MOON_MIN_PX = 2.5
 const HELIOPAUSE_SAMPLES = 180
 /** Heliosphere refits to hold the craft once the sim date has moved this far, days. */
 const HELIOSPHERE_REFIT_DAYS = 180
@@ -188,6 +193,8 @@ export class OrreryRenderer {
   private readonly bodyGroup = new Group()
   /** Spacecraft from JPL Horizons (#93); placed through the same scale as the planets. */
   private readonly craft = new CraftLayer((pos) => this.toScene(pos))
+  /** Major moons and Earth's Moon (#107), around their planets as drawn. */
+  private readonly moons = new MoonLayer()
   /** Faint dashed ring where Voyager 1 crossed the heliopause (#93), approximate. */
   private readonly heliopause = new Line(
     new BufferGeometry(),
@@ -286,6 +293,10 @@ export class OrreryRenderer {
       this.craft.markers,
     )
     this.orbitGroup.add(this.heliopause)
+    // The Planets switch hides the moons with their planets; their loops are orbits, so
+    // they sit with the planets' orbit lines under the Orbits switch too.
+    this.bodyGroup.add(this.moons.group)
+    this.orbitGroup.add(this.moons.orbits)
     this.scene.add(
       new AmbientLight(new Color(1, 1, 1), AMBIENT_INTENSITY),
       new PointLight(new Color(1, 1, 1), SUNLIGHT_INTENSITY, 0, 0),
@@ -365,7 +376,7 @@ export class OrreryRenderer {
     }
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
-      c.mesh.scale.setScalar(Math.max(this.radiusOf(c.key), CRAFT_MIN_PX * this.unitsPerPx(depth)))
+      c.mesh.scale.setScalar(craftRadius(this.radiusOf(c.key), this.unitsPerPx(depth)))
     }
     // Maps once a planet is big enough on screen; the flat dot below that (#105).
     // A body out of view counts as size 0, so its map is not fetched until it is seen.
@@ -379,6 +390,34 @@ export class OrreryRenderer {
     }, this.bodies)
     this.canvas.dataset['orrerySkins'] = skinned.join(',')
     this.skins.faceCamera(this.camera.position)
+    this.placeMoons()
+  }
+
+  /**
+   * Moons go around their planet as drawn this frame (after its minimum size), so they
+   * always clear it; then they get their own px floor.
+   */
+  private placeMoons(): void {
+    this.moons.place(
+      this.lastJd,
+      (planet) => {
+        const mesh = this.bodies.get(planet)
+        if (!mesh) return null
+        const depth = mesh.position.distanceTo(this.camera.position)
+        const radius = mesh.scale.x
+        return {
+          position: mesh.position,
+          radius,
+          radiusPx: radius / this.unitsPerPx(depth),
+          inView: this.projectOne(mesh).visible,
+        }
+      },
+      this.focusBody,
+    )
+    for (const m of this.moons.visible()) {
+      const depth = m.mesh.position.distanceTo(this.camera.position)
+      m.mesh.scale.setScalar(Math.max(m.mesh.scale.x, MOON_MIN_PX * this.unitsPerPx(depth)))
+    }
   }
 
   /** Scene radius of a distance from the Sun, under the current mode. */
@@ -456,7 +495,17 @@ export class OrreryRenderer {
   /** Where a body or craft is drawn now, scene space. */
   bodyPosition(name: SceneKey): Vector3 {
     if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? new Vector3()
+    if (this.moons.has(name)) {
+      const parent = this.moons.parentOf(name)
+      return this.moons.position(name) ?? (parent ? this.bodyPosition(parent) : new Vector3())
+    }
     return this.craft.position(name) ?? new Vector3()
+  }
+
+  /** The moons to draw (#107): the payload's planet-centred ones and Earth's Moon. */
+  setMoons(bodies: readonly MoonBody[]): void {
+    this.moons.setMoons(bodies)
+    this.markDirty()
   }
 
   /** The orrery's craft, Earth and Moon from /api/orrery-bodies (#93). */
@@ -566,6 +615,7 @@ export class OrreryRenderer {
     this.visibility = v
     this.bodyGroup.visible = v.planets
     this.orbitGroup.visible = v.orbits
+    this.moons.setOrbitsVisible(v.planets)
     // Out-of-plane stalks are orbit furniture: the same switch (#93).
     this.craft.setStalksVisible(v.orbits)
     this.markDirty()
@@ -687,6 +737,15 @@ export class OrreryRenderer {
     if (this.visibility.planets) {
       for (const [name, mesh] of this.bodies) {
         out.push({ name, label: name, kind: 'body', ...this.projectOne(mesh) })
+      }
+      for (const m of this.moons.visible()) {
+        out.push({
+          name: m.key,
+          label: m.label,
+          kind: 'moon',
+          parent: m.parent,
+          ...this.projectOne(m.mesh),
+        })
       }
     }
     for (const c of this.craft.visible()) {
@@ -831,6 +890,18 @@ export class OrreryRenderer {
     d['orreryCalls'] = String(render.calls)
     // Craft drawn now, and the selected craft's path split (#93), for the e2e checks.
     d['orreryCraft'] = String(this.craft.visible().length)
+    // Each planet's drawn radius, px, and the moons drawn now, by name (#107 e2e checks).
+    d['orrerySizes'] = [...this.bodies]
+      .map(([name, mesh]) => {
+        const depth = mesh.position.distanceTo(this.camera.position)
+        return `${name}:${(mesh.scale.x / this.unitsPerPx(depth)).toFixed(1)}`
+      })
+      .join(',')
+    d['orreryMoonOrbits'] = String(this.visibility.orbits ? this.moons.drawnOrbits() : 0)
+    d['orreryMoons'] = this.moons
+      .visible()
+      .map((m) => m.label)
+      .join(',')
     const path = this.craft.trajectoryCounts()
     d['orreryTrajectory'] = path ? `${String(path.past)},${String(path.future)}` : ''
   }
@@ -855,6 +926,7 @@ export class OrreryRenderer {
       ;(line.material as LineBasicMaterial).dispose()
     }
     this.craft.dispose()
+    this.moons.dispose()
     this.sunImage.stop()
     this.skins.dispose()
     this.heliopause.geometry.dispose()

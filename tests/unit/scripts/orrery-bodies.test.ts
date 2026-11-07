@@ -82,6 +82,9 @@ describe('stepSize and horizonsUrl', () => {
     expect(stepSize(1)).toBe('1 d')
     expect(stepSize(0.5)).toBe('12 h')
     expect(stepSize(30)).toBe('30 d')
+    // Phobos (#107) needs steps under an hour; Horizons takes minutes as "m".
+    expect(stepSize(1 / 24)).toBe('1 h')
+    expect(stepSize(1 / 48)).toBe('30 m')
   })
 
   it('asks for heliocentric ecliptic J2000 vectors, position and velocity, as CSV', () => {
@@ -164,6 +167,16 @@ describe('buildOrreryBodies: major moons (#107)', () => {
     expect(jdOf(ioCall?.stop ?? '') - start).toBe(30)
     // Six numbers per sample: position and velocity, for Hermite.
     expect((parsed.moons[0]?.fine.samples.length ?? 1) % 6).toBe(0)
+  })
+
+  it('asks for Phobos around Mars every 30 min over a shorter ±4-day window', async () => {
+    const h = fakeWithCenter(anySpan)
+    await buildOrreryBodies({ now: NOW, fetchText: h.fetchText, pauseMs: 0 })
+    const phobos = h.calls.find((c) => c.command === '401')
+    expect(phobos?.center).toBe('500@499')
+    expect(phobos?.step).toBe('30 m')
+    expect(jdOf(phobos?.stop ?? '') - jdOf(phobos?.start ?? '')).toBe(8)
+    expect(h.calls.find((c) => c.command === '402')?.center).toBe('500@499')
   })
 
   it('lists a moon Horizons cannot serve as missing, and keeps the bodies and other moons', async () => {

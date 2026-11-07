@@ -1,20 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Label } from '@/components/ui/Label'
-import { PLAYBACK_RATES, useOrreryClock } from '@/store/orreryClock'
+import { PLAYBACK_RATES, simAtEdge, useOrreryClock } from '@/store/orreryClock'
 
 import styles from './orrery.module.css'
-import { DAY_MS, formatSimUtc, parseSimDate, toDateField } from './simDate'
+import { DAY_MS, formatSimUtc, parseSimDate, SCRUB_DAYS, scrubCentre, toDateField } from './simDate'
 import { useSimTime } from './useSimTime'
 
+/** What each rate button shows: short, so seven fit one row (#114). Its name is RATE_LABEL. */
+const RATE_SHORT: Record<(typeof PLAYBACK_RATES)[number], string> = {
+  1: '1×',
+  60: 'min/s',
+  3600: 'h/s',
+  86_400: 'day/s',
+  604_800: 'wk/s',
+  2_592_000: 'mo/s',
+  31_536_000: 'yr/s',
+}
 const RATE_LABEL: Record<(typeof PLAYBACK_RATES)[number], string> = {
   1: '1×',
   60: '1 min/s',
   3600: '1 h/s',
   86_400: '1 day/s',
+  604_800: '1 wk/s',
+  2_592_000: '1 mo/s',
+  31_536_000: '1 yr/s',
 }
-/** The scrubber spans a year either side of the real now, in days. */
-const SCRUB_DAYS = 365
 const WEEK = 7
 
 interface TimeBarProps {
@@ -29,14 +40,24 @@ interface TimeBarProps {
  */
 export function TimeBar({ now = Date.now }: TimeBarProps) {
   const clock = useOrreryClock()
-  const { sim, wall } = useSimTime()
+  const { sim } = useSimTime()
   const [field, setField] = useState<string | null>(null)
   const [invalid, setInvalid] = useState(false)
-  const offsetDays = Math.round((sim - wall) / DAY_MS)
-  const inRange = Math.abs(offsetDays) <= SCRUB_DAYS
+  const [centre, setCentre] = useState(now)
+  // Move the window with the clock during render (React's "adjust state on a prop
+  // change" pattern), so the thumb never draws pinned at an end first.
+  const nextCentre = scrubCentre(centre, sim)
+  if (nextCentre !== centre) setCentre(nextCentre)
+  const offsetDays = Math.round((sim - nextCentre) / DAY_MS)
+
+  // Past Table 2's window there are no valid planet elements: the clock stops there.
+  const { playing, pause } = clock
+  useEffect(() => {
+    if (playing && simAtEdge(sim)) pause()
+  }, [playing, pause, sim])
 
   const setOffset = (days: number) => {
-    clock.setSimTime(now() + days * DAY_MS)
+    clock.setSimTime(nextCentre + days * DAY_MS)
   }
   const step = (days: number) => {
     clock.step(days * DAY_MS)
@@ -60,7 +81,9 @@ export function TimeBar({ now = Date.now }: TimeBarProps) {
         type="button"
         className={styles.chipBtn ?? ''}
         onClick={() => {
-          clock.resetToNow(now())
+          const t = now()
+          clock.resetToNow(t)
+          setCentre(t)
         }}
       >
         Now
@@ -82,8 +105,8 @@ export function TimeBar({ now = Date.now }: TimeBarProps) {
       <input
         type="range"
         className={styles.scrub ?? ''}
-        aria-label="Date, days from today"
-        aria-valuetext={`${formatSimUtc(sim)}${inRange ? '' : ' (beyond the scrubber; use the date field)'}`}
+        aria-label="Date, days either side of the scrubber's centre"
+        aria-valuetext={formatSimUtc(sim)}
         min={-SCRUB_DAYS}
         max={SCRUB_DAYS}
         step={1}
@@ -105,13 +128,14 @@ export function TimeBar({ now = Date.now }: TimeBarProps) {
             type="button"
             role="radio"
             aria-checked={clock.rate === r}
+            aria-label={RATE_LABEL[r]}
             className={styles.rateBtn ?? ''}
             onClick={() => {
               clock.setRate(r)
               if (!clock.playing) clock.play()
             }}
           >
-            {RATE_LABEL[r]}
+            {RATE_SHORT[r]}
           </button>
         ))}
       </div>

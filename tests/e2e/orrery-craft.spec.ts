@@ -158,11 +158,18 @@ test.describe('Spacecraft in the orrery (#93)', () => {
     await date.fill('1990-01-01')
     await date.press('Enter')
     await expect(canvas(page)).toHaveAttribute('data-orrery-craft', '0')
+    // The stage says why they vanished (#114), not just the search list.
+    await expect(page.locator('[data-orrery-nodata]')).toContainText(
+      '4 spacecraft have no data for this date and are hidden',
+    )
     await page.getByRole('combobox', { name: /find/i }).fill('voyager')
     await expect(page.getByRole('option').first()).toContainText('no data for this date')
     await page.getByRole('option').first().click()
     await expect(
-      page.getByRole('status').filter({ hasText: 'No data for this date' }),
+      page
+        .getByRole('complementary')
+        .getByRole('status')
+        .filter({ hasText: 'No data for this date' }),
     ).toBeVisible()
   })
 })

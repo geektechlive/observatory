@@ -7,6 +7,7 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
+import { serveMoons } from './moonPayload'
 import { offlineSun } from './swpc'
 
 test.beforeEach(async ({ page }) => {
@@ -60,10 +61,16 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Performance.enable')
   const metric = async (name: string) => {
+    // Count what is retained, not garbage waiting for the collector. With the moon
+    // payload (#107) the uncollected count read 3,484 nodes against 1,620 at the start;
+    // after a forced collection it stays within bounds.
+    await cdp.send('HeapProfiler.collectGarbage')
     const { metrics } = await cdp.send('Performance.getMetrics')
     return metrics.find((m) => m.name === name)?.value ?? NaN
   }
 
+  // Moons (#107) too: focusing Mars and Jupiter draws and hides them every cycle.
+  await serveMoons(page)
   await page.goto('/#orrery')
   await expect(page.locator('[data-orrery-mode]')).toHaveAttribute('data-orrery-mode', 'webgl', {
     timeout: 20_000,
@@ -79,8 +86,10 @@ test('preset, drag, zoom and search cycles leave loops, listeners and GPU object
     await page.mouse.move(x, y)
     await page.mouse.wheel(0, i % 2 ? 120 : -120)
     const search = page.getByRole('combobox', { name: /find/i })
-    await search.fill(i % 2 ? 'mars' : 'saturn')
+    // Planets with moons in turn: their moons and orbit loops come and go (#107).
+    await search.fill(['mars', 'jupiter', 'saturn', 'earth'][i % 4] ?? 'mars')
     await search.press('Enter')
+    await expect(canvas(page)).not.toHaveAttribute('data-orrery-moons', '')
     await page.getByRole('button', { name: 'Close', exact: true }).click()
   }
 
