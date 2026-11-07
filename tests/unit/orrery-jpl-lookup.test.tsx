@@ -166,6 +166,13 @@ describe('SearchBox: JPL fallback (#100)', () => {
     expect(screen.getByRole('button', { name: 'Show in orrery' })).toBeDefined()
   })
 
+  it('says how long a busy queue asked to wait (#145)', async () => {
+    stubApi({ '/api/lookup': () => json({ error: 'x' }, 503, { 'Retry-After': '20' }) })
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
+    expect(await screen.findByText('JPL is busy right now. Try again in 20 s.')).toBeDefined()
+  })
+
   it('says when JPL has no such object (#145)', async () => {
     stubApi({ '/api/lookup': () => json({ error: 'x' }, 404) })
     wrap(<SearchBox onSelect={vi.fn()} />)
