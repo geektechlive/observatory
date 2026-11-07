@@ -1,0 +1,90 @@
+{
+  "data": [
+    {
+      "type": "object",
+      "id": "20577",
+      "attributes": {
+        "cosparId": "1990-037B",
+        "vimpelId": null,
+        "satno": 20580,
+        "name": "Hubble Space Telescope",
+        "objectClass": "Payload",
+        "mass": 11258.67,
+        "shape": "Cyl + 2 Pan",
+        "width": null,
+        "height": 13.1,
+        "depth": null,
+        "diameter": 4.3,
+        "span": 13.1,
+        "xSectMax": 58.17179500174723,
+        "xSectMin": 14.522012041218817,
+        "xSectAvg": 51.502484564787665,
+        "firstEpoch": "1990-04-24",
+        "mission": "Civil Astronomy",
+        "predDecayDate": "2034-07-12",
+        "active": true,
+        "cataloguedFragments": 0,
+        "onOrbitCataloguedFragments": 0
+      },
+      "relationships": {
+        "operators": {
+          "links": {
+            "self": "/api/objects/20577/relationships/operators",
+            "related": "/api/objects/20577/operators"
+          },
+          "data": [
+            {
+              "type": "organisation",
+              "id": "338"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "id": "44371",
+      "attributes": {
+        "cosparId": "1998-067A",
+        "vimpelId": null,
+        "satno": 25544,
+        "name": "International Space Station",
+        "objectClass": "Payload",
+        "mass": 450000,
+        "shape": "Irr",
+        "width": 72.8,
+        "height": 20,
+        "depth": 108.5,
+        "diameter": null,
+        "span": 108.5,
+        "xSectMax": 8319.848402465035,
+        "xSectMin": 1456,
+        "xSectAvg": 5762.4,
+        "firstEpoch": "1998-12-07",
+        "mission": "Civil Spaceship",
+        "predDecayDate": "2026-05-12",
+        "active": null,
+        "cataloguedFragments": 0,
+        "onOrbitCataloguedFragments": 0
+      },
+      "relationships": {
+        "operators": {
+          "links": {
+            "self": "/api/objects/44371/relationships/operators",
+            "related": "/api/objects/44371/operators"
+          },
+          "data": []
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "type": "organisation",
+      "id": "338",
+      "attributes": {
+        "name": "NASA Goddard Space Flight Center"
+      }
+    }
+  ]
+}

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -8,8 +11,35 @@ import {
   parseDiscosObjects,
 } from '@/lib/discos'
 
-// Synthetic JSON:API answers in DISCOSweb's documented shape (data[], included[],
-// attributes, relationships); the live dry run replaces these with recorded ones.
+// Synthetic JSON:API answers in DISCOSweb's shape (data[], included[], attributes,
+// relationships), then real ones recorded in the live dry run (fixtures/discos).
+
+const fixture = (name: string): unknown =>
+  JSON.parse(readFileSync(join(__dirname, 'fixtures', 'discos', name), 'utf8'))
+
+describe('real DISCOSweb answers (recorded 2026-11-07 22:23 UTC)', () => {
+  it('every orrery craft comes back under its COSPAR id with the name expected', () => {
+    const objects = parseDiscosObjects(fixture('craft.json'))
+    for (const [naif, c] of Object.entries(CRAFT_COSPAR)) {
+      const o = objects.find((x) => x.cosparId === c.cospar)
+      expect(o, naif).toBeDefined()
+      expect(nameMatches(o?.name ?? '', c.expect), `${naif} ${o?.name ?? ''}`).toBe(true)
+    }
+    const v1 = objects.find((o) => o.cosparId === '1977-084A')
+    expect(v1?.massKg).toBe(817.64)
+    expect(v1?.operators).toEqual(['Jet Propulsion Lab'])
+  })
+
+  it('the ISS and Hubble by NORAD number', () => {
+    const objects = parseDiscosObjects(fixture('satellites.json'))
+    expect(objects.find((o) => o.satno === '25544')).toMatchObject({
+      name: 'International Space Station',
+      massKg: 450000,
+      spanM: 108.5,
+    })
+    expect(objects.find((o) => o.satno === '20580')?.name).toBe('Hubble Space Telescope')
+  })
+})
 
 describe('the orrery craft by COSPAR id', () => {
   it('covers the craft drawn in the orrery, each with a name to check the answer by', () => {

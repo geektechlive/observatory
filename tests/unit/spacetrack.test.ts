@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
+import { toRow } from '@/lib/orbit/satCatalog'
 import {
   boxscoreUrl,
   bucketHistory,
@@ -21,7 +25,63 @@ import {
 
 // Synthetic records: the field names follow Space-Track's own column names, as shown in
 // its SATCAT, Box Score and Decay/Reentry tables (2026-11-07). Values are made up but
-// typed as Space-Track sends them (JSON with numbers as strings).
+// typed as Space-Track sends them (JSON with numbers as strings). The last block reads
+// real answers recorded in the live dry run (tests/unit/fixtures/spacetrack).
+
+const fixture = (name: string): unknown =>
+  JSON.parse(readFileSync(join(__dirname, 'fixtures', 'spacetrack', name), 'utf8'))
+
+describe('real Space-Track answers (recorded 2026-11-07 22:23 UTC)', () => {
+  it('TIP: nine messages, five objects, soonest first', () => {
+    const tip = parseTip(fixture('tip.json'))
+    expect(tip).toHaveLength(5)
+    expect(tip[0]).toMatchObject({
+      noradId: '45532',
+      decayEpoch: '2026-11-08T05:41:00Z',
+      windowMin: 780,
+    })
+    expect(tip.every((r, i) => i === 0 || (tip[i - 1]?.decayEpoch ?? '') <= r.decayEpoch)).toBe(
+      true,
+    )
+  })
+
+  it('Decay: names, both kinds, Space-Track dates with a one-digit hour', () => {
+    const decays = parseDecays(fixture('decay.json'))
+    expect(decays.find((d) => d.noradId === '45700')).toMatchObject({
+      name: 'STARLINK-1400',
+      kind: 'prediction',
+      decayEpoch: '2026-11-11T20:32:00Z',
+    })
+    expect(decays.some((d) => d.kind === 'historical')).toBe(true)
+  })
+
+  it('Box Score: the totals Space-Track showed that evening', () => {
+    expect(parseBoxscore(fixture('boxscore.json'))).toEqual({
+      inOrbit: { payload: 19870, rocketBody: 2434, debris: 12545, unassigned: 677, total: 35526 },
+      decayed: { payload: 8415, rocketBody: 4494, debris: 22858, total: 35767 },
+      catalogued: 71293,
+    })
+  })
+
+  it('SATCAT: Vanguard 1 first, as a compact row', () => {
+    expect(parseSatcat(fixture('satcat.json'))[0]).toEqual([
+      '5',
+      '1958-002B',
+      'PAYLOAD',
+      'US',
+      '1958-03-17',
+      'AFETR',
+      'MEDIUM',
+    ])
+  })
+
+  it('GP_HISTORY: element sets that json2satrec rows accept, thinned to weeks', () => {
+    const omms = fixture('gp_history.json') as Record<string, unknown>[]
+    const rows = bucketHistory(omms).map((o) => toRow(o))
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every((r) => r !== null && r[1] === '25544')).toBe(true)
+  })
+})
 
 const day = (iso: string) => Date.parse(iso)
 
