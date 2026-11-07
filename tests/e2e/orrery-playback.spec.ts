@@ -60,15 +60,19 @@ async function open(page: Page) {
 test('1 yr/s advances the readout by about a year a second', async ({ page }) => {
   await open(page)
   const before = await readoutYear(page)
+  // Click latency under a loaded full run reached seconds (#115: 3.76 years read against
+  // a 5.4 s window). The clock surely ran at 1 yr/s from the rate click's return to the
+  // Pause click, and at most from before the first click to after the second.
   const started = Date.now()
   await page.getByRole('radio', { name: '1 yr/s' }).click()
+  const running = Date.now()
   await page.waitForTimeout(3000)
+  const pausing = Date.now()
   await page.getByRole('button', { name: 'Pause' }).click()
-  const seconds = (Date.now() - started) / 1000
+  const stopped = Date.now()
   const years = (await readoutYear(page)) - before
-  // A year per wall second, give or take the click and readout latency.
-  expect(years).toBeGreaterThan(seconds * 0.75)
-  expect(years).toBeLessThan(seconds * 1.1)
+  expect(years).toBeGreaterThan(((pausing - running) / 1000) * 0.9)
+  expect(years).toBeLessThan(((stopped - started) / 1000) * 1.1)
 })
 
 test('ten seconds at 1 yr/s leave loops, draws and GPU objects flat, and say what hid', async ({
