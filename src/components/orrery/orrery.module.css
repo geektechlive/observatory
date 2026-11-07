@@ -343,9 +343,11 @@
   min-width: 21ch;
 }
 
+/* The scrubber takes what the controls leave. Its basis must not exceed its minimum, or
+   flex-wrap breaks the row on the basis before the scrubber shrinks (#117). */
 .scrub {
-  flex: 1 1 160px;
-  min-width: 120px;
+  flex: 1 1 96px;
+  min-width: 96px;
   accent-color: var(--copper);
 }
 
@@ -354,8 +356,10 @@
   gap: var(--space-2);
 }
 
-/* Seven rates (#114): never break a label across lines. */
+/* Seven rates (#114): never break a label across lines, and keep them tight enough that
+   the bar holds one row on a 1280 px desktop (#117). */
 .rates .rateBtn {
+  padding-inline: var(--space-2);
   white-space: nowrap;
 }
 
