@@ -35,7 +35,11 @@ function parseHash(): HashState {
   return { view, layers }
 }
 
-function buildHash(view: ConsoleView, layers: Record<LayerKey, boolean>): string {
+/** Views that draw the Earth globe or map, the only ones the layers apply to. */
+const LAYER_VIEWS: ReadonlySet<ConsoleView> = new Set(['earth', 'orbit'])
+
+export function buildHash(view: ConsoleView, layers: Record<LayerKey, boolean>): string {
+  if (!LAYER_VIEWS.has(view)) return `#${view}`
   const enabled = LAYER_KEYS.filter((k) => layers[k])
   return enabled.length > 0 ? `#${view}?layers=${enabled.join(',')}` : `#${view}`
 }
