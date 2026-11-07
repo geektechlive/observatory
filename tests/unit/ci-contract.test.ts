@@ -162,6 +162,20 @@ describe('refresh job time (#128)', () => {
   })
 })
 
+describe('refresh job accounts (#101)', () => {
+  // The Space-Track and DISCOSweb steps skip with a warning when their secrets are
+  // absent, so a missing env line would go quiet rather than fail: pin it here.
+  const workflow = readFileSync(join(WORKFLOW_DIR, 'data-refresh.yml'), 'utf8')
+  const refreshJob = workflow.slice(workflow.indexOf('  refresh:'), workflow.indexOf('  health:'))
+
+  it.each(['SPACETRACK_USER', 'SPACETRACK_PASS', 'DISCOSWEB_TOKEN'])(
+    'passes %s from the repository secrets to the refresh step',
+    (name) => {
+      expect(refreshJob).toContain(`${name}: \${{ secrets.${name} }}`)
+    },
+  )
+})
+
 describe('Vite configs', () => {
   // Vite's future native config loader has no CommonJS globals; it warned on every
   // build and test run until #95.

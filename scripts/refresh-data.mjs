@@ -6,7 +6,9 @@
 // here one request at a time, never on the request path; see orrery-bodies.mjs), and
 // /api/orrery-neo (#92: close approaches placed with Horizons, JPL Scout and ESA NEOCC;
 // see orrery-neo.mjs), and /api/orrery-smallbodies (#99: comets and the interstellar
-// objects; see orrery-smallbodies.mjs).
+// objects; see orrery-smallbodies.mjs), and /api/spacetrack (#101: re-entries, the
+// satellite catalogue, the Box Score and a few objects' element history from
+// Space-Track.org, with the owner's account; see spacetrack.mjs).
 //
 // Why this exists: CelesTrak returns HTTP 522 to Cloudflare Workers egress (observed
 // from about 2026-09-03), so the Pages Functions cannot fetch TLEs themselves. An
@@ -29,11 +31,16 @@
 //   ... --dry-run --only=orrery-smallbodies --smallbodies-out=/tmp/sb.json
 //                                            just the comets and interstellar objects (#99)
 //   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
+//   ... --dry-run --only=spacetrack --spacetrack-out=/tmp/st.json
+//                                            just Space-Track (#101); needs SPACETRACK_USER
+//                                            and SPACETRACK_PASS, else it is skipped
 //
 // Env (write mode only):
 //   CLOUDFLARE_API_TOKEN   token with "Workers KV Storage: Edit" on the account
 //   CLOUDFLARE_ACCOUNT_ID  account that owns the namespace
 //   KV_NAMESPACE_ID        optional override, defaults to the observatory namespace
+// Env (any mode, optional):
+//   SPACETRACK_USER, SPACETRACK_PASS  the Space-Track.org account (#101); never logged
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -46,6 +53,12 @@ import {
   buildOrrerySmallBodies,
   DEFAULT_BUDGET_MS as SMALLBODIES_BUDGET_MS,
 } from './orrery-smallbodies.mjs'
+import {
+  buildSpaceTrack,
+  DEFAULT_BUDGET_MS as SPACETRACK_BUDGET_MS,
+  satcatShards,
+  spaceTrackCredentials,
+} from './spacetrack.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(HERE, '..')
@@ -77,6 +90,15 @@ export const KEY_ORRERY_SMALLBODIES = 'horizons:smallbodies:v1'
 const SMALLBODIES_SIGNATURE = 'refresh:orrery-smallbodies'
 /** Spans run 30 days either side, so /api/orrery-smallbodies serves a copy up to 72 h old. */
 const SMALLBODIES_MAX_AGE_MS = 72 * 3_600_000
+/** Space-Track (#101): re-entries, recent decays, the Box Score; see spacetrack.mjs. */
+export const KEY_SPACETRACK_CATALOG = 'spacetrack:catalog:v1'
+/** GP_HISTORY element sets, each month asked once ever; rewritten only when it grows. */
+export const KEY_SPACETRACK_HISTORY = 'spacetrack:history:v1'
+/** SATCAT, in shards by NORAD id, rewritten once a day. */
+export const SPACETRACK_SATCAT_KEY = (shard) => `spacetrack:satcat:v1:${String(shard)}`
+const SPACETRACK_SIGNATURE = 'refresh:spacetrack'
+/** TIP is asked every run; /api/spacetrack calls a catalogue past 36 h degraded. */
+const SPACETRACK_MAX_AGE_MS = 36 * 3_600_000
 const APOD_INDEX = 'https://science.nasa.gov/apod/'
 
 const FETCH_TIMEOUT_MS = 20_000
@@ -788,6 +810,94 @@ export async function refreshOrrerySmallBodies(config, deps = {}) {
   }
 }
 
+/**
+ * Space-Track (#101): the catalogue every run, the SATCAT shards once a day, and the
+ * history when it gained months, each a finished body with its time in the metadata.
+ * Skipped with a warning when the account isn't configured (a local run, or before the
+ * secrets were added). A failure is judged by the age of the catalogue it would replace.
+ */
+export async function refreshSpaceTrack(config, deps = {}) {
+  const credentials = spaceTrackCredentials(deps.env ?? process.env)
+  if (!credentials) {
+    const detail = `${SPACETRACK_SIGNATURE} skipped: SPACETRACK_USER and SPACETRACK_PASS not set`
+    console.warn(detail)
+    return { entry: { signature: SPACETRACK_SIGNATURE, ok: true, warning: true, detail }, writes: [] }
+  }
+  const now = deps.now ?? Date.now()
+  const previousCatalogText =
+    deps.previousCatalogText !== undefined
+      ? deps.previousCatalogText
+      : await readKv(KEY_SPACETRACK_CATALOG, config)
+  const previousHistoryText =
+    deps.previousHistoryText !== undefined
+      ? deps.previousHistoryText
+      : await readKv(KEY_SPACETRACK_HISTORY, config)
+  const previousCatalog = parseJsonOrNull(previousCatalogText)
+  try {
+    const budgetMs = deps.budgetMs ?? SPACETRACK_BUDGET_MS
+    if (budgetMs <= 0) throw new Error('job deadline reached (#128)')
+    const { catalog, satcat, history, requests } = await buildSpaceTrack({
+      now,
+      credentials,
+      previous: { catalog: previousCatalog, history: parseJsonOrNull(previousHistoryText) },
+      budgetMs,
+      ...(deps.http === undefined ? {} : { http: deps.http }),
+      ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+    })
+    const fetchedAt = catalog.generatedAt
+    const writes = [
+      {
+        key: KEY_SPACETRACK_CATALOG,
+        value: JSON.stringify(catalog),
+        metadata: {
+          fetchedAt,
+          reentries: catalog.tip?.reentries.length ?? 0,
+          missing: catalog.missing.length,
+        },
+      },
+    ]
+    if (satcat) {
+      for (const shard of satcatShards(satcat, fetchedAt)) {
+        writes.push({
+          key: SPACETRACK_SATCAT_KEY(shard.shard),
+          value: JSON.stringify(shard),
+          metadata: { fetchedAt, rows: shard.rows.length },
+        })
+      }
+    }
+    if (history) {
+      writes.push({
+        key: KEY_SPACETRACK_HISTORY,
+        value: JSON.stringify(history),
+        metadata: { fetchedAt, objects: history.objects.length },
+      })
+    }
+    const missing = catalog.missing.map((m) => `${m.id} (${m.reason})`)
+    const detail =
+      `ok ${SPACETRACK_SIGNATURE} ${String(catalog.tip?.reentries.length ?? 0)} re-entries, ` +
+      `SATCAT ${satcat ? `${String(satcat.length)} objects` : 'not due'}, ` +
+      `history ${history ? 'updated' : 'unchanged'}, ${String(requests)} requests` +
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+    console.log(detail)
+    return {
+      entry: { signature: SPACETRACK_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      writes,
+    }
+  } catch (err) {
+    const verdict = classifyFailure({
+      err,
+      envelopeText: previousCatalog
+        ? JSON.stringify({ fetchedAt: previousCatalog.generatedAt })
+        : previousCatalogText,
+      maxAgeMs: SPACETRACK_MAX_AGE_MS,
+      now,
+    })
+    const detail = `${SPACETRACK_SIGNATURE} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    return { entry: { ...verdict, signature: SPACETRACK_SIGNATURE, detail }, writes: [] }
+  }
+}
+
 async function main(argv) {
   const dryRun = argv.includes('--dry-run')
   // Local runs: --only=orrery-bodies skips the other sources; --bodies-out=path saves
@@ -798,6 +908,7 @@ async function main(argv) {
   const smallOut = argv
     .find((a) => a.startsWith('--smallbodies-out='))
     ?.slice('--smallbodies-out='.length)
+  const stOut = argv.find((a) => a.startsWith('--spacetrack-out='))?.slice('--spacetrack-out='.length)
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
@@ -876,6 +987,29 @@ async function main(argv) {
     })
     report.push(entry)
     for (const write of satWrites) writes.push({ ...write, entry })
+  }
+
+  if (!only || only === 'spacetrack') {
+    // Space-Track (#101): its own account and pace, inside what is left of the job.
+    const began = Date.now()
+    const { entry, writes: stWrites } = await refreshSpaceTrack(config, {
+      budgetMs: stepBudget(SPACETRACK_BUDGET_MS, deadline),
+    })
+    console.log(
+      `  ${SPACETRACK_SIGNATURE} took ${String(Math.round((Date.now() - began) / 1000))} s`,
+    )
+    report.push(entry)
+    for (const write of stWrites) {
+      writes.push({ ...write, entry })
+      console.log(`  ${write.key}: ${String(write.value.length)} bytes`)
+    }
+    if (dryRun && stOut && stWrites.length > 0) {
+      await writeFile(
+        stOut,
+        JSON.stringify(Object.fromEntries(stWrites.map((w) => [w.key, JSON.parse(w.value)]))),
+      )
+      console.log(`  saved the Space-Track bodies to ${stOut}`)
+    }
   }
 
   if (dryRun) {
