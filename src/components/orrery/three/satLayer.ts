@@ -28,6 +28,7 @@ import {
   Vector3,
 } from 'three'
 
+import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import { SAT_OK } from '@/lib/orbit/bulk/satStatus'
 import { SAT_GROUPS, type SatCategory, type SatGroupId } from '@/lib/orbit/satCatalog'
 import { EARTH_FRAME_SPREAD, EARTH_RADIUS_KM, GEO_RADII } from '@/lib/orrery/earthFrame'
@@ -459,6 +460,11 @@ export class SatLayer {
   /** Whether the points are close enough to pick now. */
   pickable(): boolean {
     return this.display.pickable
+  }
+
+  /** The loaded field's names, ids, groups, orbit classes and launches (the browser, #158). */
+  field(): SatFieldInfo | null {
+    return this.ctl.field()
   }
 
   snapshot(): SatSnapshot {

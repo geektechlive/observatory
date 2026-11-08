@@ -11,6 +11,7 @@ import {
   resolveFocus,
   serialiseOrreryLink,
 } from './orreryLink'
+import { satIdFromFocus, satLinkStep } from './satLink'
 import type { FocusPreset, OrreryRenderer, SceneKey } from './three/OrreryRenderer'
 
 /** A scrub is many clock changes in a row; the address is written once it settles. */
@@ -36,6 +37,19 @@ interface LinkOptions {
    */
   requestLookup: (spkid: string) => void
   lookupFailed: boolean
+  /**
+   * A link to a satellite (`sat:<NORAD id>`, #158) opens the Earth orbit view, waits for
+   * its group, and widens to every group once if it isn't in the loaded ones (see
+   * satLinkStep). `version` changes whenever the loaded satellites do.
+   */
+  sats: {
+    has: (key: string) => boolean
+    settled: boolean
+    allOn: boolean
+    version: unknown
+    openOrbit: () => void
+    widen: () => void
+  }
 }
 
 const onOrrery = () => /^#\/?orrery(\?|$)/i.test(window.location.hash)
@@ -52,6 +66,8 @@ type Pending = Pick<OrreryLink, 'focus' | 'preset'>
  */
 export function useOrreryLink(o: LinkOptions): void {
   const pending = useRef<Pending | null>(null)
+  // The Earth orbit view is opened once per link to a satellite (#158).
+  const satOpened = useRef(false)
   // Bumped when the address brings a new link, to run the apply step again.
   const [linkSeq, setLinkSeq] = useState(0)
   const latest = useRef(o)
@@ -89,6 +105,7 @@ export function useOrreryLink(o: LinkOptions): void {
       }
       if (link.focus !== null || link.preset !== null) {
         pending.current = { focus: link.focus, preset: link.preset }
+        satOpened.current = false
         setLinkSeq((n) => n + 1)
       }
     }
@@ -111,8 +128,31 @@ export function useOrreryLink(o: LinkOptions): void {
       const ready = catalog.some((i) => i.key === want.focus && i.available)
       if (!ready && !lookupFailed) return
     }
-    const key = want.focus === null ? null : resolveFocus(want.focus, catalog)
-    if (spkid === null && want.focus !== null && key === null && !settled) return // still loading
+    // A satellite (#158) is found among the loaded groups, not the catalog.
+    const satId = want.focus === null ? null : satIdFromFocus(want.focus)
+    let key: string | null
+    if (satId !== null && want.focus !== null) {
+      const { sats } = latest.current
+      if (!satOpened.current) {
+        satOpened.current = true
+        sats.openOrbit()
+      }
+      const step = satLinkStep({
+        found: sats.has(want.focus),
+        settled: sats.settled,
+        allOn: sats.allOn,
+      })
+      if (step === 'wait') return
+      if (step === 'widen') {
+        sats.widen()
+        return
+      }
+      key = step === 'select' ? want.focus : null
+    } else {
+      key = want.focus === null ? null : resolveFocus(want.focus, catalog)
+      if (spkid === null && want.focus !== null && key === null && !settled) return // still loading
+    }
+    satOpened.current = false
     pending.current = null
     const { select, applyPreset } = latest.current
     // Select first: selecting clears the preset, and a link with both means the camera
@@ -121,7 +161,7 @@ export function useOrreryLink(o: LinkOptions): void {
     if (want.preset !== null) applyPreset(want.preset)
     // An unknown focus, or a preset already showing, changes no state: write now.
     write.current()
-  }, [renderer, catalog, settled, lookupFailed, linkSeq])
+  }, [renderer, catalog, settled, lookupFailed, linkSeq, o.sats.version, o.sats.allOn])
 
   const { selected, preset } = o
   const shown = useRef({ selected, preset })

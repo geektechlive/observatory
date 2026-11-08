@@ -1,8 +1,14 @@
+import { lazy, Suspense, useId, useState } from 'react'
+
 import { boxscoreLine } from '@/lib/satcatWords'
 
 import styles from './orrery.module.css'
+import type { SatBrowserProps } from './SatBrowser'
 import { SAT_TOGGLES, type SatToggles } from './satToggles'
 import { Switch } from './Switch'
+
+/** The browser (#158) is its own chunk, fetched when first opened. */
+const SatBrowser = lazy(() => import('./SatBrowser').then((m) => ({ default: m.SatBrowser })))
 
 interface SatControlsProps {
   toggles: SatToggles
@@ -16,6 +22,8 @@ interface SatControlsProps {
     | undefined
   /** How many objects Space-Track predicts will re-enter in the next 7 days (#101). */
   reentriesThisWeek?: number | undefined
+  /** What the satellite browser needs (#158); without it there is no Browse button. */
+  browse?: Omit<SatBrowserProps, 'toggles' | 'onToggles'> | undefined
 }
 
 /**
@@ -29,7 +37,10 @@ export function SatControls({
   status,
   boxscore,
   reentriesThisWeek = 0,
+  browse,
 }: SatControlsProps) {
+  const [browsing, setBrowsing] = useState(false)
+  const panelId = useId()
   return (
     <section className={styles.group ?? ''} aria-labelledby="orrery-sats">
       <h2 id="orrery-sats" className={styles.groupTitle ?? ''}>
@@ -58,6 +69,37 @@ export function SatControls({
         </p>
       )}
       {boxscore && <p className={styles.switchHint ?? ''}>{boxscoreLine(boxscore)}</p>}
+      {browse && (
+        <>
+          <button
+            type="button"
+            className={styles.chipBtn ?? ''}
+            aria-expanded={browsing}
+            aria-controls={panelId}
+            onClick={() => {
+              setBrowsing((b) => !b)
+            }}
+          >
+            {browsing ? 'Close the satellite browser' : 'Browse satellites'}
+          </button>
+          <p className={styles.switchHint ?? ''}>
+            Find satellites without knowing a name: by kind, orbit, launch date and more.
+          </p>
+          <div id={panelId}>
+            {browsing && (
+              <Suspense
+                fallback={
+                  <p className={styles.switchHint ?? ''} role="status">
+                    Opening the browser…
+                  </p>
+                }
+              >
+                <SatBrowser {...browse} toggles={toggles} onToggles={onToggles} />
+              </Suspense>
+            )}
+          </div>
+        </>
+      )}
     </section>
   )
 }
