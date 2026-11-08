@@ -1,0 +1,324 @@
+/* The guide drawer (#159). It takes the inspector's place: a drawer on the right from
+   900px, a sheet along the bottom below it. While a lesson is on show it collapses to a
+   bar, so the inspector can open where the drawer was. */
+
+.drawer {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  bottom: 96px;
+  z-index: 4;
+  width: min(340px, calc(100% - 2 * var(--space-4)));
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius-panel);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--plate-shadow);
+  color: var(--bone-dim);
+}
+
+.drawer[hidden] {
+  display: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  color: var(--bone);
+  font: italic 400 var(--text-lg) / 1.1 var(--font-display);
+}
+
+.title:focus-visible {
+  outline: 1px solid var(--copper-glow);
+  outline-offset: 4px;
+}
+
+.group {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--copper-glow);
+  font: 500 var(--text-xs) / 1.2 var(--font-mono);
+  letter-spacing: var(--track-engrave);
+  text-transform: uppercase;
+}
+
+.text {
+  margin: var(--space-2) 0;
+  color: var(--bone-dim);
+  font: 400 var(--text-sm) / 1.5 var(--font-body);
+}
+
+.btn,
+.show {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  background: var(--plate-bg);
+  color: var(--bone-dim);
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: var(--track-label);
+  cursor: pointer;
+}
+
+.show {
+  border-color: var(--copper-2);
+  color: var(--copper-glow);
+}
+
+.show:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:hover {
+  color: var(--bone);
+}
+
+.show:hover:not(:disabled) {
+  color: var(--bone);
+}
+
+.lesson {
+  margin-block: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+}
+
+.lessonTitle {
+  margin: 0 0 var(--space-1);
+  color: var(--bone);
+  font: italic 400 var(--text-base) / 1.2 var(--font-display);
+}
+
+.try {
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--bone-dim);
+  font: 400 var(--text-sm) / 1.5 var(--font-body);
+}
+
+.try strong,
+.text strong {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.note {
+  margin: var(--space-2) 0 0;
+  color: var(--amber);
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+}
+
+.sourceNote {
+  margin-top: var(--space-3);
+  color: var(--bone-faint);
+  font: 400 var(--text-xs) / 1.4 var(--font-body);
+}
+
+.sourceNote summary {
+  cursor: pointer;
+}
+
+.sourceNote ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+}
+
+.section {
+  margin-block: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--plate-edge);
+}
+
+.section summary {
+  padding-block: var(--space-2);
+  color: var(--bone);
+  font: 500 var(--text-sm) / 1.3 var(--font-body);
+  cursor: pointer;
+}
+
+.list,
+.marks,
+.sources {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-4);
+  color: var(--bone-dim);
+  font: 400 var(--text-sm) / 1.5 var(--font-body);
+}
+
+.list li,
+.sources li {
+  margin-block: var(--space-2);
+}
+
+.marks {
+  padding-left: 0;
+  list-style: none;
+}
+
+.marks li {
+  display: flex;
+  gap: var(--space-3);
+  margin-block: var(--space-2);
+}
+
+.marks strong {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.dot {
+  flex: none;
+  inline-size: 10px;
+  block-size: 10px;
+  margin-top: 6px;
+  border: 1px solid var(--bone-faint);
+  border-radius: 50%;
+}
+
+.dot[data-tone='cyan'] {
+  border-color: var(--signal);
+  background: var(--signal);
+}
+
+.dot[data-tone='amber'] {
+  border-color: var(--amber);
+  background: var(--amber);
+}
+
+.dot[data-tone='red'] {
+  border-color: var(--mcrn);
+  background: var(--mcrn);
+}
+
+.dot[data-tone='bone'] {
+  border-color: var(--bone);
+  background: var(--bone);
+}
+
+.terms {
+  margin: var(--space-2) 0;
+}
+
+.terms dt {
+  color: var(--bone);
+  font: 600 var(--text-sm) / 1.4 var(--font-body);
+}
+
+.terms dd {
+  margin: 0 0 var(--space-3);
+  color: var(--bone-dim);
+  font: 400 var(--text-sm) / 1.5 var(--font-body);
+}
+
+.sources {
+  padding-left: 0;
+  list-style: none;
+}
+
+.sources a {
+  display: block;
+  color: var(--copper-glow);
+}
+
+.sources span {
+  display: block;
+}
+
+.fresh {
+  color: var(--bone-faint);
+  font-size: var(--text-xs);
+}
+
+/* The collapsed state: a bar where the drawer was, with the inspector opening below it. */
+.bar {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 4;
+  width: min(340px, calc(100% - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--copper-2);
+  border-radius: var(--radius-panel);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--plate-shadow);
+}
+
+.barTitle {
+  margin: 0 0 var(--space-2);
+  overflow: hidden;
+  color: var(--bone);
+  font: italic 400 var(--text-base) / 1.2 var(--font-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.barTry {
+  margin-top: var(--space-2);
+  color: var(--bone-dim);
+  font: 400 var(--text-xs) / 1.4 var(--font-body);
+}
+
+.barTry summary {
+  cursor: pointer;
+}
+
+/* The tip opens inside the bar, which grows; the page measures the bar (onBarHeight) and
+   the inspector starts below it, so the tip never hides the rows it points at. */
+.barTry p {
+  max-height: 30dvh;
+  margin: var(--space-2) 0 0;
+  overflow-y: auto;
+}
+
+@media (width <= 899px) {
+  .drawer {
+    inset: auto var(--space-2) var(--space-2);
+    z-index: 6;
+    width: auto;
+    max-height: 70%;
+  }
+
+  .bar {
+    top: 48px;
+    right: var(--space-2);
+    left: var(--space-2);
+    z-index: 6;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    width: auto;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .barTitle {
+    margin: 0;
+  }
+
+  .barTry {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+
+  .barTry p {
+    max-height: 16dvh;
+  }
+}

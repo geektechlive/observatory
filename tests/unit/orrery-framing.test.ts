@@ -7,6 +7,7 @@ import { PerspectiveCamera, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import {
+  FILL,
   FOV,
   framePreset,
   frameView,
@@ -147,6 +148,27 @@ describe('Heliosphere holds the deep-space craft in 3D (#93)', () => {
       const neptuneNearest = Math.min(...NEPTUNE.map(gap))
       const v1 = points[0] ?? new Vector3()
       expect(gap(v1)).toBeGreaterThan(neptuneNearest)
+    })
+  }
+
+  // #159: on a phone the guide's bar covers the top of the stage; craft keep clear of it.
+  for (const aspect of [0.8, 0.45]) {
+    it(`at aspect ${String(aspect)}: a top reserve keeps every craft below the covered strip`, () => {
+      const TOP = 0.4
+      const view = frameView('heliosphere', aspect, toScene, {
+        points,
+        bottomReserveNdc: RESERVE,
+        topReserveNdc: TOP,
+      })
+      const camera = new PerspectiveCamera(FOV, aspect, 0.001, 1e7)
+      camera.updateProjectionMatrix()
+      camera.position.copy(view.position)
+      camera.lookAt(view.target)
+      camera.updateMatrixWorld()
+      for (const p of [...points, ...NEPTUNE]) {
+        const v = p.clone().project(camera)
+        expect(v.y).toBeLessThanOrEqual(FILL - TOP + 1e-3)
+      }
     })
   }
 })

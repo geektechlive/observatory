@@ -746,3 +746,113 @@
     transition: none;
   }
 }
+
+/* The first-visit nudge (#159): a small note above the time bar, never a modal. */
+.guideChip {
+  position: absolute;
+  left: var(--space-4);
+  bottom: 96px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  max-width: calc(100% - 2 * var(--space-4));
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.guideChipText {
+  color: var(--bone);
+  font: italic 400 var(--text-sm) / 1.2 var(--font-display);
+}
+
+/* "What's this?" beside an inspector term (#159): the word is a button, the definition
+   opens under it. */
+.term {
+  position: relative;
+  display: inline-block;
+}
+
+.termBtn {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted var(--bone-faint);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: help;
+}
+
+.termBtn:hover,
+.termBtn[aria-expanded='true'] {
+  border-bottom-color: var(--copper-glow);
+  color: var(--bone);
+}
+
+.termNote {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 100%;
+  inset-inline-start: 0;
+  inline-size: min(28ch, 70vw);
+  margin-block-start: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  background: var(--plate-bg);
+  box-shadow: var(--plate-shadow);
+  color: var(--bone-dim);
+  font: 400 var(--text-xs) / 1.45 var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.termName {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+/* The Guide button on the stage is for phones, where the rail is behind Controls (#159). */
+.guideToggle {
+  display: none;
+}
+
+/* A lesson on show collapses the guide to a bar; the inspector opens below it. */
+.stage[data-guide='compact'] .inspector {
+  /* The guide's bar grows when its tip opens: the page passes its height. */
+  top: calc(var(--space-4) + var(--guide-bar-h, 90px) + var(--space-3));
+}
+
+@media (width <= 899px) {
+  .guideToggle {
+    display: inline-flex;
+    position: absolute;
+    top: var(--space-3);
+    left: 108px;
+    z-index: 3;
+  }
+
+  .guideChip {
+    bottom: 132px;
+    left: var(--space-3);
+  }
+
+  /* A lesson on show: the stage is small, so the bar is one row, the inspector sheet is
+     short, and the notices wait, leaving the scene the lesson is about in view. */
+  .stage[data-guide='compact'] .inspector {
+    top: auto;
+
+    /* Short, and shorter while the tip is open, so its heading is never under the bar. */
+    max-height: max(72px, min(30%, calc(100% - var(--guide-bar-h, 0px) - 64px)));
+  }
+
+  .stage[data-guide='compact'] .notices {
+    display: none;
+  }
+}

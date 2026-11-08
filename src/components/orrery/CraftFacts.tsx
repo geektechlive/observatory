@@ -10,6 +10,7 @@ import type { DiscosObject } from '@/schemas/spaceTrack'
 import { DiscosFacts } from './DiscosFacts'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
+import { Term } from './Term'
 
 const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
 const fmtKm = (km: number) =>
@@ -92,18 +93,24 @@ export function CraftFacts({ track, earth, jd, simMs, link, physical }: CraftFac
                 {fmtKm(d.earthDistanceAu * AU_KM * KM_TO_MI)} mi
               </Label>
             </dd>
-            <dt>Light time</dt>
+            <dt>
+              <Term id="light-time">Light time</Term>
+            </dt>
             <dd>
               <Readout value={formatLightTime(d.lightTimeFromEarthS)} />
             </dd>
-            <dt>Seen from Earth</dt>
+            <dt>
+              <Term id="range-rate">Seen from Earth</Term>
+            </dt>
             <dd>
               <Readout value={Math.abs(d.rangeRateKmS).toFixed(1)} unit="km/s" />{' '}
               <Label>{d.rangeRateKmS < 0 ? 'approaching' : 'receding'}</Label>
             </dd>
             {track.category !== 'moon' && (
               <>
-                <dt>Deep Space Network</dt>
+                <dt>
+                  <Term id="dsn">Deep Space Network</Term>
+                </dt>
                 <dd className={styles.inspectorText ?? ''} data-dsn={link ? 'contact' : 'none'}>
                   {link
                     ? `In contact now: ${link.station}, ${link.dish}${link.bands.length ? ` (${link.bands.join(', ')} band)` : ''}`
@@ -113,7 +120,9 @@ export function CraftFacts({ track, earth, jd, simMs, link, physical }: CraftFac
             )}
             <dt>Source</dt>
             <dd className={styles.inspectorText ?? ''}>{d.state.sourceProvider}</dd>
-            <dt>Position type</dt>
+            <dt>
+              <Term id="ephemeris">Position type</Term>
+            </dt>
             <dd className={styles.inspectorText ?? ''}>
               {d.predicted
                 ? `Ephemeris: a prediction past tracking data (to ${String(track.observedUntil)})`

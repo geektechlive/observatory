@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { lookupSpkid } from '@/lib/orrery/lookupTrack'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
@@ -52,12 +52,23 @@ interface LinkOptions {
     /** Puts the switches back as they were before `widen`, keeping the found satellite's group. */
     restore: (focus: string | null) => void
   }
+  /** Deselect: a guide lesson with no focus (#159) starts from a clean inspector. */
+  clearSelection: () => void
+}
+
+export interface ApplyLinkOptions {
+  /**
+   * A lesson or button applying a link, not a pasted address (#159): a link without `t`
+   * returns the clock to now, and one without a focus clears the selection, so the scene
+   * shows the lesson and not what was open before it.
+   */
+  fresh?: boolean
 }
 
 const onOrrery = () => /^#\/?orrery(\?|$)/i.test(window.location.hash)
 
 /** What a link asks for that has not been applied yet. */
-type Pending = Pick<OrreryLink, 'focus' | 'preset'>
+type Pending = Pick<OrreryLink, 'focus' | 'preset'> & { fresh: boolean }
 
 /**
  * The orrery's shareable link (#108, format in orreryLink.ts). On load, and when the
@@ -66,7 +77,7 @@ type Pending = Pick<OrreryLink, 'focus' | 'preset'>
  * `replaceState` when the selection, the preset or the clock changes: never per frame,
  * and never a new history entry. The dial tabs still own the view (useHashView).
  */
-export function useOrreryLink(o: LinkOptions): void {
+export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLinkOptions) => void {
   const pending = useRef<Pending | null>(null)
   // The Earth orbit view is opened once per link to a satellite (#158).
   const satOpened = useRef(false)
@@ -94,29 +105,38 @@ export function useOrreryLink(o: LinkOptions): void {
     if (window.location.hash !== next) window.history.replaceState(window.history.state, '', next)
   })
 
+  // The one path a link takes into the scene: the address on load and on edit, and the
+  // guide's "Show me" (#159). Applying the same link twice works, because the camera is
+  // not part of a link and may have moved since.
+  const apply = useCallback((link: OrreryLink, opts?: ApplyLinkOptions) => {
+    const fresh = opts?.fresh === true
+    const clock = useOrreryClock.getState()
+    if (link.t !== null) {
+      // Pause first, then set: the clock must not run on between the two (#121).
+      clock.pause()
+      clock.setSimTime(link.t)
+    } else if (fresh) {
+      clock.resetToNow()
+    }
+    if (link.focus !== null || link.preset !== null) {
+      pending.current = { focus: link.focus, preset: link.preset, fresh }
+      satOpened.current = false
+      setLinkSeq((n) => n + 1)
+    }
+  }, [])
+
   // Read the address now and whenever it is edited by hand.
   useEffect(() => {
     const read = () => {
       if (!onOrrery()) return
-      const link = parseOrreryLink(window.location.hash)
-      if (link.t !== null) {
-        // Pause first, then set: the clock must not run on between the two (#121).
-        const clock = useOrreryClock.getState()
-        clock.pause()
-        clock.setSimTime(link.t)
-      }
-      if (link.focus !== null || link.preset !== null) {
-        pending.current = { focus: link.focus, preset: link.preset }
-        satOpened.current = false
-        setLinkSeq((n) => n + 1)
-      }
+      apply(parseOrreryLink(window.location.hash))
     }
     read()
     window.addEventListener('hashchange', read)
     return () => {
       window.removeEventListener('hashchange', read)
     }
-  }, [])
+  }, [apply])
 
   const { renderer, catalog, settled, lookupFailed } = o
   useEffect(() => {
@@ -157,7 +177,8 @@ export function useOrreryLink(o: LinkOptions): void {
     }
     satOpened.current = false
     pending.current = null
-    const { select, applyPreset } = latest.current
+    const { select, applyPreset, clearSelection } = latest.current
+    if (want.fresh && want.focus === null) clearSelection()
     // Select first: selecting clears the preset, and a link with both means the camera
     // is on the preset with the inspector open.
     if (key !== null) select(key)
@@ -189,4 +210,5 @@ export function useOrreryLink(o: LinkOptions): void {
       unsubscribe()
     }
   }, [selected, preset])
+  return apply
 }

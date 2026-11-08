@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 
 import { SOURCES } from '@/lib/orrery/sources'
 
@@ -29,6 +29,10 @@ const SCALES: { id: ScaleMode; label: string; hint: string }[] = [
 
 interface ControlRailProps {
   open: boolean
+  /** The guide drawer (#159): whether it is open, how to open it, and its button's ref. */
+  guideOpen?: boolean | undefined
+  onGuide?: (() => void) | undefined
+  guideRef?: Ref<HTMLButtonElement> | undefined
   visibility: Visibility
   onVisibility: (v: Visibility) => void
   scale: ScaleMode
@@ -56,6 +60,9 @@ interface ControlRailProps {
  */
 export function ControlRail({
   open,
+  guideOpen,
+  onGuide,
+  guideRef,
   visibility,
   onVisibility,
   scale,
@@ -79,6 +86,24 @@ export function ControlRail({
       role="region"
       aria-label="Orrery controls"
     >
+      {onGuide && (
+        <section className={styles.group ?? ''} aria-labelledby="orrery-guide-group">
+          <h2 id="orrery-guide-group" className={styles.groupTitle ?? ''}>
+            Learn
+          </h2>
+          <button
+            ref={guideRef}
+            type="button"
+            className={styles.chipBtn ?? ''}
+            aria-expanded={guideOpen === true}
+            aria-controls="orrery-guide"
+            onClick={onGuide}
+          >
+            Guide
+          </button>
+        </section>
+      )}
+
       <section className={styles.group ?? ''} aria-labelledby="orrery-find">
         <h2 id="orrery-find" className={styles.groupTitle ?? ''}>
           Find

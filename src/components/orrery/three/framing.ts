@@ -76,19 +76,21 @@ function placeCamera(camera: PerspectiveCamera, elevationDeg: number, distance: 
 /**
  * How far the points reach in the view (NDC, 1 = edge), counting the strip the time bar
  * covers at the bottom as off the view: a point may sink no lower than -(1 - reserve).
+ * `topReserveNdc` does the same for a strip covered at the top (a phone's guide bar).
  * A point behind the camera reaches infinitely far.
  */
 export function pointsExtent(
   camera: PerspectiveCamera,
   points: readonly Vector3[],
   bottomReserveNdc = 0,
+  topReserveNdc = 0,
 ): number {
   let max = 0
   const p = new Vector3()
   for (const point of points) {
     p.copy(point).project(camera)
     if (p.z > 1) return Infinity
-    const down = p.y < 0 ? -p.y + bottomReserveNdc : p.y
+    const down = p.y < 0 ? -p.y + bottomReserveNdc : p.y + topReserveNdc
     max = Math.max(max, Math.abs(p.x), down)
   }
   return max
@@ -99,6 +101,8 @@ export interface FrameExtras {
   points?: readonly Vector3[]
   /** The bottom strip the time bar covers, as a share of the view's NDC height (0–2). */
   bottomReserveNdc?: number
+  /** The top strip something covers (a phone's guide bar), as a share of NDC height. */
+  topReserveNdc?: number
 }
 
 export interface FrameView {
@@ -125,6 +129,7 @@ function bisectDistance(
   points: readonly Vector3[],
   reserve: number,
   start: number,
+  topReserve = 0,
 ): number {
   let near = start * 0.02
   let far = start * 200
@@ -133,7 +138,7 @@ function bisectDistance(
     camera.position.copy(target).addScaledVector(dir, mid)
     camera.lookAt(target)
     camera.updateMatrixWorld()
-    if (pointsExtent(camera, points, reserve) > FILL) near = mid
+    if (pointsExtent(camera, points, reserve, topReserve) > FILL) near = mid
     else far = mid
   }
   return far
@@ -157,6 +162,7 @@ export function frameView(
     return { position: framePreset(preset, aspect, toScene, extras), target: new Vector3() }
   }
   const reserve = extras.bottomReserveNdc ?? 0
+  const topReserve = extras.topReserveNdc ?? 0
   const rN = toScene(NEPTUNE_AU)
   const ring = Array.from({ length: RING_SAMPLES }, (_, i) => {
     const a = (i / RING_SAMPLES) * Math.PI * 2
@@ -185,7 +191,7 @@ export function frameView(
   for (let k = 0; k < AZIMUTH_STEPS; k += 1) {
     const az = (k / AZIMUTH_STEPS) * Math.PI * 2
     const dir = new Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az))
-    const distance = bisectDistance(camera, target, dir, framed, reserve, size)
+    const distance = bisectDistance(camera, target, dir, framed, reserve, size, topReserve)
     camera.position.copy(target).addScaledVector(dir, distance)
     camera.lookAt(target)
     camera.updateMatrixWorld()
@@ -219,6 +225,7 @@ export function framePreset(
   const r = toScene(edgeAu)
   const points = extras.points ?? []
   const reserve = extras.bottomReserveNdc ?? 0
+  const topReserve = extras.topReserveNdc ?? 0
   const camera = new PerspectiveCamera(FOV, Math.max(0.1, aspect), 0.001, 1e7)
   camera.updateProjectionMatrix()
   // Extent falls as distance grows: bisect for the distance where it equals FILL.
@@ -227,7 +234,10 @@ export function framePreset(
   for (let i = 0; i < 60; i += 1) {
     const mid = Math.sqrt(near * far)
     placeCamera(camera, elevationDeg, mid)
-    const extent = Math.max(ringExtent(camera, r), pointsExtent(camera, points, reserve))
+    const extent = Math.max(
+      ringExtent(camera, r),
+      pointsExtent(camera, points, reserve, topReserve),
+    )
     if (extent > FILL) near = mid
     else far = mid
   }

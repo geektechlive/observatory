@@ -337,7 +337,7 @@ export class OrreryRenderer {
   /** The view is still exactly a preset's (the user has not turned or zoomed): refit on resize. */
   private presetPristine = true
   /** Px of the stage covered by the inspector, so the focus sits in what is left (#91). */
-  private inset = { right: 0, bottom: 0 }
+  private inset = { right: 0, bottom: 0, top: 0 }
   /** A camera fly in progress: from/to positions and targets, wall-clock start. */
   private flight: {
     fromPos: Vector3
@@ -880,11 +880,16 @@ export class OrreryRenderer {
    * Keep the focus centred in the part of the stage the inspector leaves free, by
    * shifting the projection window rather than the camera (#91).
    */
-  setViewInset(right: number, bottom: number): void {
-    const next = { right: Math.max(0, right), bottom: Math.max(0, bottom) }
-    const changed = next.right !== this.inset.right || next.bottom !== this.inset.bottom
+  setViewInset(right: number, bottom: number, top = 0): void {
+    const next = { right: Math.max(0, right), bottom: Math.max(0, bottom), top: Math.max(0, top) }
+    const changed =
+      next.right !== this.inset.right ||
+      next.bottom !== this.inset.bottom ||
+      next.top !== this.inset.top
     this.inset = next
     this.applyInset()
+    // The picture moved by the sheet: a preset is fitted for where it now sits.
+    if (changed) this.refitPreset()
     // The inspector opens after a looked-up object is focused: refit it to the room left.
     const focus = this.focusBody
     if (changed && this.lookupFramed && focus && this.lookup.has(focus)) {
@@ -894,14 +899,14 @@ export class OrreryRenderer {
   }
 
   private applyInset(): void {
-    const { right, bottom } = this.inset
-    if (right === 0 && bottom === 0) this.camera.clearViewOffset()
+    const { right, bottom, top } = this.inset
+    if (right === 0 && bottom === top) this.camera.clearViewOffset()
     else
       this.camera.setViewOffset(
         this.width,
         this.height,
         right / 2,
-        bottom / 2,
+        (bottom - top) / 2,
         this.width,
         this.height,
       )
@@ -960,7 +965,7 @@ export class OrreryRenderer {
     this.fitJd = this.lastJd
     const view = frameView(preset, this.width / Math.max(1, this.height), this.sceneRadius, {
       points,
-      bottomReserveNdc: (2 * this.reserveBottomPx) / Math.max(1, this.height),
+      ...this.presetReserves(),
     })
     this.flyTo(view.position, view.target, instant)
   }
@@ -1002,6 +1007,27 @@ export class OrreryRenderer {
     if (Math.abs(bottomPx - this.reserveBottomPx) < 1) return
     this.reserveBottomPx = Math.max(0, bottomPx)
     this.refitPreset()
+  }
+
+  /**
+   * The strips of the stage presets must keep craft out of, as shares of NDC height. The
+   * time bar covers the bottom; a phone's sheet covers more of it and a guide bar covers
+   * the top (#159). Those overlays also shift the picture to centre it in what they leave
+   * (applyInset), so the shift is counted here: 0.12 is FILL's own margin.
+   */
+  private presetReserves(): { bottomReserveNdc: number; topReserveNdc: number } {
+    const h = Math.max(1, this.height)
+    const { bottom, top } = this.inset
+    if (bottom === 0 && top === 0) {
+      return { bottomReserveNdc: (2 * this.reserveBottomPx) / h, topReserveNdc: 0 }
+    }
+    const margin = 1 - 0.88
+    const shift = (bottom - top) / h
+    const blocked = Math.max(this.reserveBottomPx, bottom)
+    return {
+      bottomReserveNdc: Math.max(0, (2 * blocked) / h - shift - margin),
+      topReserveNdc: Math.max(0, shift + (2 * top) / h - margin),
+    }
   }
 
   /** Refit the current preset while the user hasn't moved the camera. */
