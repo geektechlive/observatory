@@ -94,7 +94,7 @@ const LISTS: { id: ListId; label: string; about: string; needsSatcat?: boolean }
     id: 'reentry',
     label: 'Re-entering soon',
     about:
-      'Objects Space-Track.org predicts will fall back to Earth in the next 7 days. Some are rocket stages the orrery does not draw.',
+      'Objects Space-Track.org predicts will fall back to Earth in the next 7 days. Some may be in groups that are switched off, or be rocket stages and debris the orrery doesn’t carry.',
   },
 ]
 
@@ -145,6 +145,11 @@ function whenDown(r: Reentry | undefined): string {
   return r ? `down ${reentryWhen(r)}` : ''
 }
 
+/** The NORAD number, unless it is already the title (no name known). */
+function idPart(row: BrowseRow): string {
+  return row.name === `NORAD ${row.id}` ? '' : `NORAD ${row.id}`
+}
+
 function rowMeta(
   row: BrowseRow,
   field: SatFieldInfo,
@@ -158,9 +163,9 @@ function rowMeta(
       row.notDrawnReason === 'no-group'
         ? 'not drawn: in no group the orrery carries'
         : `not in the groups switched on (may be in ${offLabels || 'a group still loading'})`
-    return `NORAD ${row.id} · ${whenDown(reentry)} · ${why}`
+    return [idPart(row), whenDown(reentry), why].filter(Boolean).join(' · ')
   }
-  const parts = [`NORAD ${row.id}`]
+  const parts = [idPart(row)]
   if (row.group) parts.push(GROUP_LABEL.get(row.group) ?? row.group)
   parts.push(ORBIT_SHORT[field.orbit[row.index] ?? 0] ?? '')
   const year = Math.floor((field.launch[row.index] ?? 0) / 1000)

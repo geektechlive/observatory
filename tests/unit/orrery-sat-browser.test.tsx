@@ -218,7 +218,12 @@ describe('<SatBrowser> (#158)', () => {
     expect(list).toHaveLength(2)
     expect(list[0]).toMatch(/FALCON 9 R\/B/)
     // Starlink and debris are off, so it may be in one of them: never "in no group".
+    // A named object keeps its NORAD number in the detail line.
+    expect(list[0]).toMatch(/NORAD 99999/)
     expect(list[0]).toMatch(/not in the groups switched on/i)
+    // The intro claims only what is known without SATCAT.
+    expect(screen.getByText(/Some may be in groups that are switched off/)).toBeTruthy()
+    expect(screen.queryByText(/Some are rocket stages/)).toBeNull()
     expect(list[0]).toMatch(/may be in Starlink or Debris, which are off/)
     expect(list[0]).not.toMatch(/no group/i)
     expect(list[0]).not.toMatch(/Object 99999/)
@@ -249,7 +254,8 @@ describe('<SatBrowser> (#158)', () => {
       target: { value: 'reentry' },
     })
     expect(rows()[0]).toMatch(/in no group the orrery carries/)
-    expect(rows()[0]).toMatch(/NORAD 99999/)
+    // The title is the id (no name known): the detail line does not repeat it.
+    expect(rows()[0]?.match(/NORAD 99999/g)).toHaveLength(1)
   })
 
   it('says when re-entry predictions are not available', () => {
