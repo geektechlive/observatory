@@ -257,8 +257,11 @@
 
 .barTitle {
   margin: 0 0 var(--space-2);
+  overflow: hidden;
   color: var(--bone);
   font: italic 400 var(--text-base) / 1.2 var(--font-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .barActions {
@@ -275,6 +278,22 @@
 
 .barTry summary {
   cursor: pointer;
+}
+
+/* The tip opens as a card over the inspector, so the bar keeps its height and the
+   inspector never has to move for it. */
+.barTry p {
+  position: absolute;
+  inset: 100% 0 auto;
+  z-index: 1;
+  max-height: 40dvh;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-3) var(--space-4);
+  overflow-y: auto;
+  border: 1px solid var(--copper-2);
+  border-radius: var(--radius-panel);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--glass-blur));
 }
 
 @media (width <= 899px) {
@@ -300,18 +319,10 @@
 
   .barTitle {
     margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .barTry {
     grid-column: 1 / -1;
     margin-top: 0;
-  }
-
-  .barTry p {
-    max-height: 30dvh;
-    overflow-y: auto;
   }
 }

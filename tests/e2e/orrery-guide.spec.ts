@@ -205,6 +205,34 @@ test.describe('The guide (#159)', () => {
     await expect(guideButton(page)).toBeFocused()
   })
 
+  test('Esc in the Find box only dismisses its suggestions', async ({ page }) => {
+    await openOrrery(page)
+    await openGuide(page)
+    const find = page.getByRole('combobox', { name: /find/i })
+    await find.fill('mar')
+    await expect(page.getByRole('listbox')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    await expect(drawer(page)).toBeVisible()
+  })
+
+  test('a lesson’s tip opens over the inspector without moving the bar', async ({ page }) => {
+    await openOrrery(page)
+    await openGuide(page)
+    await showLesson(page, 'l1')
+    const before = await bar(page).boundingBox()
+    await bar(page).getByText('What to look for').click()
+    const tip = bar(page).locator('p').last()
+    await expect(tip).toBeVisible()
+    const after = await bar(page).boundingBox()
+    expect(after?.height).toBe(before?.height)
+    // The bar still ends above the inspector.
+    const inspector = await page
+      .getByRole('complementary', { name: 'L1', exact: true })
+      .boundingBox()
+    expect((inspector?.y ?? 0) >= (after?.y ?? 0) + (after?.height ?? 0)).toBe(true)
+  })
+
   test('the reference sections open, and the glossary lists the terms', async ({ page }) => {
     await openOrrery(page)
     await openGuide(page)
@@ -268,7 +296,7 @@ test.describe('The first-visit hint (#159)', () => {
 })
 
 test.describe('The guide on a phone (#159)', () => {
-  test.use({ viewport: { width: 390, height: 844 } })
+  test.use({ viewport: { width: 375, height: 812 } })
 
   test('opens as a sheet with no sideways scroll, and a lesson collapses it to a bar', async ({
     page,
@@ -282,13 +310,13 @@ test.describe('The guide on a phone (#159)', () => {
     await expect(drawer(page)).toBeVisible()
     expect(await noSideways()).toBe(true)
     const sheet = await drawer(page).boundingBox()
-    expect((sheet?.x ?? -1) >= 0 && (sheet?.x ?? 0) + (sheet?.width ?? 999) <= 390).toBe(true)
+    expect((sheet?.x ?? -1) >= 0 && (sheet?.x ?? 0) + (sheet?.width ?? 999) <= 375).toBe(true)
 
     await showLesson(page, 'jupiter-moons')
     await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'Jupiter')
     expect(await noSideways()).toBe(true)
     const strip = await bar(page).boundingBox()
-    expect((strip?.x ?? -1) >= 0 && (strip?.x ?? 0) + (strip?.width ?? 999) <= 390).toBe(true)
+    expect((strip?.x ?? -1) >= 0 && (strip?.x ?? 0) + (strip?.width ?? 999) <= 375).toBe(true)
     await backToGuide(page)
     await drawer(page).getByRole('button', { name: 'Close' }).click()
     await expect(drawer(page)).toHaveCount(0)

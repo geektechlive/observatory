@@ -139,10 +139,15 @@ export function OrreryGuide({ mode, shown, onShow, onExpand, onClose }: OrreryGu
   const heading = useRef<HTMLHeadingElement>(null)
   const back = useRef<HTMLButtonElement>(null)
 
-  // Esc closes the guide, unless something inside already used it (a term's popover).
+  // Esc closes the guide, unless something already used it: a term's popover stops it, and
+  // in a text field or the Find combobox Esc means "dismiss the suggestions", not "leave".
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) onClose()
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const t = e.target
+      if (t instanceof HTMLElement && t.closest('input, textarea, select, [role="combobox"]'))
+        return
+      onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => {

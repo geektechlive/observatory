@@ -65,6 +65,14 @@ describe('the lessons (#159)', () => {
     }
   })
 
+  it('shows visitors only public sources, never file paths, tests or issue numbers', () => {
+    const internal = /\.tsx?\b|CLAUDE\.md|tests\/|src\/|#\d+/
+    for (const l of lessons) {
+      for (const source of l.sources) expect(source, l.id).not.toMatch(internal)
+      expect([l.title, ...l.paragraphs, l.tryIt].join(' '), l.id).not.toMatch(internal)
+    }
+  })
+
   it('has unique ids', () => {
     expect(new Set(lessons.map((l) => l.id)).size).toBe(lessons.length)
   })

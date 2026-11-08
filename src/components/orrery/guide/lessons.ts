@@ -88,9 +88,9 @@ function asteroidLesson(ctx: LessonContext): Lesson {
     id: 'closest-asteroid',
     title: 'The closest asteroid pass this month',
     sources: [
-      'JPL Close Approach Data (ssd-api.jpl.nasa.gov/cad.api): nominal miss distance and time, over the last and next 30 days',
-      'Lunar distance 384,400 km (src/lib/orrery/units.ts)',
-      'PHA label: NASA CNEOS (cneos.jpl.nasa.gov/about/neo_groups.html)',
+      'JPL Close Approach Data (ssd-api.jpl.nasa.gov/cad.api): miss distance and time of closest approach, for 30 days either side of today',
+      'One lunar distance is 384,400 km',
+      'NASA CNEOS, near-Earth object groups: how a potentially hazardous asteroid is defined (cneos.jpl.nasa.gov/about/neo_groups.html)',
     ],
   }
   if (pick === null) {
@@ -125,6 +125,18 @@ function asteroidLesson(ctx: LessonContext): Lesson {
   }
 }
 
+/*
+ * Where each lesson's facts were checked, for maintainers (the lists below name only public
+ * sources, which is what a visitor sees):
+ * - Heliopause 121.6 au on 2012-08-25: HELIOPAUSE_V1_AU (src/lib/orrery/units.ts) and
+ *   CLAUDE.md "Heliopause". Light-time arithmetic: tests/unit/orrery-guide-facts.test.ts.
+ * - L1, Earth frame, Moon < L1 < 0.05 au pass: CLAUDE.md "The Earth frame (#92)".
+ * - Mars turning points: tests/unit/orrery-guide-facts.test.ts and src/lib/orrery/retrograde.ts.
+ * - Geostationary ring, satellite switches: CLAUDE.md "Satellites (#98)"; radius in
+ *   tests/unit/orrery-guide-facts.test.ts.
+ * - 'Oumuamua SPK-ID 50788063 and discovery date: src/lib/orrery/smallBodies.ts.
+ * - Moon periods: src/lib/orrery/moons.ts; stretched scale: CLAUDE.md "Major moons (#107)".
+ */
 export function buildLessons(ctx: LessonContext): Lesson[] {
   return [
     {
@@ -138,8 +150,10 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Find the faint dashed ring marked “approx.” and the Light time row in the inspector. Then play at 1 day/s to watch Voyager 1 carry on outward. On a narrow screen the ring’s label is hidden.',
       link: { t: Date.UTC(2012, 7, 25), focus: 'naif:-31', preset: 'heliosphere' },
       sources: [
-        'NASA/JPL date the crossing to 25 Aug 2012 (2013-09-12 release); JPL Horizons gives 121.60 au for that day (CLAUDE.md, HELIOPAUSE_V1_AU). NASA: Voyager 1 “crossed into interstellar space in August 2012”, the region outside the heliopause (science.nasa.gov/mission/voyager/voyager-1, read 2026-11-07)',
-        '121.6 au x 499.0 s per au = 60,680 s = 16.9 h (tests/unit/orrery-guide-facts.test.ts)',
+        'NASA and JPL date Voyager 1’s crossing of the heliopause to 25 August 2012 (news release of 12 September 2013)',
+        'JPL Horizons puts Voyager 1 at 121.60 au from the Sun on that day',
+        'NASA Science, Voyager 1: it “crossed into interstellar space in August 2012”, the region outside the heliopause (science.nasa.gov/mission/voyager/voyager-1, read 7 November 2026)',
+        'Signal delay: light takes about 499 seconds to cross one au, so 121.6 au is about 16.9 hours',
       ],
     },
     {
@@ -147,16 +161,16 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
       title: 'L1, the parking spot between Earth and the Sun',
       paragraphs: [
         'L1 is a point about 1.5 million km from Earth toward the Sun, nearly four times as far as the Moon. A craft parked there keeps pace with Earth and always has the Sun in view.',
-        'SOHO and DSCOVR watch the Sun and the solar wind from L1, which gives about an hour’s warning at typical wind speeds before it reaches Earth.',
+        'SOHO and DSCOVR watch the Sun and the solar wind from L1. The most common, slow solar wind moves at about 400 km/s, so it takes roughly an hour to reach Earth from there, and that hour is the warning these craft give.',
       ],
       tryIt:
         'Select the L1 marker. If NOAA’s solar wind data is available the inspector shows the wind speed and how long it takes to reach Earth. Near Earth the view is not to scale: distances beyond the geostationary ring are squeezed so the Moon and L1 fit one picture.',
       link: { ...NONE, focus: L1_KEY, preset: 'earth' },
       sources: [
-        'L1 at 1.5 million km: NASA (JWST at L2 is 1.5 million km from Earth, science.nasa.gov/mission/webb/orbit; L1 is the same distance on the Sun side)',
-        'SOHO and DSCOVR at L1: the orrery’s craft list (src/lib/orrery/craft.ts)',
-        '1.5 million km / 400 km/s = 1.04 h; 1.5 million km / 384,400 km = 3.9 (tests/unit/orrery-guide-facts.test.ts)',
-        'Earth frame: CLAUDE.md, “The Earth frame (#92)”',
+        'NASA Science, SOHO: it operates near the Sun–Earth L1 point, about 1.5 million km from Earth (science.nasa.gov/mission/soho, read 7 November 2026)',
+        'NASA Science, DSCOVR: it hovers between the Sun and Earth at Lagrange point 1 (science.nasa.gov/mission/dscovr, read 7 November 2026)',
+        'NOAA Space Weather Prediction Center: the most common solar wind is slow wind at about 400 km/s (swpc.noaa.gov/phenomena/solar-wind, read 7 November 2026)',
+        'Arithmetic: 1.5 million km at 400 km/s takes about 1.04 hours, and is 3.9 times the Moon’s 384,400 km',
       ],
     },
     asteroidLesson(ctx),
@@ -171,9 +185,9 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Show me stops the clock on that day. Press play at 1 day/s and watch Earth swing past Mars on the inside track. The orrery looks down on the system from above, so the backward loop itself, which is what you would see in the night sky, is not drawn.',
       link: { t: Date.UTC(2025, 0, 16), focus: 'Mars', preset: 'inner' },
       sources: [
-        'JPL Horizons observer table, geocentre, Mars: longitude peaks 2024-Dec-07 (126.17 deg) and bottoms out 2025-Feb-24 (107.02 deg); Sun-observer-target angle peaks 2025-Jan-16 (queried 2026-11-07)',
-        'The orrery’s own planet maths finds the same dates within 3 days (src/lib/orrery/retrograde.ts, tested)',
-        '7 Dec 2024 to 24 Feb 2025 is 79 days',
+        'JPL Horizons observer table from Earth’s centre, Mars (queried 7 November 2026): its ecliptic longitude peaks on 7 December 2024 and bottoms out on 24 February 2025, and the Sun–Earth–Mars angle peaks on 16 January 2025',
+        'The orrery’s own planet maths finds the same turning points within 3 days',
+        'From 7 December 2024 to 24 February 2025 is 79 days',
       ],
     },
     {
@@ -187,25 +201,24 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Look for the band of points far out around Earth, and tap one to see its group, height and how old its orbit data is. Inside the ring distances are true to scale; outside it they are squeezed.',
       link: { ...NONE, focus: null, preset: 'orbit' },
       sources: [
-        'Kepler’s third law with Earth’s GM and the sidereal day: 42,164 km from the centre, 35,786 km up (tests/unit/orrery-guide-facts.test.ts)',
-        'Earth orbit view holds the ring: CLAUDE.md, “Satellites (#98)”',
-        'NASA Earth Observatory, Catalog of Earth Satellite Orbits (earthobservatory.nasa.gov/features/OrbitsCatalog, read 2026-11-07): a geostationary orbit does not move relative to the ground, and suits weather monitoring',
+        'Kepler’s third law with Earth’s gravitational parameter and the sidereal day: 42,164 km from Earth’s centre, 35,786 km above the equator',
+        'NASA Earth Observatory, Catalog of Earth Satellite Orbits: a geostationary orbit does not move relative to the ground, which suits weather monitoring (earthobservatory.nasa.gov/features/OrbitsCatalog, read 7 November 2026)',
       ],
     },
     {
       id: 'oumuamua',
       title: '‘Oumuamua, a visitor from another star',
       paragraphs: [
-        '‘Oumuamua, found on 19 October 2017, was the first object seen passing through the solar system from another star. Its path is a hyperbola (eccentricity 1.20), so the Sun cannot hold it.',
+        '‘Oumuamua, found on 19 October 2017, was the first known interstellar object to visit our solar system. Its path is a hyperbola (eccentricity 1.20), so the Sun cannot hold it.',
         'It swung past the Sun on 9 September 2017, at 0.26 au, closer than Mercury ever gets, about six weeks before anyone saw it.',
       ],
       tryIt:
         'This object is not in the orrery’s own data, so Show me asks JPL for its path and takes a moment. Then play at 1 day/s to follow it in and out.',
       link: { ...NONE, t: Date.UTC(2017, 8, 9, 12, 0, 0), focus: 'lookup:50788063', preset: null },
       sources: [
-        'JPL SBDB (ssd-api.jpl.nasa.gov/sbdb.api?sstr=1I, read 2026-11-07): e = 1.2011, q = 0.2559 au, perihelion JD 2458006.007 TDB = 2017-09-09 12:10 UTC, SPK-ID 50788063',
-        'Discovered 2017-10-19 by Pan-STARRS1 (NASA, science.nasa.gov/solar-system/comets/oumuamua; src/lib/orrery/smallBodies.ts)',
-        'Mercury’s closest approach to the Sun is about 0.31 au (a = 0.387 au, e = 0.2056)',
+        'JPL Small-Body Database, 1I/ʻOumuamua (ssd-api.jpl.nasa.gov/sbdb.api?sstr=1I, read 7 November 2026): eccentricity 1.2011, perihelion distance 0.2559 au, perihelion at JD 2458006.007 TDB, which is 9 September 2017, 12:10 UTC',
+        'NASA Science, ʻOumuamua: the first known interstellar object to visit our solar system, discovered by Pan-STARRS1 on 19 October 2017 (science.nasa.gov/solar-system/comets/oumuamua)',
+        'Mercury’s perihelion distance is about 46 million km, 0.31 au (NASA planetary fact sheet)',
       ],
     },
     {
@@ -219,9 +232,8 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Play at 1 h/s: Io goes round in under a minute. Choose a moon in the Find box to read its orbital period and distance.',
       link: { ...NONE, focus: 'Jupiter', preset: null },
       sources: [
-        'Periods from JPL Horizons physical data, read 2026-11-07 (src/lib/orrery/moons.ts)',
-        'Galileo, 1610: NASA Science, Jupiter moons (science.nasa.gov/jupiter/moons, read 2026-11-07)',
-        'Stretched moon scale: CLAUDE.md, “Major moons (#107)”',
+        'Orbital periods: JPL Horizons physical data for each moon, read 7 November 2026',
+        'NASA Science, Jupiter’s moons: the four largest were first observed by Galileo Galilei in 1610 (science.nasa.gov/jupiter/moons, read 7 November 2026)',
       ],
     },
   ]
