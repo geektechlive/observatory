@@ -885,6 +885,8 @@ export class OrreryRenderer {
     const changed = next.right !== this.inset.right || next.bottom !== this.inset.bottom
     this.inset = next
     this.applyInset()
+    // The picture moved by the sheet: a preset is fitted for where it now sits.
+    if (changed) this.refitPreset()
     // The inspector opens after a looked-up object is focused: refit it to the room left.
     const focus = this.focusBody
     if (changed && this.lookupFramed && focus && this.lookup.has(focus)) {
@@ -958,10 +960,13 @@ export class OrreryRenderer {
             .map((c) => c.mesh.position.clone())
         : []
     this.fitJd = this.lastJd
+    const h = Math.max(1, this.height)
     const view = frameView(preset, this.width / Math.max(1, this.height), this.sceneRadius, {
       points,
-      bottomReserveNdc: (2 * this.reserveBottomPx) / Math.max(1, this.height),
-      topReserveNdc: (2 * this.reserveTopPx) / Math.max(1, this.height),
+      // A phone's sheet (inset.bottom) shifts the picture up by half its height: that eats
+      // into the strip the time bar covers and into the room under a bar at the top.
+      bottomReserveNdc: Math.max(0, (2 * this.reserveBottomPx - this.inset.bottom) / h),
+      topReserveNdc: (2 * this.reserveTopPx + this.inset.bottom) / h,
     })
     this.flyTo(view.position, view.target, instant)
   }
