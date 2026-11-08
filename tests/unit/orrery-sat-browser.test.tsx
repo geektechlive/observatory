@@ -219,7 +219,7 @@ describe('<SatBrowser> (#158)', () => {
     expect(list[0]).toMatch(/FALCON 9 R\/B/)
     // Starlink and debris are off, so it may be in one of them: never "in no group".
     expect(list[0]).toMatch(/not in the groups switched on/i)
-    expect(list[0]).toMatch(/Starlink/)
+    expect(list[0]).toMatch(/may be in Starlink or Debris, which are off/)
     expect(list[0]).not.toMatch(/no group/i)
     expect(list[0]).not.toMatch(/Object 99999/)
     expect(list[1]).toMatch(/ISS/)

@@ -218,9 +218,11 @@ export function SatBrowser(p: SatBrowserProps) {
   const allGroupsLoaded =
     SAT_TOGGLES.every((t) => p.toggles[t.id]) &&
     SAT_GROUPS.every((g) => p.groups[g.id]?.status === 'loaded')
-  const offLabels = joinLabels(
-    SAT_TOGGLES.filter((t) => !p.toggles[t.id]).map((t) => `${t.label}, which is off`),
-  )
+  const offNames = SAT_TOGGLES.filter((t) => !p.toggles[t.id]).map((t) => t.label)
+  const offLabels =
+    offNames.length === 0
+      ? ''
+      : `${joinLabels(offNames)}, which ${offNames.length === 1 ? 'is' : 'are'} off`
 
   const result = useMemo(
     () =>
