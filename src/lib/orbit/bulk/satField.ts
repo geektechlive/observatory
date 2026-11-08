@@ -12,6 +12,7 @@ import * as satellite from 'satellite.js'
 
 import { OrrerySatsSchema } from '@/schemas/orrerySats'
 
+import { launchOrder, orbitClassOf } from '../orbitClass'
 import { EPOCH_WINDOW_MS, rowEpochMs, rowToOmm, type SatGroupId, type SatRow } from '../satCatalog'
 import type { bulkRuntime } from './bulkEci'
 import { propagateBulk } from './bulkEci'
@@ -34,6 +35,10 @@ export interface SatField {
   names: string[]
   satrecs: satellite.SatRec[]
   epochMs: Float64Array
+  /** Orbit class code per object (orbitClass.ts), for the satellite browser (#158). */
+  orbit: Uint8Array
+  /** Launch order per object (orbitClass.ts launchOrder), 0 when unknown (#158). */
+  launch: Int32Array
 }
 
 export interface SatFrame {
@@ -65,8 +70,12 @@ export function buildSatField(groups: SatGroupRows[]): SatField {
     names: [],
     satrecs: [],
     epochMs: new Float64Array(0),
+    orbit: new Uint8Array(0),
+    launch: new Int32Array(0),
   }
   const epochs: number[] = []
+  const orbits: number[] = []
+  const launches: number[] = []
   for (const { group, rows } of groups) {
     field.groups.push({ group, start: field.count, count: rows.length })
     for (const row of rows) {
@@ -74,10 +83,14 @@ export function buildSatField(groups: SatGroupRows[]): SatField {
       field.ids.push(row[1])
       field.names.push(row[0])
       epochs.push(rowEpochMs(row))
+      orbits.push(orbitClassOf(row[4], row[5]))
+      launches.push(launchOrder(row[2]))
     }
     field.count += rows.length
   }
   field.epochMs = Float64Array.from(epochs)
+  field.orbit = Uint8Array.from(orbits)
+  field.launch = Int32Array.from(launches)
   return field
 }
 

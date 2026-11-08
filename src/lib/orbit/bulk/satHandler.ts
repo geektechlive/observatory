@@ -37,6 +37,9 @@ export interface SatFieldInfo {
   names: string[]
   /** Each object's element epoch, ms (the inspector's "orbit data from"). */
   epochMs: Float64Array
+  /** Orbit class and launch order per object, for the satellite browser (#158). */
+  orbit: Uint8Array
+  launch: Int32Array
 }
 
 export type SatReply =
@@ -85,6 +88,8 @@ export function createSatHandler(deps: SatHandlerDeps) {
     ids: field.ids,
     names: field.names,
     epochMs: field.epochMs.slice(),
+    orbit: field.orbit.slice(),
+    launch: field.launch.slice(),
   })
   const wasm = () => {
     runtime ??= deps.runtime().catch(() => null)

@@ -26,6 +26,8 @@ function info(version: number, groups: { group: SatGroupId; count: number }[]): 
     ids: Array.from({ length: start }, (_, i) => String(25544 + i)),
     names: Array.from({ length: start }, (_, i) => (i === 0 ? 'ISS (ZARYA)' : `SAT ${String(i)}`)),
     epochMs: new Float64Array(start).fill(T0),
+    orbit: new Uint8Array(start),
+    launch: new Int32Array(start),
   }
 }
 
