@@ -14,6 +14,7 @@ import type { OrreryApproach, OrreryNeo, ScoutObject } from '@/schemas/orreryNeo
 
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
+import { Term } from './Term'
 
 const ld = (au: number) => {
   const v = (au * AU_KM) / LD_KM
@@ -81,12 +82,16 @@ export function AsteroidFacts({ approach: a, neo, earth, jd, simMs }: AsteroidFa
           <dd>
             <Readout value={ld(now.distAu)} unit="LD" /> <Label>{km(now.distAu)} km</Label>
           </dd>
-          <dt>Seen from Earth</dt>
+          <dt>
+            <Term id="range-rate">Seen from Earth</Term>
+          </dt>
           <dd>
             <Readout value={Math.abs(now.rangeRateKmS).toFixed(1)} unit="km/s" />{' '}
             <Label>{now.rangeRateKmS < 0 ? 'approaching' : 'receding'}</Label>
           </dd>
-          <dt>Light time</dt>
+          <dt>
+            <Term id="light-time">Light time</Term>
+          </dt>
           <dd>
             <Readout value={formatLightTime(now.lightSeconds)} />
           </dd>
@@ -183,7 +188,9 @@ export function ScoutFacts({ object: o }: { object: ScoutObject }) {
         <dd>
           <Readout value={pct(o.neoScore)} /> <Label>chance</Label>
         </dd>
-        <dt>Potentially hazardous?</dt>
+        <dt>
+          <Term id="pha">Potentially hazardous?</Term>
+        </dt>
         <dd>
           <Readout value={pct(o.phaScore)} /> <Label>chance</Label>
         </dd>

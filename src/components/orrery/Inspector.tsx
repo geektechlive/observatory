@@ -23,6 +23,7 @@ import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './N
 import styles from './orrery.module.css'
 import { SatFacts } from './SatFacts'
 import { formatSimUtc } from './simDate'
+import { Term } from './Term'
 import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
 import type { LookupView } from './useLookupTrack'
@@ -262,7 +263,9 @@ function PlanetFacts({
                 {fmtKm(earthKm)} km · {fmtKm(earthKm * KM_TO_MI)} mi
               </Label>
             </dd>
-            <dt>Light time</dt>
+            <dt>
+              <Term id="light-time">Light time</Term>
+            </dt>
             <dd>
               <Readout value={formatLightTime(d.lightTimeFromEarthS ?? 0)} />
             </dd>
@@ -270,7 +273,9 @@ function PlanetFacts({
         )}
         {d.rangeRateKmS !== null && (
           <>
-            <dt>Seen from Earth</dt>
+            <dt>
+              <Term id="range-rate">Seen from Earth</Term>
+            </dt>
             <dd>
               <Readout value={Math.abs(d.rangeRateKmS).toFixed(1)} unit="km/s" />{' '}
               <Label>{d.rangeRateKmS < 0 ? 'approaching' : 'receding'}</Label>
@@ -279,7 +284,9 @@ function PlanetFacts({
         )}
         <dt>Source</dt>
         <dd className={styles.inspectorText ?? ''}>{state.sourceProvider}</dd>
-        <dt>Position type</dt>
+        <dt>
+          <Term id="ephemeris">Position type</Term>
+        </dt>
         <dd className={styles.inspectorText ?? ''}>
           Kepler approximation (a model, not an observation) · confidence {state.confidence}
         </dd>

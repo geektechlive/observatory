@@ -11,6 +11,7 @@ import type { DiscosObject, Reentry } from '@/schemas/spaceTrack'
 import { DiscosFacts } from './DiscosFacts'
 import styles from './orrery.module.css'
 import { SAT_TOGGLES } from './satToggles'
+import { Term } from './Term'
 import type { SatInfo } from './three/OrreryRenderer'
 
 const GROUP_LABEL = new Map(SAT_TOGGLES.flatMap((t) => t.groups.map((g) => [g, t.label] as const)))
@@ -69,7 +70,9 @@ export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsPr
             </dd>
           </>
         )}
-        <dt>Orbit data</dt>
+        <dt>
+          <Term id="epoch">Orbit data</Term>
+        </dt>
         <dd className={styles.inspectorText ?? ''}>
           {Number.isFinite(info.epochMs) ? epochAgeText(info.epochMs, simMs) : 'unknown'}
         </dd>

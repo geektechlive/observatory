@@ -7,6 +7,7 @@ import type { OrreryTrack } from '@/schemas/orreryBodies'
 
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
+import { Term } from './Term'
 
 const JD_UNIX_EPOCH = 2440587.5
 const DAY_MS = 86_400_000
@@ -89,11 +90,15 @@ export function LookupFacts({
               {fmtKm(earthKm)} km · {fmtKm(earthKm * KM_TO_MI)} mi
             </Label>
           </dd>
-          <dt>Light time</dt>
+          <dt>
+            <Term id="light-time">Light time</Term>
+          </dt>
           <dd>
             <Readout value={formatLightTime(d.lightTimeFromEarthS)} />
           </dd>
-          <dt>Seen from Earth</dt>
+          <dt>
+            <Term id="range-rate">Seen from Earth</Term>
+          </dt>
           <dd>
             <Readout value={Math.abs(d.rangeRateKmS).toFixed(1)} unit="km/s" />{' '}
             <Label>{d.rangeRateKmS < 0 ? 'approaching' : 'receding'}</Label>
