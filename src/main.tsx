@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { defaultRetry } from '@/hooks/useSourceQuery'
 import { onRevalidating } from '@/lib/api/client'
 import { refetchOnceAfter } from '@/lib/api/revalidate'
+import { isOrreryHash, prefetchOrrery, scheduleOrreryIdlePrefetch } from '@/lib/orreryPrefetch'
 
 import { App } from './App'
 
@@ -31,6 +32,17 @@ onRevalidating(
     void queryClient.invalidateQueries({ refetchType: 'active' })
   }),
 )
+
+// The orrery's code arrived in two hops, each a round trip (#168). When the address is the
+// orrery, ask for all of it now, before React renders; otherwise fetch it once the Earth
+// page has loaded and the browser is idle, so the Orrery tab opens without a wait.
+if (isOrreryHash(window.location.hash)) {
+  void prefetchOrrery()
+} else if (document.readyState === 'complete') {
+  scheduleOrreryIdlePrefetch()
+} else {
+  window.addEventListener('load', () => scheduleOrreryIdlePrefetch(), { once: true })
+}
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')

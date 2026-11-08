@@ -19,6 +19,7 @@ import { useGlobeData } from '@/hooks/useGlobeData'
 import { useHashView } from '@/hooks/useHashView'
 import { useLensExpand } from '@/hooks/useLensExpand'
 import { useLensSize } from '@/hooks/useLensSize'
+import { loadOrreryPage } from '@/lib/orreryPrefetch'
 import { useUiStore } from '@/store/ui'
 
 import styles from './App.module.css'
@@ -27,10 +28,9 @@ import consoleStyles from './components/consoles/console.module.css'
 const WorldMap = lazy(() =>
   import('@/components/world-map/WorldMap').then((m) => ({ default: m.WorldMap })),
 )
-// The orrery (#91) takes the whole page and loads only when its tab is opened.
-const OrreryPage = lazy(() =>
-  import('@/components/orrery/OrreryPage').then((m) => ({ default: m.OrreryPage })),
-)
+// The orrery (#91) takes the whole page and loads only when its tab is opened. Its loader
+// is shared with the early prefetch (#168), so both ask for the same chunk once.
+const OrreryPage = lazy(() => loadOrreryPage().then((m) => ({ default: m.OrreryPage })))
 
 /**
  * The page (#63), laid out like the approved ROCI v2 prototype: a header plate, then

@@ -21,19 +21,21 @@ import { gzipSync } from 'node:zlib'
  */
 export const BUDGETS = {
   entryGzip: 190_000,
+  // Files in the first load (entry plus modulepreloads), a tripwire against runaway
+  // splitting (#101 once went from 4 to 9). Not a target: HTTP/2 has no 6-connection limit.
+  firstLoadFiles: 8,
   lazyThreeGzip: 160_000,
   worldMapGzip: 294_000,
   // #91 measured OrreryPage 11.4 kB and OrreryRenderer 7.0 kB gzip with the planets
   // only; #92/#93/#98 add asteroids, craft and satellites, so each gets room to 30 kB.
   // With the satellites (#98) OrreryPage measured 29.7 kB and OrreryRenderer 23.3 kB, so
   // 34 kB leaves room for #99's comets.
-  // The satellite browser (#158) added 4.1 kB to OrreryPage (33.5 to 37.6 kB measured).
-  // It is not a chunk of its own: as one, the bundler pulled the query code out of the
-  // first-load entry into a fifth file (4 files became 5; stubs with only a React hook, or
-  // only JSX, did the same, cause unknown), so it ships in the orrery chunk, which only
-  // the orrery tab loads. The guide's chip, the inspector's term buttons and the guide
-  // wiring (#159) add about 1.3 kB more. 42 kB leaves room.
-  orreryGzip: 42_000,
+  // The satellite browser (#158, 4.4 kB gzip) briefly lived inside OrreryPage because as a
+  // chunk of its own it split the first load (#162). vite.config.ts now pins everything the
+  // entry imports statically into two chunks, so it is its own chunk again. With it out,
+  // OrreryPage measured 34.7 kB and OrreryRenderer 24.4 kB (2026-11-08); 38 kB leaves room.
+  orreryGzip: 38_000,
+  satBrowserGzip: 6_000,
   textureBytes: 1_500_000,
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses
   // the globe's day-2048). They load with the orrery tab, never with the page.
@@ -67,6 +69,28 @@ const SAT_MARKERS = ['sats.worker', 'fengyun-1c-debris']
 // The guide drawer (#159) names this on its root element; it lives in its own chunk,
 // loaded on first open, and may reach neither the first load nor the orrery page's chunk.
 const GUIDE_MARKER = 'data-guide-drawer'
+
+// `import{a as b}from"./x.js"`, `import"./x.js"`, `export{a}from"./x.js"` and their spaced
+// forms. A dynamic `import("./x.js")` has no clause or quote right after `import`.
+const STATIC_IMPORT = /\b(?:import|export)\s*(?:[\w$*\s,{}]*?\bfrom\s*)?["'`]\.\/([^"'`/]+\.js)["'`]/g
+
+/** The `assets/` files reachable from `entryPath` through static imports (entry excluded). */
+function staticGraph(distDir, entryPath) {
+  const seen = new Set()
+  const queue = [entryPath]
+  while (queue.length > 0) {
+    const path = queue.pop()
+    const file = join(distDir, path)
+    if (!existsSync(file)) continue
+    for (const m of readFileSync(file, 'utf8').matchAll(STATIC_IMPORT)) {
+      const dep = `assets/${m[1]}`
+      if (dep === entryPath || seen.has(dep)) continue
+      seen.add(dep)
+      queue.push(dep)
+    }
+  }
+  return seen
+}
 const gz = (buf) => gzipSync(buf, { level: 9 }).length
 const kb = (n) => `${(n / 1000).toFixed(1)} kB`
 
@@ -91,6 +115,24 @@ export function checkBundle(distDir, budgets = BUDGETS) {
   const initialGzip = bodies.reduce((sum, body) => sum + gz(body), 0)
   const parts = preloads.length > 0 ? ` + ${preloads.join(', ')}` : ''
   add('entry-gzip', initialGzip <= budgets.entryGzip, `${entryPath}${parts} ${kb(initialGzip)} gzip (budget ${kb(budgets.entryGzip)})`)
+
+  // #155: no chain. A file the entry reaches through static imports but index.html does
+  // not preload is requested only after its parent has arrived and run; on a phone that
+  // is a round trip each (#168 measured the orrery's two hops at ~530 ms on desktop).
+  const reached = staticGraph(distDir, entryPath)
+  const unlisted = [...reached].filter((p) => !initial.includes(p))
+  add(
+    'first-load-no-chain',
+    unlisted.length === 0,
+    unlisted.length === 0
+      ? `all ${reached.size} files of the entry's static import graph are modulepreloaded`
+      : `${unlisted.join(', ')} imported statically but not in index.html's modulepreload list: the browser finds it only after its parent runs`,
+  )
+  // A tripwire against accidental fragmentation, not a target: over HTTP/2 the count costs
+  // a request each and slightly worse compression, never a connection limit.
+  const maxFiles = budgets.firstLoadFiles ?? BUDGETS.firstLoadFiles
+  add('first-load-files', initial.length <= maxFiles, `${initial.length} files (ceiling ${maxFiles})`)
+
   const withThree = initial.filter((_, i) => bodies[i].includes(THREE_MARKER))
   add(
     'entry-has-no-three',
@@ -142,6 +184,9 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       sawGuideChunk = true
       const size = gz(body)
       add('orrery-guide-gzip', size <= budgets.orreryGuideGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGuideGzip)})`)
+    } else if (name.startsWith('SatBrowser-')) {
+      const size = gz(body)
+      add('sat-browser-gzip', size <= budgets.satBrowserGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satBrowserGzip)})`)
     } else if (name.startsWith('sats.worker-')) {
       const size = gz(body)
       add('sat-worker-gzip', size <= budgets.satWorkerGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`)
