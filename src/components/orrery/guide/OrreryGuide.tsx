@@ -114,8 +114,8 @@ function LessonCard({ lesson, onShow }: { lesson: Lesson; onShow: () => void }) 
 /**
  * The orrery's guide (#159): a drawer of short lessons, each with a Show me button that
  * sets the scene, and the reference sections behind them. It stays mounted while a lesson
- * is on show, collapsed to a bar, so the inspector can open where the drawer was and the
- * visitor can come back to the same place in the list.
+ * is on show, collapsed to a bar, so the inspector can open where the drawer was and one
+ * press brings the lessons back.
  *
  * Loaded on first open as its own chunk; nothing here is in the page's first load.
  */

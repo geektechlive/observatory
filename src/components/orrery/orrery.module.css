@@ -785,6 +785,7 @@
   color: inherit;
   font: inherit;
   letter-spacing: inherit;
+  text-transform: inherit;
   cursor: help;
 }
 
@@ -839,5 +840,16 @@
   .guideChip {
     bottom: 132px;
     left: var(--space-3);
+  }
+
+  /* A lesson on show: the stage is small, so the bar is one row, the inspector sheet is
+     short, and the notices wait, leaving the scene the lesson is about in view. */
+  .stage[data-guide='compact'] .inspector {
+    top: auto;
+    max-height: 36%;
+  }
+
+  .stage[data-guide='compact'] .notices {
+    display: none;
   }
 }
