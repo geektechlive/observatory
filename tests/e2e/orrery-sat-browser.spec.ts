@@ -157,14 +157,28 @@ test.describe('a link to a satellite (#158)', () => {
       page.getByRole('complementary').getByRole('heading', { name: 'STARLINK-5' }),
     ).toBeVisible({ timeout: 15_000 })
     expect(requested).toContain('starlink')
+    // Only the satellite's own group stays on: the debris the search widened to goes back.
+    await expect(page.getByRole('switch', { name: 'Starlink' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    await expect(page.getByRole('switch', { name: 'Debris' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
   })
 
-  test('drops an unknown satellite once the groups have settled', async ({ page }) => {
+  test('drops an unknown satellite once the groups have settled, and puts the switches back', async ({
+    page,
+  }) => {
     const requested = await openOrrery(page, '#orrery?focus=sat:99999999')
     // It widened to every group before giving up.
     await expect.poll(() => requested.includes('starlink')).toBe(true)
     await expect.poll(() => new URL(page.url()).hash).not.toContain('focus=')
     await expect(page.getByRole('complementary')).toHaveCount(0)
+    for (const name of ['Starlink', 'Debris']) {
+      await expect(page.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'false')
+    }
   })
 })
 

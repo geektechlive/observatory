@@ -49,6 +49,8 @@ interface LinkOptions {
     version: unknown
     openOrbit: () => void
     widen: () => void
+    /** Puts the switches back as they were before `widen`, keeping the found satellite's group. */
+    restore: (focus: string | null) => void
   }
 }
 
@@ -148,6 +150,7 @@ export function useOrreryLink(o: LinkOptions): void {
         return
       }
       key = step === 'select' ? want.focus : null
+      sats.restore(key)
     } else {
       key = want.focus === null ? null : resolveFocus(want.focus, catalog)
       if (spkid === null && want.focus !== null && key === null && !settled) return // still loading

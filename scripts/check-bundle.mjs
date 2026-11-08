@@ -28,9 +28,10 @@ export const BUDGETS = {
   // With the satellites (#98) OrreryPage measured 29.7 kB and OrreryRenderer 23.3 kB, so
   // 34 kB leaves room for #99's comets.
   // The satellite browser (#158) added 4.1 kB to OrreryPage (33.5 to 37.6 kB measured).
-  // It is not a chunk of its own: any lazy chunk with JSX made the bundler pull the query
-  // code out of the first-load entry into a fifth file (4 files became 5), so it ships in
-  // the orrery chunk, which only the orrery tab loads. 40 kB leaves room.
+  // It is not a chunk of its own: as one, the bundler pulled the query code out of the
+  // first-load entry into a fifth file (4 files became 5; stubs with only a React hook, or
+  // only JSX, did the same, cause unknown), so it ships in the orrery chunk, which only
+  // the orrery tab loads. 40 kB leaves room.
   orreryGzip: 40_000,
   textureBytes: 1_500_000,
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses

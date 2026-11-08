@@ -596,6 +596,7 @@ export function OrreryPage() {
     setPreset('orbit')
     renderer?.applyPreset('orbit')
   }, [renderer])
+  const widenedFrom = useRef<SatToggles | null>(null)
   const satLink = useMemo(
     () => ({
       has: (key: string) => renderer?.satellite(key) != null,
@@ -611,7 +612,16 @@ export function OrreryPage() {
       version: satState,
       openOrbit,
       widen: () => {
+        widenedFrom.current ??= satToggles
         setSatToggles(ALL_SAT_TOGGLES_ON)
+      },
+      // The switches as they were before widening, plus the found satellite's own group.
+      restore: (focus: string | null) => {
+        const before = widenedFrom.current
+        widenedFrom.current = null
+        if (!before) return
+        const group = focus ? renderer?.satellite(focus)?.group : undefined
+        setSatToggles(group ? withToggleOn(before, toggleForGroup(group)) : before)
       },
     }),
     [renderer, satState, satToggles, openOrbit],

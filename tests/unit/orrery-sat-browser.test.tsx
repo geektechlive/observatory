@@ -232,7 +232,7 @@ describe('<SatBrowser> (#158)', () => {
 })
 
 describe('<SatControls> browse button (#158)', () => {
-  it('opens the browser, lazily, and closes it again', async () => {
+  it('opens the browser and closes it again', async () => {
     const client = new QueryClient()
     const browse = props()
     render(

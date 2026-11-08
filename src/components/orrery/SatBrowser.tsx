@@ -160,7 +160,7 @@ function rowMeta(row: BrowseRow, field: SatFieldInfo, reentry: Reentry | undefin
 /**
  * The satellite browser (#158): find satellites without knowing a name. A list to start
  * from, a filter on name or NORAD id, about 100 rows at a time. Choosing a row does what
- * choosing the ISS from search does. Lazy: it is its own chunk, fetched when opened.
+ * choosing the ISS from search does. It ships in the OrreryPage chunk (a chunk of its own split the first load; see CLAUDE.md).
  */
 export function SatBrowser(p: SatBrowserProps) {
   const [listId, setListId] = useState<ListId>('all')
