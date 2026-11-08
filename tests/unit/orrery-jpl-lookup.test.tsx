@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useLookupStore } from '@/components/orrery/lookupStore'
 import { SearchBox } from '@/components/orrery/SearchBox'
 import { parseSbdbLookup } from '@/lib/orrery/jplLookup'
 import { useOrreryClock } from '@/store/orreryClock'
@@ -16,6 +17,7 @@ import halley from './fixtures/jpl-lookup/sbdb-halley.json'
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  useLookupStore.getState().clear()
 })
 
 beforeEach(() => {
@@ -109,7 +111,7 @@ describe('SearchBox: JPL fallback (#100)', () => {
     expect(card.textContent).toContain('Asteroid · Aten')
     expect(card.textContent).toContain('Potentially hazardous')
     expect(await screen.findByText(/from the Sun/)).toBeDefined()
-    expect(card.textContent).toMatch(/not drawn in the 3D scene/i)
+    expect(screen.getByRole('button', { name: 'Show in orrery' })).toBeDefined()
     expect(fetch).toHaveBeenCalledWith('/api/lookup?q=apophis', undefined)
     expect(fetch.mock.calls.some(([u]) => u.startsWith('/api/trajectory?id=sb%3A20099942'))).toBe(
       true,
@@ -142,6 +144,40 @@ describe('SearchBox: JPL fallback (#100)', () => {
     wrap(<SearchBox onSelect={vi.fn()} />)
     fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
     expect(await screen.findByText(/JPL is busy/)).toBeDefined()
+  })
+
+  it('"Show in orrery" hands the object to the orrery, and Remove takes it back (#145)', async () => {
+    stubApi({
+      '/api/lookup': () => json(lookupBody(apophis, 'apophis')),
+      '/api/trajectory': () => json(trajectory),
+    })
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Show in orrery' }))
+    expect(useLookupStore.getState().shown).toEqual({
+      spkid: '20099942',
+      object: apophisObject,
+      focusOnLoad: true,
+    })
+    expect(screen.queryByRole('button', { name: 'Show in orrery' })).toBeNull()
+    expect(screen.getByText(/shown in the orrery/i)).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from orrery' }))
+    expect(useLookupStore.getState().shown).toBeNull()
+    expect(screen.getByRole('button', { name: 'Show in orrery' })).toBeDefined()
+  })
+
+  it('says how long a busy queue asked to wait (#145)', async () => {
+    stubApi({ '/api/lookup': () => json({ error: 'x' }, 503, { 'Retry-After': '20' }) })
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
+    expect(await screen.findByText('JPL is busy right now. Try again in 20 s.')).toBeDefined()
+  })
+
+  it('says when JPL has no such object (#145)', async () => {
+    stubApi({ '/api/lookup': () => json({ error: 'x' }, 404) })
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
+    expect(await screen.findByText(/JPL has no object/)).toBeDefined()
   })
 
   it('closes the card', async () => {

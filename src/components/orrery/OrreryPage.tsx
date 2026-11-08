@@ -14,6 +14,7 @@ import {
   PLANETS,
   rangeRateKmS,
 } from '@/lib/orrery'
+import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import { moonBodies } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
@@ -27,6 +28,7 @@ import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DEFAULT_PRESET } from './defaultView'
 import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
+import { useLookupStore } from './lookupStore'
 import { NeoControls } from './NeoControls'
 import styles from './orrery.module.css'
 import { SatControls } from './SatControls'
@@ -48,6 +50,7 @@ import type {
   Visibility,
 } from './three/OrreryRenderer'
 import { TimeBar } from './TimeBar'
+import { useLookupTrack } from './useLookupTrack'
 import { useNearEarth } from './useNearEarth'
 import { useOrreryLink } from './useOrreryLink'
 import { useSimTime } from './useSimTime'
@@ -387,13 +390,15 @@ export function OrreryPage() {
       )
       // Craft DSN is talking to, and the deep-space ones, win label room after the voice
       // subject: on a phone Voyager 1's label used to lose to Juno's.
+      // So does an object the visitor looked up at JPL and asked to see (#145).
       const boosted = new Set(
         items
           .filter(
             (i) =>
-              i.kind === 'craft' &&
-              (i.group === 'deep-space' ||
-                (i.naifId !== undefined && dsnRef.current.has(i.naifId))),
+              i.kind === 'lookup' ||
+              (i.kind === 'craft' &&
+                (i.group === 'deep-space' ||
+                  (i.naifId !== undefined && dsnRef.current.has(i.naifId)))),
           )
           .map((i) => i.name),
       )
@@ -510,6 +515,21 @@ export function OrreryPage() {
     [renderer, moonParent],
   )
 
+  // An object looked up at JPL and shown (#145): drawn, searchable and linkable. Removing
+  // it, from the search card or the inspector, closes its inspector.
+  const lookup = useLookupTrack({ renderer, simMs: sim, select })
+  const items = useMemo(
+    () => (lookup.item ? [...catalog, lookup.item] : catalog),
+    [catalog, lookup.item],
+  )
+  useEffect(
+    () =>
+      useLookupStore.subscribe((s, prev) => {
+        if (prev.shown && !s.shown) setSelected((k) => (k && isLookupKey(k) ? null : k))
+      }),
+    [],
+  )
+
   // Tap or click a body on the canvas to select it. A drag (the camera turning) is not a
   // pick. Keyboard users have the label buttons and the search box.
   useEffect(() => {
@@ -545,12 +565,14 @@ export function OrreryPage() {
   // The address carries time, focus and preset, so a view can be shared (#108).
   useOrreryLink({
     renderer,
-    catalog,
+    catalog: items,
     settled: bodies.status === 'success' && near.settled,
     selected,
     preset,
     select,
     applyPreset: onPreset,
+    requestLookup: useLookupStore.getState().request,
+    lookupFailed: lookup.failed,
   })
 
   // With the inspector open over the stage, centre the focus in the part it leaves free:
@@ -618,7 +640,7 @@ export function OrreryPage() {
         preset={preset}
         onPreset={onPreset}
         onSelect={select}
-        items={catalog}
+        items={items}
         craftFilter={craftFilter}
         onCraftFilter={setCraftFilter}
         craftStatus={craftStatus}
@@ -764,6 +786,26 @@ export function OrreryPage() {
               {satellite.name}
             </button>
           )}
+          {lookup.key && (
+            <button
+              key={lookup.key}
+              type="button"
+              hidden
+              data-kind="lookup"
+              ref={(el) => {
+                const k = lookup.key ?? ''
+                if (el) labelNodes.current.set(k, el)
+                else labelNodes.current.delete(k)
+              }}
+              className={`${styles.label ?? ''} ${styles.lookupLabel ?? ''}`}
+              aria-pressed={selected === lookup.key}
+              onClick={() => {
+                if (lookup.key) select(lookup.key)
+              }}
+            >
+              {lookup.label}
+            </button>
+          )}
           {moons.map((m) => (
             <button
               key={m.key}
@@ -837,6 +879,8 @@ export function OrreryPage() {
             wind={near.wind}
             cme={near.cme}
             satellite={satellite}
+            lookup={lookup}
+            onRemoveLookup={useLookupStore.getState().clear}
             onClose={() => {
               setSelected(null)
             }}

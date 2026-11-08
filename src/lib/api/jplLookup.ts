@@ -12,10 +12,24 @@ import { apiFetch } from './client'
 // reach JPL through the jpl-queue Durable Object. A failure is an answer the search box
 // shows ("not set up", "busy"), never a thrown error.
 
-export type Unavailable = 'not-set-up' | 'busy' | 'failed' | 'out-of-range'
+export type Unavailable = 'not-set-up' | 'busy' | 'failed' | 'out-of-range' | 'not-found'
 
 export type LookupState<T> =
-  { state: 'ok'; data: T } | { state: 'unavailable'; reason: Unavailable }
+  | { state: 'ok'; data: T }
+  | {
+      state: 'unavailable'
+      reason: Unavailable
+      /** A busy queue's Retry-After, seconds (#145: the card says how long to wait). */
+      retryAfterS?: number
+    }
+
+const NOT_FOUND = 404
+
+/** Retry-After in seconds, when the queue sent one. */
+function retryAfter(res: Response): number | null {
+  const s = Number(res.headers.get('Retry-After'))
+  return Number.isFinite(s) && s > 0 ? s : null
+}
 
 async function getLookupJson<T>(
   url: string,
@@ -31,8 +45,13 @@ async function getLookupJson<T>(
     if (res.headers.get('X-Not-Configured') !== null) {
       return { state: 'unavailable', reason: 'not-set-up' }
     }
+    if (res.status === NOT_FOUND) return { state: 'unavailable', reason: 'not-found' }
     // 503 is the queue refusing or JPL not answering: worth another try shortly.
-    return { state: 'unavailable', reason: res.status === 503 ? 'busy' : 'failed' }
+    if (res.status !== 503) return { state: 'unavailable', reason: 'failed' }
+    const wait = retryAfter(res)
+    return wait === null
+      ? { state: 'unavailable', reason: 'busy' }
+      : { state: 'unavailable', reason: 'busy', retryAfterS: wait }
   }
   const data = read(await res.json().catch(() => null))
   return data === null ? { state: 'unavailable', reason: 'failed' } : { state: 'ok', data }
@@ -71,7 +90,15 @@ export function fetchTrajectoryAround(
 ): Promise<LookupState<TrajectoryResponse>> {
   const window = trajectoryWindow(jd)
   if (!window) return Promise.resolve({ state: 'unavailable', reason: 'out-of-range' })
-  const params = new URLSearchParams({ id, start: window.start, end: window.end, step: '1d' })
+  return fetchTrajectorySpan(id, { ...window, step: '1d' })
+}
+
+/** Horizons samples for a span (#145: the two years the orrery draws a looked-up object from). */
+export function fetchTrajectorySpan(
+  id: string,
+  span: { start: string; end: string; step: string },
+): Promise<LookupState<TrajectoryResponse>> {
+  const params = new URLSearchParams({ id, start: span.start, end: span.end, step: span.step })
   return getLookupJson(`/api/trajectory?${params.toString()}`, readTrajectory)
 }
 

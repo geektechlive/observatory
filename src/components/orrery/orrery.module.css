@@ -596,6 +596,11 @@
   color: var(--mcrn);
 }
 
+/* An object looked up at JPL and shown (#145): the Space objects lane, like its marker. */
+.lookupLabel {
+  color: var(--data-space-emit);
+}
+
 .markerLabel {
   color: var(--bone-faint);
 }

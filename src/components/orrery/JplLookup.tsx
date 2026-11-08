@@ -1,10 +1,11 @@
 import { useState } from 'react'
 
 import { useJplLookup, useJplTrajectory } from '@/hooks/useJplLookup'
-import { trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
+import { type LookupState, trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
 import type { LookupObject } from '@/schemas/jplLookup'
 
 import styles from './jpl-lookup.module.css'
+import { useLookupStore } from './lookupStore'
 import { useSimTime } from './useSimTime'
 
 // The orrery search's answer for a name the orrery doesn't carry (#100): what JPL's
@@ -21,6 +22,51 @@ const UNAVAILABLE: Record<Unavailable, string> = {
   busy: 'JPL is busy right now. Try again in a minute.',
   failed: 'The JPL lookup didn’t work this time.',
   'out-of-range': 'JPL positions are asked for 1900 to 2100 only.',
+  'not-found': 'JPL has no object by that name or number.',
+}
+
+/** A failed answer in words; a busy queue's own wait when it sent one (#145). */
+function unavailable(answer: LookupState<unknown> | undefined): string {
+  if (
+    answer?.state === 'unavailable' &&
+    answer.reason === 'busy' &&
+    answer.retryAfterS !== undefined
+  ) {
+    return `JPL is busy right now. Try again in ${String(Math.round(answer.retryAfterS))} s.`
+  }
+  return UNAVAILABLE[answer?.state === 'unavailable' ? answer.reason : 'failed']
+}
+
+/** "Show in orrery" (#145): hand the object to the orrery, which draws it and flies there. */
+function ShowInOrrery({ object }: { object: LookupObject }) {
+  const shownId = useLookupStore((s) => s.shown?.spkid ?? null)
+  if (shownId === object.spkid) {
+    return (
+      <p className={styles.shown ?? ''}>
+        <span>Shown in the orrery.</span>
+        <button
+          type="button"
+          className={styles.close ?? ''}
+          onClick={() => {
+            useLookupStore.getState().clear()
+          }}
+        >
+          Remove from orrery
+        </button>
+      </p>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className={styles.show ?? ''}
+      onClick={() => {
+        useLookupStore.getState().show(object)
+      }}
+    >
+      Show in orrery
+    </button>
+  )
 }
 
 const fmt = (n: number, digits: number) => n.toFixed(digits)
@@ -32,7 +78,7 @@ function Position({ object }: { object: LookupObject }) {
   if (traj.isPending) return <p className={styles.muted ?? ''}>Asking JPL Horizons where it is…</p>
   const answer = traj.data
   if (answer?.state !== 'ok') {
-    return <p className={styles.muted ?? ''}>{UNAVAILABLE[answer?.reason ?? 'failed']}</p>
+    return <p className={styles.muted ?? ''}>{unavailable(answer)}</p>
   }
   const facts = trajectoryFacts(answer.data, jd)
   if (!facts)
@@ -62,9 +108,7 @@ function ObjectCard({ object }: { object: LookupObject }) {
         </p>
       )}
       <Position object={object} />
-      <p className={styles.muted ?? ''}>
-        Not drawn in the 3D scene yet: the orrery draws only the objects it loads ahead.
-      </p>
+      <ShowInOrrery object={object} />
     </>
   )
 }
@@ -78,7 +122,7 @@ export default function JplLookup({ query, onClose }: { query: string; onClose: 
   if (lookup.isPending) {
     body = <p className={styles.muted ?? ''}>Asking JPL…</p>
   } else if (answer?.state !== 'ok') {
-    body = <p className={styles.muted ?? ''}>{UNAVAILABLE[answer?.reason ?? 'failed']}</p>
+    body = <p className={styles.muted ?? ''}>{unavailable(answer)}</p>
   } else if (answer.data.result.type === 'object') {
     body = <ObjectCard object={answer.data.result.object} />
   } else if (answer.data.result.type === 'list') {
