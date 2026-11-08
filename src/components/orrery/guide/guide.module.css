@@ -317,4 +317,8 @@
     grid-column: 1 / -1;
     margin-top: 0;
   }
+
+  .barTry p {
+    max-height: 16dvh;
+  }
 }

@@ -73,6 +73,9 @@ import { useNearEarth } from './useNearEarth'
 import { useOrreryLink } from './useOrreryLink'
 import { useSimTime } from './useSimTime'
 
+/** Where the guide's bar sits on a phone, px from the stage's top (guide.module.css). */
+const GUIDE_BAR_TOP_PX = 48
+
 /** The guide drawer (#159) loads on first open, never with the page. */
 const OrreryGuide = lazy(() =>
   import('./guide/OrreryGuide').then((m) => ({ default: m.OrreryGuide })),
@@ -667,6 +670,13 @@ export function OrreryPage() {
   const guide = useGuide(applyLink, guideFocus)
   // The guide's collapsed bar grows with its tip; the inspector starts below it.
   const [barHeight, setBarHeight] = useState(0)
+
+  // On a phone the guide's bar spans the stage's top: presets keep craft clear of it.
+  useEffect(() => {
+    if (!renderer) return
+    const phone = window.matchMedia('(width <= 899px)').matches
+    renderer.setFrameTop(guide.mode === 'compact' && phone ? GUIDE_BAR_TOP_PX + barHeight + 36 : 0)
+  }, [renderer, guide.mode, barHeight])
 
   // With the inspector open over the stage, centre the focus in the part it leaves free:
   // a drawer on the right on wide screens, a sheet along the bottom on phones.

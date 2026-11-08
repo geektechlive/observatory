@@ -331,4 +331,47 @@ test.describe('The guide on a phone (#159)', () => {
     await drawer(page).getByRole('button', { name: 'Close' }).click()
     await expect(drawer(page)).toHaveCount(0)
   })
+
+  test('the Voyager lesson keeps the craft, the tip and the inspector heading in the clear', async ({
+    page,
+  }) => {
+    await openOrrery(page)
+    await page.getByRole('button', { name: 'Open the guide' }).click()
+    await showLesson(page, 'voyager-1')
+    const inspector = page.getByRole('complementary', { name: 'Voyager 1' })
+    const heading = inspector.getByRole('heading', { name: 'Voyager 1' })
+    const label = page.locator('button[data-kind="craft"]', { hasText: 'Voyager 1' })
+    const apart = (
+      a: { y: number; height: number } | null,
+      b: { y: number; height: number } | null,
+    ) => !a || !b || a.y + a.height <= b.y + 4 || b.y + b.height <= a.y + 4
+
+    await expect(canvas(page)).toHaveAttribute('data-orrery-animating', 'false', {
+      timeout: 15_000,
+    })
+    // Tip closed: the craft's label sits between the bar and the inspector sheet.
+    await expect(label).toBeVisible()
+    const sheetClosed = await inspector.boundingBox()
+    const labelBox = await label.boundingBox()
+    // The refit after the bar's height arrives is a short flight: wait for it to settle.
+    await expect
+      .poll(async () => apart(await label.boundingBox(), await bar(page).boundingBox()), {
+        timeout: 15_000,
+      })
+      .toBe(true)
+    expect(apart(labelBox, sheetClosed)).toBe(true)
+
+    // Tip open: it grows, and the sheet gives way so its heading is not under it.
+    await bar(page).getByText('What to look for').click()
+    await expect(bar(page).locator('p').last()).toBeVisible()
+    const barOpen = await bar(page).boundingBox()
+    const headingBox = await heading.boundingBox()
+    expect(apart(barOpen, headingBox)).toBe(true)
+    // Nothing reaches under the dial bar below the stage.
+    const stage = await page.getByRole('region', { name: 'Orrery' }).boundingBox()
+    const sheetOpen = await inspector.boundingBox()
+    expect(
+      (sheetOpen?.y ?? 0) + (sheetOpen?.height ?? 0) <= (stage?.y ?? 0) + (stage?.height ?? 0),
+    ).toBe(true)
+  })
 })

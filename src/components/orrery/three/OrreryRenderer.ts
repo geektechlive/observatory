@@ -961,6 +961,7 @@ export class OrreryRenderer {
     const view = frameView(preset, this.width / Math.max(1, this.height), this.sceneRadius, {
       points,
       bottomReserveNdc: (2 * this.reserveBottomPx) / Math.max(1, this.height),
+      topReserveNdc: (2 * this.reserveTopPx) / Math.max(1, this.height),
     })
     this.flyTo(view.position, view.target, instant)
   }
@@ -1001,6 +1002,13 @@ export class OrreryRenderer {
   setFrameReserve(bottomPx: number): void {
     if (Math.abs(bottomPx - this.reserveBottomPx) < 1) return
     this.reserveBottomPx = Math.max(0, bottomPx)
+    this.refitPreset()
+  }
+
+  /** The stage's top strip something covers (a phone's guide bar), px: framing keeps craft below it. */
+  setFrameTop(topPx: number): void {
+    if (Math.abs(topPx - this.reserveTopPx) < 1) return
+    this.reserveTopPx = Math.max(0, topPx)
     this.refitPreset()
   }
 
@@ -1319,6 +1327,7 @@ export class OrreryRenderer {
   /** The sim date Heliosphere was last fitted at: craft drift, so it refits when far. */
   private fitJd = Number.NaN
   private reserveBottomPx = 0
+  private reserveTopPx = 0
 
   private updateBodies(force = false): void {
     const jd = jdFromDate(new Date(this.clock.simTime()))

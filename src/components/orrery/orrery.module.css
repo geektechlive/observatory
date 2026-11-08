@@ -847,7 +847,9 @@
      short, and the notices wait, leaving the scene the lesson is about in view. */
   .stage[data-guide='compact'] .inspector {
     top: auto;
-    max-height: 36%;
+
+    /* Short, and shorter while the tip is open, so its heading is never under the bar. */
+    max-height: max(72px, min(30%, calc(100% - var(--guide-bar-h, 0px) - 64px)));
   }
 
   .stage[data-guide='compact'] .notices {
