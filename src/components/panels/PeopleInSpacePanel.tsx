@@ -33,7 +33,7 @@ export function PeopleInSpacePanel() {
 
   if (isLoading) {
     return (
-      <GlassPanel variant="tile" label="Humans in Orbit">
+      <GlassPanel variant="tile" label="Humans in Orbit" className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -41,7 +41,7 @@ export function PeopleInSpacePanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Humans in Orbit">
+      <GlassPanel variant="tile" label="Humans in Orbit" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The crew roster feed did not answer" />
       </GlassPanel>
     )
@@ -50,7 +50,7 @@ export function PeopleInSpacePanel() {
   const groups = groupByCraft(data.people)
 
   return (
-    <GlassPanel variant="tile" label="Humans in Orbit">
+    <GlassPanel variant="tile" label="Humans in Orbit" className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.panel ?? ''}>
         <div className={styles.headline ?? ''}>

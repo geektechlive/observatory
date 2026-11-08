@@ -54,7 +54,7 @@ export function SunMoonPanel() {
 
   if (isLoading) {
     return (
-      <GlassPanel variant="tile" label="Sun & Moon" breathe>
+      <GlassPanel variant="tile" label="Sun & Moon" breathe className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -62,7 +62,7 @@ export function SunMoonPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Sun & Moon" breathe>
+      <GlassPanel variant="tile" label="Sun & Moon" breathe className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The USNO rise and set service is not answering" />
       </GlassPanel>
     )
@@ -72,7 +72,7 @@ export function SunMoonPanel() {
   const days = next ? daysUntil(next.date) : null
 
   return (
-    <GlassPanel variant="tile" label="Sun & Moon" breathe>
+    <GlassPanel variant="tile" label="Sun & Moon" breathe className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.panel ?? ''}>
         <div className={styles.moonRow ?? ''}>

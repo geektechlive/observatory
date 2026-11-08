@@ -81,3 +81,9 @@
 .crewDays {
   color: var(--bone-dim);
 }
+
+/* Room for a loaded panel (410 px at 380 px wide), so the console column does not
+   grow under the reader as the data arrives (#169). */
+.reserve {
+  min-height: 25rem;
+}

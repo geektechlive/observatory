@@ -35,3 +35,9 @@
   letter-spacing: var(--track-label);
   color: var(--bone-faint);
 }
+
+/* Room for a loaded panel (228 px at 380 px wide), so the console column does not
+   grow under the reader as the data arrives (#169). */
+.reserve {
+  min-height: 14rem;
+}

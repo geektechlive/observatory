@@ -83,3 +83,9 @@
   border-radius: var(--radius);
   background: color-mix(in oklch, var(--bone) 3%, transparent);
 }
+
+/* Room for a loaded panel (233 px at 380 px wide), so the console column does not
+   grow under the reader as the data arrives (#169). */
+.reserve {
+  min-height: 14.5rem;
+}
