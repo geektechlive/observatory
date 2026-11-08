@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 
 import {
-  CONSOLE_VIEWS,
   type ConsoleView,
   isLayerKey,
   LAYER_KEYS,
   type LayerKey,
   useUiStore,
+  viewFromHash,
 } from '@/store/ui'
 
 interface HashState {
@@ -17,9 +17,8 @@ interface HashState {
 
 function parseHash(): HashState {
   const raw = window.location.hash.replace(/^#\/?/, '')
-  const [viewPart = '', queryPart] = raw.split('?')
-  const candidate = viewPart.toLowerCase()
-  const view = (CONSOLE_VIEWS as string[]).includes(candidate) ? (candidate as ConsoleView) : null
+  const queryPart = raw.split('?')[1]
+  const view = viewFromHash(window.location.hash)
 
   if (queryPart === undefined) return { view, layers: null }
 

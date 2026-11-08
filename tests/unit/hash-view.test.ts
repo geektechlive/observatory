@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildHash } from '@/hooks/useHashView'
-import { LAYER_KEYS, type LayerKey } from '@/store/ui'
+import { LAYER_KEYS, type LayerKey, viewFromHash } from '@/store/ui'
+
+describe('viewFromHash (#167)', () => {
+  it.each([
+    ['#orrery', 'orrery'],
+    ['#/Orrery?t=2012-08-25', 'orrery'],
+    ['#sun', 'sun'],
+    ['#earth?layers=iss', 'earth'],
+  ])('reads %s as %s', (hash, view) => {
+    expect(viewFromHash(hash)).toBe(view)
+  })
+
+  it.each(['', '#', '#nowhere', '#?layers=iss'])('gives null for %j', (hash) => {
+    expect(viewFromHash(hash)).toBeNull()
+  })
+})
 
 const someOn = Object.fromEntries(
   LAYER_KEYS.map((k) => [k, k === 'iss' || k === 'quakes']),

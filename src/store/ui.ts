@@ -7,6 +7,24 @@ export type ConsoleView = 'earth' | 'orrery' | 'sun' | 'sky' | 'orbit'
 
 export const CONSOLE_VIEWS: ConsoleView[] = ['earth', 'orrery', 'sun', 'sky', 'orbit']
 
+/** The console a URL hash names (`#orrery?t=…`, `#/sun`), or null when it names none. */
+export function viewFromHash(hash: string): ConsoleView | null {
+  const [viewPart = ''] = hash.replace(/^#\/?/, '').split('?')
+  const candidate = viewPart.toLowerCase()
+  return (CONSOLE_VIEWS as string[]).includes(candidate) ? (candidate as ConsoleView) : null
+}
+
+/**
+ * The first view, read from the hash before anything renders (#167). Starting on
+ * 'earth' and fixing it in an effect mounted the Earth columns for one render on every
+ * direct #orrery, #sun, #sky or #orbit load: their chunks and ten feeds were fetched
+ * for a page that was never shown.
+ */
+function initialView(): ConsoleView {
+  if (typeof window === 'undefined') return 'earth'
+  return viewFromHash(window.location.hash) ?? 'earth'
+}
+
 /** The views laid out as lens + console columns; the orrery takes the whole page (#91). */
 export type ConsoleColumnView = Exclude<ConsoleView, 'orrery'>
 
@@ -129,7 +147,7 @@ const safeStorage: StateStorage = {
 export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
-      view: 'earth',
+      view: initialView(),
       mapMode: 'globe',
       layers: DEFAULT_LAYERS,
       tickerPaused: false,
