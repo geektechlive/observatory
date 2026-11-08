@@ -57,3 +57,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Reserve the room of a loaded panel with one alert (234 px) so the console column, and everything below it, does not
+   move when the data arrives (#169). */
+.reserve {
+  min-height: 14.5rem;
+}

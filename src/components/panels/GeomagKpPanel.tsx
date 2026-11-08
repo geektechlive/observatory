@@ -70,7 +70,7 @@ export function GeomagKpPanel() {
 
   if (isLoading && !data) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -78,7 +78,7 @@ export function GeomagKpPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA Kp feed did not answer" />
       </GlassPanel>
     )
@@ -88,7 +88,7 @@ export function GeomagKpPanel() {
   const readings = data.kpReadings.map((r) => ({ observedTime: r.time, kpIndex: r.kp }))
 
   return (
-    <GlassPanel variant="tile" label={TITLE}>
+    <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
       <DataAge updatedAt={Date.parse(data.updatedAt)} />
       <div className={styles.panel ?? ''}>
         <div className={styles.head ?? ''}>

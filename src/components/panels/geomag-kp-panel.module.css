@@ -59,3 +59,9 @@
   letter-spacing: var(--track-label);
   text-transform: uppercase;
 }
+
+/* Reserve the room of a loaded panel (239 px) so the console column, and everything below it, does not
+   move when the data arrives (#169). */
+.reserve {
+  min-height: 15rem;
+}

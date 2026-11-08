@@ -18,6 +18,10 @@
   line-height: 1.3;
   color: var(--bone);
   text-wrap: balance;
+
+  /* Two lines, the usual length of the sentence (#169). The placeholder is one line,
+     and the real sentence wrapping to two pushed the whole column down by 30 px. */
+  min-height: calc(2 * 1.3 * 1.45rem);
 }
 
 .sub {

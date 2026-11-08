@@ -114,7 +114,7 @@ export function SentryPanel() {
   }
 
   return (
-    <GlassPanel variant="tile" label="Sentry">
+    <GlassPanel variant="tile" label="Sentry" className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.sentryPanel ?? ''}>{renderContent()}</div>
     </GlassPanel>

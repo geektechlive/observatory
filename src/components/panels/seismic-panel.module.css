@@ -69,3 +69,9 @@
   align-items: baseline;
   gap: var(--space-2);
 }
+
+/* Reserve the room of a loaded panel with its aftershock list (274 px at 380 px wide) so the console column, and everything below it, does not
+   move when the data arrives (#169). */
+.reserve {
+  min-height: 17rem;
+}

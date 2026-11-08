@@ -76,7 +76,7 @@ export function DsnPanel() {
 
   if (isLoading) {
     return (
-      <GlassPanel variant="tile" label="Deep Space Network">
+      <GlassPanel variant="tile" label="Deep Space Network" className={styles.reserve ?? ''}>
         <PanelState kind="loading" detail="Acquiring signal" />
       </GlassPanel>
     )
@@ -84,14 +84,14 @@ export function DsnPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Deep Space Network">
+      <GlassPanel variant="tile" label="Deep Space Network" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="NASA's DSN Now feed did not answer" />
       </GlassPanel>
     )
   }
 
   return (
-    <GlassPanel variant="tile" label="Deep Space Network">
+    <GlassPanel variant="tile" label="Deep Space Network" className={styles.reserve ?? ''}>
       <div className={styles.panel ?? ''}>
         {data.stations.map((s) => (
           <StationBlock key={s.name} station={s} />

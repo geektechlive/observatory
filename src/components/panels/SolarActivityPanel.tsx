@@ -38,7 +38,7 @@ export function SolarActivityPanel() {
 
   if (isLoading) {
     return (
-      <GlassPanel variant="tile" label="Solar Activity" breathe>
+      <GlassPanel variant="tile" label="Solar Activity" breathe className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -46,7 +46,7 @@ export function SolarActivityPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Solar Activity" breathe>
+      <GlassPanel variant="tile" label="Solar Activity" breathe className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA GOES X-ray feed did not answer" />
       </GlassPanel>
     )
@@ -56,7 +56,7 @@ export function SolarActivityPanel() {
   const cls = xray.currentClass
 
   return (
-    <GlassPanel variant="tile" label="Solar Activity" breathe>
+    <GlassPanel variant="tile" label="Solar Activity" breathe className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.panel ?? ''}>
         <div className={styles.xrayRow ?? ''}>

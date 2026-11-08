@@ -34,7 +34,7 @@ export function SolarWindPanel() {
 
   if (isLoading && !data) {
     return (
-      <GlassPanel variant="tile" label="Solar Wind" breathe>
+      <GlassPanel variant="tile" label="Solar Wind" breathe className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -42,7 +42,7 @@ export function SolarWindPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Solar Wind" breathe>
+      <GlassPanel variant="tile" label="Solar Wind" breathe className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA solar wind feed did not answer" />
       </GlassPanel>
     )
@@ -52,7 +52,7 @@ export function SolarWindPanel() {
   const sparklineReadings = data.kpReadings.map((r) => ({ observedTime: r.time, kpIndex: r.kp }))
 
   return (
-    <GlassPanel variant="tile" label="Solar Wind" breathe>
+    <GlassPanel variant="tile" label="Solar Wind" breathe className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.solarWindPanel ?? ''}>
         <div className={styles.kpRow ?? ''}>

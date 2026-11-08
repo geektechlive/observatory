@@ -22,7 +22,7 @@ export function GeomagPanel() {
 
   if (isLoading && !data) {
     return (
-      <GlassPanel variant="tile" label="Geomagnetic">
+      <GlassPanel variant="tile" label="Geomagnetic" className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -30,7 +30,7 @@ export function GeomagPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Geomagnetic">
+      <GlassPanel variant="tile" label="Geomagnetic" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA geomagnetic feed did not answer" />
       </GlassPanel>
     )
@@ -40,7 +40,7 @@ export function GeomagPanel() {
   const bz = data.currentBz
 
   return (
-    <GlassPanel variant="tile" label="Geomagnetic">
+    <GlassPanel variant="tile" label="Geomagnetic" className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.panel ?? ''}>
         <div className={styles.metric ?? ''}>

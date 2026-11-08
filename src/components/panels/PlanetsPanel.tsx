@@ -32,7 +32,7 @@ export function PlanetsPanel() {
 
   if (isLoading) {
     return (
-      <GlassPanel variant="tile" label="Planets Tonight">
+      <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
         <PanelState kind="loading" detail="Plotting ephemerides" />
       </GlassPanel>
     )
@@ -40,7 +40,7 @@ export function PlanetsPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label="Planets Tonight">
+      <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="JPL Horizons is not answering" />
       </GlassPanel>
     )
@@ -51,7 +51,7 @@ export function PlanetsPanel() {
   const sorted = [...planets].sort((a, b) => b.elongation - a.elongation)
 
   return (
-    <GlassPanel variant="tile" label="Planets Tonight">
+    <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
       <DataAge updatedAt={updatedAt} />
       <div className={styles.panel ?? ''}>
         <svg

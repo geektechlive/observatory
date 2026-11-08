@@ -109,3 +109,9 @@
 .footer {
   text-align: right;
 }
+
+/* Room for a loaded panel (318 px at 380 px wide), so the console column does not
+   grow under the reader as the data arrives (#169). */
+.reserve {
+  min-height: 19.5rem;
+}
