@@ -31,8 +31,9 @@ export const BUDGETS = {
   // It is not a chunk of its own: as one, the bundler pulled the query code out of the
   // first-load entry into a fifth file (4 files became 5; stubs with only a React hook, or
   // only JSX, did the same, cause unknown), so it ships in the orrery chunk, which only
-  // the orrery tab loads. 40 kB leaves room.
-  orreryGzip: 40_000,
+  // the orrery tab loads. The guide's chip, the inspector's term buttons and the guide
+  // wiring (#159) add about 1.3 kB more. 42 kB leaves room.
+  orreryGzip: 42_000,
   textureBytes: 1_500_000,
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses
   // the globe's day-2048). They load with the orrery tab, never with the page.
@@ -46,6 +47,10 @@ export const BUDGETS = {
   craftModelTotal: 3_000_000,
   // three's GLTFLoader, fetched with the first craft model (#115).
   gltfLoaderGzip: 30_000,
+  // The orrery's guide drawer (#159): lessons, reference copy and the glossary, fetched
+  // on the first open. Measured 8.7 kB gzip, plus a small glossary chunk it shares with
+  // the inspector's term buttons.
+  orreryGuideGzip: 12_000,
 }
 
 const THREE_MARKER = 'WebGLRenderer'
@@ -59,6 +64,9 @@ const ORRERY_MARKERS = ['data-orrery-page', 'orreryWebgl']
 // The satellite worker (#98) and its catalogue load with the orrery's satellite layer:
 // the client names the worker file, the catalogue names its debris groups.
 const SAT_MARKERS = ['sats.worker', 'fengyun-1c-debris']
+// The guide drawer (#159) names this on its root element; it lives in its own chunk,
+// loaded on first open, and may reach neither the first load nor the orrery page's chunk.
+const GUIDE_MARKER = 'data-guide-drawer'
 const gz = (buf) => gzipSync(buf, { level: 9 }).length
 const kb = (n) => `${(n / 1000).toFixed(1)} kB`
 
@@ -116,16 +124,39 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       : 'satellite worker and catalogue not in first-load chunks',
   )
 
+  const withGuide = initial.filter((_, i) => bodies[i].includes(GUIDE_MARKER))
+  add(
+    'entry-has-no-guide',
+    withGuide.length === 0,
+    withGuide.length > 0
+      ? `${withGuide.join(', ')} contains the guide drawer: it must load on first open (OrreryPage.tsx lazy OrreryGuide)`
+      : 'guide drawer not in first-load chunks',
+  )
+
+  let sawOrreryPage = false
+  let sawGuideChunk = false
   for (const name of readdirSync(join(distDir, 'assets'))) {
     if (!name.endsWith('.js') || initial.includes(`assets/${name}`)) continue
     const body = readFileSync(join(distDir, 'assets', name))
-    if (name.startsWith('sats.worker-')) {
+    if (name.startsWith('OrreryGuide-')) {
+      sawGuideChunk = true
+      const size = gz(body)
+      add('orrery-guide-gzip', size <= budgets.orreryGuideGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGuideGzip)})`)
+    } else if (name.startsWith('sats.worker-')) {
       const size = gz(body)
       add('sat-worker-gzip', size <= budgets.satWorkerGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`)
     } else if (name.startsWith('GLTFLoader-')) {
       const size = gz(body)
       add('gltf-loader-gzip', size <= budgets.gltfLoaderGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.gltfLoaderGzip)})`)
     } else if (name.startsWith('OrreryPage-') || name.startsWith('OrreryRenderer-')) {
+      if (name.startsWith('OrreryPage-')) {
+        sawOrreryPage = true
+        add(
+          'orrery-page-has-no-guide',
+          !body.includes(GUIDE_MARKER),
+          body.includes(GUIDE_MARKER) ? `${name} contains the guide drawer: it must stay a separate lazy chunk` : `${name} does not contain the guide drawer`,
+        )
+      }
       const size = gz(body)
       add('orrery-gzip', size <= budgets.orreryGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGzip)})`)
     } else if (body.includes(THREE_MARKER)) {
@@ -135,6 +166,15 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       const size = gz(body)
       add('worldmap-gzip', size <= budgets.worldMapGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.worldMapGzip)})`)
     }
+  }
+
+  // A rename of the guide's chunk must not quietly switch its budget off.
+  if (sawOrreryPage) {
+    add(
+      'orrery-guide-found',
+      sawGuideChunk,
+      sawGuideChunk ? 'OrreryGuide chunk found' : 'no OrreryGuide-*.js chunk next to OrreryPage: its budget rule would not run',
+    )
   }
 
   const textureDir = join(distDir, 'textures')
