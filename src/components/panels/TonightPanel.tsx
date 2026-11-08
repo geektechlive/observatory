@@ -255,13 +255,19 @@ export function TonightPanel() {
         )}
         {passes && tle && <IssPasses passes={passes} now={now} line1={tle.line1} />}
         <CometsTonight coords={coords} dark={sky.dark} now={now} />
-        <Label>
-          Your approximate location is sent to{' '}
-          <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">
-            Open-Meteo
-          </a>{' '}
-          for cloud cover.
-        </Label>
+        <Label>Your approximate location is sent to Open-Meteo for cloud cover.</Label>
+        {clouds && (
+          // Open-Meteo's CC BY 4.0 terms ask for this link next to its data (#179).
+          <Label>
+            <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">
+              Weather data by Open-Meteo.com
+            </a>
+            ,{' '}
+            <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
+              CC BY 4.0
+            </a>
+          </Label>
+        )}
       </div>
     </GlassPanel>
   )

@@ -109,6 +109,14 @@ function quakesToGeoJson(
   }
 }
 
+// Credits that sources' terms ask for, shown by the attribution control while a layer of
+// that source is visible (#179). OpenAQ: "Attribution to OpenAQ as the source data is also
+// required" (docs.openaq.org/about/terms); adsb.lol publishes its data under ODbL.
+const OPENAQ_CREDIT =
+  'Air quality: <a href="https://openaq.org/" target="_blank" rel="noreferrer">OpenAQ</a> and its data providers'
+const ADSB_CREDIT =
+  'Aircraft: <a href="https://adsb.lol/" target="_blank" rel="noreferrer">adsb.lol</a> (ODbL)'
+
 // NASA GIBS true-color tiles lag a few hours; use yesterday (UTC).
 function gibsDate(): string {
   const d = new Date(Date.now() - 24 * 3600 * 1000)
@@ -227,8 +235,10 @@ export function WorldMap() {
     })
 
     // Bottom-left: in map mode that corner of the lens has no plate, and the ISS plate
-    // holds the bottom-right (#94).
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
+    // holds the bottom-right (#94). Never compact: CARTO's credit must not be "hidden,
+    // faded or behind a click", and MapLibre folds a compact control (or, left unset, any
+    // control on a narrow map) behind a button after the first drag (#179).
+    map.addControl(new maplibregl.AttributionControl({ compact: false }), 'bottom-left')
 
     mapRef.current = map
 
@@ -323,6 +333,7 @@ export function WorldMap() {
       map.addSource('aircraft', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
+        attribution: ADSB_CREDIT,
       })
       map.addLayer({
         id: 'aircraft-dots',
@@ -341,6 +352,7 @@ export function WorldMap() {
       map.addSource('air-quality', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
+        attribution: OPENAQ_CREDIT,
       })
       map.addLayer({
         id: 'air-dots',

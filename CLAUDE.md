@@ -73,6 +73,7 @@ Details: [docs/reference/bundle-and-loading.md](docs/reference/bundle-and-loadin
 - Cyan is spacecraft and telemetry only; MCRN red is hazard only.
 - Layout follows the approved prototype (#63, `docs/design-history/mockups-v2.html`); under 900px the dial is a fixed bottom bar on purpose.
 - **maplibre-gl 6 needs `setWorkerUrl` wired by hand** (`WorldMap.tsx`), or every vector layer dies silently behind an HTTP 200.
+- **Credits that sources' terms require are licence terms:** the map's attribution control stays `compact: false`, a new map source with credit terms sets `attribution`, and a panel shows a credit its source asks for (#179).
 - **Never grade the map with a CSS `filter`**: `src/lib/basemap.ts` repaints CARTO's layers.
 - **Globe nameplates: occlusion runs BEFORE the draw** (`syncOcclusion`, #60). Keep layer props stable (shared empty arrays).
 - **Bloom is high tier only and `pnpm verify` never draws it.** A change to `three/bloom.ts` needs a real-GPU look. Never use `UnrealBloomPass.renderToScreen`.

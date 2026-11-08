@@ -106,10 +106,30 @@ describe('TonightPanel', () => {
     const cells = [...document.querySelectorAll('[data-cloud]')].map((c) => c.textContent)
     expect(cells).toEqual(['45', '32', '10', '36', '93', '85', '6', '3', '24', '100', '100', '—'])
     expect(document.body.textContent).toMatch(/approximate location is sent to Open-Meteo/i)
-    expect(screen.getByRole('link', { name: /Open-Meteo/ }).getAttribute('href')).toBe(
-      'https://open-meteo.com/',
-    )
+    expect(
+      screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' }).getAttribute('href'),
+    ).toBe('https://open-meteo.com/')
     clouds.useClouds.mockReturnValue({ data: undefined })
+  })
+
+  it('credits Open-Meteo beside the cloud cover, in the wording its licence asks for (#179)', () => {
+    const start = Math.floor(NOW.getTime() / 3_600_000) * 3600
+    clouds.useClouds.mockReturnValue({
+      data: { hourly: { time: [start], cloud_cover: [40] } },
+    })
+    useUiStore.setState({ observer: { lat: 39.1, lon: -94.6, isFallback: false } })
+    render(<TonightPanel />)
+    const credit = screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' })
+    expect(credit.getAttribute('href')).toBe('https://open-meteo.com/')
+    const licence = screen.getByRole('link', { name: 'CC BY 4.0' })
+    expect(licence.getAttribute('href')).toBe('https://creativecommons.org/licenses/by/4.0/')
+    clouds.useClouds.mockReturnValue({ data: undefined })
+  })
+
+  it('shows no Open-Meteo credit while there is no cloud data to credit (#179)', () => {
+    useUiStore.setState({ observer: { lat: 39.1, lon: -94.6, isFallback: false } })
+    render(<TonightPanel />)
+    expect(screen.queryByRole('link', { name: 'Weather data by Open-Meteo.com' })).toBeNull()
   })
 
   describe('aurora chance (#80)', () => {

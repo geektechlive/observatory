@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useLaunches } from '@/hooks/useLaunches'
@@ -240,6 +241,12 @@ export function LaunchPanel() {
           )
         })}
       </div>
+      {/* RocketLaunch.live asks for this text "somewhere near the data" (#179). */}
+      <Label>
+        <a href="https://www.rocketlaunch.live/" target="_blank" rel="noreferrer">
+          Data by RocketLaunch.Live
+        </a>
+      </Label>
     </GlassPanel>
   )
 }

@@ -70,6 +70,15 @@ share of the stage, and the map takes the screen height. The globe keeps its one
   passes it to `maplibregl.setWorkerUrl()`. `tests/e2e/map-health.spec.ts` guards it by asserting
   the worker URL is served as JavaScript, not as the SPA fallback; a status check alone cannot
   catch this.
+- **The credit line is a licence term, so it stays open (#94, #179).** CARTO requires
+  "© OpenStreetMap contributors, © CARTO" "Visible on the map, legible, in any corner. Not
+  hidden, faded or behind a click" (carto.com/attributions, read 2026-11-08). The control is
+  `AttributionControl({ compact: false })`: a compact one, or an unset one on a narrow map,
+  folds behind a button after the first drag. Sources whose terms ask for credit carry it as
+  the source's `attribution` (OpenAQ, adsb.lol), and MapLibre lists it while one of that
+  source's layers is visible. `tests/e2e/map-credits.spec.ts` checks all of it. Elsewhere on the
+  site, the Launches panel says "Data by RocketLaunch.Live" and the Tonight panel "Weather data
+  by Open-Meteo.com" beside the cloud cover, as those services ask.
 - **CARTO dark-matter's `background` layer is the land; water is a fill on top of it.**
   `src/lib/basemap.ts` repaints those vector layers on `style.load`. Never grade the map with a
   CSS `filter`: it recolours every data layer. `tests/e2e/map-renders.spec.ts` guards this.
