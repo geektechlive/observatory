@@ -170,7 +170,9 @@ export function useOrreryLink(o: LinkOptions): void {
     // still waits is the visitor's own choice: it replaces the link.
     const was = shown.current
     shown.current = { selected, preset }
-    if (pending.current && (was.selected !== selected || was.preset !== preset)) {
+    // The Earth orbit view a satellite link opens itself (#158) is not the visitor's choice.
+    const presetChanged = was.preset !== preset && !(satOpened.current && preset === 'orbit')
+    if (pending.current && (was.selected !== selected || presetChanged)) {
       pending.current = null
     }
     write.current()
