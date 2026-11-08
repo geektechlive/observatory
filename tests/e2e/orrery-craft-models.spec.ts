@@ -101,7 +101,7 @@ test('focusing Voyager 1 loads its NASA model, served as glTF, and a preset drop
   await focus(page, 'Voyager 1')
   await expect(canvas(page)).toHaveAttribute('data-orrery-model', 'model:-31', { timeout: 15_000 })
   // A missing file would come back as the SPA's index.html with a 200 (the maplibre
-  // worker lesson in CLAUDE.md): check what was actually served.
+  // worker lesson in docs/reference/globe-and-design.md): check what was actually served.
   expect(models.map((m) => new URL(m.url).pathname)).toEqual(['/models/craft/voyager.glb'])
   expect(models[0]?.type).not.toMatch(/html/)
   const inspector = page.getByRole('complementary', { name: 'Voyager 1' })

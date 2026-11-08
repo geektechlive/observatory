@@ -1,0 +1,336 @@
+# Orrery data: craft, moons, close approaches, comets, on-demand JPL
+
+Where the orrery's bodies come from, how they are sampled, stored and drawn, and the
+measurements behind each choice. The page itself (renderer, presets, labels, links, guide,
+imagery) is in [orrery.md](orrery.md); satellites are in [satellites.md](satellites.md).
+Decisions: [ADR 0009](../decisions/0009-horizons-sampled-in-the-refresh-job.md),
+[ADR 0010](../decisions/0010-on-demand-jpl-through-one-durable-object.md).
+
+## Spacecraft, Earth and Moon (#93)
+
+They come from JPL Horizons, sampled by the refresh job, never on the request path.
+
+- **The job:** `scripts/orrery-bodies.mjs`, called from `refresh-data.mjs`, asks Horizons for
+  heliocentric ecliptic J2000 vectors, one request at a time with a 1 s pause and a 4-minute
+  budget. That's 44 requests and about 55 s.
+  - It covers the 17 bodies in `src/lib/orrery/craft.ts`.
+  - Each body gets a fine span, 30 days either side of now, position and velocity.
+  - Each craft also gets a whole-mission span, positions only, refetched once a day. Fast
+    loopers cap its step with `maxCoarseStepDays`: Parker every 3 days, because its 88-day orbit
+    drew as a jagged polygon at 25-day steps.
+  - A span past the ephemeris is clamped to Horizons' "No ephemeris … after/prior to" limit and
+    asked again.
+  - A reply naming the wrong target is rejected, and a failed object goes into `missing` while
+    the rest still ship.
+- **One KV write, value and metadata together** (`kvPutInit`'s multipart form): key
+  `horizons:bodies:v1`, about 240 KB (100 KB gzip), about 4 writes a day.
+- **The Function streams that body through without parsing it** (10 ms of CPU).
+  `/api/orrery-bodies` gets its age from the metadata via `getWithMetadata`.
+  - Up to 72 h old: fresh.
+  - Older or undated: degraded with `X-Error-Kind: upstream`.
+  - Missing: our 503.
+- **`src/lib/horizons.ts` and `src/lib/orrery/craft.ts` have no imports and use erasable syntax
+  only,** because the `.mjs` job imports them under Node's type stripping (Node 26). Keep them
+  that way.
+- **The client interpolates; it never extrapolates** (`src/lib/orrery/ephemeris.ts`).
+  - Hermite on the fine span reproduces Horizons' own 12 h samples to within 1–15 km.
+  - Catmull-Rom on the coarse span is marked coarse.
+  - Outside both: "no data for this date". The craft is hidden but stays in search.
+- **Earth is drawn from the same Horizons answer when it covers the date,** so the L1 craft sit
+  where they should; outside it, Earth is Kepler, and the inspector says so.
+- **The L1 & L2 group is off by default:** at the solar-system scale those craft sit on Earth's
+  marker. The Earth frame (below) separates them, with Earth's Moon (drawn since #107), as you
+  near Earth; the Earth–Moon preset turns the group on.
+- **DSN `spacecraftID` is the NAIF id.** `dsnContactsById` gives the ring on a craft in contact
+  and the "Only in DSN contact" filter.
+- **Deep-space craft outside the view become rim markers** (`rimPoint`, `spreadRim`), kept clear
+  of the time bar and of each other.
+- **Heliosphere with craft is its own view (`frameView` in `three/framing.ts`):**
+  - Low, 20° above the ecliptic, so north and south of the plane read as up and down.
+  - Aimed at the centre of Neptune's orbit plus the deep-space craft, not at the Sun.
+  - At the azimuth (of 24 tried) that puts the craft farthest from the Sun on screen relative to
+    Neptune's orbit.
+  - At the distance that keeps them all in view and above the time bar; the page passes the
+    bar's height through `setFrameReserve`.
+  - Why: from 30° up, aimed at the Sun, Voyager 1 (99 au north) projected right beside the Sun
+    and read as "near the Sun". Before that, Voyager 2 (90 au south) fell below a ring-only
+    frame.
+  - It refits when craft arrive, when the filter changes, and when the sim date moves 180 days,
+    as long as the camera hasn't been moved. With no craft data it falls back to the Sun-centred
+    200 au ring.
+  - Rim markers are left only for craft genuinely out of view.
+- **Stalks** (`craftLayer.ts`): a craft more than 1 au off the ecliptic gets a thin line to the
+  plane (dashed when south) and a cross where it lands. The classic orrery cue. They follow the
+  Orbits switch.
+- **Heliopause.** The ring is a faint dashed circle at 121.6 au, labelled "approx.".
+  - Source: NASA/JPL date Voyager 1's crossing to Aug. 25, 2012 (2013-09-12 release), and JPL
+    Horizons puts it 121.60 au from the Sun that day (`HELIOPAUSE_V1_AU`).
+  - The label hides on stages under 600 px, where it ran across the planets.
+- **Craft labels get priority:** craft in DSN contact and the deep-space ones rank just after the
+  voice line's subject (`labelOrder`'s `boosted`). On a phone, Voyager 1's label used to lose to
+  Juno's.
+- **Checked against Horizons' own observer quantities on 2026-11-07:**
+
+  | Craft     | Horizons                           | Inspector                                  |
+  | --------- | ---------------------------------- | ------------------------------------------ |
+  | Voyager 1 | 172.953 au, 29.75 km/s, 1438.4 min | 172.96 au, 29.8 km/s receding, 23 h 58 min |
+  | Parker    | 0.9544 au, 0.16 km/s               | 0.954 au, 0.2 km/s                         |
+
+## Major moons (#107)
+
+They ride in the same job and payload, relative to their planets.
+
+- The catalogue is `src/lib/orrery/moons.ts`: 14 moons of Mars, Jupiter, Saturn, Uranus and
+  Neptune. It has no imports, like `craft.ts`. Each id was checked live on 2026-11-07, and period
+  and semi-major axis come from Horizons' physical-data header. Charon is left out because the
+  orrery draws no Pluto.
+- The job asks `CENTER='500@<planet>'` at the coarsest step that gives 14 samples per orbit
+  (`moonStepDays`): Phobos every 30 min (`stepSize` writes minutes), Io every 3 h, Enceladus,
+  Miranda and Deimos every 2 h, Titan daily. Hermite stays within 100 km of Horizons for Io.
+- The window is ±15 days (`MOON_WINDOW_DAYS`), shrunk for a fast moon to stay under
+  `MOON_MAX_SAMPLES` (400): Phobos gets ±4 days (`moonWindowDays`).
+- The moons go in a separate `moons` array (`OrreryMoonSchema`, `center` and `parent` on each),
+  never in `bodies`. Zod strips unknown keys, so a client that predates moons drops them, and its
+  heliocentric code never sees planet-centred vectors. That's why the key stayed
+  `horizons:bodies:v1`. An old KV copy parses with `moons: []`.
+- A moon that fails goes into `missing`. The health contract still requires only `bodies`.
+- Cost, measured in a full dry run on 2026-11-07 with Phobos and Deimos: 58 requests in 80 s,
+  and a payload of 419 KB (160 KB gzip), up from 242 KB before moons. Steady-state runs reuse
+  the whole-mission spans.
+- Placement is `moonScenePosition` (`src/lib/orrery/moonPlacement.ts`): an exaggerated log scale
+  in planet radii as drawn, `R·(1.6 + 1.2·log10(1 + d/100,000 km))`, with `place3d`'s axes. Not
+  to scale; the inspector says so (`MoonFacts.tsx`). Saturn's moons start outside its rings
+  (`moonClearance`), or Enceladus would sit inside them.
+- **Earth's Moon is drawn too, from data already fetched:** Moon minus Earth, both heliocentric
+  from the same DE441 answer (`src/lib/orrery/moonState.ts`), placed by the Earth frame's scale
+  rather than `moonScenePosition` (#92), so it shares one scale with the L1 craft and the close
+  approaches. Only fine spans are used for any moon: never coarse, never extrapolated.
+- **When moons show** (`moonsShown` in `three/moonLayer.ts`): with a planet focused, only its own
+  moons; with none focused, a planet's once it is in view and drawn at least `MOON_SHOW_PX` (36)
+  in radius. Measured on the 1440 px stage: presets draw planets at 26 px at most, a focused
+  planet at 42, and focusing Mars still draws Jupiter at 42, which is why a size rule alone would
+  not do. Choosing a moon in search focuses its planet. The canvas's `data-orrery-moons` and
+  `data-orrery-sizes` let e2e check this.
+- Craft and moon labels step off planets' drawn discs (`layoutLabels`' `discs`; #105's
+  Juno-on-Jupiter nit).
+- **Moon orbit lines** (`src/lib/orrery/moonOrbit.ts`): one period of the moon's own samples
+  around the date, on a grid through the date so the moon is a vertex; when the window is shorter
+  than a period (Iapetus), the osculating ellipse from the state now, with μ from Kepler's third
+  law and Horizons' period and semi-major axis. The inspector says which. The layer writes each
+  loop at unit radius into a fixed buffer and scales the line by the planet's drawn radius
+  (`moonScenePosition` is linear in it), so the dot stays on its line with no geometry churn.
+  Shown only with their moons, under the Orbits switch. The canvas's `data-orrery-moon-orbits`
+  counts them.
+
+## Close approaches (#92, data half)
+
+They come from JPL CAD, placed with Horizons, plus JPL Scout and ESA NEOCC, in
+`horizons:neo:v1`. `scripts/orrery-neo.mjs` runs in the refresh job right after the craft step,
+so the two never ask JPL at once; CAD, Scout and Horizons share one paced queue (1 s, 2-minute
+budget).
+
+- CAD is asked for 0.05 au over now ±30 days (#136; ±10 before) with full names, then again with
+  `pha=true` to mark hazardous objects (one request, no SBDB lookups). Pass explicit `YYYY-MM-DD`
+  dates: `date-min=now-10` is a 400.
+- **40 objects, one row each (its closest approach)** (`selectApproachesAround`): up to 25 from
+  within ±10 days of now, then the rest of the month fills the other 15, each part PHAs first,
+  then the closest. CAD lists about 200 objects over ±30 days (199 on 2026-11-07), so ranking the
+  month alone would skip most of this week's.
+- **Each object costs one Horizons request at 3 h over ±30 days, stored as two Hermite spans**
+  (`splitApproachSpans`): `fine` keeps every 8th sample (daily, 61), `close` every sample within
+  ±3 days of CAD's closest approach (up to 49). Why: re-interpolating the live 3 h samples, a
+  daily step stays at the 1.5 km rounding floor away from the pass, but near a pass inside a
+  lunar distance Earth bends the path and a 12 h step was off by up to 2,000 km (2026 VL5 at
+  0.14 LD); daily-only was off by 33,000 km for 2026 TP128. A uniform 3 h step over ±30 days
+  would be about 35 KB per object. `asteroidState` uses `close` where it covers the date, else
+  `fine`; `approachPathTimes` draws the chosen pass from both. Copies written before #136 parse
+  with `close: null`.
+- **Naming a small body (`src/lib/orrery/closeApproach.ts`):** a numbered asteroid is `'433;'`, a
+  provisional one `'DES=2026 UE2;'`. `DES=433;` returns 248370 (2005 QN173), checked live
+  2026-11-07, so `targetMatchesDesignation` checks every answer's target name; a mismatch goes
+  into `missing`. `fetchSpan` in `orrery-bodies.mjs` takes the command and that check.
+- **ESA NEOCC** flat files (`neo.ssa.esa.int/PSDB-portlet/download?file=esa_risk_list` and
+  `esa_upcoming_close_app`) are pipe tables; NEOCC writes `2026VZ3` where JPL writes `2026 VZ3`
+  (`neoccDesignation`). The payload keeps the risk list's top 50 by Palermo scale plus any placed
+  object on it (`riskListed`), and all upcoming approaches.
+- A CAD failure fails the step, judged by the KV copy's age (36 h). Scout, NEOCC, the PHA filter
+  or a single asteroid failing ships as a warning listed in `missing`.
+- Measured in a live dry run on 2026-11-07 (#136): 43 JPL requests in 67 s, 39 of 40 placed
+  (2026 VO5 is in CAD but not yet in Horizons' small-body index: "No matches found"), 414 KB
+  (139 KB gzip). Before #136: 28 requests, 38 s, 25 objects, 391 KB (132 KB gzip).
+- `/api/orrery-neo` streams it through like `/api/orrery-bodies` (both use
+  `functions/api/_kvBody.ts`), degraded past 36 h. `useOrreryNeo` fetches it, through
+  `useNearEarth` on the orrery page.
+
+## The Earth frame (#92, renderer half)
+
+An inset around Earth (`src/lib/orrery/earthFrame.ts`, `three/earthNeighbourhood.ts`). At
+`place3d`'s scale a 0.05 au pass sits on Earth's dot, so near Earth distances use their own
+scale, in Earth radii: true out to GEO (6.6, for the satellites of #98), then
+`GEO + 4·log10(d/GEO)` beyond. The Moon lands near 10.5, L1 and L2 near 12.8, a 0.05 au pass
+near 15.6. Direction is kept; not to scale beyond GEO, and the inspector says so.
+
+- **Once open, Earth is drawn at the frame's unit** (`EARTH_FRAME_UNIT`, 0.0085 scene units per
+  Earth radius) and the other bodies shrink to their px floor. The first version drew the frame
+  at Earth's exaggerated radius (0.048): a 0.05 au pass then landed beyond Venus, which was drawn
+  huge beside it. Now the whole neighbourhood (0.1 au is 0.145 units) stays inside half the way
+  to Venus at its closest (0.31).
+- **When it opens** (`earthFrameBlend`): by the camera's distance to Earth in frame units,
+  log-linear from 620 (closed) to 110 (open), times the target's distance (open within 18 units,
+  closed past 30). Focusing Mars or Venus never opens it. The camera range matches Earth's
+  exaggerated radius over the unit, so Earth keeps its px size while it opens. The Inner preset
+  sits near 965 (closed). Closed in the proportional mode and whenever Horizons' Earth doesn't
+  cover the date (the Kepler Earth is the Earth–Moon barycentre, about 4,700 km off).
+- **What lives in it:** Earth's Moon (`moonLayer`'s `placementFor`), any craft within 0.1 au of
+  Earth (`CraftLayer.placeNear`: the L1/L2 ones, Europa Clipper on its flyby), the close
+  approaches (`AsteroidLayer`: amber, red for PHAs, the chosen one's sampled pass), the Sun–Earth
+  line and an L1 marker. One scale for all of them, so Moon < L1 < a 0.05 au pass holds on
+  screen.
+- **Asteroids** are Hermite on their Horizons samples minus Horizons' Earth
+  (`src/lib/orrery/asteroids.ts`), never extrapolated. On the live payload of 2026-11-07 the
+  samples find CAD's closest approach within 30 minutes and 2% for all four objects tested, and
+  the range rate flips sign at it (`orrery-asteroids.test.ts`). On the #136 dry-run payload (39
+  objects) the time was within 0.7 min for all, and the distance within 1% for all but 2026
+  TP128, which passed 7,490 km from Earth's centre (about 1,100 km up): 6.8% off, because that
+  pass takes minutes and the samples are 3 h apart.
+- **The Earth–Moon/L1 preset** (`earthPresetView`) aims at Earth from beside the Sun–Earth line,
+  so L1 and L2 sit to either side, 13.5 frame units held above the time bar, and follows Earth.
+  Focusing Earth uses its distance; a close approach, L1 or an L1/L2 craft is focused from 40
+  frame units, with the frame forced open for the flight's target (`placeEarthFrame(true)`).
+- **Controls** (`NeoControls.tsx`): closest approach within a day, a week or 30 days (#136; the
+  default, and everything at today's date, since the payload covers ±30 days; scrubbed away from
+  today it still means 30 days of the date shown), hazardous only, ESA risk list only, each
+  explained in place; JPL Scout's unconfirmed objects with NEO score and sky uncertainty (no
+  position: too new for an orbit); and the Space weather switch for the Sun–Earth line and L1.
+- **Inspector** (`NearFacts.tsx`): an approach's CAD distance with its 3-sigma range, where it is
+  now, size (from H for albedo 0.25–0.05 when JPL has no diameter), ESA's view, and spec Part
+  12's four terms kept apart (passes near Earth, potentially hazardous, modelled impact chance as
+  a model output, confirmed impact: always no). L1: the solar wind from `useSolarWind`, the
+  transit time from L1 at that speed, and the next CME's ETA from `useCme` (an arrival time
+  only: ENLIL gives no position).
+- Canvas data for e2e: `data-orrery-earth-frame` (0 to 1), `-asteroids`, `-asteroid-path`,
+  `-l1`. `e2e/orrery-neo.spec.ts` mocks the payload along `moonPayload.ts`'s Earth
+  (`neoPayload.ts`); the soak cycles through the Earth–Moon preset.
+
+## Comets and interstellar objects (#99, data half)
+
+They are `horizons:smallbodies:v1`. `scripts/orrery-smallbodies.mjs` runs in the refresh job
+after the close-approach step, through the same kind of paced JPL queue (1 s, 90 s budget).
+
+- **Which comets:** SBDB Query for comets within a year of perihelion, inside 5 au, at full
+  precision (`sbdbCometQueryUrl`), then the twelve JPL's own magnitude law makes brightest
+  tonight, T = M1 + 5 log Δ + K1 log r, down to 18 (`selectComets`). A cut at 15 left two comets
+  on 2026-11-07. Split-comet fragments (`240P-B`) and the interstellar objects are left out.
+- **The interstellar objects** are `INTERSTELLAR` in `src/lib/orrery/smallBodies.ts`: 1I
+  (`A/2017 U1`, filed as an asteroid), 2I (`C/2019 Q4`), 3I (`C/2025 N1`). Each also gets a long
+  span from three years before perihelion to five years ahead, positions only, reused for a day.
+  The steps (5, 10 and 5 days) keep Catmull-Rom within 0.0028 au of the path at 1I's perihelion,
+  under 1,000 km for 2I and 3I.
+- **Naming them to Horizons (checked live 2026-11-07):** a bare SPK-ID is refused ("out of
+  bounds"); `DES=<SPK-ID>;` lists every apparition of a periodic comet instead of answering;
+  `DES=<SPK-ID>;CAP;NOFRAG` works for comets but searches comets only, so 1I is asked
+  `DES=50788063;`. Every answer's target name is checked (`targetMatchesSmallBody`).
+- **Elements and provenance come from the same answer's header** (`parseSmallBodyHeader` in
+  `horizons.ts`): osculating elements, M1/k1 (or 1I's H), the solution and its data arc. Outside
+  the arc the path is extrapolated. When Horizons fails, a comet keeps SBDB's elements
+  (`elementsSource`).
+- **Two-body is only a fallback.** `src/lib/orrery/conic.ts` solves ellipses, parabolas and
+  hyperbolas (no imports, so the job uses it too). Against Horizons it is within 2,000 km for 3I
+  a few days from its epoch, but 4.2 million km off for 161P and 1I, whose elements are years
+  old. Draw from the spans; use the conic outside them and say so.
+- **v∞ is for the visitors only:** 26.4, 32.3 and 58.0 km/s. A comet's osculating e can be just
+  over 1 (C/2024 T5, 1.0022) while it is still bound.
+- Measured in a live dry run on 2026-11-07: 19 JPL requests in 26 s, all 15 placed, 164 KB (72
+  KB gzip). One KV write a run.
+- `/api/orrery-smallbodies` streams it through `_kvBody.ts`, degraded past 72 h. Health requires
+  a non-empty `interstellar` list, since comets can be few. `useOrrerySmallBodies` fetches it;
+  the orrery doesn't draw it yet.
+- **"Comets tonight" in the Tonight panel (#99)** is our stand-in for JPL's missing sb_obs
+  (`CometsTonight.tsx`, `src/lib/sky/`). It is fetched only once the user shares a location,
+  from our own API, so the location goes nowhere new.
+  - `topocentric.ts`: the Hermite span minus JPL Table 1's Earth–Moon barycentre, corrected for
+    light time, turned to the equator of J2000, precessed to the date (IAU 1976), turned with
+    Earth by mean sidereal time, then seen from the observer on WGS84 through east-north-up, so
+    parallax is exact. Nutation, aberration and refraction are left out. Against Horizons'
+    observer table for C/2024 T5 from Kitt Peak (`fixtures/tonight/`): RA/Dec within 0.001°,
+    altitude and azimuth within 0.008°.
+  - `cometsTonight.ts` samples the dark window from now (Sun below −18°, `darkWindow`) every 10
+    minutes, keeps each object's highest point above 10°, and rates JPL's law there: naked eye to
+    6, binoculars to 9, small telescope to 12, an 8-inch to 14 (`FAINTEST_LISTED`). Those limits
+    are an observers' rule of thumb, set a magnitude or two brighter than for stars because a
+    comet's light is spread out. Fainter comets aren't listed; the brightest of them is named in
+    the empty state.
+    1I has no magnitude law (only H) and is skipped.
+  - On 2026-11-07 the brightest were C/2024 T5 (13.3) and C/2026 A2 (13.9), both 8-inch objects:
+    a quiet month.
+
+## On-demand JPL (#100)
+
+A visitor's search goes through one Durable Object, `JplQueue`, in its own Worker
+(`workers/jpl-queue/`, deployed as `observatory-jpl-queue`). It reaches JPL only through it, one
+request at a time, as JPL's Fair Use asks ("only one API request at a time"). `/api/planets`,
+`/api/sentry` and `/api/fireball` still call JPL from their own Functions (cached, outside the
+queue).
+
+- **Why a separate Worker:** Pages can't host one. "You cannot create and deploy a Durable Object
+  within a Pages project", and a Pages binding "require[s] the `script_name` key"
+  (developers.cloudflare.com/pages/functions/wrangler-configuration, read 2026-11-07).
+- **Free plan:** "Durable Objects are available both on Workers Free and Workers Paid plans", but
+  on Free "Only Durable Objects with SQLite storage backend" (durable-objects/platform/pricing),
+  hence `new_sqlite_classes`. Limits: 100,000 requests a day and 13,000 GB-s a day; duration is
+  wall time at 128 MB, "shared across all requests active on an Object at once". One instance
+  (`idFromName('jpl')`) awake all day is 11,059 GB-s, so it can't run out of duration.
+- **The queue** (`queue.ts`): an explicit promise chain, because a Durable Object takes the next
+  request while one awaits its fetch. 1 s between starts, 8 waiting at most (then 503 with
+  `Retry-After`, `X-Queue: full`), 2,000 JPL requests a UTC day (`budget.ts`, one storage row a
+  request; then 503 until midnight). `fetchJpl` allows only `ssd.jpl.nasa.gov` and
+  `ssd-api.jpl.nasa.gov`, gives each attempt 15 s, and retries 503/429 twice (2 s, 5 s, or a
+  `Retry-After` up to 10 s). `workers_dev` and preview URLs are off: only a binding reaches it.
+  The DO answers 200 with JPL's status in `X-Jpl-Status`.
+- **`/api/lookup?q=`** reads SBDB (`sstr=`): one object, a list (HTTP 300), or "not found".
+  `parseLookupQuery` normalises the text (it is the cache key) and allows one trailing `*` after
+  three characters. **`/api/trajectory?id=sb:<SPK-ID>&start=&end=&step=`** looks the SPK-ID up
+  in SBDB (cached a week), asks Horizons for vectors (`DES=<SPK-ID>;` for an asteroid,
+  `DES=<SPK-ID>;CAP;NOFRAG` for a comet, checked live 2026-11-07 on Eros, Apophis and 3I), checks
+  the target name and the sample count, and caps a span at 600 samples between 1900 and 2100.
+  Both cache a day with the Cache API.
+- **The binding** is in `wrangler.toml` (`[[durable_objects.bindings]] name = "JPL_QUEUE"`,
+  `class_name = "JplQueue"`, `script_name = "observatory-jpl-queue"`; the Worker was deployed
+  first, 2026-11-07). Top-level bindings apply to previews and production alike. Without it both
+  endpoints answer 503 `X-Error-Kind: upstream` plus `X-Not-Configured: jpl-queue`; the search
+  card says lookup isn't available yet, and the health probe (a fixed 2026-01 span of Eros,
+  cached, so most runs never reach JPL) only warns (`notConfiguredWarns`).
+- **The search** (`SearchBox.tsx`): with no match among what the orrery carries, it offers
+  "Search JPL for …". The card (`JplLookup.tsx`, its own lazy chunk) shows SBDB's answer and,
+  from three daily Horizons samples around the sim date, the distance from the Sun and Earth
+  (Earth from the planet tables) and the speed.
+- **"Show in orrery" (#145) draws the object.** The card puts it in `lookupStore.ts`;
+  `useLookupTrack.ts` asks `/api/trajectory` for two years around the sim date at 2-day steps
+  (366 samples of the 600 allowed, `lookupSpan` in `src/lib/orrery/lookupTrack.ts`).
+  - The span's centre moves on a 120-day grid, so the date is always ≥ 305 days from an end,
+    everyone looking that season shares one cached answer, and a scrub of months asks for
+    nothing. Past the span, the next one is asked for only once the clock has rested 1.2 s
+    (`LOOKUP_SETTLE_MS`): a scrub across years sends one request, not one per span. The last span
+    keeps drawing meanwhile (react-query `placeholderData`); the marker hides wherever no sample
+    covers the date.
+  - A busy queue's `Retry-After` is said in words ("Trying again in 20 s.") and honoured, 5–60 s;
+    nothing else is retried. 404 reads "JPL has no object with this id".
+  - `three/lookupLayer.ts`: one marker on the samples (Hermite, never extrapolated) in the Space
+    objects lane colour (`LANES.space.emit`), apart from the amber approaches and cyan craft,
+    joining the Earth frame within 0.1 au like the craft. Its line is the osculating ellipse
+    through the state at the span's centre (`osculatingLoop`, shared with the moons, about the
+    Sun's GM), so Halley shows its whole orbit from two sampled years; an unbound object
+    (3I/ATLAS) draws its sampled path. The line is rebuilt only when the object or scale mode
+    changes, and sits under the Orbits switch.
+  - The inspector opens at once (`LookupFacts.tsx`: kind, orbit class, NEO/PHA, distances, light
+    time, range rate, the samples' span and step, which line is drawn); the camera flies there
+    once the samples cover the date. "Remove from orrery", on the card or in the inspector,
+    clears it and closes its inspector.
+  - Its key is `lookup:<SPK-ID>` in the scene, search ("Looked up at JPL") and links:
+    `#orrery?focus=lookup:20099942` asks JPL on load and applies once the samples cover the
+    link's date (or JPL says no for good). The canvas's `data-orrery-lookup` and `-lookup-path`
+    let e2e check it (`e2e/orrery-lookup.spec.ts`).
+- **No zod unions in client schemas.** `LookupResultSchema` is flat and narrowed by
+  `readLookupResult`: a `z.discriminatedUnion`, the app's first, pulled zod's union code into the
+  shared first-load chunk (150.3 kB against 149.8 kB).
+- **Local run:** see [local-dev.md](../operations/local-dev.md#the-jpl-queue-locally).

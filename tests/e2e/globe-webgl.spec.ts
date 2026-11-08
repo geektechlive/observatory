@@ -23,7 +23,7 @@ test.describe('Globe host', () => {
   })
 
   test('headless SwiftShader is the low tier: sprites, not bloom (#50)', async ({ page }) => {
-    // This also means e2e never draws the bloom pass; see the CLAUDE.md gotcha.
+    // This also means e2e never draws the bloom pass; see docs/reference/globe-and-design.md, "The globe".
     await page.goto('/')
     await expect(page.locator('canvas[data-globe-webgl]')).toHaveAttribute(
       'data-globe-bloom',

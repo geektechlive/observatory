@@ -2,7 +2,7 @@
 // rows (src/lib/orbit/satCatalog.ts) and written to KV as one finished body per group,
 // `celestrak:gp:<group>:v1`, for /api/orrery-sats to stream through.
 //
-// CelesTrak refuses Cloudflare Workers egress (CLAUDE.md, "Data feeds"), so this runs in
+// CelesTrak refuses Cloudflare Workers egress (docs/reference/data-feeds-and-monitoring.md, "Upstream quirks"), so this runs in
 // the refresh job. Eight downloads, one at a time with a pause, every 6 h: inside
 // CelesTrak's guidance not to fetch the same data more than once per update (~2 h).
 // Starlink comes out of `active` (see satCatalog.ts), so its 4.7 MB group is never

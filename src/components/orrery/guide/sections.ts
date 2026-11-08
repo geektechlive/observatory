@@ -1,6 +1,6 @@
 /**
  * The guide's reference sections (#159): plain data, so the copy can be tested (no dashes,
- * real glossary ids) and the drawer stays a thin renderer. Every fact is one CLAUDE.md
+ * real glossary ids) and the drawer stays a thin renderer. Every fact is one docs/reference/
  * records as checked, or something the controls themselves say; sources are named inline
  * in the comments next to the facts.
  */

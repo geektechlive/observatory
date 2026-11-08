@@ -3,7 +3,7 @@
  * the #108 format (`t`, `focus`, `preset`) that "Show me" applies through the same path a
  * pasted link takes (useOrreryLink), so the scene shows the thing being explained.
  *
- * Which lessons carry a fixed `t` is decided by how long the data lasts (CLAUDE.md):
+ * Which lessons carry a fixed `t` is decided by how long the data lasts (docs/reference/orrery.md, "The guide"):
  * craft, planets and the heliopause are fine at any date; the moons (±15 days of fine data),
  * the Earth frame and L1 (Horizons' Earth, ±30 days), satellites (±3 days of their epoch)
  * and the asteroid payload (a rolling ±30 days) only exist near today, so those lessons
@@ -129,13 +129,13 @@ function asteroidLesson(ctx: LessonContext): Lesson {
  * Where each lesson's facts were checked, for maintainers (the lists below name only public
  * sources, which is what a visitor sees):
  * - Heliopause 121.6 au on 2012-08-25: HELIOPAUSE_V1_AU (src/lib/orrery/units.ts) and
- *   CLAUDE.md "Heliopause". Light-time arithmetic: tests/unit/orrery-guide-facts.test.ts.
- * - L1, Earth frame, Moon < L1 < 0.05 au pass: CLAUDE.md "The Earth frame (#92)".
+ *   docs/reference/orrery-data.md, "Heliopause". Light-time arithmetic: tests/unit/orrery-guide-facts.test.ts.
+ * - L1, Earth frame, Moon < L1 < 0.05 au pass: docs/reference/orrery-data.md, "The Earth frame".
  * - Mars turning points: tests/unit/orrery-guide-facts.test.ts and src/lib/orrery/retrograde.ts.
- * - Geostationary ring, satellite switches: CLAUDE.md "Satellites (#98)"; radius in
+ * - Geostationary ring, satellite switches: docs/reference/satellites.md, "Satellites (#98)"; radius in
  *   tests/unit/orrery-guide-facts.test.ts.
  * - 'Oumuamua SPK-ID 50788063 and discovery date: src/lib/orrery/smallBodies.ts.
- * - Moon periods: src/lib/orrery/moons.ts; stretched scale: CLAUDE.md "Major moons (#107)".
+ * - Moon periods: src/lib/orrery/moons.ts; stretched scale: docs/reference/orrery-data.md, "Major moons (#107)".
  */
 export function buildLessons(ctx: LessonContext): Lesson[] {
   return [

@@ -8,7 +8,7 @@
 #
 # Every download is checked to be a real JPEG of the requested size: a GIBS error
 # comes back as an XML ServiceException or a smaller image with HTTP 200, and a
-# font once shipped for months as a saved 404 page (see CLAUDE.md).
+# font once shipped for months as a saved 404 page (see docs/reference/globe-and-design.md, "Fonts").
 set -euo pipefail
 
 OUT="$(cd "$(dirname "$0")/.." && pwd)/public/textures"
