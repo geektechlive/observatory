@@ -1,14 +1,11 @@
-import { lazy, Suspense, useId, useState } from 'react'
+import { useId, useState } from 'react'
 
 import { boxscoreLine } from '@/lib/satcatWords'
 
 import styles from './orrery.module.css'
-import type { SatBrowserProps } from './SatBrowser'
+import { SatBrowser, type SatBrowserProps } from './SatBrowser'
 import { SAT_TOGGLES, type SatToggles } from './satToggles'
 import { Switch } from './Switch'
-
-/** The browser (#158) is its own chunk, fetched when first opened. */
-const SatBrowser = lazy(() => import('./SatBrowser').then((m) => ({ default: m.SatBrowser })))
 
 interface SatControlsProps {
   toggles: SatToggles
@@ -86,17 +83,7 @@ export function SatControls({
             Find satellites without knowing a name: by kind, orbit, launch date and more.
           </p>
           <div id={panelId}>
-            {browsing && (
-              <Suspense
-                fallback={
-                  <p className={styles.switchHint ?? ''} role="status">
-                    Opening the browser…
-                  </p>
-                }
-              >
-                <SatBrowser {...browse} toggles={toggles} onToggles={onToggles} />
-              </Suspense>
-            )}
+            {browsing && <SatBrowser {...browse} toggles={toggles} onToggles={onToggles} />}
           </div>
         </>
       )}

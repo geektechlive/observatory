@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SatBrowser, type SatBrowserProps } from '@/components/orrery/SatBrowser'
 import { SatControls } from '@/components/orrery/SatControls'
 import { DEFAULT_SAT_TOGGLES } from '@/components/orrery/satToggles'
+import { resetSatcatCache } from '@/components/orrery/useAllSatcat'
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import { ORBIT_GEO, ORBIT_LEO, ORBIT_MEO } from '@/lib/orbit/orbitClass'
 import type { SatGroupId } from '@/lib/orbit/satCatalog'
@@ -22,6 +23,7 @@ vi.mock('@/lib/api/spaceTrack', () => ({
 
 afterEach(cleanup)
 beforeEach(() => {
+  resetSatcatCache()
   fetchSatcatShard.mockReset()
 })
 
