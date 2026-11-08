@@ -60,6 +60,11 @@ export interface BrowseQuery {
   reentries?: ReadonlyMap<string, { decayMs: number }> | undefined
   /** Names Space-Track gave the objects it lists, for those the orrery does not carry. */
   reentryNames?: Readonly<Record<string, string>> | undefined
+  /**
+   * Every stored group is switched on and loaded. Only then can an object missing from the
+   * field be said to be in no group; until then it may be in one that is off.
+   */
+  allGroupsLoaded?: boolean | undefined
   limit?: number
 }
 
@@ -72,6 +77,8 @@ export interface BrowseRow {
   group: SatGroupId | null
   /** In a group the orrery carries, so it can be shown. */
   drawn: boolean
+  /** For a row that is not drawn: it may be in a group that is off, or is in none. */
+  notDrawnReason?: 'groups-off' | 'no-group'
   decayMs?: number
 }
 
@@ -165,7 +172,10 @@ export function browse(index: BrowseIndex, q: BrowseQuery): BrowseResult {
   return { rows: rows.slice(0, limit), total: rows.length }
 }
 
-/** Predicted re-entries of objects in no group the orrery carries (rocket stages, mostly). */
+/**
+ * Predicted re-entries of objects not in the field: in a group that is off or not yet
+ * loaded, or in none (a rocket stage). The row says which only when it can know.
+ */
 function addUndrawn(
   rows: BrowseRow[],
   index: BrowseIndex,
@@ -177,11 +187,20 @@ function addUndrawn(
   const have = new Set(index.field.ids)
   for (const [id, { decayMs }] of q.reentries) {
     if (have.has(id)) continue
-    const name = q.reentryNames?.[id] ?? `Object ${id}`
+    const name = q.reentryNames?.[id] ?? `NORAD ${id}`
     const hit =
       needle === '' || name.toLowerCase().includes(needle) || (idPrefix && id.startsWith(needle))
     if (!hit) continue
-    rows.push({ index: -1, key: satKey(id), id, name, group: null, drawn: false, decayMs })
+    rows.push({
+      index: -1,
+      key: satKey(id),
+      id,
+      name,
+      group: null,
+      drawn: false,
+      notDrawnReason: q.allGroupsLoaded === true ? 'no-group' : 'groups-off',
+      decayMs,
+    })
   }
 }
 

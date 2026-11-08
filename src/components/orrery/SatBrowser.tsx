@@ -145,9 +145,21 @@ function whenDown(r: Reentry | undefined): string {
   return r ? `down ${reentryWhen(r)}` : ''
 }
 
-function rowMeta(row: BrowseRow, field: SatFieldInfo, reentry: Reentry | undefined): string {
-  if (!row.drawn)
-    return `NORAD ${row.id} · ${whenDown(reentry)} · not drawn: in no group the orrery carries`
+function rowMeta(
+  row: BrowseRow,
+  field: SatFieldInfo,
+  reentry: Reentry | undefined,
+  offLabels: string,
+): string {
+  if (!row.drawn) {
+    // Only a fully loaded orrery can say an object is in no group; otherwise it may be in
+    // a group that is off or still loading.
+    const why =
+      row.notDrawnReason === 'no-group'
+        ? 'not drawn: in no group the orrery carries'
+        : `not in the groups switched on (may be in ${offLabels || 'a group still loading'})`
+    return `NORAD ${row.id} · ${whenDown(reentry)} · ${why}`
+  }
   const parts = [`NORAD ${row.id}`]
   if (row.group) parts.push(GROUP_LABEL.get(row.group) ?? row.group)
   parts.push(ORBIT_SHORT[field.orbit[row.index] ?? 0] ?? '')
@@ -203,6 +215,13 @@ export function SatBrowser(p: SatBrowserProps) {
     }
   }, [listId, kind, orbitId, chosenCountry])
 
+  const allGroupsLoaded =
+    SAT_TOGGLES.every((t) => p.toggles[t.id]) &&
+    SAT_GROUPS.every((g) => p.groups[g.id]?.status === 'loaded')
+  const offLabels = joinLabels(
+    SAT_TOGGLES.filter((t) => !p.toggles[t.id]).map((t) => `${t.label}, which is off`),
+  )
+
   const result = useMemo(
     () =>
       index
@@ -212,9 +231,10 @@ export function SatBrowser(p: SatBrowserProps) {
             satcat,
             reentries: reentryMap,
             reentryNames: p.reentryNames,
+            allGroupsLoaded,
           })
         : { rows: [], total: 0 },
-    [index, list, filter, satcat, reentryMap, p.reentryNames],
+    [index, list, filter, satcat, reentryMap, p.reentryNames, allGroupsLoaded],
   )
 
   const kindToggle = toggleById(kind)
@@ -411,14 +431,14 @@ export function SatBrowser(p: SatBrowserProps) {
                   >
                     <span className={browserStyles.name ?? ''}>{row.name}</span>
                     <span className={browserStyles.meta ?? ''}>
-                      {p.field ? rowMeta(row, p.field, reentryById.get(row.id)) : ''}
+                      {p.field ? rowMeta(row, p.field, reentryById.get(row.id), offLabels) : ''}
                     </span>
                   </button>
                 ) : (
                   <div className={browserStyles.row ?? ''} data-drawn="false">
                     <span className={browserStyles.name ?? ''}>{row.name}</span>
                     <span className={browserStyles.meta ?? ''}>
-                      {p.field ? rowMeta(row, p.field, reentryById.get(row.id)) : ''}
+                      {p.field ? rowMeta(row, p.field, reentryById.get(row.id), offLabels) : ''}
                     </span>
                   </div>
                 )}
@@ -451,6 +471,12 @@ export function SatBrowser(p: SatBrowserProps) {
       )}
     </div>
   )
+}
+
+/** "A", "A or B", "A, B or C". */
+function joinLabels(labels: string[]): string {
+  if (labels.length < 2) return labels.join('')
+  return `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1] ?? ''}`
 }
 
 const NO_IDS: readonly string[] = []

@@ -10,11 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SatBrowser, type SatBrowserProps } from '@/components/orrery/SatBrowser'
 import { SatControls } from '@/components/orrery/SatControls'
-import { DEFAULT_SAT_TOGGLES } from '@/components/orrery/satToggles'
+import { ALL_SAT_TOGGLES_ON, DEFAULT_SAT_TOGGLES } from '@/components/orrery/satToggles'
 import { resetSatcatCache } from '@/components/orrery/useAllSatcat'
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import { ORBIT_GEO, ORBIT_LEO, ORBIT_MEO } from '@/lib/orbit/orbitClass'
-import type { SatGroupId } from '@/lib/orbit/satCatalog'
+import { SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
 
 const fetchSatcatShard = vi.fn()
 vi.mock('@/lib/api/spaceTrack', () => ({
@@ -217,9 +217,39 @@ describe('<SatBrowser> (#158)', () => {
     const list = rows()
     expect(list).toHaveLength(2)
     expect(list[0]).toMatch(/FALCON 9 R\/B/)
-    expect(list[0]).toMatch(/not drawn/i)
+    // Starlink and debris are off, so it may be in one of them: never "in no group".
+    expect(list[0]).toMatch(/not in the groups switched on/i)
+    expect(list[0]).toMatch(/Starlink/)
+    expect(list[0]).not.toMatch(/no group/i)
+    expect(list[0]).not.toMatch(/Object 99999/)
     expect(list[1]).toMatch(/ISS/)
     expect(screen.queryByRole('button', { name: /FALCON 9/ })).toBeNull()
+  })
+
+  it('says "in no group" only once every group is switched on and loaded', () => {
+    const loaded = { status: 'loaded', count: 1, degraded: false, ageSeconds: 0 } as const
+    show(
+      props({
+        toggles: ALL_SAT_TOGGLES_ON,
+        groups: Object.fromEntries(SAT_GROUPS.map((g) => [g.id, loaded])),
+        reentries: [
+          {
+            noradId: '99999',
+            decayEpoch: '2026-11-09T00:00:00Z',
+            windowMin: 600,
+            msgEpoch: '2026-11-08T00:00:00Z',
+            lat: null,
+            lon: null,
+            highInterest: false,
+          },
+        ],
+      }),
+    )
+    fireEvent.change(screen.getByRole('combobox', { name: 'Browse by' }), {
+      target: { value: 'reentry' },
+    })
+    expect(rows()[0]).toMatch(/in no group the orrery carries/)
+    expect(rows()[0]).toMatch(/NORAD 99999/)
   })
 
   it('says when re-entry predictions are not available', () => {

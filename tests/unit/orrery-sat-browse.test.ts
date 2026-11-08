@@ -163,6 +163,18 @@ describe('browse', () => {
       expect(r.total).toBe(3)
     })
 
+    it('says why an object is not drawn: groups are off, or it is in none of them', () => {
+      const q = { list: { list: 'reentry' } as const, text: '', reentries, reentryNames }
+      expect(browse(index, q).rows[0]?.notDrawnReason).toBe('groups-off')
+      expect(browse(index, { ...q, allGroupsLoaded: false }).rows[0]?.notDrawnReason).toBe(
+        'groups-off',
+      )
+      expect(browse(index, { ...q, allGroupsLoaded: true }).rows[0]?.notDrawnReason).toBe(
+        'no-group',
+      )
+      expect(browse(index, q).rows[1]?.notDrawnReason).toBeUndefined()
+    })
+
     it('names an undrawn object by id when Space-Track gave no name', () => {
       const r = browse(index, {
         list: { list: 'reentry' },
@@ -170,7 +182,7 @@ describe('browse', () => {
         reentries,
         reentryNames: {},
       })
-      expect(r.rows[0]?.name).toBe('Object 99999')
+      expect(r.rows[0]?.name).toBe('NORAD 99999')
     })
   })
 })

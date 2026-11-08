@@ -186,6 +186,24 @@ test.describe('a link to a satellite (#158)', () => {
 test.describe('on a phone (#158)', () => {
   test.use({ viewport: { width: 375, height: 760 } })
 
+  test('scrolled to the bottom, the controls sheet clears the fixed dial bar', async ({ page }) => {
+    await openOrrery(page)
+    await page.getByRole('button', { name: 'Controls', exact: true }).click()
+    const gap = await page.evaluate(() => {
+      const rail = document.getElementById('orrery-controls')
+      const last = rail?.lastElementChild
+      const dial = [...document.querySelectorAll<HTMLElement>('div')].find(
+        (el) => getComputedStyle(el).position === 'fixed' && /dial/i.test(el.className),
+      )
+      if (!rail || !last || !dial) return null
+      rail.scrollTop = rail.scrollHeight
+      return dial.getBoundingClientRect().top - last.getBoundingClientRect().bottom
+    })
+    // Positive: the last group ends above the bar.
+    expect(gap).not.toBeNull()
+    expect(gap ?? -1).toBeGreaterThanOrEqual(0)
+  })
+
   test('the browser fits 375 px with nothing scrolling sideways', async ({ page }) => {
     await openOrrery(page)
     // The view buttons are in the controls sheet, which closes once one is chosen.
