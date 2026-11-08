@@ -35,7 +35,8 @@ export function useGuide(
 
   const close = useCallback(() => {
     setState({ mode: 'closed', shown: null })
-    const back = opener.current?.isConnected ? opener.current : null
+    const back =
+      opener.current?.isConnected && opener.current.offsetParent !== null ? opener.current : null
     // The chip is gone once pressed, and the rail's button is hidden on a phone: use
     // whichever Guide button is on screen.
     const visible = fallbackFocus.map((r) => r.current).find((el) => el && el.offsetParent !== null)

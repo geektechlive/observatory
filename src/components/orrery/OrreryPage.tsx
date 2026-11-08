@@ -739,7 +739,11 @@ export function OrreryPage() {
       <ControlRail
         open={sheetOpen}
         guideOpen={guide.mode !== 'closed'}
-        onGuide={guide.open}
+        onGuide={() => {
+          // On a phone the sheet would sit under the guide: close it, as choosing a preset does.
+          setSheetOpen(false)
+          guide.open()
+        }}
         guideRef={railGuideButton}
         visibility={visibility}
         onVisibility={setVisibility}

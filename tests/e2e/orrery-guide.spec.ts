@@ -374,4 +374,17 @@ test.describe('The guide on a phone (#159)', () => {
       (sheetOpen?.y ?? 0) + (sheetOpen?.height ?? 0) <= (stage?.y ?? 0) + (stage?.height ?? 0),
     ).toBe(true)
   })
+
+  test('opening the guide from the controls sheet closes the sheet (#165)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openOrrery(page)
+    await page.getByRole('button', { name: 'Controls' }).click()
+    await expect(page.locator('#orrery-controls')).toHaveAttribute('data-open', 'true')
+    await page
+      .locator('#orrery-controls')
+      .getByRole('button', { name: 'Guide', exact: true })
+      .click()
+    await expect(page.locator('#orrery-controls')).not.toHaveAttribute('data-open', 'true')
+    await expect(page.getByRole('heading', { name: 'Guide', level: 2 })).toBeVisible()
+  })
 })
