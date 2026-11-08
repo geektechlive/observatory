@@ -74,9 +74,9 @@ export const SOURCES: readonly Source[] = [
     url: 'https://www.space-track.org/basicspacedata/query',
     auth: 'account',
     provides: 'Catalogue, element history, decay and launch data',
-    status: 'registered',
+    status: 'operational',
     terms: '30 requests/min, 300/h; redistribution of basic SSA data with citation',
-    plannedIn: 101,
+    note: 'The refresh job reads re-entry predictions every 6 h, and SATCAT, the Box Score and decays daily, with the owner’s account, for /api/spacetrack (#101)',
   },
   {
     id: 'sbdb',
@@ -200,8 +200,9 @@ export const SOURCES: readonly Source[] = [
     url: 'https://discosweb.esoc.esa.int/api/',
     auth: 'account',
     provides: 'Object metadata: mass, size, launch, re-entry',
-    status: 'registered',
-    plannedIn: 101,
+    status: 'operational',
+    terms: '100 requests per minute per token (its X-RateLimit headers, 2026-11-07)',
+    note: 'The refresh job reads mass, size and operator for the orrery craft and some satellites weekly, with the owner’s token, for /api/discos (#101)',
   },
   {
     id: 'mpc-orb',

@@ -9,8 +9,10 @@ import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodie
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
+import type { SatcatEntry } from '@/lib/spacetrack'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryNeo } from '@/schemas/orreryNeo'
+import type { Discos, Reentry } from '@/schemas/spaceTrack'
 
 import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
@@ -50,6 +52,12 @@ interface InspectorProps {
   /** An object looked up at JPL and shown (#145), and how to remove it. */
   lookup?: LookupView | undefined
   onRemoveLookup?: (() => void) | undefined
+  /** ESA DISCOS facts for craft and some satellites (#101). */
+  discos?: Discos | null | undefined
+  /** Space-Track's re-entry predictions (#101). */
+  reentries?: readonly Reentry[] | undefined
+  /** The chosen satellite's Space-Track catalogue entry, once its shard loads (#101). */
+  satCatalog?: SatcatEntry | null | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -79,6 +87,9 @@ export function Inspector({
   satellite,
   lookup,
   onRemoveLookup,
+  discos,
+  reentries,
+  satCatalog,
 }: InspectorProps) {
   const headingId = useId()
   if (isLookupKey(body)) {
@@ -116,7 +127,13 @@ export function Inspector({
           </button>
         </div>
         {satellite ? (
-          <SatFacts info={satellite} simMs={simMs} />
+          <SatFacts
+            info={satellite}
+            simMs={simMs}
+            catalog={satCatalog}
+            physical={discos?.satellites[satellite.noradId] ?? null}
+            reentry={reentries?.find((r) => r.noradId === satellite.noradId) ?? null}
+          />
         ) : (
           <p className={styles.inspectorText ?? ''} role="status">
             Loading its orbit data from CelesTrak…
@@ -178,6 +195,7 @@ export function Inspector({
             jd={jd}
             simMs={simMs}
             link={dsn?.get(track.naifId)}
+            physical={discos?.craft[track.naifId] ?? null}
           />
         ) : (
           <p className={styles.inspectorText ?? ''}>Not in the current data.</p>

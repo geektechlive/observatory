@@ -35,6 +35,67 @@ describe('<SatFacts> (#98)', () => {
     expect(text).toMatch(/CelesTrak/)
   })
 
+  it('adds Space-Track’s catalogue, ESA DISCOS’s physical facts and a re-entry, each credited (#101)', () => {
+    render(
+      <SatFacts
+        info={{
+          key: 'sat:45700',
+          noradId: '45700',
+          name: 'STARLINK-1400',
+          group: 'starlink',
+          epochMs: T0 - 3_600_000,
+          teme: [EARTH_RADIUS_KM + 210, 0, 0],
+        }}
+        simMs={T0}
+        catalog={{
+          noradId: '45700',
+          intlDes: '2020-035AV',
+          objectType: 'PAYLOAD',
+          country: 'US',
+          launch: '2020-06-04',
+          site: 'AFETR',
+          rcsSize: 'LARGE',
+        }}
+        physical={{
+          satno: '45700',
+          cosparId: '2020-035AV',
+          name: 'Starlink-1400',
+          objectClass: 'Payload',
+          massKg: 260,
+          shape: 'Box + 1 Pan',
+          widthM: 2.8,
+          heightM: 0.2,
+          depthM: 1.4,
+          diameterM: null,
+          spanM: 11,
+          operators: ['SpaceX'],
+          firstEpoch: '2020-06-04',
+          fetchedAt: '2026-11-07T22:23:18Z',
+        }}
+        reentry={{
+          noradId: '45700',
+          decayEpoch: '2026-11-11T20:32:00Z',
+          windowMin: 780,
+          msgEpoch: '2026-11-07T20:06:00Z',
+          lat: null,
+          lon: null,
+          highInterest: false,
+        }}
+      />,
+    )
+    const text = document.body.textContent
+    expect(text).toMatch(/Satellite or spacecraft/)
+    expect(text).toMatch(/United States/)
+    expect(text).toMatch(/2020-06-04/)
+    expect(text).toMatch(/Large on radar/)
+    expect(text).toMatch(/260/)
+    expect(text).toMatch(/SpaceX/)
+    expect(text).toMatch(/2\.8 × 0\.2 × 1\.4 m/)
+    expect(text).toMatch(/Predicted to re-enter 11 Nov 20:32 UTC, give or take 13 h/)
+    expect(text).toMatch(/Space-Track\.org/)
+    expect(text).toMatch(/ESA DISCOS/)
+  })
+
   it('says when it has no position at this date', () => {
     render(
       <SatFacts

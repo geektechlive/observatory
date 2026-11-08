@@ -112,4 +112,10 @@ describe('formatRelativeTime', () => {
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 3_600_000).toISOString()
     expect(formatRelativeTime(threeDaysAgo)).toBe('3d ago')
   })
+  it('says "in" for a time still ahead, such as a predicted re-entry (#101)', () => {
+    const at = (ms: number) => new Date(Date.now() + ms).toISOString()
+    expect(formatRelativeTime(at(3 * 24 * 3_600_000 + 60_000))).toBe('in 3d')
+    expect(formatRelativeTime(at(19 * 3_600_000 + 60_000))).toBe('in 19h')
+    expect(formatRelativeTime(at(12 * 60_000 + 5_000))).toBe('in 12m')
+  })
 })

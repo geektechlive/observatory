@@ -40,6 +40,15 @@ export function formatDateUtc(iso: string): string {
 
 export function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
+  // Still ahead (a predicted re-entry, #101): "in 3d", never "just now".
+  if (diff < -60_000) {
+    const ahead = -diff
+    const hAhead = Math.floor(ahead / 3_600_000)
+    const dAhead = Math.floor(hAhead / 24)
+    if (dAhead > 0) return `in ${String(dAhead)}d`
+    if (hAhead > 0) return `in ${String(hAhead)}h`
+    return `in ${String(Math.floor(ahead / 60_000))}m`
+  }
   const h = Math.floor(diff / 3_600_000)
   const d = Math.floor(h / 24)
   if (d > 0) return `${d}d ago`

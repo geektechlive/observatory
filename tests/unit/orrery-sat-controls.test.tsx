@@ -158,4 +158,32 @@ describe('<SatControls> (#98)', () => {
     }
     expect(screen.getByRole('status').textContent).toBe('Loading…')
   })
+
+  it('adds Space-Track’s Box Score and this week’s re-entries, credited (#101)', () => {
+    render(
+      <SatControls
+        toggles={DEFAULT_SAT_TOGGLES}
+        onToggles={() => undefined}
+        status="x"
+        boxscore={{ inOrbit: { payload: 19870, rocketBody: 2434, debris: 12545, total: 35526 } }}
+        reentriesThisWeek={5}
+      />,
+    )
+    const text = document.body.textContent
+    expect(text).toMatch(/Space-Track tracks 35,526 objects in orbit/)
+    expect(text).toMatch(/5 objects are predicted to re-enter in the next 7 days/)
+    expect(text).toMatch(/ringed in amber/)
+  })
+
+  it('says nothing about re-entries when none are predicted', () => {
+    render(
+      <SatControls
+        toggles={DEFAULT_SAT_TOGGLES}
+        onToggles={() => undefined}
+        status="x"
+        reentriesThisWeek={0}
+      />,
+    )
+    expect(document.body.textContent).not.toMatch(/re-enter/)
+  })
 })

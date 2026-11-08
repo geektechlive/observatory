@@ -1,0 +1,137 @@
+[
+  {
+    "NORAD_CAT_ID": "5",
+    "INTLDES": "1958-002B",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1958-03-17",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "11",
+    "INTLDES": "1959-001A",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1959-02-17",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "12",
+    "INTLDES": "1959-001B",
+    "OBJECT_TYPE": "ROCKET BODY",
+    "COUNTRY": "US",
+    "LAUNCH": "1959-02-17",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "16",
+    "INTLDES": "1958-002A",
+    "OBJECT_TYPE": "ROCKET BODY",
+    "COUNTRY": "US",
+    "LAUNCH": "1958-03-17",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "20",
+    "INTLDES": "1959-007A",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1959-09-18",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "22",
+    "INTLDES": "1959-009A",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1959-10-13",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "27",
+    "INTLDES": "1960-001A",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-03-11",
+    "SITE": "AFETR",
+    "RCS_SIZE": null
+  },
+  {
+    "NORAD_CAT_ID": "29",
+    "INTLDES": "1960-002B",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-04-01",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "45",
+    "INTLDES": "1960-007A",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-06-22",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "46",
+    "INTLDES": "1960-007B",
+    "OBJECT_TYPE": "PAYLOAD",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-06-22",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "47",
+    "INTLDES": "1960-007C",
+    "OBJECT_TYPE": "ROCKET BODY",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-06-22",
+    "SITE": "AFETR",
+    "RCS_SIZE": "LARGE"
+  },
+  {
+    "NORAD_CAT_ID": "50",
+    "INTLDES": "1960-009B",
+    "OBJECT_TYPE": "ROCKET BODY",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-08-12",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "51",
+    "INTLDES": "1960-009C",
+    "OBJECT_TYPE": "DEBRIS",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-08-12",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  },
+  {
+    "NORAD_CAT_ID": "52",
+    "INTLDES": "1960-009D",
+    "OBJECT_TYPE": "DEBRIS",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-08-12",
+    "SITE": "AFETR",
+    "RCS_SIZE": null
+  },
+  {
+    "NORAD_CAT_ID": "53",
+    "INTLDES": "1960-009E",
+    "OBJECT_TYPE": "DEBRIS",
+    "COUNTRY": "US",
+    "LAUNCH": "1960-08-12",
+    "SITE": "AFETR",
+    "RCS_SIZE": "MEDIUM"
+  }
+]

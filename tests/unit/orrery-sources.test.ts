@@ -40,6 +40,14 @@ describe('SOURCES (#91)', () => {
     expect(sbdb?.note).toMatch(/jpl-queue/)
   })
 
+  it('marks the owner’s Space-Track and DISCOSweb accounts as operational (#101)', () => {
+    for (const id of ['space-track', 'discosweb']) {
+      const s = SOURCES.find((x) => x.id === id)
+      expect(s?.status).toBe('operational')
+      expect(s?.note).toMatch(/refresh job/)
+    }
+  })
+
   it('records the fact-check: sb_obs does not exist, Launch Library is 2.3.0', () => {
     const sbObs = SOURCES.find((s) => s.id === 'sb_obs')
     expect(sbObs?.status).toBe('unavailable')

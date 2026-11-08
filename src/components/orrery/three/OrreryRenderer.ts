@@ -143,6 +143,8 @@ const SAT_MARKER_MIN_PX = 4
 const LOOKUP_MIN_PX = 3.5
 /** A looked-up object this close to Earth, au, is framed with Earth as well as the Sun (#145). */
 const LOOKUP_WITH_EARTH_AU = 3
+/** A re-entry ring around a satellite never draws smaller than this, px (#101). */
+const SAT_REENTRY_MIN_PX = 9
 /** Asteroid and L1 labels show once the Earth frame is this open (or the object is chosen). */
 const NEAR_LABEL_OPEN = 0.5
 /** The Earth–Moon/L1 preset holds this many Earth radii (as drawn) around Earth: L2 at 12.8. */
@@ -482,6 +484,7 @@ export class OrreryRenderer {
     if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX)
     if (this.sats.marker.visible) this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX)
     if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
+    for (const ring of this.sats.flagRings()) this.floorPx(ring, SAT_REENTRY_MIN_PX)
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
       c.mesh.scale.setScalar(craftIconScale(this.unitsPerPx(depth)))
@@ -594,6 +597,12 @@ export class OrreryRenderer {
   /** The satellite groups switched on (#98); fetched once the Earth frame opens. */
   setSatGroups(groups: ReadonlySet<SatGroupId>): void {
     this.sats.setEnabled(groups)
+    this.markDirty()
+  }
+
+  /** Objects Space-Track predicts will re-enter soon, by NORAD id (#101): ringed in amber. */
+  setReentries(noradIds: readonly string[]): void {
+    this.sats.setFlagged(noradIds)
     this.markDirty()
   }
 
@@ -1419,6 +1428,7 @@ export class OrreryRenderer {
     d['orrerySatTotal'] = String(sats.total)
     d['orrerySatDrawn'] = String(sats.drawn)
     d['orrerySatHidden'] = String(sats.outOfWindow)
+    d['orrerySatReentries'] = String(this.sats.flagRings().length)
     d['orrerySatGroups'] = Object.entries(sats.groups)
       .filter(([, g]) => g.status === 'loaded')
       .map(([id]) => id)

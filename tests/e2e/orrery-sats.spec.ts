@@ -9,6 +9,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
 import { serveSats } from './satPayload'
+import { serveSpaceTrack } from './spaceTrackPayload'
 import { offlineSun } from './swpc'
 
 test.beforeEach(async ({ page }) => {
@@ -95,5 +96,24 @@ test.describe('satellites (#98)', () => {
     await expect(inspector.getByText('NORAD 25544')).toBeVisible()
     await expect(inspector.getByText('Space stations')).toBeVisible()
     await expect(page.locator('button[data-kind="satellite"]')).toBeVisible()
+  })
+
+  test('Space-Track and DISCOS add to the inspector, the controls and the stage (#101)', async ({
+    page,
+  }) => {
+    await serveSpaceTrack(page)
+    await openOrrery(page)
+    await expect(page.getByText('Space-Track tracks 35,526 objects in orbit')).toBeVisible()
+    await expect(
+      page.getByText(/1 object is predicted to re-enter in the next 7 days/),
+    ).toBeVisible()
+    await page.getByRole('combobox', { name: /find/i }).fill('ISS')
+    await page.getByRole('option', { name: /^ISS/ }).first().click()
+    const inspector = page.getByRole('complementary')
+    await expect(inspector.getByText('International Space Station partners (ISS)')).toBeVisible()
+    await expect(inspector.getByText('Large on radar (over 1 m)')).toBeVisible()
+    await expect(inspector.getByText('ESA DISCOS: International Space Station')).toBeVisible()
+    // Tiangong (stations group, on by default) is predicted to come down: ringed.
+    await expect.poll(async () => Number(await attr(page, 'data-orrery-sat-reentries'))).toBe(1)
   })
 })

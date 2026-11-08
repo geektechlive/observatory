@@ -52,6 +52,20 @@ describe('SOURCES', () => {
     ).toBe(true)
   })
 
+  it('grades Space-Track by a TIP list (empty is fine), 36 h before degraded (#101)', () => {
+    expect(SOURCES.spacetrack.headline).toBe(false)
+    expect(SOURCES.spacetrack.maxAgeMs).toBe(36 * 3_600_000)
+    expect(SOURCES.spacetrack.required({ tip: null })).toBe(false)
+    expect(SOURCES.spacetrack.required({ tip: { reentries: [] } })).toBe(true)
+  })
+
+  it('grades DISCOS by its craft, 14 days before degraded (#101)', () => {
+    expect(SOURCES.discos.headline).toBe(false)
+    expect(SOURCES.discos.maxAgeMs).toBe(14 * 24 * 3_600_000)
+    expect(SOURCES.discos.required({ craft: {} })).toBe(false)
+    expect(SOURCES.discos.required({ craft: { '-31': { name: 'Voyager 1' } } })).toBe(true)
+  })
+
   it('grades orrery satellites by non-empty rows, 36 h before degraded (#98)', () => {
     expect(SOURCES['orrery-sats'].headline).toBe(false)
     expect(SOURCES['orrery-sats'].maxAgeMs).toBe(36 * 3_600_000)

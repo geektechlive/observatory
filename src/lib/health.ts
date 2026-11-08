@@ -20,6 +20,7 @@ export type SourceName =
   | 'aurora'
   | 'buoys'
   | 'cme'
+  | 'discos'
   | 'co2'
   | 'donki'
   | 'eonet'
@@ -47,6 +48,7 @@ export type SourceName =
   | 'solar-cycle'
   | 'solar-wind'
   | 'space-news'
+  | 'spacetrack'
   | 'sun-moon'
   | 'swpc-alerts'
   | 'weather'
@@ -114,6 +116,14 @@ export const SOURCES: Record<SourceName, SourceContract> = {
   buoys: { label: 'Ocean Buoys', headline: false, maxAgeMs: 3 * HOUR, required: hasContent },
   cme: { label: 'CME', headline: false, maxAgeMs: 12 * HOUR, required: hasContent },
   co2: { label: 'CO2', headline: false, maxAgeMs: 30 * DAY, required: hasContent },
+  discos: {
+    // Not headline: only the inspector asks (#101). Each object is asked weekly; the 15
+    // orrery craft are always there, so no craft means a broken refresh.
+    label: 'ESA DISCOS',
+    headline: false,
+    maxAgeMs: 14 * DAY,
+    required: (data) => isRecord(data) && hasContent(data['craft']),
+  },
   donki: { label: 'DONKI', headline: false, maxAgeMs: 12 * HOUR, required: hasContent },
   eonet: { label: 'EONET Events', headline: true, maxAgeMs: 12 * HOUR, required: hasContent },
   epic: { label: 'EPIC', headline: false, maxAgeMs: 2 * DAY, required: hasContent },
@@ -213,6 +223,15 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     required: (data) => fieldPresent(data, 'currentKp') && fieldPresent(data, 'windSpeed'),
   },
   'space-news': { label: 'Space News', headline: false, maxAgeMs: 12 * HOUR, required: hasContent },
+  spacetrack: {
+    // Not headline: only the satellite inspector, controls and ticker ask (#101). TIP is
+    // asked every 6 h; some weeks nothing is coming down, so an empty list is an answer,
+    // but no TIP part at all means the refresh never reached Space-Track.
+    label: 'Space-Track',
+    headline: false,
+    maxAgeMs: 36 * HOUR,
+    required: (data) => isRecord(data) && fieldPresent(data['tip'], 'reentries'),
+  },
   'sun-moon': { label: 'Sun & Moon', headline: false, maxAgeMs: DAY, required: hasContent },
   'swpc-alerts': {
     label: 'SWPC Alerts',

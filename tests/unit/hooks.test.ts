@@ -7,6 +7,7 @@ vi.mock('@/hooks/useEvents')
 vi.mock('@/hooks/useDonki')
 vi.mock('@/hooks/useSentry')
 vi.mock('@/hooks/useFireball')
+vi.mock('@/hooks/useSpaceTrack')
 vi.mock('@/lib/api/iss')
 vi.mock('@/lib/orbit/propagate')
 
@@ -17,6 +18,7 @@ import { useIss } from '@/hooks/useIss'
 import { useNow } from '@/hooks/useNow'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { useSentry } from '@/hooks/useSentry'
+import { useSpaceTrack } from '@/hooks/useSpaceTrack'
 import { useTicker } from '@/hooks/useTicker'
 import { fetchIssTleEnvelope } from '@/lib/api/iss'
 import { computeTrail, propagateIss } from '@/lib/orbit/propagate'
@@ -26,6 +28,7 @@ const mockedUseEvents = vi.mocked(useEvents)
 const mockedUseDonki = vi.mocked(useDonki)
 const mockedUseSentry = vi.mocked(useSentry)
 const mockedUseFireball = vi.mocked(useFireball)
+const mockedUseSpaceTrack = vi.mocked(useSpaceTrack)
 const mockedFetchIssTle = vi.mocked(fetchIssTleEnvelope)
 const mockedPropagateIss = vi.mocked(propagateIss)
 const mockedComputeTrail = vi.mocked(computeTrail)
@@ -109,8 +112,14 @@ describe('useTicker', () => {
       donki?: object
       sentry?: object
       fireball?: object
+      spacetrack?: object
     } = {},
   ) {
+    mockedUseSpaceTrack.mockReturnValue({
+      data: overrides.spacetrack,
+      error: null,
+      isLoading: false,
+    } as ReturnType<typeof useSpaceTrack>)
     mockedUseEvents.mockReturnValue({
       data: { events: overrides.events ?? [] } as ReturnType<typeof useEvents>['data'],
       error: null,
@@ -137,6 +146,30 @@ describe('useTicker', () => {
     setupMocks()
     const { result } = renderHook(() => useTicker())
     expect(result.current).toEqual([])
+  })
+
+  it("adds this week's Space-Track re-entry predictions, named (#101)", () => {
+    const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 19) + 'Z'
+    const later = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 19) + 'Z'
+    const reentry = (noradId: string, decayEpoch: string) => ({
+      noradId,
+      decayEpoch,
+      windowMin: 780,
+      msgEpoch: soon,
+      lat: null,
+      lon: null,
+      highInterest: false,
+    })
+    setupMocks({
+      spacetrack: {
+        tip: { fetchedAt: soon, reentries: [reentry('45700', soon), reentry('1', later)] },
+        names: { '45700': 'STARLINK-1400' },
+      },
+    })
+    const { result } = renderHook(() => useTicker())
+    expect(result.current).toHaveLength(1)
+    expect(result.current[0]).toMatchObject({ id: 'reentry-45700', label: 'RE-ENTRY' })
+    expect(result.current[0]?.description).toMatch(/^STARLINK-1400 · /)
   })
 
   it('maps a wildfire EONET event to a WILDFIRE ticker item', () => {

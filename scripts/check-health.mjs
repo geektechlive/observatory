@@ -131,6 +131,25 @@ export const CHECKS = [
       Array.isArray(b?.fine?.samples) &&
       b.fine.samples.length === 18,
   },
+  // Space-Track (#101): KV-only, read by the refresh job with the owner's account. Some
+  // weeks nothing is predicted to re-enter, so an empty TIP list passes; no list fails.
+  {
+    path: '/api/spacetrack?part=catalog',
+    requires: 'a TIP re-entries list, each with its predicted time',
+    check: (b) =>
+      Array.isArray(b?.tip?.reentries) &&
+      b.tip.reentries.every((r) => typeof r?.noradId === 'string' && typeof r?.decayEpoch === 'string'),
+  },
+  // ESA DISCOS (#101): KV-only, read by the refresh job with the owner's token.
+  {
+    path: '/api/discos',
+    requires: 'the orrery craft, each with a name',
+    check: (b) =>
+      typeof b?.craft === 'object' &&
+      b.craft !== null &&
+      Object.keys(b.craft).length > 0 &&
+      Object.values(b.craft).every((c) => typeof c?.name === 'string'),
+  },
   // The orrery's satellites (#98): KV-only, one CelesTrak group per request. The small
   // stations group proves the pipeline without pulling Starlink's 1.7 MB every run.
   {
