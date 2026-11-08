@@ -20,15 +20,6 @@ export interface Section {
   blocks: readonly Block[]
 }
 
-/**
- * The "Browse satellites" panel is being built in #158. Flip `GUIDE_FLAGS.browseSatellites` to true when it lands to
- * add the sentence below to "Finding things"; tests/unit/orrery-guide-sections.test.ts
- * keeps the two in step.
- */
-export const GUIDE_FLAGS = { browseSatellites: false }
-export const BROWSE_SATELLITES_SENTENCE =
-  'Browse satellites lists the tracked satellites, so you can find one without knowing its name.'
-
 export const SECTIONS: readonly Section[] = [
   {
     id: 'getting-around',
@@ -92,9 +83,10 @@ export const SECTIONS: readonly Section[] = [
         kind: 'p',
         text: 'For satellites, choose Earth orbit. The Earth orbit controls have a switch for each kind: space stations, GPS, weather, science, other active satellites, debris and Starlink. Debris and Starlink start off, because Starlink is the biggest download. Satellites show only when you are near Earth and fade out as you zoom away. Choosing a station in the Find box, the ISS for instance, opens that view and switches the stations on.',
       },
-      ...(GUIDE_FLAGS.browseSatellites
-        ? ([{ kind: 'p', text: BROWSE_SATELLITES_SENTENCE }] as const)
-        : []),
+      {
+        kind: 'p',
+        text: 'Browse satellites, in the Earth orbit controls, lists them by kind, by orbit, by launch date, by size on radar, by owner and by the ones about to fall back to Earth, so you can find one without knowing its name. Choosing one flies there and opens its details.',
+      },
     ],
   },
   {

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  BROWSE_SATELLITES_SENTENCE,
-  DATA_SOURCES,
-  GUIDE_FLAGS,
-  SECTIONS,
-  sectionText,
-} from '@/components/orrery/guide/sections'
+import { DATA_SOURCES, SECTIONS, sectionText } from '@/components/orrery/guide/sections'
 import { GLOSSARY_IDS } from '@/lib/orrery/glossary'
 import { SOURCES } from '@/lib/orrery/sources'
 
@@ -38,11 +32,11 @@ describe('the guide reference sections (#159)', () => {
     }
   })
 
-  it('names the browse-satellites panel only once it ships', () => {
-    // Off until #158 lands: flip GUIDE_FLAGS.browseSatellites to true to add the sentence.
+  it('points to the satellite browser (#158) for finding a satellite without its name', () => {
     const finding = SECTIONS.find((s) => s.id === 'finding')
     const text = finding ? sectionText(finding) : ''
-    expect(text.includes(BROWSE_SATELLITES_SENTENCE)).toBe(GUIDE_FLAGS.browseSatellites)
+    expect(text).toContain('Browse satellites')
+    expect(text).toContain('without knowing its name')
   })
 
   it('gives every data source a link, what it gives and how fresh it is', () => {
