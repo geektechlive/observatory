@@ -1,7 +1,7 @@
 import { type ReactNode, useRef } from 'react'
 
 import { TickRing } from '@/components/ui/TickRing'
-import { prefetchOrrery } from '@/lib/orreryPrefetch'
+import { preloadOrreryLinks } from '@/lib/orreryPrefetch'
 import { CONSOLE_VIEWS, type ConsoleView, useUiStore } from '@/store/ui'
 
 import styles from './orbital-dial.module.css'
@@ -169,9 +169,9 @@ export function OrbitalDial() {
               onClick={() => {
                 setView(v)
               }}
-              // Reaching for the Orrery tab starts its download (#168).
-              onPointerEnter={v === 'orrery' ? () => void prefetchOrrery() : undefined}
-              onFocus={v === 'orrery' ? () => void prefetchOrrery() : undefined}
+              // Reaching for the Orrery tab downloads its chunks without running them (#168).
+              onPointerEnter={v === 'orrery' ? () => void preloadOrreryLinks() : undefined}
+              onFocus={v === 'orrery' ? () => void preloadOrreryLinks() : undefined}
             >
               <span className={styles.glyphRing ?? ''} aria-hidden="true">
                 {/* The same machined ring as the globe bezel, so nav and lens match */}

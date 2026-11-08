@@ -46,6 +46,75 @@ export const prefetchOrrery = createOrreryPrefetch({
   renderer: loadOrreryRenderer,
 })
 
+/**
+ * Where the build lists the orrery's chunk files (vite.config.ts `orreryPreloadManifest`):
+ * OrreryPage, OrreryRenderer and every chunk they import statically, three.js included.
+ */
+export const ORRERY_PRELOAD_MANIFEST = '/orrery-preload.json'
+
+const CHUNK_PATH = /^\/assets\/[\w.-]+\.js$/
+
+async function fetchPreloadManifest(): Promise<unknown> {
+  const res = await fetch(ORRERY_PRELOAD_MANIFEST)
+  if (!res.ok) throw new Error(`orrery preload manifest ${res.status}`)
+  return res.json()
+}
+
+interface LinkPreloadOptions {
+  fetchManifest?: () => Promise<unknown>
+  doc?: Document
+}
+
+function readFiles(manifest: unknown): string[] | null {
+  if (typeof manifest !== 'object' || manifest === null || !('files' in manifest)) return null
+  const { files } = manifest
+  if (!Array.isArray(files)) return null
+  const paths = files.filter((f): f is string => typeof f === 'string' && CHUNK_PATH.test(f))
+  return paths.length > 0 ? paths : null
+}
+
+/**
+ * Download, and let the browser compile, the orrery's chunks without running them: one
+ * `<link rel="modulepreload">` each. Unlike `import()` this adds no main-thread work, which
+ * is what the hover and idle paths want on a phone. The real import later finds the modules
+ * in the browser's module map. Never rejects; a failure may be tried again.
+ */
+export function createOrreryLinkPreload({
+  fetchManifest = fetchPreloadManifest,
+  doc = document,
+}: LinkPreloadOptions = {}): () => Promise<void> {
+  let started: Promise<void> | null = null
+  return () => {
+    started ??= fetchManifest().then(
+      (manifest) => {
+        const files = readFiles(manifest)
+        if (files === null) {
+          started = null
+          return
+        }
+        const present = new Set(
+          [...doc.querySelectorAll('link[rel="modulepreload"]')].map((l) => l.getAttribute('href')),
+        )
+        for (const href of files) {
+          if (present.has(href)) continue
+          const link = doc.createElement('link')
+          link.rel = 'modulepreload'
+          link.setAttribute('crossorigin', '')
+          link.href = href
+          doc.head.append(link)
+        }
+      },
+      () => {
+        started = null
+      },
+    )
+    return started
+  }
+}
+
+/** Hover, focus and idle use this; only a boot on #orrery really imports (`prefetchOrrery`). */
+export const preloadOrreryLinks = createOrreryLinkPreload()
+
 /** `#orrery`, `#/orrery` and `#orrery?t=…`, the way useHashView reads the view. */
 export function isOrreryHash(hash: string): boolean {
   const [view = ''] = hash.replace(/^#\/?/, '').split('?')
@@ -79,7 +148,7 @@ interface IdleOptions {
 
 /** Prefetch once the page has settled and the browser is idle. Returns a cancel function. */
 export function scheduleOrreryIdlePrefetch(
-  prefetch: () => Promise<void> = prefetchOrrery,
+  prefetch: () => Promise<void> = preloadOrreryLinks,
   { connection = currentConnection(), idleDelayMs = IDLE_DELAY_MS }: IdleOptions = {},
 ): () => void {
   if (!shouldPrefetchOnIdle(connection)) return () => undefined

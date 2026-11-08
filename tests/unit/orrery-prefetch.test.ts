@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  createOrreryLinkPreload,
   createOrreryPrefetch,
   isOrreryHash,
   scheduleOrreryIdlePrefetch,
@@ -94,5 +95,52 @@ describe('scheduleOrreryIdlePrefetch', () => {
     scheduleOrreryIdlePrefetch(prefetch, { connection: { saveData: true }, idleDelayMs: 1000 })
     vi.advanceTimersByTime(10_000)
     expect(prefetch).not.toHaveBeenCalled()
+  })
+})
+
+// Hover and idle must not evaluate the orrery's modules (no main-thread work on a phone):
+// they inject <link rel="modulepreload">, which downloads and compiles but does not run.
+describe('createOrreryLinkPreload', () => {
+  const manifest = {
+    files: ['/assets/OrreryPage-a.js', '/assets/OrreryRenderer-b.js', '/assets/three.module-c.js'],
+  }
+
+  afterEach(() => {
+    document.head.innerHTML = ''
+  })
+
+  it('adds one modulepreload link per chunk, without importing anything', async () => {
+    const fetchManifest = vi.fn(() => Promise.resolve(manifest))
+    await createOrreryLinkPreload({ fetchManifest, doc: document })()
+    const links = [...document.head.querySelectorAll('link[rel="modulepreload"]')]
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(manifest.files)
+    expect(links.every((l) => l.getAttribute('crossorigin') === '')).toBe(true)
+  })
+
+  it('does it once, and skips files the page already preloads', async () => {
+    const existing = document.createElement('link')
+    existing.rel = 'modulepreload'
+    existing.href = '/assets/three.module-c.js'
+    document.head.append(existing)
+    const fetchManifest = vi.fn(() => Promise.resolve(manifest))
+    const preload = createOrreryLinkPreload({ fetchManifest, doc: document })
+    await Promise.all([preload(), preload()])
+    await preload()
+    expect(fetchManifest).toHaveBeenCalledTimes(1)
+    expect(document.head.querySelectorAll('link[rel="modulepreload"]')).toHaveLength(3)
+  })
+
+  it('never rejects on a missing or malformed manifest, and tries again later', async () => {
+    const fetchManifest = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('404'))
+      .mockResolvedValueOnce({ nope: true })
+      .mockResolvedValue(manifest)
+    const preload = createOrreryLinkPreload({ fetchManifest, doc: document })
+    await expect(preload()).resolves.toBeUndefined()
+    await expect(preload()).resolves.toBeUndefined()
+    expect(document.head.querySelectorAll('link')).toHaveLength(0)
+    await preload()
+    expect(document.head.querySelectorAll('link')).toHaveLength(3)
   })
 })

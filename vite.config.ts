@@ -1,9 +1,45 @@
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+
+/**
+ * Lists the orrery's chunk files in `orrery-preload.json` (outside `/assets/`, whose files are cached as immutable) (#168): OrreryPage,
+ * OrreryRenderer and everything they import statically, three.js included. The hover and
+ * idle prefetch turns them into `<link rel="modulepreload">`, which downloads and compiles
+ * without running them. The names are hashed, so only the build knows them.
+ */
+function orreryPreloadManifest(): Plugin {
+  return {
+    name: 'orrery-preload-manifest',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const roots = Object.values(bundle).filter(
+        (c) => c.type === 'chunk' && /^Orrery(Page|Renderer)$/.test(c.name),
+      )
+      const files = new Set<string>()
+      const visit = (name: string) => {
+        const chunk = bundle[name]
+        if (chunk.type !== 'chunk' || chunk.isEntry || files.has(name)) return
+        files.add(name)
+        chunk.imports.forEach(visit)
+      }
+      roots.forEach((c) => {
+        visit(c.fileName)
+      })
+      // A build with no orrery chunks would silently turn the prefetch off.
+      if (roots.length !== 2)
+        this.error('orrery-preload-manifest: OrreryPage/OrreryRenderer chunks not found')
+      this.emitFile({
+        type: 'asset',
+        fileName: 'orrery-preload.json',
+        source: JSON.stringify({ files: [...files].sort().map((f) => `/${f}`) }),
+      })
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), orreryPreloadManifest()],
   resolve: {
     alias: {
       '@': resolve(import.meta.dirname, 'src'),
