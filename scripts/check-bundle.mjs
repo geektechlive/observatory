@@ -21,6 +21,9 @@ import { gzipSync } from 'node:zlib'
  */
 export const BUDGETS = {
   entryGzip: 190_000,
+  // Files in the first load (entry plus modulepreloads), a tripwire against runaway
+  // splitting (#101 once went from 4 to 9). Not a target: HTTP/2 has no 6-connection limit.
+  firstLoadFiles: 8,
   lazyThreeGzip: 160_000,
   worldMapGzip: 294_000,
   // #91 measured OrreryPage 11.4 kB and OrreryRenderer 7.0 kB gzip with the planets
@@ -67,6 +70,28 @@ const SAT_MARKERS = ['sats.worker', 'fengyun-1c-debris']
 // The guide drawer (#159) names this on its root element; it lives in its own chunk,
 // loaded on first open, and may reach neither the first load nor the orrery page's chunk.
 const GUIDE_MARKER = 'data-guide-drawer'
+
+// `import{a as b}from"./x.js"`, `import"./x.js"`, `export{a}from"./x.js"` and their spaced
+// forms. A dynamic `import("./x.js")` has no clause or quote right after `import`.
+const STATIC_IMPORT = /\b(?:import|export)\s*(?:[\w$*\s,{}]*?\bfrom\s*)?["'`]\.\/([^"'`/]+\.js)["'`]/g
+
+/** The `assets/` files reachable from `entryPath` through static imports (entry excluded). */
+function staticGraph(distDir, entryPath) {
+  const seen = new Set()
+  const queue = [entryPath]
+  while (queue.length > 0) {
+    const path = queue.pop()
+    const file = join(distDir, path)
+    if (!existsSync(file)) continue
+    for (const m of readFileSync(file, 'utf8').matchAll(STATIC_IMPORT)) {
+      const dep = `assets/${m[1]}`
+      if (dep === entryPath || seen.has(dep)) continue
+      seen.add(dep)
+      queue.push(dep)
+    }
+  }
+  return seen
+}
 const gz = (buf) => gzipSync(buf, { level: 9 }).length
 const kb = (n) => `${(n / 1000).toFixed(1)} kB`
 
@@ -91,6 +116,24 @@ export function checkBundle(distDir, budgets = BUDGETS) {
   const initialGzip = bodies.reduce((sum, body) => sum + gz(body), 0)
   const parts = preloads.length > 0 ? ` + ${preloads.join(', ')}` : ''
   add('entry-gzip', initialGzip <= budgets.entryGzip, `${entryPath}${parts} ${kb(initialGzip)} gzip (budget ${kb(budgets.entryGzip)})`)
+
+  // #155: no chain. A file the entry reaches through static imports but index.html does
+  // not preload is requested only after its parent has arrived and run; on a phone that
+  // is a round trip each (#168 measured the orrery's two hops at ~530 ms on desktop).
+  const reached = staticGraph(distDir, entryPath)
+  const unlisted = [...reached].filter((p) => !initial.includes(p))
+  add(
+    'first-load-no-chain',
+    unlisted.length === 0,
+    unlisted.length === 0
+      ? `all ${reached.size} files of the entry's static import graph are modulepreloaded`
+      : `${unlisted.join(', ')} imported statically but not in index.html's modulepreload list: the browser finds it only after its parent runs`,
+  )
+  // A tripwire against accidental fragmentation, not a target: over HTTP/2 the count costs
+  // a request each and slightly worse compression, never a connection limit.
+  const maxFiles = budgets.firstLoadFiles ?? BUDGETS.firstLoadFiles
+  add('first-load-files', initial.length <= maxFiles, `${initial.length} files (ceiling ${maxFiles})`)
+
   const withThree = initial.filter((_, i) => bodies[i].includes(THREE_MARKER))
   add(
     'entry-has-no-three',
