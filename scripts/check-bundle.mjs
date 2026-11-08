@@ -30,13 +30,12 @@ export const BUDGETS = {
   // only; #92/#93/#98 add asteroids, craft and satellites, so each gets room to 30 kB.
   // With the satellites (#98) OrreryPage measured 29.7 kB and OrreryRenderer 23.3 kB, so
   // 34 kB leaves room for #99's comets.
-  // The satellite browser (#158) added 4.1 kB to OrreryPage (33.5 to 37.6 kB measured).
-  // It is not a chunk of its own: as one, the bundler pulled the query code out of the
-  // first-load entry into a fifth file (4 files became 5; stubs with only a React hook, or
-  // only JSX, did the same, cause unknown), so it ships in the orrery chunk, which only
-  // the orrery tab loads. The guide's chip, the inspector's term buttons and the guide
-  // wiring (#159) add about 1.3 kB more. 42 kB leaves room.
-  orreryGzip: 42_000,
+  // The satellite browser (#158, 4.4 kB gzip) briefly lived inside OrreryPage because as a
+  // chunk of its own it split the first load (#162). vite.config.ts now pins everything the
+  // entry imports statically into two chunks, so it is its own chunk again. With it out,
+  // OrreryPage measured 34.7 kB and OrreryRenderer 24.4 kB (2026-11-08); 38 kB leaves room.
+  orreryGzip: 38_000,
+  satBrowserGzip: 6_000,
   textureBytes: 1_500_000,
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses
   // the globe's day-2048). They load with the orrery tab, never with the page.
@@ -185,6 +184,9 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       sawGuideChunk = true
       const size = gz(body)
       add('orrery-guide-gzip', size <= budgets.orreryGuideGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGuideGzip)})`)
+    } else if (name.startsWith('SatBrowser-')) {
+      const size = gz(body)
+      add('sat-browser-gzip', size <= budgets.satBrowserGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satBrowserGzip)})`)
     } else if (name.startsWith('sats.worker-')) {
       const size = gz(body)
       add('sat-worker-gzip', size <= budgets.satWorkerGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`)

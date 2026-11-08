@@ -137,3 +137,20 @@ describe('checkBundle first-load graph (#155)', () => {
     expect(rule(ok, 'first-load-files')?.detail).toContain('8 files')
   })
 })
+
+// #162: the satellite browser is a lazy chunk of its own again.
+describe('checkBundle satellite browser chunk (#162)', () => {
+  const noise = Array.from({ length: 20_000 }, (_, i) =>
+    ((i * 2654435761) % 4093).toString(36),
+  ).join('')
+
+  it('budgets the SatBrowser chunk', () => {
+    const budgets = { ...BUDGETS, satBrowserGzip: 4_000 }
+    const big = fakeDist({ 'index-abc.js': 'x', 'SatBrowser-q1.js': noise }, 'index-abc.js', [])
+    expect(failures(checkBundle(big, budgets))).toEqual(['sat-browser-gzip'])
+    const small = fakeDist({ 'index-abc.js': 'x', 'SatBrowser-q1.js': 'small' }, 'index-abc.js', [])
+    const findings = checkBundle(small, budgets) as Finding[]
+    expect(failures(findings)).toEqual([])
+    expect(rule(findings, 'sat-browser-gzip')?.ok).toBe(true)
+  })
+})
