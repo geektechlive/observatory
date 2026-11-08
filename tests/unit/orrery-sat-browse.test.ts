@@ -188,7 +188,7 @@ describe('groupCounts', () => {
 
 describe('per-keystroke cost over 19,500 objects (#158)', () => {
   const N = 19_500
-  const big = Array.from({ length: N }, (_, i) => ({
+  const big: Obj[] = Array.from({ length: N }, (_, i) => ({
     id: String(10_000 + i),
     name: i % 2 === 0 ? `STARLINK-${String(1000 + i)}` : `OBJECT ${String(i)} DEB`,
     group: i % 2 === 0 ? 'starlink' : 'other',
