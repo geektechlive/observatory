@@ -825,7 +825,8 @@
 
 /* A lesson on show collapses the guide to a bar; the inspector opens below it. */
 .stage[data-guide='compact'] .inspector {
-  top: 128px;
+  /* The guide's bar grows when its tip opens: the page passes its height. */
+  top: calc(var(--space-4) + var(--guide-bar-h, 90px) + var(--space-3));
 }
 
 @media (width <= 899px) {

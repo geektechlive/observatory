@@ -216,21 +216,31 @@ test.describe('The guide (#159)', () => {
     await expect(drawer(page)).toBeVisible()
   })
 
-  test('a lesson’s tip opens over the inspector without moving the bar', async ({ page }) => {
+  test('a lesson’s tip and the inspector stack: the Light time row stays visible', async ({
+    page,
+  }) => {
     await openOrrery(page)
     await openGuide(page)
-    await showLesson(page, 'l1')
-    const before = await bar(page).boundingBox()
+    await showLesson(page, 'voyager-1')
     await bar(page).getByText('What to look for').click()
     const tip = bar(page).locator('p').last()
     await expect(tip).toBeVisible()
-    const after = await bar(page).boundingBox()
-    expect(after?.height).toBe(before?.height)
-    // The bar still ends above the inspector.
-    const inspector = await page
-      .getByRole('complementary', { name: 'L1', exact: true })
-      .boundingBox()
-    expect((inspector?.y ?? 0) >= (after?.y ?? 0) + (after?.height ?? 0)).toBe(true)
+    const inspector = page.getByRole('complementary', { name: 'Voyager 1' })
+    const row = inspector.getByRole('button', { name: 'Light time' })
+    await expect(row).toBeVisible()
+    const tipBox = await tip.boundingBox()
+    const inspectorBox = await inspector.boundingBox()
+    const rowBox = await row.boundingBox()
+    const barBox = await bar(page).boundingBox()
+    const disjoint = (a: typeof tipBox, b: typeof tipBox) =>
+      !a || !b || a.y + a.height <= b.y || b.y + b.height <= a.y
+    expect(disjoint(barBox, inspectorBox)).toBe(true)
+    expect(disjoint(tipBox, rowBox)).toBe(true)
+    // The row is inside the inspector's visible area, not scrolled out of it.
+    expect(
+      (rowBox?.y ?? 0) + (rowBox?.height ?? 0) <=
+        (inspectorBox?.y ?? 0) + (inspectorBox?.height ?? 0),
+    ).toBe(true)
   })
 
   test('the reference sections open, and the glossary lists the terms', async ({ page }) => {

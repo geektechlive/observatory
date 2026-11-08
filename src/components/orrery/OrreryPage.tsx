@@ -1,4 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type CSSProperties,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import { useDsn } from '@/hooks/useDsn'
 import { useNow } from '@/hooks/useNow'
@@ -656,6 +665,8 @@ export function OrreryPage() {
   const stageGuideButton = useRef<HTMLButtonElement>(null)
   const guideFocus = useMemo(() => [railGuideButton, stageGuideButton], [])
   const guide = useGuide(applyLink, guideFocus)
+  // The guide's collapsed bar grows with its tip; the inspector starts below it.
+  const [barHeight, setBarHeight] = useState(0)
 
   // With the inspector open over the stage, centre the focus in the part it leaves free:
   // a drawer on the right on wide screens, a sheet along the bottom on phones.
@@ -770,6 +781,7 @@ export function OrreryPage() {
         className={styles.stage ?? ''}
         aria-label="Orrery"
         data-guide={guide.mode}
+        style={{ '--guide-bar-h': `${String(barHeight)}px` } as CSSProperties}
       >
         <div
           ref={host}
@@ -990,6 +1002,7 @@ export function OrreryPage() {
               onShow={guide.show}
               onExpand={guide.expand}
               onClose={guide.close}
+              onBarHeight={setBarHeight}
             />
           </Suspense>
         )}

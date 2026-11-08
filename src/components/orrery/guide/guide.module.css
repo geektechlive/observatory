@@ -280,20 +280,12 @@
   cursor: pointer;
 }
 
-/* The tip opens as a card over the inspector, so the bar keeps its height and the
-   inspector never has to move for it. */
+/* The tip opens inside the bar, which grows; the page measures the bar (onBarHeight) and
+   the inspector starts below it, so the tip never hides the rows it points at. */
 .barTry p {
-  position: absolute;
-  inset: 100% 0 auto;
-  z-index: 1;
-  max-height: 40dvh;
-  margin: var(--space-1) 0 0;
-  padding: var(--space-3) var(--space-4);
+  max-height: 30dvh;
+  margin: var(--space-2) 0 0;
   overflow-y: auto;
-  border: 1px solid var(--copper-2);
-  border-radius: var(--radius-panel);
-  background: var(--scrim);
-  backdrop-filter: blur(var(--glass-blur));
 }
 
 @media (width <= 899px) {

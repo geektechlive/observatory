@@ -24,6 +24,8 @@ interface OrreryGuideProps {
   onShow: (lesson: ShownLesson, link: OrreryLink) => void
   onExpand: () => void
   onClose: () => void
+  /** The collapsed bar's height in px, 0 when it is not showing: the inspector sits below it. */
+  onBarHeight: (px: number) => void
 }
 
 function Blocks({ blocks }: { blocks: readonly Block[] }) {
@@ -119,7 +121,14 @@ function LessonCard({ lesson, onShow }: { lesson: Lesson; onShow: () => void }) 
  *
  * Loaded on first open as its own chunk; nothing here is in the page's first load.
  */
-export function OrreryGuide({ mode, shown, onShow, onExpand, onClose }: OrreryGuideProps) {
+export function OrreryGuide({
+  mode,
+  shown,
+  onShow,
+  onExpand,
+  onClose,
+  onBarHeight,
+}: OrreryGuideProps) {
   // The page already asks for the close approaches; this shares its query, not a second fetch.
   const neo = useOrreryNeo().data
   const lessons = useMemo(
@@ -138,6 +147,7 @@ export function OrreryGuide({ mode, shown, onShow, onExpand, onClose }: OrreryGu
   )
   const heading = useRef<HTMLHeadingElement>(null)
   const back = useRef<HTMLButtonElement>(null)
+  const barRef = useRef<HTMLElement>(null)
 
   // Esc closes the guide, unless something already used it: a term's popover stops it, and
   // in a text field or the Find combobox Esc means "dismiss the suggestions", not "leave".
@@ -154,6 +164,27 @@ export function OrreryGuide({ mode, shown, onShow, onExpand, onClose }: OrreryGu
       document.removeEventListener('keydown', onKey)
     }
   }, [onClose])
+
+  // Tell the page how tall the bar is (its tip opens and closes), so the inspector can
+  // start below it instead of under it.
+  useEffect(() => {
+    const el = barRef.current
+    if (mode !== 'compact' || !el) {
+      onBarHeight(0)
+      return
+    }
+    const report = () => {
+      onBarHeight(el.getBoundingClientRect().height)
+    }
+    report()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(report)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      onBarHeight(0)
+    }
+  }, [mode, onBarHeight])
 
   // Keep the keyboard where the visitor is: the heading when the drawer opens, the way
   // back when it collapses.
@@ -237,7 +268,12 @@ export function OrreryGuide({ mode, shown, onShow, onExpand, onClose }: OrreryGu
       </aside>
 
       {mode === 'compact' && (
-        <aside className={styles.bar ?? ''} aria-label="Lesson on show" data-guide-bar="">
+        <aside
+          ref={barRef}
+          className={styles.bar ?? ''}
+          aria-label="Lesson on show"
+          data-guide-bar=""
+        >
           <p className={styles.barTitle ?? ''}>{shown?.title ?? 'Guide'}</p>
           <div className={styles.barActions ?? ''}>
             <button ref={back} type="button" className={styles.btn ?? ''} onClick={onExpand}>
