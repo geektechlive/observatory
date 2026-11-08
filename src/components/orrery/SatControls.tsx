@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 import { boxscoreLine } from '@/lib/satcatWords'
 
@@ -38,6 +38,11 @@ export function SatControls({
 }: SatControlsProps) {
   const [browsing, setBrowsing] = useState(false)
   const panelId = useId()
+  const panel = useRef<HTMLDivElement>(null)
+  // The list sits below the switches in a scrolling rail: bring it into view on opening.
+  useEffect(() => {
+    if (browsing) panel.current?.scrollIntoView({ block: 'start' })
+  }, [browsing])
   return (
     <section className={styles.group ?? ''} aria-labelledby="orrery-sats">
       <h2 id="orrery-sats" className={styles.groupTitle ?? ''}>
@@ -82,7 +87,7 @@ export function SatControls({
           <p className={styles.switchHint ?? ''}>
             Find satellites without knowing a name: by kind, orbit, launch date and more.
           </p>
-          <div id={panelId}>
+          <div id={panelId} ref={panel}>
             {browsing && <SatBrowser {...browse} toggles={toggles} onToggles={onToggles} />}
           </div>
         </>

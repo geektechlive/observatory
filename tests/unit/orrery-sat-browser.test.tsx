@@ -23,6 +23,8 @@ vi.mock('@/lib/api/spaceTrack', () => ({
 
 afterEach(cleanup)
 beforeEach(() => {
+  // jsdom has no layout: opening the browser scrolls it into view.
+  Element.prototype.scrollIntoView = vi.fn()
   resetSatcatCache()
   fetchSatcatShard.mockReset()
 })
