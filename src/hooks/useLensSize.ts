@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useState } from 'react'
+import { type RefObject, useLayoutEffect, useState } from 'react'
 
 /** The globe's ring adds this much on each side (BEZEL_WIDTH in GlobeBezel). */
 const BEZEL_PX = 38
@@ -37,7 +37,10 @@ export function useLensSize(
   remountKey?: unknown,
 ): number {
   const [size, setSize] = useState(DEFAULT_GLOBE_PX)
-  useEffect(() => {
+  // A layout effect: it measures and sets the size before the first paint (#169). As a
+  // passive effect it ran after paint, so the globe drew at DEFAULT_GLOBE_PX and then
+  // grew, pushing the plates and the footer down by 200 px or more.
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
     const update = () => {

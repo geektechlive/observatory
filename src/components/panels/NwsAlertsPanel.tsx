@@ -43,7 +43,7 @@ export function NwsAlertsPanel() {
 
   if (isLoading) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -51,7 +51,7 @@ export function NwsAlertsPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The National Weather Service feed did not answer" />
       </GlassPanel>
     )
@@ -59,14 +59,14 @@ export function NwsAlertsPanel() {
 
   if (data.features.length === 0) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="empty" detail="No active US weather alerts" />
       </GlassPanel>
     )
   }
 
   return (
-    <GlassPanel variant="tile" label={TITLE}>
+    <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
       <DataAge updatedAt={Date.parse(data.updatedAt)} />
       <ul className={styles.list ?? ''}>
         {rank(data.features).map(({ alert, tier, status }, i) => (

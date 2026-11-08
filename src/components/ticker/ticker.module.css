@@ -52,6 +52,10 @@
   flex: 1;
   overflow: hidden;
   position: relative;
+
+  /* Full height, empty or not: the track was --ticker-h tall while it said "Awaiting
+     telemetry" and 26 px once items arrived, a layout shift (#169). */
+  align-self: stretch;
 }
 
 .inner {
@@ -59,6 +63,7 @@
   align-items: center;
   gap: 0;
   white-space: nowrap;
+  height: 100%;
   animation: ticker-scroll var(--ticker-duration, 60s) linear infinite;
   will-change: transform;
 }

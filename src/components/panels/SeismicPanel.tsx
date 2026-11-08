@@ -74,7 +74,7 @@ export function SeismicPanel() {
 
   if (isLoading && !data) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
       </GlassPanel>
     )
@@ -82,7 +82,7 @@ export function SeismicPanel() {
 
   if (error || !data) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The USGS earthquake feed did not answer" />
       </GlassPanel>
     )
@@ -91,7 +91,7 @@ export function SeismicPanel() {
   const rows = strongestRecent(data.quakes, now)
   if (rows.length === 0) {
     return (
-      <GlassPanel variant="tile" label={TITLE}>
+      <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="empty" detail="No quakes in the last 24 hours" />
         <AftershockOdds />
       </GlassPanel>
@@ -99,7 +99,7 @@ export function SeismicPanel() {
   }
 
   return (
-    <GlassPanel variant="tile" label={TITLE}>
+    <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
       <DataAge updatedAt={Date.parse(data.updatedAt)} />
       <ul className={styles.list ?? ''}>
         {rows.map((q) => (
