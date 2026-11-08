@@ -1,6 +1,9 @@
+import { useEffect, useId, useRef, useState } from 'react'
+
 import { boxscoreLine } from '@/lib/satcatWords'
 
 import styles from './orrery.module.css'
+import { SatBrowser, type SatBrowserProps } from './SatBrowser'
 import { SAT_TOGGLES, type SatToggles } from './satToggles'
 import { Switch } from './Switch'
 
@@ -16,6 +19,8 @@ interface SatControlsProps {
     | undefined
   /** How many objects Space-Track predicts will re-enter in the next 7 days (#101). */
   reentriesThisWeek?: number | undefined
+  /** What the satellite browser needs (#158); without it there is no Browse button. */
+  browse?: Omit<SatBrowserProps, 'toggles' | 'onToggles'> | undefined
 }
 
 /**
@@ -29,7 +34,15 @@ export function SatControls({
   status,
   boxscore,
   reentriesThisWeek = 0,
+  browse,
 }: SatControlsProps) {
+  const [browsing, setBrowsing] = useState(false)
+  const panelId = useId()
+  const panel = useRef<HTMLDivElement>(null)
+  // The list sits below the switches in a scrolling rail: bring it into view on opening.
+  useEffect(() => {
+    if (browsing) panel.current?.scrollIntoView({ block: 'start' })
+  }, [browsing])
   return (
     <section className={styles.group ?? ''} aria-labelledby="orrery-sats">
       <h2 id="orrery-sats" className={styles.groupTitle ?? ''}>
@@ -58,6 +71,27 @@ export function SatControls({
         </p>
       )}
       {boxscore && <p className={styles.switchHint ?? ''}>{boxscoreLine(boxscore)}</p>}
+      {browse && (
+        <>
+          <button
+            type="button"
+            className={styles.chipBtn ?? ''}
+            aria-expanded={browsing}
+            aria-controls={panelId}
+            onClick={() => {
+              setBrowsing((b) => !b)
+            }}
+          >
+            {browsing ? 'Close the satellite browser' : 'Browse satellites'}
+          </button>
+          <p className={styles.switchHint ?? ''}>
+            Find satellites without knowing a name: by kind, orbit, launch date and more.
+          </p>
+          <div id={panelId} ref={panel}>
+            {browsing && <SatBrowser {...browse} toggles={toggles} onToggles={onToggles} />}
+          </div>
+        </>
+      )}
     </section>
   )
 }

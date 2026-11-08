@@ -33,11 +33,13 @@ function ring(
   n: number,
   meanMotion: number,
   inclination: number,
+  launchYear?: number,
 ): Row[] {
   return Array.from({ length: n }, (_, i) => [
     `${prefix}-${String(i + 1)}`,
     String(firstId + i),
-    '',
+    // A COSPAR id (year-number) for the lists that sort by launch (#158).
+    launchYear === undefined ? '' : `${String(launchYear)}-${String(i + 1).padStart(3, '0')}A`,
     epoch(),
     meanMotion,
     0.0005,
@@ -59,8 +61,8 @@ const GROUPS: Record<string, () => Row[]> = {
   'gps-ops': () => ring('GPS BIIF', 40000, 6, 2.0056, 55),
   weather: () => ring('GOES', 41000, 4, 1.0027, 0.05),
   science: () => ring('SCI', 42000, 3, 15.1, 28.5),
-  other: () => ring('OTHER', 43000, 40, 14.2, 98),
-  starlink: () => ring('STARLINK', 44000, 30, 15.06, 53),
+  other: () => ring('OTHER', 43000, 40, 14.2, 98, 2025),
+  starlink: () => ring('STARLINK', 44000, 30, 15.06, 53, 2024),
 }
 
 export async function serveSats(page: Page): Promise<string[]> {

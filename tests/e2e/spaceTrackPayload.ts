@@ -59,7 +59,11 @@ export async function serveSpaceTrack(page: Page): Promise<void> {
         generatedAt: now,
         citation: 'Space-Track.org (USSPACECOM)',
         shard: 8,
-        rows: [['25544', '1998-067A', 'PAYLOAD', 'ISS', '1998-11-20', 'TTMTR', 'LARGE']],
+        rows: [
+          ['25544', '1998-067A', 'PAYLOAD', 'ISS', '1998-11-20', 'TTMTR', 'LARGE'],
+          ['48274', '2021-035A', 'PAYLOAD', 'PRC', '2021-04-29', 'WSC', 'LARGE'],
+          ['41001', '2016-071A', 'PAYLOAD', 'US', '2016-11-19', 'AFETR', 'MEDIUM'],
+        ],
       }),
     ),
   )

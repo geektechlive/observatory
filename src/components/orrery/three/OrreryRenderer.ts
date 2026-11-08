@@ -27,6 +27,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
+import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import type { SatGroupId } from '@/lib/orbit/satCatalog'
 import {
   AU_KM,
@@ -615,6 +616,11 @@ export class OrreryRenderer {
   /** A satellite's details for the inspector (#98), or null when it is not loaded. */
   satellite(key: SceneKey): SatInfo | null {
     return this.sats.info(key)
+  }
+
+  /** The loaded satellites' names, ids, groups, orbit classes and launches (#158). */
+  satField(): SatFieldInfo | null {
+    return this.sats.field()
   }
 
   /** Every loaded object in a satellite group, for search. */

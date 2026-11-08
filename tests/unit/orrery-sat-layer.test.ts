@@ -25,6 +25,8 @@ function field(version: number, groups: SatGroupId[]): SatFieldInfo {
     ids: groups.map((g) => (g === 'stations' ? '25544' : '44713')),
     names: groups.map((g) => (g === 'stations' ? 'ISS (ZARYA)' : 'STARLINK-1007')),
     epochMs: new Float64Array(groups.length).fill(T0 - 3_600_000),
+    orbit: new Uint8Array(groups.length),
+    launch: new Int32Array(groups.length),
   }
 }
 

@@ -37,11 +37,14 @@ import { NeoControls } from './NeoControls'
 import styles from './orrery.module.css'
 import { SatControls } from './SatControls'
 import {
+  ALL_SAT_TOGGLES_ON,
   DEFAULT_SAT_TOGGLES,
   enabledSatGroups,
   satHiddenNotice,
   satStatusText,
   type SatToggles,
+  toggleForGroup,
+  withToggleOn,
 } from './satToggles'
 import type {
   FocusPreset,
@@ -108,6 +111,8 @@ const RING_LABEL_MIN_WIDTH = 600
 const LOADING = { state: 'loading' } as const
 const NO_TRACKS: readonly OrreryTrack[] = []
 const NO_MOONS: readonly OrreryMoon[] = []
+const NO_GROUP_STATES: SatViewState['groups'] = {}
+const NO_NAMES: Readonly<Record<string, string>> = {}
 const VOICE_EMPTY: VoiceInput = {
   quakes: LOADING,
   kp: LOADING,
@@ -524,8 +529,13 @@ export function OrreryPage() {
       setSelected(key)
       setPreset(null)
       setSheetOpen(false)
-      // A station chosen in search needs its group: the ISS is listed before it loads (#98).
-      if (isSatKey(key)) setSatToggles((t) => (t.stations ? t : { ...t, stations: true }))
+      // A satellite chosen in search or the browser needs its own group on (#98, #158); the
+      // ISS is listed before its group loads, so an unloaded one is a station.
+      if (isSatKey(key)) {
+        const group = renderer?.satellite(key)?.group
+        const toggle = group ? toggleForGroup(group) : 'stations'
+        setSatToggles((t) => withToggleOn(t, toggle))
+      }
       // A moon moves fast around its planet: the camera holds the planet's neighbourhood,
       // where the moon is drawn (#107).
       renderer?.focusOn(moonParent.get(key) ?? key)
@@ -580,8 +590,46 @@ export function OrreryPage() {
     renderer?.applyPreset(p)
   }
 
+  // What a link to a satellite needs (#158): the Earth orbit view open so its groups load,
+  // then (if it isn't in the groups switched on) every group switched on.
+  const openOrbit = useCallback(() => {
+    setPreset('orbit')
+    renderer?.applyPreset('orbit')
+  }, [renderer])
+  const widenedFrom = useRef<SatToggles | null>(null)
+  const satLink = useMemo(
+    () => ({
+      has: (key: string) => renderer?.satellite(key) != null,
+      // Every switched-on group has loaded or failed (a new switch reads 'off' until the
+      // renderer has been told, so it counts as unsettled).
+      settled:
+        satState !== null &&
+        [...enabledSatGroups(satToggles)].every((g) => {
+          const status = satState.groups[g]?.status
+          return status === 'loaded' || status === 'error'
+        }),
+      allOn: Object.values(satToggles).every(Boolean),
+      version: satState,
+      openOrbit,
+      widen: () => {
+        widenedFrom.current ??= satToggles
+        setSatToggles(ALL_SAT_TOGGLES_ON)
+      },
+      // The switches as they were before widening, plus the found satellite's own group.
+      restore: (focus: string | null) => {
+        const before = widenedFrom.current
+        widenedFrom.current = null
+        if (!before) return
+        const group = focus ? renderer?.satellite(focus)?.group : undefined
+        setSatToggles(group ? withToggleOn(before, toggleForGroup(group)) : before)
+      },
+    }),
+    [renderer, satState, satToggles, openOrbit],
+  )
+
   // The address carries time, focus and preset, so a view can be shared (#108).
   useOrreryLink({
+    sats: satLink,
     renderer,
     catalog: items,
     settled: bodies.status === 'success' && near.settled,
@@ -685,6 +733,15 @@ export function OrreryPage() {
             status={satState ? satStatusText(satState) : 'Loading…'}
             boxscore={spaceTrack?.boxscore}
             reentriesThisWeek={reentries.length}
+            browse={{
+              field: renderer && satState ? renderer.satField() : null,
+              groups: satState?.groups ?? NO_GROUP_STATES,
+              reentries,
+              reentryNames: spaceTrack?.names ?? NO_NAMES,
+              reentriesAvailable: spaceTrack?.tip != null,
+              onChoose: select,
+              onOpenOrbit: openOrbit,
+            }}
           />
         }
       />

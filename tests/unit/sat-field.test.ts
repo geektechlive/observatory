@@ -20,6 +20,7 @@ import {
   SAT_OK,
   SAT_OUT_OF_WINDOW,
 } from '@/lib/orbit/bulk/satField'
+import { ORBIT_LEO } from '@/lib/orbit/orbitClass'
 import { type SatRow, toRow } from '@/lib/orbit/satCatalog'
 import { OrrerySatsSchema } from '@/schemas/orrerySats'
 
@@ -101,6 +102,17 @@ describe('buildSatField', () => {
       { group: 'other', start: 2, count: 1 },
     ])
     expect(field.ids).toEqual(['25544', '100001', '100000'])
+  })
+
+  it('gives each object its orbit class and launch order, for the browser (#158)', () => {
+    const field = buildSatField([
+      { group: 'stations', rows: [row('ISS (ZARYA)')] },
+      { group: 'starlink', rows: [row('STARLINK-38128')] },
+    ])
+    expect(field.orbit).toEqual(Uint8Array.from([ORBIT_LEO, ORBIT_LEO]))
+    expect(field.launch).toHaveLength(2)
+    expect(field.launch[0]).toBe(1998 * 1000 + 67)
+    expect(field.launch[1]).toBeGreaterThan(2019 * 1000)
   })
 })
 
