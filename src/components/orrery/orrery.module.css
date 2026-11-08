@@ -816,3 +816,28 @@
   color: var(--bone);
   font-weight: 600;
 }
+
+/* The Guide button on the stage is for phones, where the rail is behind Controls (#159). */
+.guideToggle {
+  display: none;
+}
+
+/* A lesson on show collapses the guide to a bar; the inspector opens below it. */
+.stage[data-guide='compact'] .inspector {
+  top: 128px;
+}
+
+@media (width <= 899px) {
+  .guideToggle {
+    display: inline-flex;
+    position: absolute;
+    top: var(--space-3);
+    left: 108px;
+    z-index: 3;
+  }
+
+  .guideChip {
+    bottom: 132px;
+    left: var(--space-3);
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useDsn } from '@/hooks/useDsn'
 import { useNow } from '@/hooks/useNow'
@@ -30,6 +30,7 @@ import { buildCatalog, L1_KEY, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DEFAULT_PRESET } from './defaultView'
+import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
 import { useLookupStore } from './lookupStore'
@@ -57,10 +58,16 @@ import type {
   Visibility,
 } from './three/OrreryRenderer'
 import { TimeBar } from './TimeBar'
+import { useGuide } from './useGuide'
 import { useLookupTrack } from './useLookupTrack'
 import { useNearEarth } from './useNearEarth'
 import { useOrreryLink } from './useOrreryLink'
 import { useSimTime } from './useSimTime'
+
+/** The guide drawer (#159) loads on first open, never with the page. */
+const OrreryGuide = lazy(() =>
+  import('./guide/OrreryGuide').then((m) => ({ default: m.OrreryGuide })),
+)
 
 /**
  * One renderer for the page's lifetime (the GlobeHost pattern, #46): leaving the tab
@@ -628,7 +635,7 @@ export function OrreryPage() {
   )
 
   // The address carries time, focus and preset, so a view can be shared (#108).
-  useOrreryLink({
+  const applyLink = useOrreryLink({
     sats: satLink,
     renderer,
     catalog: items,
@@ -639,7 +646,16 @@ export function OrreryPage() {
     applyPreset: onPreset,
     requestLookup: useLookupStore.getState().request,
     lookupFailed: lookup.failed,
+    clearSelection: () => {
+      setSelected(null)
+    },
   })
+
+  // The guide (#159): lessons apply links through the same path a pasted address takes.
+  const railGuideButton = useRef<HTMLButtonElement>(null)
+  const stageGuideButton = useRef<HTMLButtonElement>(null)
+  const guideFocus = useMemo(() => [railGuideButton, stageGuideButton], [])
+  const guide = useGuide(applyLink, guideFocus)
 
   // With the inspector open over the stage, centre the focus in the part it leaves free:
   // a drawer on the right on wide screens, a sheet along the bottom on phones.
@@ -701,6 +717,9 @@ export function OrreryPage() {
 
       <ControlRail
         open={sheetOpen}
+        guideOpen={guide.mode !== 'closed'}
+        onGuide={guide.open}
+        guideRef={railGuideButton}
         visibility={visibility}
         onVisibility={setVisibility}
         scale={scale}
@@ -746,7 +765,12 @@ export function OrreryPage() {
         }
       />
 
-      <section ref={stage} className={styles.stage ?? ''} aria-label="Orrery">
+      <section
+        ref={stage}
+        className={styles.stage ?? ''}
+        aria-label="Orrery"
+        data-guide={guide.mode}
+      >
         <div
           ref={host}
           className={styles.canvasHost ?? ''}
@@ -945,6 +969,30 @@ export function OrreryPage() {
         >
           {sheetOpen ? 'Close controls' : 'Controls'}
         </button>
+        <button
+          ref={stageGuideButton}
+          type="button"
+          className={`${styles.chipBtn ?? ''} ${styles.guideToggle ?? ''}`}
+          aria-expanded={guide.mode !== 'closed'}
+          aria-controls="orrery-guide"
+          onClick={guide.open}
+        >
+          Guide
+        </button>
+        {guide.chipVisible && guide.mode === 'closed' && (
+          <GuideChip onOpen={guide.open} onDismiss={guide.dismissChip} />
+        )}
+        {guide.mode !== 'closed' && (
+          <Suspense fallback={null}>
+            <OrreryGuide
+              mode={guide.mode}
+              shown={guide.shown}
+              onShow={guide.show}
+              onExpand={guide.expand}
+              onClose={guide.close}
+            />
+          </Suspense>
+        )}
         {selected && (
           <Inspector
             ref={inspectorRef}
