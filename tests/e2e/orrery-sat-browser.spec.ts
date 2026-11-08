@@ -148,7 +148,8 @@ test.describe('a link to a satellite (#158)', () => {
     await expect(
       page.getByRole('complementary').getByRole('heading', { name: 'GOES-3' }),
     ).toBeVisible({ timeout: 15_000 })
-    expect(new URL(page.url()).hash).toContain('focus=sat:41002')
+    // The address is written in an effect after the inspector paints.
+    await expect.poll(() => new URL(page.url()).hash).toContain('focus=sat:41002')
   })
 
   test('switches on the groups that start off to find a Starlink', async ({ page }) => {
