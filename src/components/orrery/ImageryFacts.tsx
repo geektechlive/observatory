@@ -39,7 +39,15 @@ export function ImageryFacts({ body, sun }: { body: BodyName; sun?: SunImageStat
       <dt>Mission</dt>
       <dd className={styles.inspectorText ?? ''}>{img.mission}</dd>
       <dt>Credit</dt>
-      <dd className={styles.inspectorText ?? ''}>{img.credit}</dd>
+      <dd className={styles.inspectorText ?? ''}>
+        {img.creditUrl ? (
+          <a href={img.creditUrl} target="_blank" rel="noreferrer">
+            {img.credit}
+          </a>
+        ) : (
+          img.credit
+        )}
+      </dd>
     </dl>
   )
 }

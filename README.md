@@ -175,8 +175,10 @@ used.
 
 ### Images and type
 
-- **Saturn, its rings and Neptune:** maps created by
-  [Björn Jónsson](https://bjj.mmedia.is/data/planetary_maps.html).
+- **Saturn, its rings and Neptune:** maps created by Björn Jónsson. The orrery uses them only as
+  downscaled textures wrapped on the planets inside the 3D scene; this site does not offer them
+  as maps. For the full, current maps, go to
+  [his planetary maps page](https://bjj.mmedia.is/data/planetary_maps.html).
 - **Fonts**, self-hosted: [Fraunces](https://fonts.google.com/specimen/Fraunces),
   [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) and
   [Inter Tight](https://fonts.google.com/specimen/Inter+Tight) under the SIL Open Font License,

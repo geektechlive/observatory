@@ -25,9 +25,19 @@ export interface BodyImagery {
   readonly note: string
   readonly mission: string
   readonly credit: string
+  /** The credited source's own page, linked from the inspector's credit (#180). */
+  readonly creditUrl?: string
   /** Sidereal rotation period, hours; negative for retrograde (NASA planetary fact sheet). */
   readonly rotationHours?: number
 }
+
+/**
+ * Björn Jónsson's maps page. His terms: no permission is needed to use the maps, "please
+ * mention their origin", links welcome, but "please do not place a copy of the maps on your
+ * website". We use them only as downscaled textures inside the 3D scene, never offered as
+ * maps, and link here for the real thing (ADR 0019, #180).
+ */
+const JONSSON_MAPS = 'https://bjj.mmedia.is/data/planetary_maps.html'
 
 export const BODY_IMAGERY: Readonly<Record<BodyName, BodyImagery>> = {
   Sun: {
@@ -81,6 +91,7 @@ export const BODY_IMAGERY: Readonly<Record<BodyName, BodyImagery>> = {
     note: 'About natural colour. Rings from Voyager profiles coloured by Cassini.',
     mission: 'Cassini and Voyager',
     credit: 'Map and ring profiles created by Björn Jónsson',
+    creditUrl: JONSSON_MAPS,
     rotationHours: 10.656,
   },
   Uranus: {
@@ -96,6 +107,7 @@ export const BODY_IMAGERY: Readonly<Record<BodyName, BodyImagery>> = {
     note: 'About natural colour.',
     mission: 'Voyager 2',
     credit: 'Map created by Björn Jónsson',
+    creditUrl: JONSSON_MAPS,
     rotationHours: 16.11,
   },
 }

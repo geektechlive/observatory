@@ -160,8 +160,11 @@ Real maps on the planets, the live Sun from GOES SUVI.
   The inspector prints all of it (`ImageryFacts.tsx`). Mercury is MESSENGER enhanced colour, Mars
   a colourised Viking mosaic, Jupiter Cassini PIA07782, Earth the globe's own `day-2048.webp`.
   Saturn, its rings and Neptune are Björn Jónsson's maps, credited by name as his terms ask
-  ("please mention their origin"). Venus and Uranus get no map: they are shaded in their palette
-  colours.
+  ("please mention their origin") and linked to his maps page (`creditUrl`). His terms also ask
+  that copies not be placed on other sites; they are used only as downscaled textures inside the
+  scene, never offered as maps ([ADR 0019](../decisions/0019-jonsson-maps-as-in-scene-textures.md),
+  #180). Don't add a download or a map page for them. Venus and Uranus get no map: they are
+  shaded in their palette colours.
 - **Maps load on first need, never with the page.** `BodySkins` gives each planet a lit, mapped
   twin, tilted to its IAU pole and spun at its sidereal period (NASA fact sheet). It takes over
   from the flat dot only once the body is in view and at least `SKIN_MIN_PX` (6 px) in radius,
