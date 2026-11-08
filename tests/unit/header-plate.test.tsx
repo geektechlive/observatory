@@ -6,7 +6,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { HeaderPlate } from '@/components/status-bar/HeaderPlate'
-import { HEADLINE_SOURCES } from '@/lib/health'
+import { VIEW_HEADLINES } from '@/lib/health'
 import { useUiStore } from '@/store/ui'
 
 afterEach(cleanup)
@@ -34,13 +34,30 @@ describe('HeaderPlate', () => {
     expect(screen.getByRole('button', { name: /about observatory/i })).toBeTruthy()
   })
 
-  it('reads "Live, N feeds" once every headline source is healthy', () => {
+  it('reads "Live, N feeds" once every headline source of the view is healthy (#178)', () => {
     useUiStore.setState({
-      sourceHealth: Object.fromEntries(HEADLINE_SOURCES.map((s) => [s, 'ok'])),
+      view: 'sun',
+      sourceHealth: Object.fromEntries(VIEW_HEADLINES.sun.map((s) => [s, 'ok'])),
     })
     render(<HeaderPlate />)
     const status = screen.getByRole('status')
-    expect(status.textContent).toBe(`Live, ${String(HEADLINE_SOURCES.length)} feeds`)
+    expect(status.textContent).toBe(`Live, ${String(VIEW_HEADLINES.sun.length)} feeds`)
+  })
+
+  it('judges the view on screen, not feeds other views fetch (#178)', () => {
+    useUiStore.setState({
+      view: 'sky',
+      // Earth's quakes and the Sun's geomag failing earlier in the session don't count here.
+      sourceHealth: {
+        quakes: 'error',
+        geomag: 'error',
+        ...Object.fromEntries(VIEW_HEADLINES.sky.map((s) => [s, 'ok'])),
+      },
+    })
+    render(<HeaderPlate />)
+    expect(screen.getByRole('status').textContent).toBe(
+      `Live, ${String(VIEW_HEADLINES.sky.length)} ${VIEW_HEADLINES.sky.length === 1 ? 'feed' : 'feeds'}`,
+    )
   })
 
   it('reads Syncing before the feeds have reported', () => {

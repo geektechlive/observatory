@@ -153,18 +153,18 @@ export const SOURCES: Record<SourceName, SourceContract> = {
   neo: { label: 'Near-Earth Objects', headline: true, maxAgeMs: 2 * DAY, required: hasContent },
   nws: { label: 'NWS Alerts', headline: false, maxAgeMs: HOUR, required: hasContent },
   'orrery-bodies': {
-    // Not headline: only the orrery page asks for it (#93). Sampled from JPL Horizons by
-    // the refresh job every 6 h; spans run 30 days either side, so 72 h is still sound.
+    // Headline for the orrery view only (#93, #178). Sampled from JPL Horizons by the
+    // refresh job every 6 h; spans run 30 days either side, so 72 h is still sound.
     label: 'Orrery Bodies',
-    headline: false,
+    headline: true,
     maxAgeMs: 72 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'bodies'),
   },
   'orrery-neo': {
-    // Not headline: only the orrery page asks for it (#92). CAD finds dozens of objects
-    // inside 0.05 au in any 20-day window, so an empty list means a broken refresh.
+    // Headline for the orrery view only (#92, #178). CAD finds dozens of objects inside
+    // 0.05 au in any 20-day window, so an empty list means a broken refresh.
     label: 'Orrery Close Approaches',
-    headline: false,
+    headline: true,
     maxAgeMs: 36 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'approaches'),
   },
@@ -252,6 +252,23 @@ export const SOURCE_NAMES = Object.keys(SOURCES) as SourceName[]
 
 export const HEADLINE_SOURCES: SourceName[] = SOURCE_NAMES.filter((n) => SOURCES[n].headline)
 
+/** The views of the dial; kept here as a literal so this module stays import-free. */
+export type HealthView = 'earth' | 'orrery' | 'sun' | 'sky' | 'orbit'
+
+/**
+ * What the header judges on each view (#178): the headline sources that view shows and that
+ * a cold load of it always fetches. One list for the whole site never settled, because no
+ * view mounts every hook. `tests/e2e/view-headlines.spec.ts` checks each view really asks
+ * for its list, so a hook that stops mounting can't drop out of the judgement unseen.
+ */
+export const VIEW_HEADLINES: Readonly<Record<HealthView, readonly SourceName[]>> = {
+  earth: ['eonet', 'quakes', 'iss-tle', 'solar-wind'],
+  orrery: ['orrery-bodies', 'orrery-neo'],
+  sun: ['solar-wind', 'geomag'],
+  sky: ['neo'],
+  orbit: ['iss-tle', 'launches'],
+}
+
 export interface SourceMeta {
   degraded: boolean
   dataAgeSeconds: number | null
@@ -272,13 +289,15 @@ export function evaluateSource(name: SourceName, data: unknown, meta: SourceMeta
 }
 
 /**
- * Console-wide indicator. Stays `syncing` until every headline source has
- * reported, so a first paint never claims LIVE on data it does not have yet.
+ * The header's indicator for the view on screen. Stays `syncing` until every one of that
+ * view's headline sources has reported, so a first paint never claims LIVE on data it does
+ * not have yet. Sources the view doesn't show are not judged (#178).
  */
 export function deriveLiveStatus(
   map: Partial<Record<SourceName, SourceState>>,
+  view: HealthView,
 ): 'syncing' | 'live' | 'degraded' {
-  const states = HEADLINE_SOURCES.map((name) => map[name] ?? 'unknown')
+  const states = VIEW_HEADLINES[view].map((name) => map[name] ?? 'unknown')
   if (states.some((s) => s === 'unknown')) return 'syncing'
   if (states.every((s) => s === 'ok')) return 'live'
   return 'degraded'

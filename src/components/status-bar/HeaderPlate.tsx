@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { deriveLiveStatus, HEADLINE_SOURCES } from '@/lib/health'
+import { deriveLiveStatus, VIEW_HEADLINES } from '@/lib/health'
 import { useUiStore } from '@/store/ui'
 
 import { AboutPopover } from './AboutPopover'
@@ -16,10 +16,12 @@ import { LiveIndicator } from './LiveIndicator'
  */
 export function HeaderPlate() {
   const [aboutOpen, setAboutOpen] = useState(false)
-  // LIVE means every headline source returned data that passed its content contract.
+  // LIVE means every headline source of the view on screen returned data that passed its
+  // content contract (#178).
   const sourceHealth = useUiStore((s) => s.sourceHealth)
-  const liveStatus = deriveLiveStatus(sourceHealth)
-  const healthy = HEADLINE_SOURCES.filter((name) => sourceHealth[name] === 'ok').length
+  const view = useUiStore((s) => s.view)
+  const liveStatus = deriveLiveStatus(sourceHealth, view)
+  const healthy = VIEW_HEADLINES[view].filter((name) => sourceHealth[name] === 'ok').length
 
   return (
     <header role="banner" className={styles.header ?? ''}>

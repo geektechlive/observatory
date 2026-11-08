@@ -8,7 +8,9 @@ import {
   type SourceName,
   SOURCES,
   type SourceState,
+  VIEW_HEADLINES,
 } from '@/lib/health'
+import type { ConsoleView } from '@/store/ui'
 
 const FRESH = { degraded: false, dataAgeSeconds: null }
 
@@ -20,7 +22,17 @@ const ISS_TLE = {
 describe('SOURCES', () => {
   it('marks exactly the console-critical sources as headline', () => {
     expect([...HEADLINE_SOURCES].sort()).toEqual(
-      ['eonet', 'geomag', 'iss-tle', 'launches', 'neo', 'quakes', 'solar-wind'].sort(),
+      [
+        'eonet',
+        'geomag',
+        'iss-tle',
+        'launches',
+        'neo',
+        'orrery-bodies',
+        'orrery-neo',
+        'quakes',
+        'solar-wind',
+      ].sort(),
     )
   })
 
@@ -29,14 +41,14 @@ describe('SOURCES', () => {
   })
 
   it('grades orrery bodies by a non-empty bodies list, 72 h before degraded (#93)', () => {
-    expect(SOURCES['orrery-bodies'].headline).toBe(false)
+    expect(SOURCES['orrery-bodies'].headline).toBe(true)
     expect(SOURCES['orrery-bodies'].maxAgeMs).toBe(72 * 3_600_000)
     expect(SOURCES['orrery-bodies'].required({ bodies: [] })).toBe(false)
     expect(SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }] })).toBe(true)
   })
 
   it('grades orrery close approaches by a non-empty approach list, 36 h before degraded (#92)', () => {
-    expect(SOURCES['orrery-neo'].headline).toBe(false)
+    expect(SOURCES['orrery-neo'].headline).toBe(true)
     expect(SOURCES['orrery-neo'].maxAgeMs).toBe(36 * 3_600_000)
     expect(SOURCES['orrery-neo'].required({ approaches: [] })).toBe(false)
     expect(SOURCES['orrery-neo'].required({ approaches: [{ id: 'sb:524522' }] })).toBe(true)
@@ -145,39 +157,62 @@ describe('evaluateSource', () => {
   })
 })
 
-function allHeadline(state: SourceState): Partial<Record<SourceName, SourceState>> {
-  return Object.fromEntries(HEADLINE_SOURCES.map((n) => [n, state]))
+function allHeadline(
+  state: SourceState,
+  view: ConsoleView = 'earth',
+): Partial<Record<SourceName, SourceState>> {
+  return Object.fromEntries(VIEW_HEADLINES[view].map((n) => [n, state]))
 }
+
+const VIEWS: ConsoleView[] = ['earth', 'orrery', 'sun', 'sky', 'orbit']
 
 describe('deriveLiveStatus', () => {
   it('reports syncing on an empty map', () => {
-    expect(deriveLiveStatus({})).toBe('syncing')
+    expect(deriveLiveStatus({}, 'earth')).toBe('syncing')
   })
 
-  it('reports syncing while any headline source has not reported', () => {
+  it('reports syncing while any of the view’s headline sources has not reported', () => {
     const partial = allHeadline('ok')
-    delete partial['neo']
-    expect(deriveLiveStatus(partial)).toBe('syncing')
+    delete partial['quakes']
+    expect(deriveLiveStatus(partial, 'earth')).toBe('syncing')
   })
 
   it('reports syncing when a headline source is explicitly unknown', () => {
-    expect(deriveLiveStatus({ ...allHeadline('ok'), neo: 'unknown' })).toBe('syncing')
+    expect(deriveLiveStatus({ ...allHeadline('ok'), quakes: 'unknown' }, 'earth')).toBe('syncing')
   })
 
   it('reports live only when every headline source is ok', () => {
-    expect(deriveLiveStatus(allHeadline('ok'))).toBe('live')
+    expect(deriveLiveStatus(allHeadline('ok'), 'earth')).toBe('live')
   })
 
   it('reports degraded when a headline source errored', () => {
-    expect(deriveLiveStatus({ ...allHeadline('ok'), quakes: 'error' })).toBe('degraded')
+    expect(deriveLiveStatus({ ...allHeadline('ok'), quakes: 'error' }, 'earth')).toBe('degraded')
   })
 
   it('reports degraded when a headline source is stale', () => {
-    expect(deriveLiveStatus({ ...allHeadline('ok'), 'solar-wind': 'degraded' })).toBe('degraded')
+    expect(deriveLiveStatus({ ...allHeadline('ok'), 'solar-wind': 'degraded' }, 'earth')).toBe(
+      'degraded',
+    )
   })
 
   it('ignores non-headline sources', () => {
-    expect(deriveLiveStatus({ ...allHeadline('ok'), apod: 'error' })).toBe('live')
+    expect(deriveLiveStatus({ ...allHeadline('ok'), apod: 'error' }, 'earth')).toBe('live')
+  })
+
+  // #178: no view ever fetched all seven old headline sources, so a cold load of any view
+  // stayed at SYNCING forever. Each view now judges the sources it shows.
+  it.each(VIEWS)('%s reaches live on its own headline sources alone (#178)', (view) => {
+    expect(VIEW_HEADLINES[view].length).toBeGreaterThan(0)
+    expect(deriveLiveStatus(allHeadline('ok', view), view)).toBe('live')
+  })
+
+  it('ignores a failing source the current view does not show (#178)', () => {
+    expect(deriveLiveStatus({ ...allHeadline('ok', 'sky'), quakes: 'error' }, 'sky')).toBe('live')
+  })
+
+  it('makes every source in a view’s set a headline source, and no other (#178)', () => {
+    const union = [...new Set(VIEWS.flatMap((v) => VIEW_HEADLINES[v]))].sort()
+    expect([...HEADLINE_SOURCES].sort()).toEqual(union)
   })
 })
 
@@ -218,7 +253,7 @@ describe('2026-09-07 upstream-drift regression', () => {
       'solar-wind': evaluateSource('solar-wind', SOLAR_WIND_AS_SERVED, FRESH),
       geomag: evaluateSource('geomag', GEOMAG_AS_SERVED, FRESH),
     }
-    expect(deriveLiveStatus(map)).toBe('degraded')
+    expect(deriveLiveStatus(map, 'earth')).toBe('degraded')
   })
 })
 

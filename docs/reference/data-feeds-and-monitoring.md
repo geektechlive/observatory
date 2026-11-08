@@ -52,6 +52,11 @@ mean day to day:
 - **Upstream drift is silent by default.** A feed that changes shape yields an
   empty-but-HTTP-200 payload. `src/lib/health.ts` gives every source a content contract so this
   reads as an error, and `scripts/check-health.mjs` probes the headline endpoints on a schedule.
+- **The header's pill judges the view on screen (#178, ADR 0018).** `VIEW_HEADLINES` lists each
+  view's headline sources; SYNCING until they have all reported, LIVE when all pass, DEGRADED
+  otherwise. One site-wide list of seven never settled, because no view mounts every hook (on
+  2026-11-08 every view read SYNCING indefinitely). `tests/e2e/view-headlines.spec.ts` checks a
+  cold load of each view asks for its whole list.
 - **Open-Meteo is called straight from the browser (#79), only after the user shares a
   location.** It needs `https://api.open-meteo.com` in `connect-src` (a unit test checks it,
   because dev ignores `_headers`). It sees the visitor's IP and the location rounded to 0.1°, and

@@ -25,3 +25,4 @@ that makes the decision.
 | [0015](0015-claude-md-holds-rules-docs-hold-the-rest.md)      | CLAUDE.md holds rules and pointers; history and measurements live in docs/     | #170           |
 | [0016](0016-decisions-are-public.md)                          | This repository's ADRs are public                                              | #170           |
 | [0017](0017-load-performance-floor.md)                        | Load performance has reached its floor                                         | #177           |
+| [0018](0018-the-header-judges-the-view-on-screen.md)          | The header's status judges the view on screen, by that view's own feeds        | #178           |
