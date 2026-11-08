@@ -36,7 +36,7 @@ export const SECTIONS: readonly Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: 'The orrery is a 3D model of the solar system. You are the camera, and nothing here is a picture: every body is drawn where its data puts it.',
+        text: 'The orrery is a 3D model of the solar system. You are the camera. Positions come from data, not artwork, though sizes and some distances are stretched (see “Not to scale”).',
       },
       {
         kind: 'list',
@@ -60,7 +60,7 @@ export const SECTIONS: readonly Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: 'The bar along the bottom is the clock, in UTC. Now returns to the present at real speed. The slider moves a year either side of its centre, which follows the clock. On wider screens the Go to date box takes YYYY-MM-DD, and a minus sign means BC.',
+        text: 'The bar along the bottom is the clock, in UTC. Now returns to the present at real speed. The slider covers a year either side of its centre. The centre stays put until the clock leaves that year, then jumps to the clock. On wider screens the Go to date box takes YYYY-MM-DD, and a minus sign means BC.',
       },
       {
         kind: 'p',
@@ -72,7 +72,7 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
-        text: 'Spacecraft and moons exist only where JPL supplied data. Outside it the inspector says “No data for this date”, the craft is hidden but stays searchable, and the stage counts how many are hidden. Positions are never guessed past the data.',
+        text: 'Spacecraft and moons are drawn only where JPL supplied data. Outside it the inspector says “No data for this date”, the craft is hidden but stays searchable, and the stage counts how many are hidden. Positions are never guessed past the data.',
       },
     ],
   },
@@ -86,7 +86,7 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
-        text: 'When nothing matches, Search JPL for the name looks it up in JPL’s Small-Body Database, any asteroid or comet. The card shows its distance from the Sun and Earth and its speed, and Show in orrery draws it and flies there. JPL is asked one request at a time, so it can take a moment.',
+        text: 'When nothing matches, the “Search JPL for …” option looks the name up in JPL’s Small-Body Database, which covers any asteroid or comet. The card shows its distance from the Sun and Earth and its speed, and Show in orrery draws it and flies there. JPL is asked one request at a time, so it can take a moment.',
       },
       {
         kind: 'p',
@@ -147,12 +147,12 @@ export const SECTIONS: readonly Section[] = [
           {
             tone: 'faint',
             name: 'Dashed ring, “approx.”',
-            text: 'The heliopause, about 121.6 au from the Sun. It is neither a sphere nor fixed, so the ring is approximate.',
+            text: 'The heliopause, about 121.6 au from the Sun. The real edge is a bubble, not a flat ring, and it shifts, so this ring is a rough slice of it through the planets’ plane. A craft at the same distance can sit well above or below it.',
           },
           {
             tone: 'bone',
             name: 'Satellites',
-            text: 'Space stations are bone white, Starlink a quiet slate and debris dim.',
+            text: 'Space stations are bone white, Starlink a muted slate grey and debris dim.',
           },
         ],
       },
@@ -164,7 +164,7 @@ export const SECTIONS: readonly Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: 'Space is almost empty, so a true-scale picture would show nothing. Big bodies, the default, stretches distances on a log scale and draws bodies larger than life. Log distance keeps the stretched distances with small bodies. Proportional draws true distances and marks the bodies so you can find them. A NOT TO SCALE badge shows whenever the scale is stretched.',
+        text: 'Space is almost empty, so a true-scale picture would show nothing. The default, Big bodies, stretches distances on a log scale and draws bodies larger than life. Log distance keeps that stretched spacing but draws the bodies small. Proportional draws true distances and marks the bodies so you can find them. A NOT TO SCALE badge shows whenever the scale is stretched.',
       },
       {
         kind: 'p',

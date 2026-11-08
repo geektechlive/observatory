@@ -44,6 +44,19 @@ describe('Mars retrograde loop of 2024-25 (guide lesson)', () => {
   })
 })
 
+describe('Voyager 1 on 2012-08-25 (guide lesson)', () => {
+  // JPL Horizons vectors, centre Sun, ecliptic J2000, 2012-08-25 00:00 TDB (km).
+  const [x, y, z] = [-3.889905731070188e9, -1.43947025398607e10, 1.042069596868827e10]
+
+  it('is about 35 degrees north of the ecliptic', () => {
+    expect(Math.round((Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI)).toBe(35)
+  })
+
+  it('is 121.6 au from the Sun, the heliopause distance', () => {
+    expect((Math.hypot(x, y, z) / AU_KM).toFixed(1)).toBe('121.6')
+  })
+})
+
 describe('arithmetic the guide quotes', () => {
   it('light crosses one au in about 8 min 19 s', () => {
     const s = AU_KM / C_KM_S

@@ -75,7 +75,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     id: 'l1',
     term: 'L1',
     short:
-      'A point about 1.5 million km from Earth, toward the Sun, where the Sun’s and Earth’s gravity let a craft keep pace with Earth. Solar observers and solar-wind monitors wait there.',
+      'A point about 1.5 million km from Earth, toward the Sun, where the Sun’s and Earth’s gravity let a craft keep pace with Earth. Craft that watch the Sun and the solar wind sit there.',
     more: 'At a typical solar wind speed of 400 km/s, particles pass L1 about an hour before they reach Earth.',
     source:
       'NASA (L2 is 1.5 million km from Earth; L1 lies the same distance on the Sun side); the hour is 1.5 million km divided by 400 km/s',
@@ -84,8 +84,9 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     id: 'l2',
     term: 'L2',
     short:
-      'The matching point on the far side of Earth from the Sun, also about 1.5 million km away. The James Webb Space Telescope orbits the Sun there.',
-    source: 'NASA Science, Webb orbit page (science.nasa.gov/mission/webb/orbit)',
+      'The matching point on the far side of Earth from the Sun, also about 1.5 million km away. The James Webb Space Telescope orbits around this point rather than sitting on it, and keeps up with Earth as both circle the Sun.',
+    source:
+      'NASA Science, Webb orbit page (science.nasa.gov/mission/webb/orbit): “Webb orbits around L2; it does not sit stationary precisely at L2”, and it “keeps up with the Earth as it goes around the Sun”',
   },
   {
     id: 'pha',
@@ -99,7 +100,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     id: 'light-time',
     term: 'Light time',
     short:
-      'How long light, or a radio signal, takes to cross the distance. It is the shortest possible delay for a message. One au is about 8 minutes 19 seconds.',
+      'How long light or a radio signal takes to cross a distance. No message can arrive sooner. One au is about 8 minutes 19 seconds.',
     source: 'One au divided by the speed of light (149,597,870.7 km / 299,792.458 km/s = 499.0 s)',
   },
   {
@@ -128,7 +129,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     id: 'heliopause',
     term: 'Heliopause',
     short:
-      'The edge of the Sun’s bubble of solar wind, where it meets the gas between the stars. NASA and JPL date Voyager 1’s crossing to 25 August 2012, about 121.6 au from the Sun.',
+      'The edge of the Sun’s bubble of solar wind, where it meets the gas between the stars. NASA and JPL date Voyager 1’s crossing to 25 August 2012, about 121.6 au from the Sun. It is not a perfect sphere, and it moves with the Sun’s activity.',
     source: 'NASA/JPL, 2013-09-12 release; JPL Horizons distance for that day (121.60 au)',
   },
   {

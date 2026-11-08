@@ -117,7 +117,7 @@ function asteroidLesson(ctx: LessonContext): Lesson {
     title: `The closest asteroid pass this month: ${pick.name.replace(/^\((.*)\)$/, '$1')}`,
     paragraphs: [
       `Among the objects the orrery places, ${pick.name} makes the closest pass within 30 days of today: about ${ldText} lunar distances (${(km / 1e6).toFixed(2)} million km) from Earth, at ${utcWhen(ms)}.${hazard}`,
-      'Show me jumps the clock to that moment and frames Earth with the asteroid chosen. Amber marks an asteroid and red one on the hazardous list.',
+      'Show me jumps the clock to that moment, frames Earth and selects the asteroid. Amber marks an asteroid, and red marks one on the hazardous list.',
     ],
     tryIt:
       'Read the inspector: the miss distance comes with a range of uncertainty, and the size is an estimate from the asteroid’s brightness unless JPL has measured it. Press play at 1 h/s to watch it move past.',
@@ -143,15 +143,15 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
       id: 'voyager-1',
       title: 'Voyager 1 leaves the Sun’s bubble',
       paragraphs: [
-        'On 25 August 2012 Voyager 1 crossed the heliopause, the edge of the Sun’s bubble of solar wind. NASA and JPL put it about 121.6 au from the Sun. That put it in interstellar space, the region outside the Sun’s bubble.',
-        'At that distance a radio signal takes about 17 hours to reach Earth, the shortest delay physics allows.',
+        'On 25 August 2012 Voyager 1 crossed the heliopause, the edge of the Sun’s bubble of solar wind. NASA and JPL put the crossing about 121.6 au from the Sun. Past that line is interstellar space.',
+        'At that distance a radio signal takes about 17 hours to reach Earth. Radio travels at the speed of light, so no message could get there faster.',
       ],
       tryIt:
-        'Find the faint dashed ring marked “approx.” and the Light time row in the inspector. Then play at 1 day/s to watch Voyager 1 carry on outward. On a narrow screen the ring’s label is hidden.',
+        'Find the faint dashed ring marked “approx.” and the Light time row in the inspector. Voyager 1 is as far from the Sun as the ring is, but it won’t sit on it: the ring lies flat in the plane of the planets, and Voyager 1 is heading out about 35 degrees north of that plane, so on screen it floats above the ring. The ring is only a slice of the Sun’s bubble through the planets’ plane. Follow the thin line down from the craft to the cross on the plane, the spot directly beneath it. Then play at 1 day/s to watch it carry on outward. On a narrow screen the ring’s label is hidden.',
       link: { t: Date.UTC(2012, 7, 25), focus: 'naif:-31', preset: 'heliosphere' },
       sources: [
         'NASA and JPL date Voyager 1’s crossing of the heliopause to 25 August 2012 (news release of 12 September 2013)',
-        'JPL Horizons puts Voyager 1 at 121.60 au from the Sun on that day',
+        'JPL Horizons puts Voyager 1 at 121.60 au from the Sun on that day, and its ecliptic latitude at about 35 degrees north (from Horizons vectors for 25 August 2012 00:00 TDB: z = 1.042e10 km over 1.491e10 km in the plane, queried November 2026)',
         'NASA Science, Voyager 1: it “crossed into interstellar space in August 2012”, the region outside the heliopause (science.nasa.gov/mission/voyager/voyager-1, read 7 November 2026)',
         'Signal delay: light takes about 499 seconds to cross one au, so 121.6 au is about 16.9 hours',
       ],
@@ -167,7 +167,7 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Select the L1 marker. If NOAA’s solar wind data is available the inspector shows the wind speed and how long it takes to reach Earth. Near Earth the view is not to scale: distances beyond the geostationary ring are squeezed so the Moon and L1 fit one picture.',
       link: { ...NONE, focus: L1_KEY, preset: 'earth' },
       sources: [
-        'NASA Science, SOHO: it operates near the Sun–Earth L1 point, about 1.5 million km from Earth (science.nasa.gov/mission/soho, read 7 November 2026)',
+        'NASA Science, SOHO: “placed at a distance of 932,000 miles (1.5 million kilometers) from Earth … around the L1 libration point” (science.nasa.gov/mission/soho)',
         'NASA Science, DSCOVR: it hovers between the Sun and Earth at Lagrange point 1 (science.nasa.gov/mission/dscovr, read 7 November 2026)',
         'NOAA Space Weather Prediction Center: the most common solar wind is slow wind at about 400 km/s (swpc.noaa.gov/phenomena/solar-wind, read 7 November 2026)',
         'Arithmetic: 1.5 million km at 400 km/s takes about 1.04 hours, and is 3.9 times the Moon’s 384,400 km',
@@ -185,7 +185,7 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Show me stops the clock on that day. Press play at 1 day/s and watch Earth swing past Mars on the inside track. The orrery looks down on the system from above, so the backward loop itself, which is what you would see in the night sky, is not drawn.',
       link: { t: Date.UTC(2025, 0, 16), focus: 'Mars', preset: 'inner' },
       sources: [
-        'JPL Horizons observer table from Earth’s centre, Mars (queried 7 November 2026): its ecliptic longitude peaks on 7 December 2024 and bottoms out on 24 February 2025, and the Sun–Earth–Mars angle peaks on 16 January 2025',
+        'JPL Horizons observer table from Earth’s centre, Mars (queried 7 November 2026): its ecliptic longitude peaks on 7 December 2024 and bottoms out on 24 February 2025 (UTC, daily samples at 00:00; popular sources give 6 December and 23 February), and the Sun–Earth–Mars angle peaks on 16 January 2025',
         'The orrery’s own planet maths finds the same turning points within 3 days',
         'From 7 December 2024 to 24 February 2025 is 79 days',
       ],
@@ -218,7 +218,7 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
       sources: [
         'JPL Small-Body Database, 1I/ʻOumuamua (ssd-api.jpl.nasa.gov/sbdb.api?sstr=1I, read 7 November 2026): eccentricity 1.2011, perihelion distance 0.2559 au, perihelion at JD 2458006.007 TDB, which is 9 September 2017, 12:10 UTC',
         'NASA Science, ʻOumuamua: the first known interstellar object to visit our solar system, discovered by Pan-STARRS1 on 19 October 2017 (science.nasa.gov/solar-system/comets/oumuamua)',
-        'Mercury’s perihelion distance is about 46 million km, 0.31 au (NASA planetary fact sheet)',
+        'NASA Mercury fact sheet: perihelion 46.000 x 10^6 km, about 0.31 au',
       ],
     },
     {
@@ -226,7 +226,7 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
       title: 'Jupiter’s four big moons',
       paragraphs: [
         'Jupiter has four large moons, first seen by Galileo Galilei in 1610: Io, Europa, Ganymede and Callisto. Io goes round Jupiter in 1.77 days, Europa in 3.55, Ganymede in 7.16 and Callisto in 16.7.',
-        'The orrery draws them on a stretched scale so they stay readable beside the planet, so their distances are not to scale.',
+        'The orrery stretches their distances from Jupiter so they stay readable; don’t read them as true to scale.',
       ],
       tryIt:
         'Play at 1 h/s: Io goes round in under a minute. Choose a moon in the Find box to read its orbital period and distance.',
