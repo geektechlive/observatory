@@ -337,7 +337,7 @@ export class OrreryRenderer {
   /** The view is still exactly a preset's (the user has not turned or zoomed): refit on resize. */
   private presetPristine = true
   /** Px of the stage covered by the inspector, so the focus sits in what is left (#91). */
-  private inset = { right: 0, bottom: 0 }
+  private inset = { right: 0, bottom: 0, top: 0 }
   /** A camera fly in progress: from/to positions and targets, wall-clock start. */
   private flight: {
     fromPos: Vector3
@@ -880,9 +880,12 @@ export class OrreryRenderer {
    * Keep the focus centred in the part of the stage the inspector leaves free, by
    * shifting the projection window rather than the camera (#91).
    */
-  setViewInset(right: number, bottom: number): void {
-    const next = { right: Math.max(0, right), bottom: Math.max(0, bottom) }
-    const changed = next.right !== this.inset.right || next.bottom !== this.inset.bottom
+  setViewInset(right: number, bottom: number, top = 0): void {
+    const next = { right: Math.max(0, right), bottom: Math.max(0, bottom), top: Math.max(0, top) }
+    const changed =
+      next.right !== this.inset.right ||
+      next.bottom !== this.inset.bottom ||
+      next.top !== this.inset.top
     this.inset = next
     this.applyInset()
     // The picture moved by the sheet: a preset is fitted for where it now sits.
@@ -896,14 +899,14 @@ export class OrreryRenderer {
   }
 
   private applyInset(): void {
-    const { right, bottom } = this.inset
-    if (right === 0 && bottom === 0) this.camera.clearViewOffset()
+    const { right, bottom, top } = this.inset
+    if (right === 0 && bottom === top) this.camera.clearViewOffset()
     else
       this.camera.setViewOffset(
         this.width,
         this.height,
         right / 2,
-        bottom / 2,
+        (bottom - top) / 2,
         this.width,
         this.height,
       )
@@ -960,13 +963,9 @@ export class OrreryRenderer {
             .map((c) => c.mesh.position.clone())
         : []
     this.fitJd = this.lastJd
-    const h = Math.max(1, this.height)
     const view = frameView(preset, this.width / Math.max(1, this.height), this.sceneRadius, {
       points,
-      // A phone's sheet (inset.bottom) shifts the picture up by half its height: that eats
-      // into the strip the time bar covers and into the room under a bar at the top.
-      bottomReserveNdc: Math.max(0, (2 * this.reserveBottomPx - this.inset.bottom) / h),
-      topReserveNdc: (2 * this.reserveTopPx + this.inset.bottom) / h,
+      ...this.presetReserves(),
     })
     this.flyTo(view.position, view.target, instant)
   }
@@ -1010,11 +1009,25 @@ export class OrreryRenderer {
     this.refitPreset()
   }
 
-  /** The stage's top strip something covers (a phone's guide bar), px: framing keeps craft below it. */
-  setFrameTop(topPx: number): void {
-    if (Math.abs(topPx - this.reserveTopPx) < 1) return
-    this.reserveTopPx = Math.max(0, topPx)
-    this.refitPreset()
+  /**
+   * The strips of the stage presets must keep craft out of, as shares of NDC height. The
+   * time bar covers the bottom; a phone's sheet covers more of it and a guide bar covers
+   * the top (#159). Those overlays also shift the picture to centre it in what they leave
+   * (applyInset), so the shift is counted here: 0.12 is FILL's own margin.
+   */
+  private presetReserves(): { bottomReserveNdc: number; topReserveNdc: number } {
+    const h = Math.max(1, this.height)
+    const { bottom, top } = this.inset
+    if (bottom === 0 && top === 0) {
+      return { bottomReserveNdc: (2 * this.reserveBottomPx) / h, topReserveNdc: 0 }
+    }
+    const margin = 1 - 0.88
+    const shift = (bottom - top) / h
+    const blocked = Math.max(this.reserveBottomPx, bottom)
+    return {
+      bottomReserveNdc: Math.max(0, (2 * blocked) / h - shift - margin),
+      topReserveNdc: Math.max(0, shift + (2 * top) / h - margin),
+    }
   }
 
   /** Refit the current preset while the user hasn't moved the camera. */
@@ -1332,7 +1345,6 @@ export class OrreryRenderer {
   /** The sim date Heliosphere was last fitted at: craft drift, so it refits when far. */
   private fitJd = Number.NaN
   private reserveBottomPx = 0
-  private reserveTopPx = 0
 
   private updateBodies(force = false): void {
     const jd = jdFromDate(new Date(this.clock.simTime()))

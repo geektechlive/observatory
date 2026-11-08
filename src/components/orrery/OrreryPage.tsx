@@ -73,8 +73,8 @@ import { useNearEarth } from './useNearEarth'
 import { useOrreryLink } from './useOrreryLink'
 import { useSimTime } from './useSimTime'
 
-/** Where the guide's bar sits on a phone, px from the stage's top (guide.module.css). */
-const GUIDE_BAR_TOP_PX = 48
+/** Clear space kept under a phone's guide bar for the labels of what the lesson shows. */
+const GUIDE_BAR_GAP_PX = 28
 
 /** The guide drawer (#159) loads on first open, never with the page. */
 const OrreryGuide = lazy(() =>
@@ -671,38 +671,38 @@ export function OrreryPage() {
   // The guide's collapsed bar grows with its tip; the inspector starts below it.
   const [barHeight, setBarHeight] = useState(0)
 
-  // On a phone the guide's bar spans the stage's top: presets keep craft clear of it.
-  useEffect(() => {
-    if (!renderer) return
-    const phone = window.matchMedia('(width <= 899px)').matches
-    renderer.setFrameTop(guide.mode === 'compact' && phone ? GUIDE_BAR_TOP_PX + barHeight + 36 : 0)
-  }, [renderer, guide.mode, barHeight])
-
   // With the inspector open over the stage, centre the focus in the part it leaves free:
-  // a drawer on the right on wide screens, a sheet along the bottom on phones.
+  // a drawer on the right on wide screens, a sheet along the bottom on phones. On a phone
+  // the guide's bar also spans the top, so the free part is the band between them (#159).
   useEffect(() => {
     if (!renderer) return
-    const panel = inspectorRef.current
+    const panel = selected ? inspectorRef.current : null
     const box = stage.current
-    if (!selected || !panel || !box) {
-      renderer.setViewInset(0, 0)
-      return
-    }
+    if (!box) return
     const measure = () => {
       const s = box.getBoundingClientRect()
-      const p = panel.getBoundingClientRect()
-      const sheet = p.width > s.width * 0.6
-      renderer.setViewInset(sheet ? 0 : s.right - p.left, sheet ? s.bottom - p.top : 0)
+      let right = 0
+      let bottom = 0
+      if (panel) {
+        const p = panel.getBoundingClientRect()
+        const sheet = p.width > s.width * 0.6
+        right = sheet ? 0 : s.right - p.left
+        bottom = sheet ? s.bottom - p.top : 0
+      }
+      const bar = box.querySelector<HTMLElement>('[data-guide-bar]')
+      const b = bar?.getBoundingClientRect()
+      const top = b && b.width > s.width * 0.6 ? b.bottom - s.top + GUIDE_BAR_GAP_PX : 0
+      renderer.setViewInset(right, bottom, top)
     }
     measure()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
-    observer.observe(panel)
+    if (panel) observer.observe(panel)
     observer.observe(box)
     return () => {
       observer.disconnect()
     }
-  }, [renderer, selected])
+  }, [renderer, selected, guide.mode, barHeight])
 
   const voice = voiceFor('orrery', {
     ...VOICE_EMPTY,
