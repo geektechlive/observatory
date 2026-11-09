@@ -121,13 +121,11 @@ without a name. Not in the global search, on purpose.
   medium between.
 - **What needs SATCAT:** radar size and owner. SATCAT is 16 shards (`part=satcat&shard=`), fetched
   one at a time for the inspector, so these two lists ask for a one-tap "Load Space-Track's
-  catalogue" (all 16 shards, `useAllSatcat.ts`, its own promise cache) and never download on
-  their own. On 2026-11-08 `/api/spacetrack?part=catalog` answered 200 (TIP and the Box Score are
-  live) but every `part=satcat&shard=` answered 503 "SATCAT not yet in KV: the refresh job writes
-  it daily", on production and on the preview, so the browser's radar and owner lists show "isn't
-  available right now" until that job has run. The size in the button ("a few hundred kB") is an
-  estimate from the inspector comment's 25 kB per shard, not a measurement. Re-measure when KV has
-  it, and put the number in the button (#161).
+  catalogue" (all 16 shards, `useAllSatcat.ts`) and never download on their own. The browser and
+  the inspector share one query cache (`satcatShardQuery`, #161); the browser uses `client.query`
+  because `useQueries` added 1.4 kB gzip to the orrery chunk. The note beside the button says
+  "about 370 kB": the 16 shards measured on 2026-11-09 from production, 370 kB gzip in all, 22.5 to
+  23.7 kB each, 2,171 to 2,260 rows each.
 - **A group that is off** shows "Turn on <group> (about N kB)" from the measured gzip sizes in
   `satToggles.ts` (`downloadKb`, from `/api/orrery-sats` on 2026-11-07: Starlink 522 kB, Other
   active 291, the three debris clouds 139, the rest under 5). Its count is unknown until it has

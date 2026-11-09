@@ -15,6 +15,7 @@ import { StarField } from '@/components/starfield/StarField'
 import { HeaderPlate } from '@/components/status-bar/HeaderPlate'
 import { Ticker } from '@/components/ticker/Ticker'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { RocketLaunchCredit } from '@/components/ui/RocketLaunchCredit'
 import { useGlobeData } from '@/hooks/useGlobeData'
 import { useHashView } from '@/hooks/useHashView'
 import { useLensExpand } from '@/hooks/useLensExpand'
@@ -137,6 +138,12 @@ function EarthColumns({ view, expanded, onToggle, buttonRef }: EarthColumnsProps
           {stageKind === 'globe' && (
             <div className={styles.layers ?? ''}>
               <LayerControl showMapLayers={mapMode === 'map'} />
+              {/* Beside the switch that draws it (#183): this corner clears the bezel and plates. */}
+              {mapMode === 'globe' && globeProps.launches.length > 0 && (
+                <div className={styles.layerCredit ?? ''}>
+                  <RocketLaunchCredit />
+                </div>
+              )}
             </div>
           )}
           {/* The globe carries the button beside Pause; every other stage, top right. */}

@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SatBrowser, type SatBrowserProps } from '@/components/orrery/SatBrowser'
 import { SatControls } from '@/components/orrery/SatControls'
 import { ALL_SAT_TOGGLES_ON, DEFAULT_SAT_TOGGLES } from '@/components/orrery/satToggles'
-import { resetSatcatCache } from '@/components/orrery/useAllSatcat'
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import { ORBIT_GEO, ORBIT_LEO, ORBIT_MEO } from '@/lib/orbit/orbitClass'
 import { SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
@@ -25,7 +24,6 @@ afterEach(cleanup)
 beforeEach(() => {
   // jsdom has no layout: opening the browser scrolls it into view.
   Element.prototype.scrollIntoView = vi.fn()
-  resetSatcatCache()
   fetchSatcatShard.mockReset()
 })
 
@@ -168,6 +166,8 @@ describe('<SatBrowser> (#158)', () => {
     })
     expect(rows()).toHaveLength(0)
     expect(fetchSatcatShard).not.toHaveBeenCalled()
+    // The 16 shards' measured gzip size (#161).
+    expect(screen.getByText(/a download of about 370 kB/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Load Space-Track/ }))
     await screen.findByRole('button', { name: /ISS \(ZARYA\)/ })
     expect(fetchSatcatShard).toHaveBeenCalledTimes(16)

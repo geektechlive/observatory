@@ -88,6 +88,10 @@
   z-index: 3;
 }
 
+.layerCredit {
+  margin-top: var(--space-3);
+}
+
 /* width:100% so the MapLibre child doesn't collapse; transform/filter are not kept
    at rest (a lingering filter or transform on the map ancestor breaks its clicks). */
 .stageMorph {

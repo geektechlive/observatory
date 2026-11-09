@@ -17,17 +17,29 @@ export function useDiscos() {
 }
 
 /**
- * A satellite's SATCAT entry (#101): its shard (about 25 kB gzip) is fetched when the
- * inspector first shows a satellite in it, then kept. Null while loading, or when the
- * object isn't in the catalogue of objects in orbit.
+ * One SATCAT shard, shared by the inspector and the satellite browser (#161). `gcTime`
+ * matches `staleTime`: the browser's fetches have no observer once it closes, and the
+ * default five minutes would download the whole catalogue again on the next visit.
+ */
+export function satcatShardQuery(shard: number) {
+  return {
+    queryKey: ['satcat', shard],
+    queryFn: () => fetchSatcatShard(shard),
+    staleTime: SIX_HOURS,
+    gcTime: SIX_HOURS,
+  }
+}
+
+/**
+ * A satellite's SATCAT entry (#101): its shard (about 23 kB gzip, measured in #161) is
+ * fetched when the inspector first shows a satellite in it, then kept. Null while loading,
+ * or when the object isn't in the catalogue of objects in orbit.
  */
 export function useSatcatEntry(noradId: string | null): SatcatEntry | null {
   const shard = noradId === null ? null : satcatShardOf(noradId)
   const query = useQuery({
-    queryKey: ['satcat', shard],
-    queryFn: () => fetchSatcatShard(shard ?? 0),
+    ...satcatShardQuery(shard ?? 0),
     enabled: shard !== null,
-    staleTime: SIX_HOURS,
     refetchOnWindowFocus: false,
   })
   return query.data && noradId !== null ? satcatEntryOf(query.data.rows, noradId) : null

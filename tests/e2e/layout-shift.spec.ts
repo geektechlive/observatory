@@ -21,7 +21,11 @@ const FALLBACK_DELAY_MS = 500
  */
 const CLS_BUDGET = 0.01
 
-const NOW = Date.UTC(2026, 10, 8, 12, 0, 0)
+/**
+ * Just after the newest timestamp in feedFixtures. The page's clock is frozen here (#184):
+ * panels drop data by age, so against the real clock these fixtures expire a day later.
+ */
+const NOW = Date.UTC(2026, 10, 8, 15, 40, 0)
 
 /** Four quakes over M5, so the voice line is its usual two lines. */
 const QUAKES = {
@@ -101,6 +105,7 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize(viewport)
+    await page.clock.setFixedTime(new Date(NOW))
     await watchShifts(page)
     await delayFeeds(page)
     await page.goto('/')

@@ -377,8 +377,8 @@ export function SatBrowser(p: SatBrowserProps) {
           ) : (
             <>
               <p className={styles.switchHint ?? ''}>
-                This list uses Space-Track.org’s catalogue of every tracked object, a download of a
-                few hundred kB.
+                This list uses Space-Track.org’s catalogue of every tracked object, a download of
+                about 370 kB.
               </p>
               <button
                 type="button"

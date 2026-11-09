@@ -351,15 +351,22 @@ test.describe('The guide on a phone (#159)', () => {
     })
     // Tip closed: the craft's label sits between the bar and the inspector sheet.
     await expect(label).toBeVisible()
-    const sheetClosed = await inspector.boundingBox()
-    const labelBox = await label.boundingBox()
-    // The refit after the bar's height arrives is a short flight: wait for it to settle.
+    // The refit after the bar's height arrives is a short flight that moves the label: judge
+    // fresh boxes while the camera is still, never one read from before it (#182).
     await expect
-      .poll(async () => apart(await label.boundingBox(), await bar(page).boundingBox()), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () => {
+          const still = (await canvas(page).getAttribute('data-orrery-animating')) === 'false'
+          const labelBox = await label.boundingBox()
+          return (
+            still &&
+            apart(labelBox, await bar(page).boundingBox()) &&
+            apart(labelBox, await inspector.boundingBox())
+          )
+        },
+        { timeout: 15_000 },
+      )
       .toBe(true)
-    expect(apart(labelBox, sheetClosed)).toBe(true)
 
     // Tip open: it grows, and the sheet gives way so its heading is not under it.
     await bar(page).getByText('What to look for').click()

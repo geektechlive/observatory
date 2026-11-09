@@ -54,6 +54,22 @@ describe('share meta tags (#110)', () => {
     }
   })
 
+  it('the title carries the main search terms and fits a results page (#181)', () => {
+    const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? ''
+    for (const term of ['Observatory', 'ISS tracker', 'orrery', 'space weather']) {
+      expect(title).toContain(term)
+    }
+    expect(title.length).toBeLessThanOrEqual(60)
+  })
+
+  it('the description names the orrery and near-Earth asteroids and fits a results page (#181)', () => {
+    const description = meta('name', 'description') ?? ''
+    for (const term of ['orrery', 'near-Earth asteroids']) {
+      expect(description).toContain(term)
+    }
+    expect(description.length).toBeLessThanOrEqual(155)
+  })
+
   it('no head text says cosmo or uses an em dash', () => {
     const head = html.slice(0, html.indexOf('</head>'))
     const texts = [...head.matchAll(/content="([^"]*)"|<title>([^<]*)<\/title>/g)].map(
