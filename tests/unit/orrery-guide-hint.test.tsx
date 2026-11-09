@@ -83,4 +83,25 @@ describe('the New here? chip (#159)', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('note')).toBeTruthy()
   })
+
+  function renderOn(pointer: 'fine' | 'coarse'): string {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query) =>
+        ({ matches: query === '(pointer: coarse)' && pointer === 'coarse' }) as MediaQueryList,
+    )
+    render(<GuideChip onOpen={vi.fn()} onDismiss={vi.fn()} />)
+    return screen.getByRole('note').textContent
+  }
+
+  it('says how to move the view with a mouse (#185)', () => {
+    const text = renderOn('fine')
+    expect(text).toContain('Drag to turn · Scroll to zoom · Right-drag to slide')
+    expect(text).not.toContain('Two fingers')
+  })
+
+  it('says how to move the view by touch (#185)', () => {
+    const text = renderOn('coarse')
+    expect(text).toContain('One finger turns · Pinch zooms · Two fingers slide')
+    expect(text).not.toContain('Right-drag')
+  })
 })

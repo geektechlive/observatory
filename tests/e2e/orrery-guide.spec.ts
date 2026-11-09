@@ -261,6 +261,33 @@ test.describe('The guide (#159)', () => {
   })
 })
 
+const timeBar = (page: Page) => page.getByRole('group', { name: 'Simulation time' })
+
+type Box = { x: number; y: number; width: number; height: number } | null
+
+/** No shared area; a missing box counts as overlapping, so a vanished element can't pass. */
+function boxesApart(a: Box, b: Box): boolean {
+  if (!a || !b) return false
+  return (
+    a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y
+  )
+}
+
+test.describe('The first-visit hint by touch (#185)', () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true })
+
+  test('gives the touch gestures and fits the phone, clear of the controls', async ({ page }) => {
+    await openOrrery(page)
+    const chip = page.getByRole('note').filter({ hasText: 'New here?' })
+    await expect(chip).toContainText('Two fingers slide')
+    const box = await chip.boundingBox()
+    expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 999) <= 375).toBe(true)
+    expect(boxesApart(box, await timeBar(page).boundingBox())).toBe(true)
+    const controls = page.getByRole('button', { name: 'Controls' })
+    expect(boxesApart(box, await controls.boundingBox())).toBe(true)
+  })
+})
+
 test.describe('The first-visit hint (#159)', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -277,6 +304,13 @@ test.describe('The first-visit hint (#159)', () => {
       timeout: 20_000,
     })
     await expect(chip).toHaveCount(0)
+  })
+
+  test('says how to move the view, clear of the time bar (#185)', async ({ page }) => {
+    await openOrrery(page)
+    const chip = page.getByRole('note').filter({ hasText: 'New here?' })
+    await expect(chip).toContainText('Right-drag to slide')
+    expect(boxesApart(await chip.boundingBox(), await timeBar(page).boundingBox())).toBe(true)
   })
 
   test('opening the guide from the chip also retires it', async ({ page }) => {
