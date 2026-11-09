@@ -313,6 +313,12 @@ test.describe('The first-visit hint (#159)', () => {
     expect(boxesApart(await chip.boundingBox(), await timeBar(page).boundingBox())).toBe(true)
   })
 
+  test('the subtitle still says how to slide once the chip is gone (#185)', async ({ page }) => {
+    await openOrrery(page)
+    await page.getByRole('button', { name: /dismiss/i }).click()
+    await expect(page.getByText('right-drag or two fingers to slide')).toBeVisible()
+  })
+
   test('opening the guide from the chip also retires it', async ({ page }) => {
     await openOrrery(page)
     await page.getByRole('button', { name: 'Open the guide' }).click()

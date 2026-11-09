@@ -732,7 +732,7 @@ export function OrreryPage() {
         <p className={consoleStyles.voice ?? ''}>{voice}</p>
         <p className={consoleStyles.sub ?? ''}>
           Solar system in 3D · planets from JPL approximate elements, spacecraft from JPL Horizons ·
-          drag to turn, pinch or scroll to zoom
+          drag to turn, pinch or scroll to zoom, right-drag or two fingers to slide
         </p>
       </div>
 
