@@ -17,6 +17,8 @@
     comets, on-demand JPL.
   - [satellites.md](reference/satellites.md): satellites, the satellite browser, Space-Track and
     DISCOSweb, satellite.js 7.
+  - [satellite-models.md](reference/satellite-models.md): which 3D models exist for Earth-orbit
+    satellites, their licences, and the gaps (#194).
   - [dependencies.md](reference/dependencies.md): updates, the two TypeScripts, pins, pnpm 12.
 - **operations/**, runbooks.
   - [landing.md](operations/landing.md): issue to production, the gate.
