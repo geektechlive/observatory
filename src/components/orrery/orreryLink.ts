@@ -9,6 +9,8 @@
  *   case, with `-` or `_` for spaces (`focus=voyager-1`).
  * - `preset` is one of the View buttons. With a focus too, the camera is on the preset
  *   and the inspector is open on the focus (choosing a preset keeps the selection).
+ * - `detail=1` opens the "Look closer" model view on the focus (#203). Without a focus,
+ *   or on an object with no model, it is ignored and dropped from the address.
  *
  * Kept apart from the three.js layer, like defaultView.ts, so it costs the page nothing.
  */
@@ -20,6 +22,8 @@ export interface OrreryLink {
   t: number | null
   focus: string | null
   preset: FocusPreset | null
+  /** The "Look closer" model view is open on the focus (#203). Only meaningful with a focus. */
+  detail: boolean
 }
 
 /** Every preset, as a record so a new one in `FocusPreset` fails the type check here. */
@@ -57,7 +61,7 @@ function parseTime(raw: string): number | null {
 
 /** The link's values; null for each one that is missing or not understood. */
 export function parseOrreryLink(hash: string): OrreryLink {
-  const out: OrreryLink = { t: null, focus: null, preset: null }
+  const out: OrreryLink = { t: null, focus: null, preset: null, detail: false }
   const raw = hash.replace(/^#\/?/, '')
   const [view = '', query] = raw.split('?')
   if (view.toLowerCase() !== 'orrery' || query === undefined) return out
@@ -72,6 +76,7 @@ export function parseOrreryLink(hash: string): OrreryLink {
     if (key === 't') out.t = parseTime(value)
     else if (key === 'focus' && value.length <= MAX_FOCUS) out.focus = value
     else if (key === 'preset' && isPreset(value)) out.preset = value
+    else if (key === 'detail') out.detail = value === '1'
   }
   return out
 }
@@ -88,6 +93,7 @@ export function serialiseOrreryLink(link: OrreryLink): string {
   if (link.t !== null) parts.push(`t=${isoSeconds(link.t)}`)
   if (link.focus !== null) parts.push(`focus=${encode(link.focus)}`)
   if (link.preset !== null) parts.push(`preset=${link.preset}`)
+  if (link.detail) parts.push('detail=1')
   return parts.length > 0 ? `#orrery?${parts.join('&')}` : '#orrery'
 }
 

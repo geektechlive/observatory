@@ -675,6 +675,9 @@ export function OrreryPage() {
     applyPreset: onPreset,
     requestLookup: useLookupStore.getState().request,
     lookupFailed: lookup.failed,
+    // No model registry yet (#202): until the view lands, a `detail` link falls back to
+    // the focus with the inspector open.
+    hasModel: () => false,
     clearSelection: () => {
       setSelected(null)
     },

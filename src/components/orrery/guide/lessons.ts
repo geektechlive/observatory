@@ -80,7 +80,7 @@ function utcWhen(ms: number): string {
   return `${String(d.getUTCDate())} ${MONTHS[d.getUTCMonth()] ?? ''} ${String(d.getUTCFullYear())}, ${hh}:${mm} UTC`
 }
 
-const NONE: Omit<OrreryLink, 'focus' | 'preset'> = { t: null }
+const NONE: Omit<OrreryLink, 'focus' | 'preset'> = { t: null, detail: false }
 
 function asteroidLesson(ctx: LessonContext): Lesson {
   const pick = closestApproach(ctx.approaches)
@@ -148,7 +148,7 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
       ],
       tryIt:
         'Find the faint dashed ring marked “approx.” and the Light time row in the inspector. Voyager 1 is as far from the Sun as the ring is, but it won’t sit on it: the ring lies flat in the plane of the planets, and Voyager 1 is heading out about 35 degrees north of that plane, so on screen it floats above the ring. The ring is only a slice of the Sun’s bubble through the planets’ plane. Follow the thin line down from the craft to the cross on the plane, the spot directly beneath it. Then play at 1 day/s to watch it carry on outward. On a narrow screen the ring’s label is hidden.',
-      link: { t: Date.UTC(2012, 7, 25), focus: 'naif:-31', preset: 'heliosphere' },
+      link: { t: Date.UTC(2012, 7, 25), focus: 'naif:-31', preset: 'heliosphere', detail: false },
       sources: [
         'NASA and JPL date Voyager 1’s crossing of the heliopause to 25 August 2012 (news release of 12 September 2013)',
         'JPL Horizons puts Voyager 1 at 121.60 au from the Sun on that day, and its ecliptic latitude at about 35 degrees north (from Horizons vectors for 25 August 2012 00:00 TDB: z = 1.042e10 km over 1.491e10 km in the plane, queried November 2026)',
@@ -183,7 +183,7 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
       ],
       tryIt:
         'Show me stops the clock on that day. Press play at 1 day/s and watch Earth swing past Mars on the inside track. The orrery looks down on the system from above, so the backward loop itself, which is what you would see in the night sky, is not drawn.',
-      link: { t: Date.UTC(2025, 0, 16), focus: 'Mars', preset: 'inner' },
+      link: { t: Date.UTC(2025, 0, 16), focus: 'Mars', preset: 'inner', detail: false },
       sources: [
         'JPL Horizons observer table from Earth’s centre, Mars (queried 7 November 2026): its ecliptic longitude peaks on 7 December 2024 and bottoms out on 24 February 2025 (UTC, daily samples at 00:00; popular sources give 6 December and 23 February), and the Sun–Earth–Mars angle peaks on 16 January 2025',
         'The orrery’s own planet maths finds the same turning points within 3 days',

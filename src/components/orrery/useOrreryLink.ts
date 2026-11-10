@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { lookupSpkid } from '@/lib/orrery/lookupTrack'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
+import { useOrreryView } from '@/store/orreryView'
 
 import { DEFAULT_PRESET } from './defaultView'
 import {
@@ -52,6 +53,12 @@ interface LinkOptions {
     /** Puts the switches back as they were before `widen`, keeping the found satellite's group. */
     restore: (focus: string | null) => void
   }
+  /**
+   * Whether the object has a model for the "Look closer" view (#203). A link's `detail`
+   * opens the view only when the focus resolved to an object this says yes to; otherwise
+   * the focus stays, the inspector opens, and `detail` is dropped from the address.
+   */
+  hasModel: (key: string) => boolean
   /** Deselect: a guide lesson with no focus (#159) starts from a clean inspector. */
   clearSelection: () => void
 }
@@ -68,7 +75,7 @@ export interface ApplyLinkOptions {
 const onOrrery = () => /^#\/?orrery(\?|$)/i.test(window.location.hash)
 
 /** What a link asks for that has not been applied yet. */
-type Pending = Pick<OrreryLink, 'focus' | 'preset'> & { fresh: boolean }
+type Pending = Pick<OrreryLink, 'focus' | 'preset' | 'detail'> & { fresh: boolean }
 
 /**
  * The orrery's shareable link (#108, format in orreryLink.ts). On load, and when the
@@ -98,6 +105,8 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
     const next = serialiseOrreryLink({
       t: clockIsLive(clock, wallNow) ? null : simTimeAt(clock, wallNow),
       focus,
+      // The detail view is always on the selection (the store keeps it so).
+      detail: focus !== null && useOrreryView.getState().detail === focus,
       // The camera's preset, kept beside a selection (choosing a preset leaves the
       // inspector open). The opening view needs no mention on its own.
       preset: view !== null && (focus !== null || view !== DEFAULT_PRESET) ? view : null,
@@ -118,8 +127,9 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
     } else if (fresh) {
       clock.resetToNow()
     }
-    if (link.focus !== null || link.preset !== null) {
-      pending.current = { focus: link.focus, preset: link.preset, fresh }
+    // A `detail` alone is applied too, only to be dropped from the address.
+    if (link.focus !== null || link.preset !== null || link.detail) {
+      pending.current = { focus: link.focus, preset: link.preset, detail: link.detail, fresh }
       satOpened.current = false
       setLinkSeq((n) => n + 1)
     }
@@ -193,20 +203,29 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
     // is on the preset with the inspector open.
     if (key !== null) select(key)
     if (want.preset !== null) applyPreset(want.preset)
+    // The detail view opens last, on the resolved focus, and only if it has a model.
+    // Otherwise it is closed: the address no longer asks for it (back to a plain focus).
+    const { openDetail, closeDetail } = useOrreryView.getState()
+    if (want.detail && key !== null && latest.current.hasModel(key)) openDetail(key)
+    else closeDetail()
     // An unknown focus, or a preset already showing, changes no state: write now.
     write.current()
   }, [renderer, catalog, settled, lookupFailed, linkSeq, o.sats.version, o.sats.allOn])
 
   const { selected, preset } = o
-  const shown = useRef({ selected, preset })
+  // Opening or closing the detail view rewrites the address (never a new entry).
+  const detail = useOrreryView((s) => s.detail)
+  const shown = useRef({ selected, preset, detail })
   useEffect(() => {
     // The apply step clears the link before it selects, so a change seen while a link
     // still waits is the visitor's own choice: it replaces the link.
     const was = shown.current
-    shown.current = { selected, preset }
+    shown.current = { selected, preset, detail }
     // The Earth orbit view a satellite link opens itself (#158) is not the visitor's choice.
     const presetChanged = was.preset !== preset && !(satOpened.current && preset === 'orbit')
-    if (pending.current && (was.selected !== selected || presetChanged)) {
+    // The apply step clears the link before it opens or closes the detail view, so a
+    // change here while a link waits is the visitor's own.
+    if (pending.current && (was.selected !== selected || presetChanged || was.detail !== detail)) {
       pending.current = null
     }
     write.current()
@@ -219,6 +238,6 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
       clearTimeout(timer)
       unsubscribe()
     }
-  }, [selected, preset])
+  }, [selected, preset, detail])
   return apply
 }

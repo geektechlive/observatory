@@ -38,7 +38,7 @@ function parseHash(): HashState {
 const LAYER_VIEWS: ReadonlySet<ConsoleView> = new Set(['earth', 'orbit'])
 
 /** The orrery's own deep-link params (#108; the orrery chunk reads and writes them). */
-const ORRERY_PARAMS: ReadonlySet<string> = new Set(['t', 'focus', 'preset'])
+const ORRERY_PARAMS: ReadonlySet<string> = new Set(['t', 'focus', 'preset', 'detail'])
 
 /**
  * The orrery's params from a hash that is already on the orrery, raw so their encoding

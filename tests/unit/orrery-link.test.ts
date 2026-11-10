@@ -14,7 +14,7 @@ describe('parseOrreryLink (#108)', () => {
   it('reads time, focus and preset', () => {
     expect(
       parseOrreryLink('#orrery?t=2012-08-25T00:00:00Z&focus=naif:-31&preset=heliosphere'),
-    ).toEqual({ t: V1_HELIOPAUSE, focus: 'naif:-31', preset: 'heliosphere' })
+    ).toEqual({ t: V1_HELIOPAUSE, focus: 'naif:-31', preset: 'heliosphere', detail: false })
   })
 
   it('takes a bare date as midnight UTC', () => {
@@ -27,7 +27,7 @@ describe('parseOrreryLink (#108)', () => {
   })
 
   it('reads nothing from a bare #orrery or another tab', () => {
-    const none = { t: null, focus: null, preset: null }
+    const none = { t: null, focus: null, preset: null, detail: false }
     expect(parseOrreryLink('#orrery')).toEqual(none)
     expect(parseOrreryLink('')).toEqual(none)
     expect(parseOrreryLink('#earth?t=2012-08-25&focus=Mars')).toEqual(none)
@@ -62,42 +62,44 @@ describe('parseOrreryLink (#108)', () => {
 
 describe('serialiseOrreryLink (#108)', () => {
   it('writes time, focus and preset in a fixed order', () => {
-    expect(serialiseOrreryLink({ t: V1_HELIOPAUSE, focus: 'naif:-31', preset: null })).toBe(
-      '#orrery?t=2012-08-25T00:00:00Z&focus=naif:-31',
-    )
+    expect(
+      serialiseOrreryLink({ t: V1_HELIOPAUSE, focus: 'naif:-31', preset: null, detail: false }),
+    ).toBe('#orrery?t=2012-08-25T00:00:00Z&focus=naif:-31')
   })
 
   it('writes a bare #orrery when there is nothing to say', () => {
-    expect(serialiseOrreryLink({ t: null, focus: null, preset: null })).toBe('#orrery')
+    expect(serialiseOrreryLink({ t: null, focus: null, preset: null, detail: false })).toBe(
+      '#orrery',
+    )
   })
 
   it('keeps the colon readable and encodes the rest', () => {
-    expect(serialiseOrreryLink({ t: null, focus: 'sb:2001 KF54', preset: null })).toBe(
-      '#orrery?focus=sb:2001%20KF54',
-    )
+    expect(
+      serialiseOrreryLink({ t: null, focus: 'sb:2001 KF54', preset: null, detail: false }),
+    ).toBe('#orrery?focus=sb:2001%20KF54')
   })
 
   it('round-trips through the parser, dates BC included', () => {
     const cases = [
-      { t: V1_HELIOPAUSE + 12_345_000, focus: 'naif:-31', preset: null },
-      { t: SIM_MIN_MS, focus: null, preset: 'outer' as const },
-      { t: null, focus: 'sb:2026 VP1', preset: null },
-      { t: null, focus: null, preset: 'earth' as const },
+      { t: V1_HELIOPAUSE + 12_345_000, focus: 'naif:-31', preset: null, detail: false },
+      { t: SIM_MIN_MS, focus: null, preset: 'outer' as const, detail: false },
+      { t: null, focus: 'sb:2026 VP1', preset: null, detail: false },
+      { t: null, focus: null, preset: 'earth' as const, detail: false },
     ]
     for (const c of cases) expect(parseOrreryLink(serialiseOrreryLink(c))).toEqual(c)
   })
 
   it('round-trips a looked-up object’s key (#145)', () => {
-    const link = { t: null, focus: 'lookup:20099942', preset: null }
+    const link = { t: null, focus: 'lookup:20099942', preset: null, detail: false }
     const hash = serialiseOrreryLink(link)
     expect(hash).toBe('#orrery?focus=lookup:20099942')
     expect(parseOrreryLink(hash)).toEqual(link)
   })
 
   it('writes whole seconds', () => {
-    expect(serialiseOrreryLink({ t: V1_HELIOPAUSE + 999, focus: null, preset: null })).toBe(
-      '#orrery?t=2012-08-25T00:00:00Z',
-    )
+    expect(
+      serialiseOrreryLink({ t: V1_HELIOPAUSE + 999, focus: null, preset: null, detail: false }),
+    ).toBe('#orrery?t=2012-08-25T00:00:00Z')
   })
 })
 
@@ -137,5 +139,37 @@ describe('clockIsLive (#108)', () => {
     expect(clockIsLive({ ...live, playing: false }, now)).toBe(false)
     expect(clockIsLive({ ...live, rate: 3600 }, now + 5_000)).toBe(false)
     expect(clockIsLive({ ...live, anchorSim: V1_HELIOPAUSE }, now)).toBe(false)
+  })
+})
+
+describe('the detail flag (#203)', () => {
+  it('reads detail=1 beside a focus', () => {
+    expect(parseOrreryLink('#orrery?focus=naif:-31&detail=1')).toEqual({
+      t: null,
+      focus: 'naif:-31',
+      preset: null,
+      detail: true,
+    })
+  })
+
+  it('reads only detail=1; anything else is off', () => {
+    expect(parseOrreryLink('#orrery?focus=Mars&detail=0').detail).toBe(false)
+    expect(parseOrreryLink('#orrery?focus=Mars&detail=yes').detail).toBe(false)
+    expect(parseOrreryLink('#orrery?focus=Mars&detail').detail).toBe(false)
+  })
+
+  it('writes detail last, only when on', () => {
+    const link = { t: null, focus: 'naif:-31', preset: 'earth' as const, detail: true }
+    expect(serialiseOrreryLink(link)).toBe('#orrery?focus=naif:-31&preset=earth&detail=1')
+    expect(serialiseOrreryLink({ ...link, detail: false })).toBe(
+      '#orrery?focus=naif:-31&preset=earth',
+    )
+  })
+
+  it('round-trips with and without detail', () => {
+    for (const detail of [true, false]) {
+      const c = { t: V1_HELIOPAUSE, focus: 'sat:25544', preset: null, detail }
+      expect(parseOrreryLink(serialiseOrreryLink(c))).toEqual(c)
+    }
   })
 })
