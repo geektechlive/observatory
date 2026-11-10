@@ -215,4 +215,28 @@ describe('useLookupTrack (#145)', () => {
     })
     expect(renderer.setLookup).toHaveBeenLastCalledWith(null)
   })
+
+  it('showing it again after removing it opens the inspector again (#188)', async () => {
+    fetchSpan.mockImplementation(async (_id, span) => ({ state: 'ok', data: answer(span) }))
+    const { renderer, select } = setup()
+    act(() => {
+      useLookupStore.getState().show(apophis)
+    })
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledTimes(1)
+    })
+    await waitFor(() => {
+      expect(renderer.focusOn).toHaveBeenCalledTimes(1)
+    })
+    act(() => {
+      useLookupStore.getState().clear()
+    })
+    act(() => {
+      useLookupStore.getState().show(apophis)
+    })
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledTimes(2)
+    })
+    expect(select).toHaveBeenLastCalledWith('lookup:20099942')
+  })
 })

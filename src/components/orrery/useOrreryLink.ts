@@ -138,6 +138,16 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
     }
   }, [apply])
 
+  // Coming back to the tab (#189): the view kept in the store writes its link. The dial's
+  // own effect (useHashView) puts the bare `#orrery` in the same commit as this mounts, so
+  // the write waits until that has run.
+  useEffect(() => {
+    const timer = setTimeout(write.current, 0)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [])
+
   const { renderer, catalog, settled, lookupFailed } = o
   useEffect(() => {
     const want = pending.current

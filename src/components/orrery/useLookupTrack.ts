@@ -149,6 +149,8 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
   // the samples cover the date.
   const opened = useRef<string | null>(null)
   useEffect(() => {
+    // Removed: the next show of the same object opens its inspector again (#188).
+    if (!key) opened.current = null
     if (!renderer || !key || !focusOnLoad) return
     if (opened.current !== key) {
       opened.current = key

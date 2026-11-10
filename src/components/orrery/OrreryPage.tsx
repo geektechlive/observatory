@@ -33,12 +33,12 @@ import { reentriesWithin } from '@/lib/spaceTrackText'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
 import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
+import { useOrreryView } from '@/store/orreryView'
 
 import consoleStyles from '../consoles/console.module.css'
 import { buildCatalog, L1_KEY, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
-import { DEFAULT_PRESET } from './defaultView'
 import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
@@ -61,7 +61,6 @@ import type {
   OrreryRenderer,
   ProjectedBody,
   SatViewState,
-  ScaleMode,
   SceneKey,
   SunImageState,
   Visibility,
@@ -101,7 +100,20 @@ const CLOCK_READER = {
 /** The satellites' data (#98): the stored CelesTrak groups and the shared SGP4 worker. */
 const SAT_SOURCE = { fetchGroup: fetchOrrerySatsBody, worker: loadSatWorker }
 
-function acquire(width: number, height: number, reducedMotion: boolean, onLost: () => void) {
+/**
+ * The live page's context-loss handler. The renderer outlives the page and was given only
+ * the first mount's callback, so a loss after a tab round trip reached a dead page (#190):
+ * each mount overwrites this, and the renderer calls through `contextLost`.
+ */
+let pageOnLost: (() => void) | null = null
+
+function contextLost() {
+  lost = true
+  shared = null
+  pageOnLost?.()
+}
+
+function acquire(width: number, height: number, reducedMotion: boolean) {
   if (!shared) {
     shared = import('./three/OrreryRenderer').then(
       ({ OrreryRenderer }) =>
@@ -109,7 +121,7 @@ function acquire(width: number, height: number, reducedMotion: boolean, onLost: 
           width,
           height,
           reducedMotion,
-          onContextLost: onLost,
+          onContextLost: contextLost,
           clock: CLOCK_READER,
           satSource: SAT_SOURCE,
         }),
@@ -117,6 +129,9 @@ function acquire(width: number, height: number, reducedMotion: boolean, onLost: 
   }
   return shared
 }
+
+/** The view store's setters are stable: the page uses them like state setters. */
+const { setSelected, setScale, setPreset } = useOrreryView.getState()
 
 /** A pointer that moves further than this between down and up was a drag, not a tap. */
 const DRAG_PX = 5
@@ -205,9 +220,10 @@ export function OrreryPage() {
   const reducedMotion = useReducedMotion()
   const [renderer, setRenderer] = useState<OrreryRenderer | null>(null)
   const [failed, setFailed] = useState(lost)
-  const [selected, setSelected] = useState<SceneKey | null>(null)
-  const [scale, setScale] = useState<ScaleMode>('exaggerated')
-  const [preset, setPreset] = useState<FocusPreset | null>(DEFAULT_PRESET)
+  // The view's controls live in a store: they outlive the page like the renderer does (#189).
+  const selected = useOrreryView((s) => s.selected)
+  const scale = useOrreryView((s) => s.scale)
+  const preset = useOrreryView((s) => s.preset)
   const [visibility, setVisibility] = useState<Visibility>({
     planets: true,
     orbits: true,
@@ -281,11 +297,11 @@ export function OrreryPage() {
     let attached: OrreryRenderer | null = null
     const el = host.current
     if (!el) return
-    acquire(el.clientWidth || 800, el.clientHeight || 600, reducedMotion, () => {
-      lost = true
-      shared = null
+    const onLost = () => {
       setFailed(true)
-    })
+    }
+    pageOnLost = onLost
+    acquire(el.clientWidth || 800, el.clientHeight || 600, reducedMotion)
       .then((r) => {
         if (cancelled || !host.current) return
         r.resize(host.current.clientWidth, host.current.clientHeight)
@@ -301,6 +317,7 @@ export function OrreryPage() {
       })
     return () => {
       cancelled = true
+      if (pageOnLost === onLost) pageOnLost = null
       attached?.detach()
     }
   }, [reducedMotion])
