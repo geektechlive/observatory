@@ -975,11 +975,9 @@ export function OrreryPage() {
             </button>
           ))}
         </div>
-        {scale !== 'proportional' && (
-          <p className={styles.badge ?? ''} data-label-obstacle="">
-            NOT TO SCALE
-          </p>
-        )}
+        <p className={styles.badge ?? ''} data-label-obstacle="">
+          {scale === 'proportional' ? 'SIZES NOT TO SCALE' : 'NOT TO SCALE'}
+        </p>
         <div className={styles.notices ?? ''}>
           {failed && (
             <p className={styles.notice ?? ''} role="status">

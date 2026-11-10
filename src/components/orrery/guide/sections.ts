@@ -156,7 +156,7 @@ export const SECTIONS: readonly Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: 'Space is almost empty, so a true-scale picture would show nothing. The default, Big bodies, stretches distances on a log scale and draws bodies larger than life. Log distance keeps that stretched spacing but draws the bodies small. Proportional draws true distances and marks the bodies so you can find them. A NOT TO SCALE badge shows whenever the scale is stretched.',
+        text: 'Space is almost empty, so a true-scale picture would show nothing. The default, Big bodies, stretches distances on a log scale and draws bodies larger than life. Log distance keeps that stretched spacing but draws the bodies small. Proportional draws true distances and marks the bodies so you can find them. A NOT TO SCALE badge shows whenever the scale is stretched; in Proportional it says SIZES NOT TO SCALE, because the markers are bigger than the bodies.',
       },
       {
         kind: 'p',

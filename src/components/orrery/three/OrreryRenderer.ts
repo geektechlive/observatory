@@ -64,6 +64,7 @@ import type { OrreryApproach } from '@/schemas/orreryNeo'
 import { L1_KEY } from '../catalog'
 import type { CraftFilter } from '../craftFilter'
 import { DEFAULT_PRESET } from '../defaultView'
+import { bodyMinPx } from './bodyMinPx'
 import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
@@ -81,6 +82,7 @@ import {
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
+import { clampRadius, PX_CEILING } from './pxClamp'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
@@ -186,23 +188,6 @@ const EXAGGERATED_RADIUS: Record<BodyName, number> = {
   Uranus: 0.075,
   Neptune: 0.075,
 }
-/**
- * Bodies never draw smaller than this on screen, px: zoomed out they keep a readable
- * size, zoomed in they grow with the scene. Ordered like the real radii.
- */
-const MIN_PX: Record<BodyName, number> = {
-  Sun: 10,
-  Mercury: 3.5,
-  Venus: 4,
-  Earth: 4.5,
-  Mars: 4,
-  Jupiter: 6.5,
-  Saturn: 6,
-  Uranus: 5,
-  Neptune: 5,
-}
-/** Markers in the proportional mode, where true sizes are far below a pixel. */
-const MIN_PX_PROPORTIONAL = 2.5
 /** Real radii, km, for the proportional mode. */
 const TRUE_RADIUS_KM: Record<BodyName, number> = {
   Sun: 695_700,
@@ -465,8 +450,7 @@ export class OrreryRenderer {
 
   private minPx(name: SceneKey): number {
     if (!isBody(name)) return CRAFT_ICON_PX / 2
-    if (this.mode === 'proportional') return MIN_PX_PROPORTIONAL
-    return this.mode === 'log' ? MIN_PX[name] * 0.6 : MIN_PX[name]
+    return bodyMinPx(name, this.mode)
   }
 
   /** Scene units that cover one px at a distance from the camera. */
@@ -485,11 +469,14 @@ export class OrreryRenderer {
     }
     this.placeEarthFrame()
     this.placeSats(t)
-    for (const a of this.near.asteroids.visible()) this.floorPx(a.mesh, ASTEROID_MIN_PX)
-    if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX)
-    if (this.sats.marker.visible) this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX)
+    for (const a of this.near.asteroids.visible())
+      this.floorPx(a.mesh, ASTEROID_MIN_PX, PX_CEILING.asteroid)
+    if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX, PX_CEILING.l1)
+    if (this.sats.marker.visible)
+      this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX, PX_CEILING.satMarker)
     if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
-    for (const ring of this.sats.flagRings()) this.floorPx(ring, SAT_REENTRY_MIN_PX)
+    for (const ring of this.sats.flagRings())
+      this.floorPx(ring, SAT_REENTRY_MIN_PX, PX_CEILING.satReentry)
     for (const c of this.craft.visible()) {
       const depth = c.mesh.position.distanceTo(this.camera.position)
       c.mesh.scale.setScalar(craftIconScale(this.unitsPerPx(depth)))
@@ -508,12 +495,42 @@ export class OrreryRenderer {
     this.skins.faceCamera(this.camera.position)
     this.placeMoons()
     this.placeModel()
+    this.writePxProbe()
   }
 
-  /** Grow a mesh to at least `px` in radius on screen. */
-  private floorPx(mesh: Object3D, px: number): void {
+  /** Hold a mesh between `px` and `maxPx` in radius on screen (no ceiling: floor only). */
+  private floorPx(mesh: Object3D, px: number, maxPx?: number): void {
     const depth = mesh.position.distanceTo(this.camera.position)
-    mesh.scale.setScalar(Math.max(mesh.scale.x, px * this.unitsPerPx(depth)))
+    mesh.scale.setScalar(clampRadius(mesh.scale.x, this.unitsPerPx(depth), px, maxPx))
+  }
+
+  /**
+   * Test probe (#195, #196): the drawn radii, px, as JSON on the canvas. Only runs when
+   * a test has put `data-orrery-px` on the canvas, so production pays one attribute check.
+   */
+  private writePxProbe(): void {
+    if (!this.canvas.hasAttribute('data-orrery-px')) return
+    const px = (mesh: Object3D): number =>
+      Math.round(
+        (mesh.scale.x / this.unitsPerPx(mesh.position.distanceTo(this.camera.position))) * 100,
+      ) / 100
+    const maxOf = (meshes: Object3D[]): number | null =>
+      meshes.length === 0 ? null : Math.max(...meshes.map(px))
+    const sun = this.bodies.get('Sun')
+    const craft = this.craft.visible()
+    this.canvas.dataset['orreryPx'] = JSON.stringify({
+      sun: sun ? px(sun) : null,
+      // A sprite's scale is its side, so half of it is the radius the Sun is compared by.
+      craft: ((): number | null => {
+        const side = maxOf(craft.map((c) => c.mesh))
+        return side === null ? null : side / 2
+      })(),
+      moon: maxOf(this.moons.visible().map((m) => m.mesh)),
+      l1: this.near.l1.visible ? px(this.near.l1) : null,
+      asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
+      satMarker: this.sats.marker.visible ? px(this.sats.marker) : null,
+      satReentry: maxOf(this.sats.flagRings()),
+    })
   }
 
   /**
@@ -682,7 +699,9 @@ export class OrreryRenderer {
     )
     for (const m of this.moons.visible()) {
       const depth = m.mesh.position.distanceTo(this.camera.position)
-      m.mesh.scale.setScalar(Math.max(m.mesh.scale.x, MOON_MIN_PX * this.unitsPerPx(depth)))
+      m.mesh.scale.setScalar(
+        clampRadius(m.mesh.scale.x, this.unitsPerPx(depth), MOON_MIN_PX, PX_CEILING.moon),
+      )
     }
   }
 
