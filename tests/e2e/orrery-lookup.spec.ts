@@ -141,6 +141,9 @@ test.describe('JPL lookup from the orrery search (#100)', () => {
     await inspector.getByRole('button', { name: 'Remove from orrery' }).click()
     await expect(canvas).toHaveAttribute('data-orrery-lookup', '')
     await expect(inspector).toHaveCount(0)
+    // The camera was following it: with it gone, the focus is cleared, not left on a
+    // removed object (#186).
+    await expect(canvas).not.toHaveAttribute('data-orrery-focus', /lookup/)
   })
 
   test('a link to a looked-up object fetches it and opens on it (#145)', async ({ page }) => {

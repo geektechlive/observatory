@@ -67,6 +67,7 @@ import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
 import { EarthNeighbourhood } from './earthNeighbourhood'
+import { followShift } from './followShift'
 import {
   earthPresetView,
   type FocusPreset,
@@ -757,16 +758,21 @@ export class OrreryRenderer {
 
   /** Where a body or craft is drawn now, scene space. */
   bodyPosition(name: SceneKey): Vector3 {
-    if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? new Vector3()
+    return this.drawnPosition(name) ?? new Vector3()
+  }
+
+  /** Where it is drawn now, or null when it is not drawn (hidden, or outside its data). */
+  private drawnPosition(name: SceneKey): Vector3 | null {
+    if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? null
     const near = this.nearPosition(name)
     if (near) return near
     const looked = this.lookup.position(name)
     if (looked) return looked
     if (this.moons.has(name)) {
       const parent = this.moons.parentOf(name)
-      return this.moons.position(name) ?? (parent ? this.bodyPosition(parent) : new Vector3())
+      return this.moons.position(name) ?? (parent ? this.drawnPosition(parent) : null)
     }
-    return this.craft.position(name) ?? new Vector3()
+    return this.craft.position(name)
   }
 
   /** A close approach or the L1 marker as drawn now (#92), or null. */
@@ -791,7 +797,15 @@ export class OrreryRenderer {
 
   /** An object looked up at JPL to draw (#145), or null to remove it. */
   setLookup(data: LookupData | null): void {
+    const followed = this.focusBody !== null && this.lookup.has(this.focusBody)
     this.lookup.set(data)
+    // The camera was on the object that is gone: drop the focus rather than keep it on
+    // a removed key (#186). The camera stays where it is.
+    if (followed && this.focusBody !== null && !this.lookup.has(this.focusBody)) {
+      this.focusBody = null
+      this.models.show(null, null)
+      delete this.canvas.dataset['orreryFocus']
+    }
     this.updateBodies(true)
     this.markDirty()
   }
@@ -926,8 +940,10 @@ export class OrreryRenderer {
     this.orbitJd = Number.NaN
     this.craft.rebuildTrajectory()
     this.updateBodies(true)
-    if (this.focusBody) this.focusOn(this.focusBody, true)
-    else this.applyPreset(this.preset ?? DEFAULT_PRESET, true)
+    // The Earth presets also set focusBody (Earth), so the preset wins; focusOn clears it (#187).
+    if (this.preset) this.applyPreset(this.preset, true)
+    else if (this.focusBody) this.focusOn(this.focusBody, true)
+    else this.applyPreset(DEFAULT_PRESET, true)
   }
 
   setVisibility(v: Visibility): void {
@@ -1364,9 +1380,10 @@ export class OrreryRenderer {
    */
   private followFocus(): void {
     if (!this.focusBody || this.flight) return
-    const target = this.bodyPosition(this.focusBody)
-    const shift = target.clone().sub(this.controls.target)
-    if (shift.lengthSq() === 0) return
+    const target = this.drawnPosition(this.focusBody)
+    // Not drawn (hidden, or past its samples): hold the camera, not pull it to the Sun (#186).
+    const shift = followShift(target, this.controls.target)
+    if (!target || !shift) return
     this.camera.position.add(shift)
     this.controls.target.copy(target)
   }
