@@ -182,6 +182,30 @@ describe('SatLayer (#98)', () => {
     expect(layer.flagRings()).toHaveLength(0)
   })
 
+  it('draws the re-entry rings over Earth: no depth test, after the Earth (#199)', async () => {
+    const { layer, at } = await loadedLayer(['stations', 'starlink'])
+    layer.setFlagged(['44713'])
+    layer.place(at(20))
+    const ring = layer.flagRings()[0]
+    expect(ring?.material.depthTest).toBe(false)
+    expect(ring?.material.depthWrite).toBe(false)
+    expect(ring?.renderOrder).toBeGreaterThan(0)
+  })
+
+  it('fades the points when Earth is small on screen (#198)', async () => {
+    const { layer, at } = await loadedLayer(['stations'])
+    const alpha = (earthPx?: number) => {
+      layer.place(earthPx === undefined ? at(20) : { ...at(20), earthPx })
+      return (
+        pointsOf(layer) as unknown as { material: { uniforms: { uAlpha: { value: number } } } }
+      ).material.uniforms.uAlpha.value
+    }
+    const full = alpha()
+    expect(alpha(250)).toBeCloseTo(full, 9)
+    expect(alpha(50)).toBeLessThan(full * 0.4)
+    expect(alpha(50)).toBeGreaterThan(0)
+  })
+
   it('has no position for an object outside its epoch window', async () => {
     const { layer } = await loadedLayer(['stations'], [SAT_OUT_OF_WINDOW])
     expect(layer.info(satKey('25544'))?.teme).toBeNull()

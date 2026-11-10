@@ -592,13 +592,15 @@ export class OrreryRenderer {
     const earth = this.bodies.get('Earth')
     if (!earth || Number.isNaN(this.lastJd)) return
     const clock = this.clock.motion()
+    const radius = this.earthFrameRadius(earth, t)
     this.sats.place({
       jd: this.lastJd,
       simMs: this.clock.simTime(),
       wallMs: performance.now(),
       rate: clock.playing ? clock.rate : 0,
       earth: earth.position,
-      radius: this.earthFrameRadius(earth, t),
+      radius,
+      earthPx: radius / this.unitsPerPx(earth.position.distanceTo(this.camera.position)),
       openness: this.mode === 'proportional' ? 0 : t,
       camera: this.camera.position,
       pixelRatio: this.renderer.getPixelRatio(),

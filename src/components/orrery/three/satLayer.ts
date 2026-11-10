@@ -40,6 +40,7 @@ import {
   type SatDisplay,
   satDisplay,
   satKey,
+  satPointStrength,
   satScenePosition,
   satViewDistance,
   temeToScene,
@@ -60,6 +61,8 @@ const MARKER_SHARE = 0.04
 const RING_SHARE = MARKER_SHARE * 2
 /** At most this many rings: TIP lists a few objects a week, never hundreds. */
 const MAX_RINGS = 32
+/** After Earth and the points: a ring that skips the depth test must not be painted under them. */
+const RING_RENDER_ORDER = 10
 
 const CATEGORIES: readonly SatCategory[] = [
   'station',
@@ -167,6 +170,8 @@ export interface SatPlace {
   pixelRatio: number
   /** The stage's width over height (satViewDistance); 1 when unknown. */
   aspect?: number
+  /** Earth's drawn radius on screen, CSS px (#198); full-strength points when unknown. */
+  earthPx?: number
 }
 
 export class SatLayer {
@@ -195,6 +200,9 @@ export class SatLayer {
     transparent: true,
     opacity: 0.9,
     depthWrite: false,
+    // A re-entering object sits lower than the ring is wide, so Earth would cut it into
+    // arcs (#199). It is a marker, always drawn whole; renderOrder keeps it after Earth.
+    depthTest: false,
   })
   /** The camera's distance from Earth this frame, Earth radii across the narrow side. */
   private re = Number.POSITIVE_INFINITY
@@ -268,7 +276,7 @@ export class SatLayer {
     const drawn = this.attached !== null
     this.setStrength(
       this.pointsMaterial,
-      this.display.pointsAlpha * POINT_ALPHA,
+      this.display.pointsAlpha * POINT_ALPHA * satPointStrength(p.earthPx ?? Infinity),
       POINT_PX * p.pixelRatio,
     )
     this.setStrength(this.hazeMaterial, this.display.hazeAlpha * HAZE_GAIN, HAZE_PX * p.pixelRatio)
@@ -309,6 +317,7 @@ export class SatLayer {
     if (had) return had
     const ring = new Mesh(this.ringGeometry, this.ringMaterial)
     ring.name = 'satellite-reentry'
+    ring.renderOrder = RING_RENDER_ORDER
     this.rings.push(ring)
     this.group.add(ring)
     return ring

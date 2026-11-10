@@ -166,3 +166,25 @@ export function epochAgeText(epochMs: number, simMs: number): string {
     ? `${String(Math.round(h))} h ${side} this date`
     : `${(h / 24).toFixed(1)} days ${side} this date`
 }
+
+/** Earth's drawn radius, CSS px, at and above which the points are at full strength (#198). */
+export const POINT_FULL_EARTH_PX = 200
+/** Below this radius the fade has bottomed out. */
+const POINT_FADE_START_PX = 20
+/** The share of strength left when Earth is tiny: a hint of the shell, not a fur coat. */
+const POINT_MIN_STRENGTH = 0.2
+
+/**
+ * How strongly the satellite points draw for Earth's size on screen, 0.2 to 1. Points are
+ * a fixed 2 px, so at the Earth-Moon preset (Earth 30 to 57 px) 5,600 to 19,000 of them
+ * bury the disc; a smoothstep from 20 px to 200 px thins them until Earth can carry them.
+ */
+export function satPointStrength(earthPx: number): number {
+  if (!(earthPx < POINT_FULL_EARTH_PX)) return 1
+  const t = Math.min(
+    1,
+    Math.max(0, (earthPx - POINT_FADE_START_PX) / (POINT_FULL_EARTH_PX - POINT_FADE_START_PX)),
+  )
+  const smooth = t * t * (3 - 2 * t)
+  return POINT_MIN_STRENGTH + (1 - POINT_MIN_STRENGTH) * smooth
+}

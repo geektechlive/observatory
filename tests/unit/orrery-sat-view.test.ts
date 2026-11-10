@@ -12,6 +12,7 @@ import {
   SAT_DISTANCE,
   satAltitudeKm,
   satDisplay,
+  satPointStrength,
   satScenePosition,
   temeToScene,
 } from '@/lib/orrery/satView'
@@ -143,5 +144,26 @@ describe('satAltitudeKm and epochAgeText (#98 inspector)', () => {
     expect(epochAgeText(now - 5 * 3_600_000, now)).toBe('5 h before this date')
     expect(epochAgeText(now - 3 * 86_400_000, now)).toBe('3.0 days before this date')
     expect(epochAgeText(now + 2 * 3_600_000, now)).toBe('2 h after this date')
+  })
+})
+
+describe('satPointStrength (#198)', () => {
+  it('is full once Earth is about 200 px across or more', () => {
+    expect(satPointStrength(200)).toBe(1)
+    expect(satPointStrength(600)).toBe(1)
+    expect(satPointStrength(Number.POSITIVE_INFINITY)).toBe(1)
+  })
+
+  it('falls as Earth gets smaller, never to zero, and never rises as it shrinks', () => {
+    let last = 1
+    for (let px = 200; px >= 0; px -= 5) {
+      const s = satPointStrength(px)
+      expect(s).toBeLessThanOrEqual(last + 1e-12)
+      expect(s).toBeGreaterThan(0.1)
+      last = s
+    }
+    expect(satPointStrength(57)).toBeLessThan(0.4)
+    expect(satPointStrength(30)).toBeLessThan(0.3)
+    expect(satPointStrength(0)).toBeCloseTo(0.2, 6)
   })
 })
