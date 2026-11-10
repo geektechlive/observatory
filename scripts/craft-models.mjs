@@ -9,8 +9,15 @@
  * and written WITHOUT Draco or meshopt compression: those need a WebAssembly decoder
  * in the browser, and the site's CSP (public/_headers) allows no WebAssembly compile
  * ('wasm-unsafe-eval'). Quantized geometry loads with three's GLTFLoader alone.
+ *
+ * The asset gate (#202): scripts/craft-manifest.mjs holds an entry per model. The build
+ * checks each source file against the entry's SHA-256, writes the result to a staging
+ * folder, and copies it to public/models/craft/ only when the entry is complete and the
+ * file is within the per-model budget (scripts/craft-gate.mjs). A 'legacy' entry builds
+ * to staging for inspection but is never promoted. Rules: docs/reference/satellite-models.md.
  */
-import { mkdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -30,24 +37,32 @@ import draco3d from 'draco3dgltf'
 import { MeshoptSimplifier } from 'meshoptimizer'
 import sharp from 'sharp'
 
+import { BUDGETS } from './check-bundle.mjs'
+import { assertSourceFiles, promote, unknownModels, verifySources } from './craft-gate.mjs'
+import { MANIFEST } from './craft-manifest.mjs'
+
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OUT = join(ROOT, 'public', 'models', 'craft')
 
-/** Output name -> source file and the triangle budget it is simplified to. */
+/**
+ * Output name -> how a single-file model is simplified. The source file and the triangle
+ * budget come from the manifest (the one place they are recorded); a model with several
+ * source files, New Horizons, is built by its own function.
+ */
 export const SOURCES = {
-  voyager: { file: 'voyager.glb', triangles: 14_000 },
-  parker: { file: 'parker.glb', triangles: 14_000 },
-  juno: { file: 'juno.glb', triangles: 14_000 },
-  dscovr: { file: 'dscovr.glb', triangles: 9_000 },
-  soho: { file: 'soho.glb', triangles: 14_000 },
-  wind: { file: 'wind.glb', triangles: 14_000 },
-  ace: { file: 'ace.glb', triangles: 14_000 },
-  jwst: { file: 'jwst.glb', triangles: 16_000 },
+  voyager: {},
+  parker: {},
+  juno: {},
+  dscovr: {},
+  soho: {},
+  wind: {},
+  ace: {},
+  jwst: {},
   // 35.7 MB, 203k triangles and 43 textures: its maps go (material colours stay) and it
   // gets a looser error to reach the budget.
   // It is thousands of small closed parts the simplifier cannot shrink, so components
   // under 1.5% of a mesh's size (sub-pixel at a focused craft's ~150 px) go first.
-  clipper: { file: 'clipper.glb', triangles: 16_000, textures: false, error: 0.05, minPart: 0.015 },
+  clipper: { textures: false, error: 0.05, minPart: 0.015 },
 }
 
 const TEXTURE_SIZE = 512
@@ -136,8 +151,11 @@ function pruneSmallComponents(doc, error) {
   console.log(`pruned small components: ${before / 3} -> ${after / 3} tris`)
 }
 
-async function build(io, name, source, srcDir) {
-  const { file, triangles, textures = true, error = SIMPLIFY_ERROR, minPart = 0 } = source
+async function build(io, name, source, srcDir, outDir) {
+  const { textures = true, error = SIMPLIFY_ERROR, minPart = 0 } = source
+  const { triangles, sources } = MANIFEST[name]
+  if (sources.length !== 1) throw new Error(`${name}: expects one source file, the manifest has ${sources.length}`)
+  const file = sources[0].file
   const doc = await io.read(join(srcDir, file))
   const before = triangleCount(doc)
   stripAttributes(doc, textures)
@@ -157,13 +175,14 @@ async function build(io, name, source, srcDir) {
     const id = ext.extensionName
     if (id === 'KHR_draco_mesh_compression' || id === 'EXT_meshopt_compression') ext.dispose()
   }
-  const out = join(OUT, `${name}.glb`)
+  const out = join(outDir, `${name}.glb`)
   await io.write(out, doc)
   const bounds = getBounds(doc.getRoot().listScenes()[0])
   const size = bounds.max.map((v, i) => +(v - bounds.min[i]).toFixed(3))
   console.log(
     `${name}: ${file} ${statSync(join(srcDir, file)).size} B, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B, extent ${size.join(' x ')}`,
   )
+  return triangleCount(doc)
 }
 
 /** Positions of a binary STL (no indices; weld() joins them). */
@@ -183,7 +202,12 @@ function readStl(path) {
  * axis, the RTG cantilevered from one corner. The arrangement is approximate, and the
  * credit says so (craftModels.ts).
  */
-async function buildNewHorizons(io, srcDir) {
+const NH_BODY = 'nh_7399_05_rp_body.stl'
+const NH_ANTENNA = 'nh_7399_05_rp_antenna.stl'
+const NH_RTG = 'nh_7399_05_rp_rtg.stl'
+
+async function buildNewHorizons(io, srcDir, outDir) {
+  assertSourceFiles('new-horizons', MANIFEST['new-horizons'], [NH_BODY, NH_ANTENNA, NH_RTG])
   const doc = new Document()
   const buffer = doc.createBuffer()
   const scene = doc.createScene()
@@ -201,37 +225,66 @@ async function buildNewHorizons(io, srcDir) {
     scene.addChild(node)
   }
   // Body: gold foil. Dish: white, sitting on the body's top face (body height 2.3).
-  part('nh_7399_05_rp_body.stl', [0.78, 0.62, 0.3, 1], [0, 0, 0])
-  part('nh_7399_05_rp_antenna.stl', [0.92, 0.92, 0.9, 1], [-0.1, 2.3, 0.2])
+  part(NH_BODY, [0.78, 0.62, 0.3, 1], [0, 0, 0])
+  part(NH_ANTENNA, [0.92, 0.92, 0.9, 1], [-0.1, 2.3, 0.2])
   // RTG: a dark rod, turned to lie along -x from the body's far corner.
   const s = Math.SQRT1_2
-  part('nh_7399_05_rp_rtg.stl', [0.25, 0.25, 0.27, 1], [-2.8, 0.9, -1.2], [0, 0, s, s])
+  part(NH_RTG, [0.25, 0.25, 0.27, 1], [-2.8, 0.9, -1.2], [0, 0, s, s])
   await doc.transform(dedup(), weld())
   const before = triangleCount(doc)
   await doc.transform(
-    simplify({ simplifier: MeshoptSimplifier, ratio: Math.min(1, 12_000 / before), error: SIMPLIFY_ERROR, lockBorder: false }),
+    simplify({ simplifier: MeshoptSimplifier, ratio: Math.min(1, MANIFEST['new-horizons'].triangles / before), error: SIMPLIFY_ERROR, lockBorder: false }),
     prune(),
     quantize(),
   )
-  const out = join(OUT, 'new-horizons.glb')
+  const out = join(outDir, 'new-horizons.glb')
   await io.write(out, doc)
-  console.log(`new-horizons: 5 STL parts, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B`)
+  console.log(`new-horizons: 3 STL parts, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B`)
+  return triangleCount(doc)
 }
 
 async function main() {
   const srcDir = process.argv[2]
-  if (!srcDir) throw new Error('usage: node scripts/craft-models.mjs <source-dir>')
-  await MeshoptSimplifier.ready
-  mkdirSync(OUT, { recursive: true })
-  const io = new NodeIO()
-    .registerExtensions(ALL_EXTENSIONS)
-    .registerDependencies({ 'draco3d.decoder': await draco3d.createDecoderModule() })
+  if (!srcDir) throw new Error('usage: node scripts/craft-models.mjs <source-dir> [name...]')
   const only = process.argv.slice(3)
-  for (const [name, source] of Object.entries(SOURCES)) {
-    if (only.length > 0 && !only.includes(name)) continue
-    await build(io, name, source, srcDir)
+  const unknown = unknownModels(only, Object.keys(MANIFEST))
+  if (unknown.length > 0) throw new Error(`no manifest entry for: ${unknown.join(', ')}`)
+  await MeshoptSimplifier.ready
+  const staging = mkdtempSync(join(tmpdir(), 'craft-models-'))
+  try {
+    const io = new NodeIO()
+      .registerExtensions(ALL_EXTENSIONS)
+      .registerDependencies({ 'draco3d.decoder': await draco3d.createDecoderModule() })
+    const built = new Map()
+    for (const [name, source] of Object.entries(SOURCES)) {
+      if (only.length > 0 && !only.includes(name)) continue
+      gateSources(name, srcDir)
+      built.set(name, await build(io, name, source, srcDir, staging))
+    }
+    if (only.length === 0 || only.includes('new-horizons')) {
+      gateSources('new-horizons', srcDir)
+      built.set('new-horizons', await buildNewHorizons(io, srcDir, staging))
+    }
+    for (const [name, triangles] of built) {
+      try {
+        promote(name, staging, OUT, MANIFEST[name], BUDGETS.craftModelBytes, triangles)
+        console.log(`promoted ${name} to public/models/craft/`)
+      } catch (e) {
+        console.warn(e.message)
+        process.exitCode = 1
+      }
+    }
+  } finally {
+    rmSync(staging, { recursive: true, force: true })
   }
-  if (only.length === 0 || only.includes('new-horizons')) await buildNewHorizons(io, srcDir)
+}
+
+/** Check a model's source files against the manifest; a legacy entry has no hash to check. */
+function gateSources(name, srcDir) {
+  const entry = MANIFEST[name]
+  if (!entry) throw new Error(`${name}: no manifest entry (scripts/craft-manifest.mjs)`)
+  if (entry.legacy) console.warn(`${name}: legacy entry, source hash not checked`)
+  else verifySources(entry, srcDir)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

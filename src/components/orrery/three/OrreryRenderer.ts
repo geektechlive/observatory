@@ -655,7 +655,7 @@ export class OrreryRenderer {
   private placeModel(): void {
     const key = this.models.shownKey()
     this.craft.setModelKey(key)
-    const model = this.models.shownModel()
+    const model = this.models.shownDescriptor()
     if (!key || !model) return
     const at = this.craft.position(key)
     const facing = this.craftFacing(key)

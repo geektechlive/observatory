@@ -12,11 +12,48 @@ land, licences are answered or new families appear.
 ## Rules a model has to meet
 
 - The licence allows free public display on a website **and** modification (we decimate and
-  Draco-compress every model at build time).
-- Under the 500 kB per-model budget after compression (`check-bundle`'s `craft-model-bytes`).
+  simplify every model at build time).
+- Under 500 kB per model, measured on the file we ship. That file is **uncompressed**:
+  the build decodes Draco and meshopt and writes plain quantized GLB, because the CSP has no
+  `'wasm-unsafe-eval'` for a decoder (ADR 0011, `scripts/craft-models.mjs`). The budget is
+  `check-bundle`'s `craft-model-bytes`.
 - No agency logos or insignia (CLAUDE.md). Check the mesh and its textures, not only the
-  thumbnail.
+  thumbnail. For NASA's marks this is also a legal requirement (14 CFR 1221), not only a style
+  rule.
 - Credit as the licence asks, in the same shape as `craftModels.ts` (credit line plus source URL).
+  A CC BY credit names the creator, the model URL and the licence URL, and says the model was changed
+  (CC BY 4.0: "give appropriate credit, provide a link to the license, and indicate if changes
+  were made").
+- A manifest entry in `scripts/craft-manifest.mjs` that passes the gate (next section).
+
+## The asset gate
+
+Decision record: [ADR 0020](../decisions/0020-models-ship-through-a-gate.md).
+
+Every file in `public/models/craft/` has an entry in `scripts/craft-manifest.mjs` (#202): source
+URL and version, licence and its evidence (text and URL), SHA-256 of each downloaded source file,
+family, logos checked (date, result `clean`) and the triangle budget. `node scripts/craft-models.mjs
+<source-dir> [name...]` reads the source files its manifest entry pins (the build fails if they
+differ), checks each against its hash, builds into a temporary staging folder (removed when the
+build ends), and copies a file to `public/models/craft/` only if its entry is complete, the file
+is within `craftModelBytes` and its triangle count is at most 5% over the entry's budget
+(`scripts/craft-gate.mjs`). A name that matches no manifest entry is an error. `tests/unit/scripts/craft-manifest.test.ts`
+fails when a file anywhere under `public/models/` has no complete entry, and when a descriptor
+points at a file with none.
+
+The ten models shipped by #115 are marked `legacy`: their source downloads were not kept, so
+their source hash, version and logo check are recorded as unknown (not invented). The manifest
+pins their shipped bytes instead, and the build will not promote a legacy entry. To rebuild one,
+download its source, fill in the real hash, version and logo check, and delete `legacy`. A plain
+`node scripts/craft-models.mjs <dir>` therefore exits 1 while every entry is legacy: it builds,
+and refuses to promote each one.
+
+At runtime a model is a `ModelDescriptor` (`src/lib/orrery/modelDescriptor.ts`): spacecraft by
+NAIF id, satellites by NORAD id and then family, each saying whether it is the object's own model
+or a family stand-in. `loadModel` (`three/craftModelLoad.ts`) loads, centres and fits one for any
+view.
+The focused-model layer still loads through its own path; when #194 adds satellites, it should move
+to `loadModel` and dedupe on key plus descriptor.
 
 ## How much of the dot cloud each family is
 
@@ -57,8 +94,11 @@ One Starlink model would put a real shape behind two thirds of every satellite d
   ship rest on the same basis.
 - [science.nasa.gov/3d-resources](https://science.nasa.gov/3d-resources/): "All of these assets
   are free to download and use."
-- **Take NASA models from GitHub or science.nasa.gov, not from NASA's Sketchfab uploads.** Those
-  are labelled CC BY-NC (for example Hubble), which contradicts the README.
+- **Take NASA models from GitHub or science.nasa.gov, not from NASA's Sketchfab uploads.** The
+  licence shown on Sketchfab may differ from the GitHub copies (UNVERIFIED: Sketchfab pages don't
+  render to automated fetches, so a CC BY-NC label on NASA's uploads, for example Hubble, was not
+  confirmed from a primary source). The GitHub and science.nasa.gov copies are "free and without
+  copyright" (VERIFIED, README).
 - Credit: "NASA" plus the model page's own Source field (for example "NASA/Ames Research
   Center"), and the page URL.
 
@@ -67,7 +107,7 @@ One Starlink model would put a real shape behind two thirds of every satellite d
 ### NASA models
 
 From `https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/<name>`. Raw GLB sizes
-are from the repository tree (VERIFIED); compressed sizes are not measured yet. No mesh has been
+are from the repository tree (VERIFIED); built sizes are not measured yet. No mesh has been
 checked for logos yet.
 
 | Model                              | Covers                                         | Raw GLB                                 | Notes                                                       |
@@ -101,25 +141,25 @@ but they are the named objects people click.
 
 Licence labels read from the Sketchfab API (VERIFIED). CC BY needs the title, author, source
 link, licence link and a note of changes:
-`"<title>" by <author>, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), <model URL>; simplified and compressed for this site.`
+`"<title>" by <author>, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), <model URL>; simplified for this site.`
 All are artists' models, not the operators'. Downloading needs a free Sketchfab login.
 
-| Model                                                                                                                                   | Covers            | Faces     | Notes                                                                                                                                                                                                                    |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ["Starlink Spacex Satellite"](https://sketchfab.com/3d-models/starlink-spacex-satellite-0a60f6720c5141c9a1c6d71aac108b31) by Malacodart | Starlink (11,201) | 19,644    | Author: "You can use the model for personal and commercial purposes, just remember to add credit". Early flat-panel design. No logo in the thumbnail; mesh and textures not checked. Size after compression not measured |
-| ["GLONASS-M"](https://sketchfab.com/3d-models/glonass-m-9660a3d4b72f47c2adde1be1d209b6bc) by tashtego                                   | GLONASS (28)      | 2,382     | Not inspected                                                                                                                                                                                                            |
-| [Tianhe core module](https://sketchfab.com/3d-models/a1ee21cce5174f4e9349bfaa4e164a05) by 博格博士 (BGBS)                               | Tiangong core (1) | 104,116   | Untextured; panels not deployed; Wentian and Mengtian missing; needs decimation                                                                                                                                          |
-| ["GPS Satellite"](https://sketchfab.com/3d-models/gps-satellite-2266e391d66144e2bd676ea16c449dc0) by ABC Almaty                         | GPS (40)          | 1,942,918 | Needs heavy decimation; a "maybe"                                                                                                                                                                                        |
+| Model                                                                                                                                   | Covers            | Faces     | Notes                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ["Starlink Spacex Satellite"](https://sketchfab.com/3d-models/starlink-spacex-satellite-0a60f6720c5141c9a1c6d71aac108b31) by Malacodart | Starlink (11,201) | 19,644    | Author: "You can use the model for personal and commercial purposes, just remember to add credit". Early flat-panel design. No logo in the thumbnail; mesh and textures not checked. Built size not measured |
+| ["GLONASS-M"](https://sketchfab.com/3d-models/glonass-m-9660a3d4b72f47c2adde1be1d209b6bc) by tashtego                                   | GLONASS (28)      | 2,382     | Not inspected                                                                                                                                                                                                |
+| [Tianhe core module](https://sketchfab.com/3d-models/a1ee21cce5174f4e9349bfaa4e164a05) by 博格博士 (BGBS)                               | Tiangong core (1) | 104,116   | Untextured; panels not deployed; Wentian and Mengtian missing; needs decimation                                                                                                                              |
+| ["GPS Satellite"](https://sketchfab.com/3d-models/gps-satellite-2266e391d66144e2bd676ea16c449dc0) by ABC Almaty                         | GPS (40)          | 1,942,918 | Needs heavy decimation; a "maybe"                                                                                                                                                                            |
 
 ## Tier B: a model exists, but the licence is a problem
 
 | Item                                                                                                                      | Problem                                                                                                                                                                  | Who to ask                                       |
 | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| [Starlink 2022 scan](https://sketchfab.com/3d-models/starlink-satellite-2022-70361e8f586e44e795d0b27220fe402a) (Acidance) | CC BY-NC-SA: share-alike on our compressed copy                                                                                                                          | The author                                       |
-| Glonass K1 (Ilya)                                                                                                         | CC BY-NC-ND: no derivatives, so no compression                                                                                                                           | The author                                       |
+| [Starlink 2022 scan](https://sketchfab.com/3d-models/starlink-satellite-2022-70361e8f586e44e795d0b27220fe402a) (Acidance) | CC BY-NC-SA: share-alike on our simplified copy                                                                                                                          | The author                                       |
+| Glonass K1 (Ilya)                                                                                                         | CC BY-NC-ND: no derivatives, so no simplifying                                                                                                                           | The author                                       |
 | Metop (erkin.yaron, a scan)                                                                                               | CC BY-NC-SA                                                                                                                                                              | The author                                       |
 | ISS models on Sketchfab (several)                                                                                         | ND or NC-ND                                                                                                                                                              | Not needed: NASA's ISS is tier A                 |
-| NASA's own Sketchfab uploads                                                                                              | CC BY-NC there, unlike the GitHub copies                                                                                                                                 | Use the GitHub copies                            |
+| NASA's own Sketchfab uploads                                                                                              | May differ from the GitHub copies (UNVERIFIED; see above)                                                                                                                | Use the GitHub or science.nasa.gov copies        |
 | ESA Rosetta (ESA's only downloadable Sketchfab model)                                                                     | CC BY-NC; not an Earth satellite                                                                                                                                         | n/a                                              |
 | "Global Star" (uperesito)                                                                                                 | CC BY on Sketchfab, but taken from the Celestia Motherlode: rights to the original unclear                                                                               | Skip unless confirmed                            |
 | ESA Sentinel, Galileo, MetOp, MTG                                                                                         | No official downloadable model or licence confirmed; ESA's terms pages returned 404 (UNVERIFIED snippets suggest editorial use with credit, some items CC BY-SA 3.0 IGO) | ESA; our 2026-11-07 question is still unanswered |
@@ -156,6 +196,30 @@ Stand-ins, labelled as stand-ins:
 
 Without Starlink, tier A covers only about 1.5% of the other 5,702 objects; those get a stand-in
 or stay a dot.
+
+## Budget plan (#202)
+
+No budget has been raised yet. The per-model budget stays **500 kB** on the uncompressed shipped file
+(`craftModelBytes`). The ten models shipped today total 2,159,048 B (VERIFIED, `wc -c` on
+`public/models/craft/`; 110 kB to 426 kB each, mean 216 kB) against a `craftModelTotal` of
+3,000,000 B. Only the focused object's model is ever loaded, so the total is deploy size, not a
+visitor's download.
+
+Proposed ceiling per tier-A model, sized from the shipped mean and the raw sizes above (a
+proposal, not a measurement; raw sizes are before decimation):
+
+| Group                                                                                                         | Models | Ceiling each  | Subtotal |
+| ------------------------------------------------------------------------------------------------------------- | ------ | ------------- | -------- |
+| Tiny meshes: GRACE, Satellite Kit (3 parts), TDRS, GLONASS-M, SWAS                                            | 5      | 25 to 150 kB  | 420 kB   |
+| Small: CubeSat 1RU, OCO-2, SORCE, MMS, Aqua, Aura, GOES                                                       | 7      | 150 to 300 kB | 1,800 kB |
+| Medium: Terra, Landsat 8, Suomi NPP, ICESat-2, SDO, Fermi, Chandra, THEMIS, CYGNSS, Jason, Jason CS, GPM, GPS | 13     | 350 kB        | 4,550 kB |
+| Large, the models people click: ISS, Hubble, Starlink, Tianhe                                                 | 4      | 400 to 450 kB | 1,700 kB |
+
+That is 29 slots and a ceiling of 8,470 kB; the shipped mean (216 kB) suggests about 6 to 7 MB
+in practice. Adding the ten shipped models, the provisional tier-A `craftModelTotal` is **9 MB**. It is not
+applied yet. **Before raising `craftModelTotal`, build a trial batch of 3**
+(for example ISS, Starlink and one medium NASA model), measure their real built sizes, and set
+the total from those; raise it only in the commit that adds the models (ADR 0007).
 
 ## Open risks
 

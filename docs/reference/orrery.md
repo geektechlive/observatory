@@ -217,6 +217,12 @@ A silhouette at a distance, a 3D model when focused.
   then quantized, with WebP textures. Ten files, 110-426 kB, 2.16 MB in all. Europa Clipper's
   official 35.7 MB file loses its textures and its sub-pixel components (`simplifyPrune`). New
   Horizons is assembled from NASA's 3D-printing parts, credited as approximate.
+- **One descriptor and a gate for every model (#202).** The layer takes a `ModelDescriptor`
+  (`src/lib/orrery/modelDescriptor.ts`): spacecraft resolve by NAIF id, satellites by NORAD id and
+  then family (empty until #194). `loadModel` (`three/craftModelLoad.ts`) loads, centres and
+  fits one, with an `AbortSignal` and a `dispose`, for any view. Every shipped file needs a
+  complete entry in `scripts/craft-manifest.mjs`; see
+  [satellite-models.md](satellite-models.md#the-asset-gate).
 - **Only the focused craft has a model** (`three/craftModelLayer.ts`). It is fetched on focus
   (GLTFLoader is its own chunk), disposed when the focus moves, sized `CRAFT_MODEL_PX` (100) in
   radius by its body, not its booms (`craftModelFit.ts`), and seen three-quarter on
