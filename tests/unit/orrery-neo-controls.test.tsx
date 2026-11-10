@@ -62,8 +62,8 @@ const hintOf = (el: HTMLElement) =>
 describe('NeoControls (#92)', () => {
   it('windows the approaches around the date shown, and says the data covers ±30 days (#136)', () => {
     const { onFilter } = renderNeo()
-    const group = screen.getByRole('radiogroup', { name: /closest approach/i })
-    const radios = within(group).getAllByRole('radio')
+    const group = screen.getByRole('group', { name: /closest approach/i })
+    const radios = within(group).getAllByRole('button')
     expect(radios.map((r) => r.textContent)).toEqual([
       'Within a day',
       'Within a week',
@@ -71,10 +71,10 @@ describe('NeoControls (#92)', () => {
     ])
     expect(
       within(group)
-        .getByRole('radio', { name: /within 30 days/i })
-        .getAttribute('aria-checked'),
+        .getByRole('button', { name: /within 30 days/i })
+        .getAttribute('aria-pressed'),
     ).toBe('true')
-    fireEvent.click(within(group).getByRole('radio', { name: /within a day/i }))
+    fireEvent.click(within(group).getByRole('button', { name: /within a day/i }))
     expect(onFilter).toHaveBeenCalledWith({ ...DEFAULT_NEO_FILTER, window: 'day' })
     expect(screen.getByText(/±30 days/)).toBeTruthy()
   })

@@ -34,6 +34,7 @@ function fakeWorker(statuses: number[]) {
   let loaded: SatGroupId[] = []
   let version = 0
   const worker: SatWorker = {
+    failed: false,
     load(body) {
       loaded = [...loaded, new TextDecoder().decode(body) as SatGroupId]
       version += 1

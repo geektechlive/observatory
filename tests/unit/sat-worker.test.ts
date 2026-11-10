@@ -151,6 +151,9 @@ describe('createSatHandler (#98)', () => {
 class FakeWorker {
   static last: FakeWorker | null = null
   onmessage: ((e: MessageEvent) => void) | null = null
+  onerror: ((e: ErrorEvent) => void) | null = null
+  onmessageerror: ((e: MessageEvent) => void) | null = null
+  terminated = false
   posted: { msg: { type: string; id: number }; transfer: Transferable[] }[] = []
   constructor() {
     FakeWorker.last = this
@@ -159,7 +162,7 @@ class FakeWorker {
     this.posted.push({ msg, transfer })
   }
   terminate() {
-    return undefined
+    this.terminated = true
   }
   reply(data: unknown) {
     this.onmessage?.({ data } as MessageEvent)
@@ -193,6 +196,35 @@ describe('createSatWorker (#98)', () => {
     const failing = sats.load(new ArrayBuffer(1))
     fake?.reply({ type: 'error', id: fake.posted[1]?.msg.id, message: 'bad body' })
     await expect(failing).rejects.toThrow('bad body')
+  })
+
+  it.each(['onerror', 'onmessageerror'] as const)(
+    'rejects every pending request when the worker fires %s, and refuses later ones (#191)',
+    async (handler) => {
+      vi.stubGlobal('Worker', FakeWorker)
+      const onFail = vi.fn()
+      const sats = createSatWorker(onFail)
+      const fake = FakeWorker.last
+      const loading = sats.load(new ArrayBuffer(1))
+      const passing = sats.propagate(new Date(AT))
+      fake?.[handler]?.({} as never)
+      await expect(loading).rejects.toThrow(/worker/i)
+      await expect(passing).rejects.toThrow(/worker/i)
+      expect(sats.failed).toBe(true)
+      expect(fake?.terminated).toBe(true)
+      expect(onFail).toHaveBeenCalledTimes(1)
+      await expect(sats.load(new ArrayBuffer(1))).rejects.toThrow(/worker/i)
+    },
+  )
+
+  it('starts a new worker on the next loadSatWorker after one failed (#191)', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const { loadSatWorker } = await import('@/lib/orbit/bulk/loadSatWorker')
+    const first = await loadSatWorker()
+    expect(await loadSatWorker()).toBe(first)
+    FakeWorker.last?.onerror?.({} as ErrorEvent)
+    const second = await loadSatWorker()
+    expect(second).not.toBe(first)
   })
 
   it('hands a released frame back to the worker with the next request (double buffering)', async () => {

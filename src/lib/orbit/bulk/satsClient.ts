@@ -20,14 +20,31 @@ export interface SatWorker {
   propagate(date: Date): Promise<Frame>
   /** Hand back a frame's buffers once drawn, to be reused by the next pass. */
   release(frame: SatFrame): void
+  /** The worker crashed or sent an unreadable message; it is stopped and every request refused. */
+  readonly failed: boolean
   terminate(): void
 }
 
-export function createSatWorker(): SatWorker {
+/** `onFail` runs once if the worker dies, so its owner can drop it and start another (#191). */
+export function createSatWorker(onFail?: () => void): SatWorker {
   const worker = new Worker(new URL('./sats.worker.ts', import.meta.url), { type: 'module' })
   let next = 0
   let spare: SatFrame | null = null
+  let failed = false
   const pending = new Map<number, { resolve: (r: SatReply) => void; reject: (e: Error) => void }>()
+
+  function fail(): void {
+    if (failed) return
+    failed = true
+    worker.terminate()
+    const error = new Error('The satellite worker failed')
+    const waiting = [...pending.values()]
+    pending.clear()
+    for (const waiter of waiting) waiter.reject(error)
+    onFail?.()
+  }
+  worker.onerror = fail
+  worker.onmessageerror = fail
 
   worker.onmessage = (event: MessageEvent<SatReply>) => {
     const reply = event.data
@@ -40,6 +57,10 @@ export function createSatWorker(): SatWorker {
 
   function send<T extends SatReply>(req: SatRequest, transfer: Transferable[] = []): Promise<T> {
     return new Promise<T>((resolve, reject) => {
+      if (failed) {
+        reject(new Error('The satellite worker failed'))
+        return
+      }
       pending.set(req.id, {
         resolve: (r) => {
           resolve(r as T)
@@ -51,6 +72,9 @@ export function createSatWorker(): SatWorker {
   }
 
   return {
+    get failed() {
+      return failed
+    },
     load(body) {
       return send<Loaded>({ type: 'load', id: ++next, body }, [body])
     },

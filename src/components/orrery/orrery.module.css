@@ -132,7 +132,7 @@
 }
 
 .chipBtn[aria-pressed='true'],
-.rateBtn[aria-checked='true'] {
+.rateBtn[aria-pressed='true'] {
   border-color: var(--copper-2);
   color: var(--copper-glow);
 }

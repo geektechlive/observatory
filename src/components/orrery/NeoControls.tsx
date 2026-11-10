@@ -57,13 +57,12 @@ export function NeoControls({
           Asteroids passing within 0.05 au (19 lunar distances) of Earth. The data covers ±30 days
           of today; closest approach is counted from the date shown.
         </p>
-        <div className={styles.chipRow ?? ''} role="radiogroup" aria-label="Closest approach">
+        <div className={styles.chipRow ?? ''} role="group" aria-label="Closest approach">
           {WINDOWS.map((w) => (
             <button
               key={w.id}
               type="button"
-              role="radio"
-              aria-checked={filter.window === w.id}
+              aria-pressed={filter.window === w.id}
               className={styles.rateBtn ?? ''}
               onClick={() => {
                 onFilter({ ...filter, window: w.id })

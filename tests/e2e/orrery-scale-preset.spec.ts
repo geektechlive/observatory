@@ -35,7 +35,7 @@ test.describe('scale mode on an Earth view (#187)', () => {
       await openOrrery(page)
       await page.getByRole('button', { name: button, exact: true }).click()
       await expect(canvas(page)).toHaveAttribute('data-orrery-focus', preset)
-      await page.getByRole('radio', { name: 'Log distance' }).click()
+      await page.getByRole('button', { name: 'Log distance', exact: true }).click()
       await expect(canvas(page)).toHaveAttribute('data-orrery-scale', 'log')
       await expect(canvas(page)).toHaveAttribute('data-orrery-focus', preset)
     })

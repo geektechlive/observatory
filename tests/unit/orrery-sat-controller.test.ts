@@ -38,6 +38,7 @@ class FakeWorker implements SatWorker {
   counts = new Map<SatGroupId, number>()
   propagations: { date: Date; resolve: (f: SatFrameReply) => void }[] = []
   released = 0
+  failed = false
   private field(): SatFieldInfo {
     return info(
       this.version,
@@ -235,6 +236,43 @@ describe('SatController (#98)', () => {
     ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 20 })
     await flush()
     expect(fetched).toEqual(['stations', 'stations'])
+  })
+
+  it('shows error when the worker dies, and a toggle starts a fresh worker (#191)', async () => {
+    const dead = new FakeWorker()
+    dead.load = () => {
+      dead.failed = true
+      return Promise.reject(new Error('The satellite worker failed'))
+    }
+    const fresh = new FakeWorker()
+    const workers = [dead, fresh]
+    const start = vi.fn(() => Promise.resolve(workers.shift() ?? fresh))
+    const ctl = new SatController(
+      {
+        fetchGroup: (group) =>
+          Promise.resolve({
+            body: new TextEncoder().encode(group).buffer,
+            degraded: false,
+            dataAgeSeconds: 0,
+          }),
+        worker: start,
+      },
+      () => undefined,
+    )
+    const tick = () => {
+      ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    }
+    ctl.setEnabled(new Set<SatGroupId>(['stations']))
+    tick()
+    await flush()
+    expect(ctl.snapshot().groups.stations?.status).toBe('error')
+
+    ctl.setEnabled(new Set<SatGroupId>())
+    ctl.setEnabled(new Set<SatGroupId>(['stations']))
+    tick()
+    await flush()
+    expect(start).toHaveBeenCalledTimes(2)
+    expect(ctl.snapshot().groups.stations?.status).toBe('loaded')
   })
 
   it('reports a failed fetch for that group and leaves the others', async () => {

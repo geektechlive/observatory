@@ -64,7 +64,7 @@ test('1 yr/s advances the readout by about a year a second', async ({ page }) =>
   // a 5.4 s window). The clock surely ran at 1 yr/s from the rate click's return to the
   // Pause click, and at most from before the first click to after the second.
   const started = Date.now()
-  await page.getByRole('radio', { name: '1 yr/s' }).click()
+  await page.getByRole('button', { name: '1 yr/s' }).click()
   const running = Date.now()
   await page.waitForTimeout(3000)
   const pausing = Date.now()
@@ -85,7 +85,7 @@ test('ten seconds at 1 yr/s leave loops, draws and GPU objects flat, and say wha
     geometries: await stat(page, 'geometries'),
     programs: await stat(page, 'programs'),
   }
-  await page.getByRole('radio', { name: '1 yr/s' }).click()
+  await page.getByRole('button', { name: '1 yr/s' }).click()
   for (let i = 0; i < 10; i += 1) {
     await page.waitForTimeout(1000)
     expect(

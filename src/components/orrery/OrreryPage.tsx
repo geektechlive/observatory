@@ -928,6 +928,9 @@ export function OrreryPage() {
               }}
               className={`${styles.label ?? ''} ${styles.moonLabel ?? ''}`}
               aria-pressed
+              onClick={() => {
+                select(satellite.key)
+              }}
             >
               {satellite.name}
             </button>

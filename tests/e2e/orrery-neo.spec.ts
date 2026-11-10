@@ -55,10 +55,10 @@ test.describe('Earth’s neighbourhood (#92)', () => {
     await page.getByRole('button', { name: 'Earth–Moon', exact: true }).click()
     // Within 30 days, the default (#136): all four.
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('4')
-    const window = page.getByRole('radiogroup', { name: /closest approach/i })
-    await window.getByRole('radio', { name: /within a day/i }).click()
+    const window = page.getByRole('group', { name: /closest approach/i })
+    await window.getByRole('button', { name: /within a day/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
-    await window.getByRole('radio', { name: /within a week/i }).click()
+    await window.getByRole('button', { name: /within a week/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('3')
     await page.getByRole('switch', { name: /risk list only/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
@@ -67,7 +67,7 @@ test.describe('Earth’s neighbourhood (#92)', () => {
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
     await expect(page.getByText(/1 of 4 drawn/)).toBeVisible()
     await page.getByRole('switch', { name: /hazardous only/i }).click()
-    await window.getByRole('radio', { name: /within 30 days/i }).click()
+    await window.getByRole('button', { name: /within 30 days/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('4')
   })
 

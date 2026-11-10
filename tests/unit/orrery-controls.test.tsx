@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { buildCatalog } from '@/components/orrery/catalog'
@@ -43,8 +43,15 @@ describe('TimeBar (#91)', () => {
     render(<TimeBar now={() => T0} />)
     fireEvent.click(screen.getByRole('button', { name: /play/i }))
     expect(useOrreryClock.getState().playing).toBe(true)
-    fireEvent.click(screen.getByRole('radio', { name: /1 day\/s/i }))
+    fireEvent.click(screen.getByRole('button', { name: /1 day\/s/i }))
     expect(useOrreryClock.getState().rate).toBe(86_400)
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    const rates = screen.getByRole('group', { name: /playback rate/i })
+    expect(
+      within(rates)
+        .getByRole('button', { name: /1 day\/s/i })
+        .getAttribute('aria-pressed'),
+    ).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: /pause/i }))
     expect(useOrreryClock.getState().playing).toBe(false)
   })
@@ -62,11 +69,11 @@ describe('TimeBar (#91)', () => {
 
   it('offers a week, a month and a year a second (#114)', () => {
     render(<TimeBar now={() => T0} />)
-    fireEvent.click(screen.getByRole('radio', { name: /1 wk\/s/i }))
+    fireEvent.click(screen.getByRole('button', { name: /1 wk\/s/i }))
     expect(useOrreryClock.getState().rate).toBe(7 * 86_400)
-    fireEvent.click(screen.getByRole('radio', { name: /1 mo\/s/i }))
+    fireEvent.click(screen.getByRole('button', { name: /1 mo\/s/i }))
     expect(useOrreryClock.getState().rate).toBe(30 * 86_400)
-    fireEvent.click(screen.getByRole('radio', { name: /1 yr\/s/i }))
+    fireEvent.click(screen.getByRole('button', { name: /1 yr\/s/i }))
     expect(useOrreryClock.getState().rate).toBe(365 * 86_400)
     expect(useOrreryClock.getState().playing).toBe(true)
   })
@@ -93,7 +100,7 @@ describe('TimeBar (#91)', () => {
         useOrreryClock.getState().setSimTime(start)
       })
       render(<TimeBar now={() => T0} />)
-      fireEvent.click(screen.getByRole('radio', { name: /1 yr\/s/i }))
+      fireEvent.click(screen.getByRole('button', { name: /1 yr\/s/i }))
       act(() => {
         vi.advanceTimersByTime(2000)
       })

@@ -51,7 +51,7 @@ test('on a phone every rate is reachable and the bar fits the screen (#117)', as
   expect(box).not.toBeNull()
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390)
   for (const name of ['1 day/s', '1 wk/s', '1 mo/s', '1 yr/s']) {
-    const rate = page.getByRole('radio', { name })
+    const rate = page.getByRole('button', { name })
     await rate.scrollIntoViewIfNeeded()
     await expect(rate).toBeInViewport()
   }

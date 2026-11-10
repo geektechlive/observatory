@@ -142,7 +142,25 @@ export class SatController {
     this.groups.set(group, { ...(this.groups.get(group) ?? idle()), ...patch })
   }
 
+  /**
+   * A worker that crashed (#191) holds nothing any more: forget it and what it held, show
+   * its groups as failed, and let the next load (a toggle off and on) start a new one.
+   */
+  private dropDeadWorker(): void {
+    if (!this.ready?.failed) return
+    this.worker = null
+    this.ready = null
+    this.info = null
+    this.current = null
+    this.inFlight = false
+    for (const group of this.inWorker) {
+      if (this.enabled.has(group)) this.set(group, { status: 'error' })
+    }
+    this.inWorker.clear()
+  }
+
   private getWorker(): Promise<SatWorker> {
+    this.dropDeadWorker()
     this.worker ??= this.source.worker().then((w) => {
       this.ready = w
       return w
@@ -190,6 +208,7 @@ export class SatController {
       })
       this.setField(reply.field)
     } catch {
+      this.dropDeadWorker()
       this.inWorker.delete(group)
       if (this.enabled.has(group)) this.set(group, { status: 'error' })
       this.onChange()
@@ -250,6 +269,8 @@ export class SatController {
       })
       .catch(() => {
         this.inFlight = false
+        this.dropDeadWorker()
+        this.onChange()
       })
   }
 

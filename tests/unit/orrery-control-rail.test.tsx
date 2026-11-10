@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ControlRail } from '@/components/orrery/ControlRail'
@@ -46,5 +46,20 @@ describe('spacecraft switches explain themselves (#122)', () => {
     renderRail()
     expect(screen.getByRole('switch', { name: /talking to Earth now \(2\)/i })).toBeTruthy()
     expect(screen.queryByText(/Only in DSN contact/)).toBeNull()
+  })
+})
+
+// The scale choice is a group of pressed buttons, like the View chips, not a radiogroup
+// that ignores the arrow keys (#192).
+describe('scale choice (#192)', () => {
+  it('is a labelled group of aria-pressed buttons', () => {
+    renderRail()
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    const group = screen.getByRole('group', { name: 'Scale' })
+    const pressed = within(group)
+      .getAllByRole('button')
+      .filter((b) => b.getAttribute('aria-pressed') === 'true')
+    expect(pressed).toHaveLength(1)
   })
 })

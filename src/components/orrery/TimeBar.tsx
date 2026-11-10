@@ -121,13 +121,12 @@ export function TimeBar({ now = Date.now }: TimeBarProps) {
           step(dir * (e.shiftKey ? WEEK : 1))
         }}
       />
-      <div className={styles.rates ?? ''} role="radiogroup" aria-label="Playback rate">
+      <div className={styles.rates ?? ''} role="group" aria-label="Playback rate">
         {PLAYBACK_RATES.map((r) => (
           <button
             key={r}
             type="button"
-            role="radio"
-            aria-checked={clock.rate === r}
+            aria-pressed={clock.rate === r}
             aria-label={RATE_LABEL[r]}
             className={styles.rateBtn ?? ''}
             onClick={() => {

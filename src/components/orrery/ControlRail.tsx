@@ -206,13 +206,12 @@ export function ControlRail({
             </button>
           ))}
         </div>
-        <div className={styles.chipRow ?? ''} role="radiogroup" aria-label="Scale">
+        <div className={styles.chipRow ?? ''} role="group" aria-label="Scale">
           {SCALES.map((s) => (
             <button
               key={s.id}
               type="button"
-              role="radio"
-              aria-checked={scale === s.id}
+              aria-pressed={scale === s.id}
               title={s.hint}
               className={styles.rateBtn ?? ''}
               onClick={() => {
