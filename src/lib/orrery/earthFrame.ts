@@ -120,10 +120,19 @@ export function earthFrameOffset(
   return { x: dir.x * r, y: dir.y * r, z: dir.z * r }
 }
 
+/**
+ * The camera's near plane, scene units. A smaller one costs depth precision across the
+ * 200,000-unit far plane, so the minimum distance near Earth is raised instead (#197).
+ */
+export const CAMERA_NEAR = 0.01
 /** The camera never comes nearer its target than this, scene units, away from Earth. */
 const CAMERA_MIN_DISTANCE = 0.5
-/** Near Earth, nearer: this many of the frame's Earth radii (the camera stays outside Earth). */
-const CAMERA_MIN_EARTH_RADII = 2
+/**
+ * Near Earth, nearer: this many of the frame's Earth radii. Earth's near surface is then
+ * (this - 1) radii off, which must exceed CAMERA_NEAR with margin or Earth is clipped
+ * (#197): 2 gave 0.0085 against a 0.01 near plane; 2.5 gives 0.01275.
+ */
+const CAMERA_MIN_EARTH_RADII = 2.5
 
 /**
  * How near the camera may come to its target (OrbitControls' minDistance), from the

@@ -46,6 +46,7 @@ import { threeQuarterView } from '@/lib/orrery/craftModelFit'
 import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
 import {
+  CAMERA_NEAR,
   cameraMinDistance,
   EARTH_FRAME_UNIT,
   earthFrameBlend,
@@ -79,6 +80,7 @@ import {
 } from './framing'
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
+import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
@@ -258,7 +260,7 @@ export class OrreryRenderer {
   readonly canvas: HTMLCanvasElement
   private readonly renderer: WebGLRenderer
   private readonly scene = new Scene()
-  private readonly camera = new PerspectiveCamera(FOV, 1, 0.01, 200_000)
+  private readonly camera = new PerspectiveCamera(FOV, 1, CAMERA_NEAR, 200_000)
   private readonly controls: OrbitControls
   private readonly bodies = new Map<BodyName, Mesh>()
   private readonly orbits = new Map<PlanetName, Line>()
@@ -329,6 +331,7 @@ export class OrreryRenderer {
   private lastDraw = 0
   private dirty = true
   private attached = false
+  private stopPixelWatch: () => void = () => undefined
   private disposed = false
   private readonly reducedMotion: boolean
   private readonly onContextLost: () => void
@@ -363,7 +366,7 @@ export class OrreryRenderer {
     this.sats = new SatLayer(() => {
       this.markDirty()
     }, options.satSource)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    this.renderer.setPixelRatio(cappedPixelRatio(window))
     this.renderer.setSize(this.width, this.height, false)
     this.camera.aspect = this.width / Math.max(1, this.height)
     this.camera.updateProjectionMatrix()
@@ -865,11 +868,18 @@ export class OrreryRenderer {
     el.append(this.canvas)
     this.attached = true
     this.sunImage.start()
+    // A display change or browser zoom changes the pixel ratio without resizing the stage (#200).
+    this.stopPixelWatch()
+    this.stopPixelWatch = watchPixelRatio(window, () => {
+      this.resize(this.width, this.height)
+    })
     this.markDirty()
   }
 
   detach(): void {
     this.attached = false
+    this.stopPixelWatch()
+    this.stopPixelWatch = () => undefined
     cancelAnimationFrame(this.frameId)
     this.frameId = 0
     this.clearTick()
@@ -882,6 +892,8 @@ export class OrreryRenderer {
     if (width < 1 || height < 1) return
     this.width = width
     this.height = height
+    // The satellite layer reads the ratio from the renderer each frame (placeSats).
+    this.renderer.setPixelRatio(cappedPixelRatio(window))
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
     this.applyInset()
@@ -1493,6 +1505,7 @@ export class OrreryRenderer {
 
   dispose(): void {
     this.disposed = true
+    this.stopPixelWatch()
     cancelAnimationFrame(this.frameId)
     this.clearTick()
     this.controls.dispose()

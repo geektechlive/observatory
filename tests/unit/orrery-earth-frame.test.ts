@@ -137,3 +137,13 @@ describe('cameraMinDistance (#98)', () => {
     expect(cameraMinDistance(Number.POSITIVE_INFINITY)).toBe(0.5)
   })
 })
+
+describe('camera near plane (#197)', () => {
+  it('keeps Earth’s near surface beyond the near plane at the closest zoom', async () => {
+    const { CAMERA_NEAR } = await import('@/lib/orrery/earthFrame')
+    // Target at Earth's centre, Earth drawn at the frame's unit radius.
+    const gap = cameraMinDistance(0) - EARTH_FRAME_UNIT
+    expect(CAMERA_NEAR).toBe(0.01)
+    expect(gap).toBeGreaterThan(CAMERA_NEAR * 1.2)
+  })
+})
