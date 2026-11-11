@@ -59,6 +59,42 @@ function LookCloserButton({
   )
 }
 
+/**
+ * The "Facts" toggle (#205): while Look closer is open on a phone, the sheet folds to its
+ * header row and this button opens it. The page passes it only while the view is open; the
+ * button shows only under 900px.
+ */
+export interface FactsToggle {
+  /** The facts are showing (the sheet is expanded). */
+  open: boolean
+  onToggle: () => void
+}
+
+const factsState = (facts: FactsToggle | undefined) =>
+  facts ? (facts.open ? 'open' : 'collapsed') : undefined
+
+function FactsButton({
+  facts,
+  controls,
+}: {
+  facts: FactsToggle | undefined
+  /** The id of the region the button folds: the sheet's body, under the header row. */
+  controls: string
+}) {
+  if (!facts) return null
+  return (
+    <button
+      type="button"
+      className={`${styles.chipBtn ?? ''} ${styles.factsToggle ?? ''}`}
+      aria-expanded={facts.open}
+      aria-controls={controls}
+      onClick={facts.onToggle}
+    >
+      Facts
+    </button>
+  )
+}
+
 interface InspectorProps {
   /** The page measures the drawer to keep the focused body out from under it. */
   ref?: Ref<HTMLElement> | undefined
@@ -94,6 +130,8 @@ interface InspectorProps {
   lookCloser?: LookCloser | undefined
   /** The button's ref, so the page can return focus to it when the view closes. */
   lookCloserRef?: Ref<HTMLButtonElement> | undefined
+  /** Present while the detail view is open: the phone sheet folds and this opens it (#205). */
+  facts?: FactsToggle | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -128,56 +166,74 @@ export function Inspector({
   satCatalog,
   lookCloser,
   lookCloserRef,
+  facts,
 }: InspectorProps) {
   const headingId = useId()
+  const bodyId = useId()
   if (isLookupKey(body)) {
     return (
-      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+      <aside
+        ref={ref}
+        className={styles.inspector ?? ''}
+        aria-labelledby={headingId}
+        data-facts={factsState(facts)}
+      >
         <div className={styles.inspectorHead ?? ''}>
           <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
             {lookup?.object?.name ?? 'Looked up at JPL'}
           </h2>
+          <FactsButton facts={facts} controls={bodyId} />
           <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
             Close
           </button>
         </div>
-        <LookupFacts
-          object={lookup?.object ?? null}
-          trajectory={lookup?.trajectory ?? null}
-          earth={tracks?.find((t) => t.naifId === '399') ?? null}
-          simMs={simMs}
-          problem={lookup?.problem ?? null}
-          loading={lookup?.loading ?? false}
-          onRemove={onRemoveLookup ?? onClose}
-        />
+        <div id={bodyId} className={styles.inspectorBody ?? ''}>
+          <LookupFacts
+            object={lookup?.object ?? null}
+            trajectory={lookup?.trajectory ?? null}
+            earth={tracks?.find((t) => t.naifId === '399') ?? null}
+            simMs={simMs}
+            problem={lookup?.problem ?? null}
+            loading={lookup?.loading ?? false}
+            onRemove={onRemoveLookup ?? onClose}
+          />
+        </div>
       </aside>
     )
   }
   if (isSatKey(body)) {
     return (
-      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+      <aside
+        ref={ref}
+        className={styles.inspector ?? ''}
+        aria-labelledby={headingId}
+        data-facts={factsState(facts)}
+      >
         <div className={styles.inspectorHead ?? ''}>
           <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
             {satellite?.name ?? 'Satellite'}
           </h2>
+          <FactsButton facts={facts} controls={bodyId} />
           <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
             Close
           </button>
         </div>
-        <LookCloserButton lookCloser={lookCloser} buttonRef={lookCloserRef} />
-        {satellite ? (
-          <SatFacts
-            info={satellite}
-            simMs={simMs}
-            catalog={satCatalog}
-            physical={discos?.satellites[satellite.noradId] ?? null}
-            reentry={reentries?.find((r) => r.noradId === satellite.noradId) ?? null}
-          />
-        ) : (
-          <p className={styles.inspectorText ?? ''} role="status">
-            Loading its orbit data from CelesTrak…
-          </p>
-        )}
+        <div id={bodyId} className={styles.inspectorBody ?? ''}>
+          <LookCloserButton lookCloser={lookCloser} buttonRef={lookCloserRef} />
+          {satellite ? (
+            <SatFacts
+              info={satellite}
+              simMs={simMs}
+              catalog={satCatalog}
+              physical={discos?.satellites[satellite.noradId] ?? null}
+              reentry={reentries?.find((r) => r.noradId === satellite.noradId) ?? null}
+            />
+          ) : (
+            <p className={styles.inspectorText ?? ''} role="status">
+              Loading its orbit data from CelesTrak…
+            </p>
+          )}
+        </div>
       </aside>
     )
   }
@@ -199,16 +255,24 @@ export function Inspector({
     body === L1_KEY ? 'L1' : approach ? shortName(approach.name) : scout ? scout.objectName : null
   if (near) {
     return (
-      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+      <aside
+        ref={ref}
+        className={styles.inspector ?? ''}
+        aria-labelledby={headingId}
+        data-facts={factsState(facts)}
+      >
         <div className={styles.inspectorHead ?? ''}>
           <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
             {nearTitle}
           </h2>
+          <FactsButton facts={facts} controls={bodyId} />
           <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
             Close
           </button>
         </div>
-        {near}
+        <div id={bodyId} className={styles.inspectorBody ?? ''}>
+          {near}
+        </div>
       </aside>
     )
   }
@@ -216,58 +280,74 @@ export function Inspector({
     const moon = moons?.find((m) => m.key === body)
     const track = tracks?.find((t) => t.id === body)
     return (
-      <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+      <aside
+        ref={ref}
+        className={styles.inspector ?? ''}
+        aria-labelledby={headingId}
+        data-facts={factsState(facts)}
+      >
         <div className={styles.inspectorHead ?? ''}>
           <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
             {moon?.name ?? track?.name ?? body}
           </h2>
+          <FactsButton facts={facts} controls={bodyId} />
           <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
             Close
           </button>
         </div>
-        {track && !moon && <LookCloserButton lookCloser={lookCloser} buttonRef={lookCloserRef} />}
-        {moon ? (
-          <MoonFacts moon={moon} jd={jd} simMs={simMs} />
-        ) : track ? (
-          <CraftFacts
-            track={track}
-            earth={earthTrack}
-            jd={jd}
-            simMs={simMs}
-            link={dsn?.get(track.naifId)}
-            physical={discos?.craft[track.naifId] ?? null}
-          />
-        ) : (
-          <p className={styles.inspectorText ?? ''}>Not in the current data.</p>
-        )}
+        <div id={bodyId} className={styles.inspectorBody ?? ''}>
+          {track && !moon && <LookCloserButton lookCloser={lookCloser} buttonRef={lookCloserRef} />}
+          {moon ? (
+            <MoonFacts moon={moon} jd={jd} simMs={simMs} />
+          ) : track ? (
+            <CraftFacts
+              track={track}
+              earth={earthTrack}
+              jd={jd}
+              simMs={simMs}
+              link={dsn?.get(track.naifId)}
+              physical={discos?.craft[track.naifId] ?? null}
+            />
+          ) : (
+            <p className={styles.inspectorText ?? ''}>Not in the current data.</p>
+          )}
+        </div>
       </aside>
     )
   }
   const object = ORRERY_BODIES.find((b) => b.name === body)?.object
 
   return (
-    <aside ref={ref} className={styles.inspector ?? ''} aria-labelledby={headingId}>
+    <aside
+      ref={ref}
+      className={styles.inspector ?? ''}
+      aria-labelledby={headingId}
+      data-facts={factsState(facts)}
+    >
       <div className={styles.inspectorHead ?? ''}>
         <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
           {body}
         </h2>
+        <FactsButton facts={facts} controls={bodyId} />
         <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
           Close
         </button>
       </div>
-      <p className={styles.inspectorMeta ?? ''}>
-        <Label>{object?.category === 'star' ? 'Star' : 'Planet'}</Label>{' '}
-        <Label>{object?.id ?? ''}</Label>
-      </p>
-      {body === 'Sun' ? (
-        <p className={styles.inspectorText ?? ''}>
-          The origin of this view: positions are heliocentric, measured from the Sun’s centre (the
-          outer planets from the solar-system barycentre, within 0.01 au of it).
+      <div id={bodyId} className={styles.inspectorBody ?? ''}>
+        <p className={styles.inspectorMeta ?? ''}>
+          <Label>{object?.category === 'star' ? 'Star' : 'Planet'}</Label>{' '}
+          <Label>{object?.id ?? ''}</Label>
         </p>
-      ) : (
-        <PlanetFacts body={body} jd={jd} simMs={simMs} />
-      )}
-      <ImageryFacts body={body} sun={sun} />
+        {body === 'Sun' ? (
+          <p className={styles.inspectorText ?? ''}>
+            The origin of this view: positions are heliocentric, measured from the Sun’s centre (the
+            outer planets from the solar-system barycentre, within 0.01 au of it).
+          </p>
+        ) : (
+          <PlanetFacts body={body} jd={jd} simMs={simMs} />
+        )}
+        <ImageryFacts body={body} sun={sun} />
+      </div>
     </aside>
   )
 }

@@ -1,18 +1,36 @@
-/* The "Look closer" view (#203, ADR 0021): the model's own canvas fills the stage, and the
-   inspector stays above it as the facts column. The page measures the inspector and passes
-   its width (or, on a phone, its height) as --inspector-right / --inspector-bottom. */
+/* The "Look closer" view (#203, ADR 0021): the stage holds three bands, top to bottom: a bar
+   (title, zoom, Back to orrery), the model's canvas, and the credit. The canvas is its own
+   grid row, so the model never draws under the title, the controls or the credit line, which
+   is a licence term (#205). The inspector stays above the stage as the facts column; the page
+   measures it and passes its width (or, on a phone, its height) as --inspector-right /
+   --inspector-bottom, which the padding keeps the bands clear of. */
 .detailView {
   position: absolute;
   inset: 0;
   z-index: 4;
+  box-sizing: border-box;
+  display: grid;
+
+  /* minmax(0, 1fr): a long credit wraps inside the stage, never widens it. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(160px, 1fr) auto;
+  padding-right: var(--inspector-right, 0);
+  padding-bottom: var(--inspector-bottom, 0);
   background: radial-gradient(circle at 50% 45%, var(--hull) 0%, var(--void) 70%);
   color: var(--bone);
 }
 
+.detailBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+}
+
 .detailCanvas {
-  position: absolute;
-  inset: 0 var(--inspector-right, 0) var(--inspector-bottom, 0) 0;
+  position: relative;
   min-height: 160px;
+  min-width: 0;
   touch-action: none;
 }
 
@@ -23,21 +41,20 @@
 }
 
 .detailTitle {
-  position: absolute;
-  top: var(--space-4);
-  left: var(--space-5);
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font: 500 var(--text-sm) / 1.2 var(--font-mono);
   letter-spacing: var(--track-label);
   text-transform: uppercase;
   color: var(--bone);
-  pointer-events: none;
 }
 
 .detailClose {
-  position: absolute;
-  top: var(--space-4);
-  right: calc(var(--inspector-right, 0px) + var(--space-4));
+  flex: none;
   min-height: 28px;
   padding: var(--space-1) var(--space-4);
   border: 1px solid var(--plate-edge);
@@ -89,16 +106,27 @@
 }
 
 .detailCredit {
-  position: absolute;
-  left: var(--space-5);
-  right: calc(var(--inspector-right, 0px) + var(--space-4));
-  bottom: calc(var(--inspector-bottom, 0px) + var(--space-3));
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
   font: 400 var(--text-xs) / 1.45 var(--font-mono);
   color: var(--bone-faint);
 }
 
 .detailCredit p {
   margin: 0;
+}
+
+/* On a phone the stage is short and the inspector sheet takes 40% of it: keep the bar and
+   the credit compact so the model band keeps its height and the credit stays above the sheet. */
+@media (width <= 899px) {
+  .detailBar {
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+  }
+
+  .detailCredit {
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+    line-height: 1.35;
+  }
 }
 
 .detailLink {
@@ -134,11 +162,8 @@
 }
 
 .detailZoom {
-  position: absolute;
-  top: calc(var(--space-4) + 28px + var(--space-3));
-  right: calc(var(--inspector-right, 0px) + var(--space-4));
+  flex: none;
   display: flex;
-  flex-direction: column;
   gap: var(--space-2);
 }
 

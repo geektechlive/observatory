@@ -50,7 +50,8 @@ export function prepareMaterials(root: Object3D): void {
   }
 }
 
-function positionsOf(root: Object3D): number[] {
+/** Every vertex under `root` in world space, as a flat x, y, z list. */
+export function positionsOf(root: Object3D): number[] {
   const out: number[] = []
   const v = new Vector3()
   root.updateMatrixWorld(true)

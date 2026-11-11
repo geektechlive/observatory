@@ -17,7 +17,9 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
-import { type PreparedModel, texturesOf } from './craftModelLoad'
+import { type OutlineFraming, outlineFraming } from '@/lib/orrery/detailFraming'
+
+import { positionsOf, type PreparedModel, texturesOf } from './craftModelLoad'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
 
 /** Which part of the scene the view is drawing, for the leak test. */
@@ -65,10 +67,17 @@ export type CreateDetailScene = (
 ) => DetailSceneHandle
 
 const FOV = 35
-/** Models are fitted to a robust radius of 1: this frames one with room around it. */
+/** With no model yet: a body-radius-1 model fits at this distance, within these limits. */
 const START_DISTANCE = 3.6
 const MIN_DISTANCE = 1.3
 const MAX_DISTANCE = 12
+/**
+ * Once a model is in, it is framed by its real outline (#205), every vertex, not the body
+ * radius the orrery uses: the share of the canvas left clear around it at the start view.
+ */
+const FRAME_MARGIN = 0.08
+/** The near plane, in radii of the model's bounding sphere (the camera never comes within 0.1). */
+const NEAR_SHARE = 0.05
 /** Keep the camera off the poles, where the turn flips. */
 const POLE_MARGIN = 0.05
 const START_DIRECTION = new Vector3(0.55, 0.32, 0.77).normalize()
@@ -100,6 +109,10 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   controls.maxDistance = MAX_DISTANCE
 
   let model: PreparedModel | null = null
+  /** Every vertex in scene space (x, y, z flat), or null with no model. */
+  let points: Float32Array | null = null
+  /** How the model was last framed; null with no model. */
+  let framing: OutlineFraming | null = null
   let frameId = 0
   let disposed = false
 
@@ -110,6 +123,7 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
     const moving = controls.update()
     renderer.render(scene, camera)
     reportCamera()
+    reportFit()
     // Test probe: what the renderer holds now (renderer.info.memory).
     canvas.dataset['detailGeometries'] = String(renderer.info.memory.geometries)
     canvas.dataset['detailTextures'] = String(renderer.info.memory.textures)
@@ -125,6 +139,42 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       .map((n) => n.toFixed(3))
       .join(',')
   }
+  // Test probe, opt in: the model's real outline as drawn now, in CSS px from the canvas's top
+  // left ("minX,minY,maxX,maxY"): every vertex of every mesh, projected (a box's corners would
+  // overstate it).
+  const corner = new Vector3()
+  const view = new Vector3()
+  function reportFit(): void {
+    // Only when a test has put `data-detail-fit` on the canvas: this walks every vertex, so
+    // production pays one attribute check a frame.
+    if (!canvas.hasAttribute('data-detail-fit')) return
+    if (!points) {
+      canvas.dataset['detailFit'] = ''
+      return
+    }
+    const w = host.clientWidth
+    const h = host.clientHeight
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    let nearest = Infinity
+    for (let i = 0; i < points.length; i += 3) {
+      view.set(points[i] ?? 0, points[i + 1] ?? 0, points[i + 2] ?? 0)
+      view.applyMatrix4(camera.matrixWorldInverse)
+      nearest = Math.min(nearest, -view.z)
+      corner.copy(view).applyMatrix4(camera.projectionMatrix)
+      const px = ((corner.x + 1) / 2) * w
+      const py = ((1 - corner.y) / 2) * h
+      minX = Math.min(minX, px)
+      minY = Math.min(minY, py)
+      maxX = Math.max(maxX, px)
+      maxY = Math.max(maxY, py)
+    }
+    canvas.dataset['detailFit'] = [minX, minY, maxX, maxY].map((n) => n.toFixed(1)).join(',')
+    // How far in front of the camera the nearest vertex is: negative means one is behind it.
+    canvas.dataset['detailNearest'] = nearest.toFixed(3)
+  }
   /** Put the camera at `spherical` about the target and draw. */
   const placeCamera = () => {
     offset.setFromSpherical(spherical)
@@ -139,6 +189,34 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   }
   controls.addEventListener('change', request)
 
+  /**
+   * Frame the model by its real outline for the canvas as it is now: the zoom limits follow
+   * the fitting distance, and the camera keeps its share of that distance, so a resize (a
+   * phone turned, the inspector opened) keeps the model in view. `reset` puts the camera at
+   * the fitting distance on the start side, for a new model.
+   */
+  const refit = (reset: boolean) => {
+    if (!points) return
+    const next = outlineFraming(points, START_DIRECTION, FOV, camera.aspect, FRAME_MARGIN)
+    controls.minDistance = next.minDistance
+    controls.maxDistance = next.maxDistance
+    // The closest approach keeps the whole model at least 0.1 radius in front of the camera, so
+    // half of that is a near plane that never clips it, and far / near stays a few hundred.
+    camera.near = next.radius * NEAR_SHARE
+    camera.far = next.maxDistance + next.radius * 2
+    if (reset) {
+      camera.position.copy(START_DIRECTION).multiplyScalar(next.distance).add(controls.target)
+    } else if (framing) {
+      offset.copy(camera.position).sub(controls.target)
+      offset.multiplyScalar(next.distance / framing.distance)
+      camera.position.copy(controls.target).add(offset)
+    }
+    framing = next
+    camera.updateProjectionMatrix()
+    camera.lookAt(controls.target)
+    controls.update()
+  }
+
   const resize = () => {
     const w = host.clientWidth
     const h = host.clientHeight
@@ -147,6 +225,7 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
+    refit(false)
     request()
   }
   const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize)
@@ -169,6 +248,8 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
     scene.remove(model.object)
     model.dispose()
     model = null
+    points = null
+    framing = null
     counts.models -= 1
     // What the model's own dispose left on the GPU: its textures still known to the renderer,
     // and any geometry still counted (the scene holds nothing else).
@@ -187,6 +268,22 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       model = next
       counts.models += 1
       scene.add(next.object)
+      next.object.updateMatrixWorld(true)
+      // Centre on the middle of the outline as first seen (the fit centred on the body), so the
+      // model sits in the middle of the canvas and the camera turns about the middle of it.
+      const all = Float32Array.from(positionsOf(next.object))
+      const { centre } = outlineFraming(all, START_DIRECTION, FOV, camera.aspect, FRAME_MARGIN)
+      next.object.position.set(-centre.x, -centre.y, -centre.z)
+      next.object.updateMatrixWorld(true)
+      const shifted = new Float32Array(all.length)
+      for (let i = 0; i < all.length; i += 3) {
+        shifted[i] = (all[i] ?? 0) - centre.x
+        shifted[i + 1] = (all[i + 1] ?? 0) - centre.y
+        shifted[i + 2] = (all[i + 2] ?? 0) - centre.z
+      }
+      points = shifted
+      framing = null
+      refit(true)
       request()
     },
     rotate(dAzimuth, dPolar) {
@@ -201,7 +298,11 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       if (disposed) return
       offset.copy(camera.position).sub(controls.target)
       spherical.setFromVector3(offset)
-      spherical.radius = MathUtils.clamp(spherical.radius * factor, MIN_DISTANCE, MAX_DISTANCE)
+      spherical.radius = MathUtils.clamp(
+        spherical.radius * factor,
+        controls.minDistance,
+        controls.maxDistance,
+      )
       placeCamera()
     },
     dispose() {

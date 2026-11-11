@@ -243,10 +243,29 @@ A button in the inspector, for a spacecraft or satellite with a model, opens the
 
 - **Its own canvas and renderer.** `DetailView.tsx` (a lazy chunk, `DetailView-*.js`) mounts only
   while `detail` is set in `store/orreryView.ts`. `three/DetailScene.ts` makes the canvas, a
-  `WebGLRenderer`, two lights and an `OrbitControls` (damping, no panning, zoom 1.3 to 12 times
-  the model's radius). Frames are on demand: a camera change, damping still settling, a resize or
+  `WebGLRenderer`, two lights and an `OrbitControls` (damping, no panning). Frames are on demand: a camera change, damping still settling, a resize or
   a new model asks for one; nothing runs otherwise. It creates its own canvas, so a canvas whose
   context was force-lost is never reused.
+- **Framing is by the model's real outline (#205), not the body radius.** `fitModel` leaves booms
+  and arrays out on purpose, which suits the orrery's small model (`CraftModelLayer`, #204) but
+  cropped big models here. `setModel` collects every vertex of every mesh and
+  `outlineFraming` (`src/lib/orrery/detailFraming.ts`, pure, unit-tested) fits them as seen from
+  the start direction: the look-at point is balanced so the outline sits in the middle of the
+  canvas (perspective makes the near side larger, so the middle of the box is not the middle of
+  the picture), and the distance makes the outline fill the limiting dimension to 1 over 1.08,
+  an 8% margin, perspective included. The model is moved so that point is the origin. A bounding
+  sphere (first version) was safe from any side but left a long model filling under half the
+  canvas. The zoom limits are 0.36 times that distance in, and out to at least 3.3 times it and
+  to where the whole bounding sphere is in view, so the whole model is reachable from any side.
+  **The closest approach never enters the bounding sphere:** `minDistance` is at least 1.1 radii
+  (and the fitting distance at least 1.2), so at full zoom the whole model is in front of the
+  camera and nothing flips behind it; `camera.near` is set per refit to 0.05 radii (the nearest
+  vertex is then at least 0.1 radii away) with `far` at the zoom-out limit, a ratio of a few
+  hundred. Raising `minDistance` was chosen over shrinking `near` for a camera inside the sphere,
+  because a camera inside the model drops parts behind it and flips their projection. A long
+  model therefore zooms in less far than 0.36 of the fit. Non-finite vertices are skipped. A
+  resize refits: the camera keeps its share of the new fitting distance. `fitModel` is
+  unchanged for the orrery.
 - **The orrery steps aside.** One effect in `OrreryPage.tsx` owns `attach` and `detach`: it
   detaches while the view is open (loop, tick and Sun image stop, canvas leaves the page, scene
   kept) and resizes and re-attaches on close. Nothing else attaches. `schedule()` is still the
@@ -254,9 +273,30 @@ A button in the inspector, for a spacecraft or satellite with a model, opens the
 - **Closing disposes everything.** Unmount aborts a load in flight, and the scene removes its
   listeners, then disposes the controls, the model (`PreparedModel.dispose`) and the renderer, then
   calls `forceContextLoss()`. A context lost while the view is open closes it.
+- **Layout: three bands, nothing under the text (#205).** `.detailView` is a grid: a top bar
+  (title, zoom buttons, Back to orrery), the model's canvas (`minmax(160px, 1fr)`), and the credit
+  band. The canvas is its own row, so the model never draws under the credit (a licence term, #179),
+  the title or the controls. The column is `minmax(0, 1fr)` so a long credit wraps rather than
+  widening the stage. Padding by `--inspector-right` and `--inspector-bottom` keeps all three
+  clear of the inspector, so the credit also stays above the phone sheet. Under 900px the bar and
+  credit are tighter, and the sheet folds (next item).
+- **The phone sheet folds to a header row, with a "Facts" toggle (#205).** At 899 px and under,
+  while the view is open, the inspector collapses to its header row (the name, a Facts button with
+  `aria-expanded`, and Close) and the model gets the rest: 280 px or more at 390 x 844 (the e2e
+  asserts it). Facts opens the usual sheet, capped at 40% of the stage and scrolling inside, and
+  folding it gives the room back. It opens folded each time the view opens: `OrreryPage` keeps
+  `factsOpen` and resets it when `detailOpen` changes, then passes `Inspector` a `facts` prop only
+  while the view is open (so the button and `data-facts` exist only then). The folded facts are
+  `display: none`, out of the tab order; the sheet's size change reaches `--inspector-bottom`
+  through the existing ResizeObserver on the panel, so the bands follow. Everything under the
+  header row sits in one `inspectorBody` div, and the Facts button's `aria-controls` points at
+  its id. The Facts button shows
+  only under 900 px; wide screens are unchanged (the e2e asserts no button there). Closing the
+  view (Back or Escape) returns the sheet and focus to Look closer. The guide's Look closer line
+  (`guide/sections.ts`) says it.
 - **What it shows.** The inspector stays on top of the view as the facts column (right on wide
-  screens, a bottom sheet under 900px, capped at about 40% of the stage while the view is open so
-  the model keeps a band of at least 160 px); the page passes its size as `--inspector-right` and
+  screens, a bottom sheet under 900px, folded as above and at most about 40% of the stage when
+  expanded); the page passes its size as `--inspector-right` and
   `--inspector-bottom` on the stage. The view adds the model, a credit line from the descriptor, a
   note when the model is a stand-in (`kind: 'standin'` or `scope: 'family'`), the "Back to orrery"
   button, and Escape. The credit reads "Model: credit, licence, Source" for a NASA model. A
@@ -281,7 +321,15 @@ A button in the inspector, for a spacecraft or satellite with a model, opens the
 - **Probes for tests.** The page root carries `data-orrery-detail-scenes`, `-models` and
   `-opened` (live scenes, live models, scenes ever made), `-leaked` and `-leaked-textures`
   (what the renderer still held after each model's dispose; must stay 0), the detail canvas
-  `data-detail-geometries`, `-textures` and `-camera` (azimuth, polar angle, distance), and the
+  `data-detail-geometries`, `-textures`, `-camera` (azimuth, polar angle, distance) and `-fit`
+  (the projected outline of every vertex, in CSS px from the canvas's top left,
+  "minX,minY,maxX,maxY"; a box's corners would overstate it). `-fit` is opt in, and with it `-nearest` (how far in front of the camera the nearest vertex is; the
+  e2e asserts it stays positive at full zoom): it walks every
+  vertex, so the scene writes it only when the canvas already carries `data-detail-fit` (the e2e
+  adds it with an init script that watches for the canvas), as with `data-orrery-px`.
+  `tests/e2e/orrery-detail-framing.spec.ts` asserts it lies inside the canvas at the default view
+  and the zoom-out limit, fills at least 80% of the limiting dimension at the default view, and
+  that the canvas is clear of the credit, title and controls), and the
   orrery canvas `data-orrery-inset` (right, bottom, top). The renderer keeps one texture of its
   own, so a count of 1 with no model is normal.
 - **`check-bundle` rules:** `orrery-detail-gzip`, `orrery-detail-found`, `entry-has-no-detail`,

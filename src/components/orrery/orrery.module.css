@@ -890,10 +890,37 @@
   background: radial-gradient(circle at 50% 45%, var(--hull) 0%, var(--void) 70%);
 }
 
-/* On a phone the open view needs room for the model: the inspector sheet shrinks to about
-   40% of the stage and scrolls inside. */
+/* "Facts" (#205) is for phones, where the sheet would take the model's room. */
+.factsToggle {
+  display: none;
+  margin-left: auto;
+}
+
+/* On a phone the open view needs room for the model: the inspector sheet folds to its header
+   row (the name, "Facts", Close) and gives the rest to the model. "Facts" opens it to about
+   40% of the stage, scrolling inside, and folding gives the room back. The page measures the
+   sheet, so the view's bands follow. Display none keeps the folded facts out of the tab order. */
 @media (width <= 899px) {
   .stage[data-detail='open'] .inspector {
     max-height: 40%;
+  }
+
+  .stage[data-detail='open'] .inspector .factsToggle {
+    display: inline-flex;
+  }
+
+  .stage[data-detail='open'] .inspector[data-facts='collapsed'] {
+    max-height: none;
+    overflow: hidden;
+    padding-block: var(--space-2);
+  }
+
+  /* A long name wraps to two lines here: a smaller size keeps the row short. */
+  .stage[data-detail='open'] .inspector[data-facts='collapsed'] .inspectorTitle {
+    font-size: var(--text-base);
+  }
+
+  .stage[data-detail='open'] .inspector[data-facts='collapsed'] .inspectorBody {
+    display: none;
   }
 }

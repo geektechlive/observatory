@@ -249,6 +249,44 @@ export function DetailView({
       role="region"
       aria-label={`Close-up of ${title}`}
     >
+      {/* Three bands, top to bottom: this bar, the model's canvas, the credit. The canvas sits
+          between the other two, so the model never draws under the title, the controls or the
+          credit line (#205). */}
+      <div className={styles.detailBar ?? ''}>
+        <h2 className={styles.detailTitle ?? ''}>{title}</h2>
+        <div className={styles.detailZoom ?? ''}>
+          <button
+            type="button"
+            className={styles.detailZoomBtn ?? ''}
+            aria-label="Zoom in"
+            onClick={() => {
+              scene.current?.zoom(ZOOM_IN)
+            }}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className={styles.detailZoomBtn ?? ''}
+            aria-label="Zoom out"
+            onClick={() => {
+              scene.current?.zoom(1 / ZOOM_IN)
+            }}
+          >
+            −
+          </button>
+        </div>
+        <button
+          ref={backButton}
+          type="button"
+          className={styles.detailClose ?? ''}
+          onClick={() => {
+            onClose('user')
+          }}
+        >
+          Back to orrery
+        </button>
+      </div>
       {/* A focusable group: arrow keys turn the model and plus and minus zoom it, so it takes
           the keyboard like a custom widget. Plain pointer drags are OrbitControls' own. */}
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
@@ -262,39 +300,6 @@ export function DetailView({
         aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown + -"
         onKeyDown={onModelKey}
       />
-      <h2 className={styles.detailTitle ?? ''}>{title}</h2>
-      <button
-        ref={backButton}
-        type="button"
-        className={styles.detailClose ?? ''}
-        onClick={() => {
-          onClose('user')
-        }}
-      >
-        Back to orrery
-      </button>
-      <div className={styles.detailZoom ?? ''}>
-        <button
-          type="button"
-          className={styles.detailZoomBtn ?? ''}
-          aria-label="Zoom in"
-          onClick={() => {
-            scene.current?.zoom(ZOOM_IN)
-          }}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className={styles.detailZoomBtn ?? ''}
-          aria-label="Zoom out"
-          onClick={() => {
-            scene.current?.zoom(1 / ZOOM_IN)
-          }}
-        >
-          −
-        </button>
-      </div>
       <p className={styles.srOnly ?? ''} role="status" data-detail-announce="">
         {ANNOUNCE[status]}
       </p>

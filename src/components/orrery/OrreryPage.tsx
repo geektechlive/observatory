@@ -334,6 +334,14 @@ export function OrreryPage() {
     [detail, renderer, satState],
   )
   const detailOpen = detail !== null && detailDescriptor !== undefined
+  // On a phone the sheet folds to its header row while the view is open and "Facts" opens it
+  // (#205). It opens folded each time the view opens: reset when `detailOpen` changes.
+  const [factsOpen, setFactsOpen] = useState(false)
+  const [factsFor, setFactsFor] = useState(detailOpen)
+  if (factsFor !== detailOpen) {
+    setFactsFor(detailOpen)
+    setFactsOpen(false)
+  }
   // The view's chunk loads on first open, never with the page (scripts/check-bundle.mjs).
   // If the fetch fails the view closes, so the orrery re-attaches and is never left detached.
 
@@ -1163,6 +1171,16 @@ export function OrreryPage() {
                 : undefined
             }
             lookCloserRef={lookCloserRef}
+            facts={
+              detailOpen
+                ? {
+                    open: factsOpen,
+                    onToggle: () => {
+                      setFactsOpen((open) => !open)
+                    },
+                  }
+                : undefined
+            }
             onClose={() => {
               setSelected(null)
             }}
