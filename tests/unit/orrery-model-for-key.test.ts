@@ -46,7 +46,7 @@ describe('modelForKey (#203)', () => {
     expect(modelForKey('sat:1', () => ({ noradId: '1' }), tables)).toBeUndefined()
   })
 
-  it('has no satellite model today, since the tables are empty', () => {
-    expect(modelForKey('sat:25544', () => ({ noradId: '25544' }))).toBeUndefined()
+  it('has no model in the shipped tables for a satellite they do not list', () => {
+    expect(modelForKey('sat:1', () => ({ noradId: '1' }))).toBeUndefined()
   })
 })

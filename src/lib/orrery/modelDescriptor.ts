@@ -47,6 +47,18 @@ export interface StandInDescriptor extends DescriptorBase {
 export type ModelDescriptor = FileDescriptor | StandInDescriptor
 
 const NASA_LICENCE = 'NASA media usage guidelines (not subject to copyright; credit NASA)'
+// Axes read from each model's frame (the GLB scene, after its own node transforms):
+// - ISS: the thin axis, normal to the plane of the truss (Z) and the module stack (Y). The
+//   station flies with that axis along the local vertical; which of +X and -X faces Earth
+//   was not determined, so the sign is a choice.
+// - Hubble: the barrel (and its aperture) is +Y. This model's solar arrays are thin along Y
+//   (they sit square to the barrel), so aiming their face at the Sun would aim the aperture
+//   at it, which Hubble never does. The axis is X, square to the barrel, so the aperture is
+//   never on the Sun line; the arrays are drawn in one fixed position.
+// - Terra: its high-gain antenna sits on a boom at +Y, so the instrument side is -Y.
+const ISS_AXIS = [1, 0, 0] as const
+const HUBBLE_AXIS = [1, 0, 0] as const
+const TERRA_AXIS = [0, -1, 0] as const
 const OWN_WORK_LICENCE = 'Own work, built in code'
 
 function fromCraftModel(model: CraftModel): ModelDescriptor {
@@ -85,15 +97,65 @@ export function spacecraftDescriptor(naifId: string): ModelDescriptor | undefine
 
 export type SatelliteModelTable = Readonly<Record<string, ModelDescriptor>>
 
+type NasaSatelliteFields = Pick<
+  FileDescriptor,
+  'file' | 'sourceUrl' | 'credit' | 'attitude' | 'axis' | 'attitudeNote'
+>
+
+/** A NASA 3D Resources model of the very satellite it is filed under. */
+function nasaSatellite(fields: NasaSatelliteFields): FileDescriptor {
+  return { ...fields, kind: 'file', licence: NASA_LICENCE, scope: 'own' }
+}
+
+const RES = 'https://science.nasa.gov/3d-resources'
+
+const ISS_MODEL = nasaSatellite({
+  file: '/models/craft/iss.glb',
+  sourceUrl: `${RES}/international-space-station-iss-b/`,
+  credit: 'NASA/Michael D. Carbajal',
+  attitude: 'earth',
+  axis: ISS_AXIS,
+  attitudeNote: 'Truss across the orbit, flat side toward Earth',
+})
+
 /**
- * By NORAD id, as a string: a model of that very object (`scope: 'own'`). Empty until the
- * tier-A models land (#194).
+ * By NORAD id, as a string: a model of that very object (`scope: 'own'`). The ISS is six
+ * CelesTrak records (the station and five module records that carry its element set); they
+ * share one model. Docked visiting vehicles (Soyuz, Progress, Dragon) are separate
+ * spacecraft and have none.
  */
-export const SATELLITE_MODELS_BY_NORAD: SatelliteModelTable = {}
+export const SATELLITE_MODELS_BY_NORAD: SatelliteModelTable = {
+  // ISS (ZARYA), UNITY, ZVEZDA, DESTINY, POISK, NAUKA
+  '25544': ISS_MODEL,
+  '25575': ISS_MODEL,
+  '26400': ISS_MODEL,
+  '26700': ISS_MODEL,
+  '36086': ISS_MODEL,
+  '49044': ISS_MODEL,
+  // HST
+  '20580': nasaSatellite({
+    file: '/models/craft/hubble.glb',
+    sourceUrl: `${RES}/hubble-space-telescope-a/`,
+    credit: 'NASA 3D Resources, model by DigitalSpace Corporation',
+    attitude: 'sun',
+    axis: HUBBLE_AXIS,
+    attitudeNote:
+      'Barrel square to the Sun, aperture never toward it (arrays drawn in one position)',
+  }),
+  // TERRA
+  '25994': nasaSatellite({
+    file: '/models/craft/terra.glb',
+    sourceUrl: `${RES}/terra/`,
+    credit: 'NASA/Christian A. Lopez',
+    attitude: 'earth',
+    axis: TERRA_AXIS,
+    attitudeNote: 'Instrument side toward Earth, antenna away',
+  }),
+}
 
 /**
  * By family id (a lower-case slug such as `starlink`): a stand-in shared by the family
- * (`scope: 'family'`). Empty until the tier-A models land (#194).
+ * (`scope: 'family'`). Empty until the family models land (#194).
  */
 export const SATELLITE_MODELS_BY_FAMILY: SatelliteModelTable = {}
 

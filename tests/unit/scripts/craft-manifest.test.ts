@@ -15,6 +15,10 @@ import {
 import { entryProblems, sha256Hex } from '../../../scripts/craft-gate.mjs'
 // @ts-expect-error plain ESM script, no type declarations
 import { MANIFEST } from '../../../scripts/craft-manifest.mjs'
+// @ts-expect-error plain ESM script, no type declarations
+import { SOURCES } from '../../../scripts/craft-sources.mjs'
+
+const SOURCES_BY_NAME = SOURCES as Record<string, Record<string, unknown>>
 
 interface Entry {
   legacy?: { reason: string; outputSha256: string }
@@ -77,6 +81,25 @@ describe('craft model manifest (#202)', () => {
       expect(sha256Hex(readFileSync(join(SHIPPED_DIR, file)))).toBe(entry.legacy.outputSha256)
     } else {
       expect(entryProblems(entry)).toEqual([])
+      // A rebuild changes the bytes: the manifest must be updated on purpose (the build prints
+      // the new hash).
+      expect(entry['outputSha256'], `${name} has no pinned outputSha256`).toMatch(/^[0-9a-f]{64}$/)
+      expect(sha256Hex(readFileSync(join(SHIPPED_DIR, file)))).toBe(entry['outputSha256'])
+    }
+  })
+
+  it('records every build-time edit in the manifest, the same as SOURCES holds it', () => {
+    // blank, dropNodes, dropExternalImages, aim and the rest: a change in SOURCES alone would
+    // ship a different file under the same logo record.
+    for (const [name, entry] of Object.entries(manifest)) {
+      if (entry.legacy) continue
+      expect(
+        SOURCES_BY_NAME[name] ?? {},
+        `${name}: SOURCES and manifest transforms differ`,
+      ).toEqual(entry['transforms'] ?? {})
+    }
+    for (const name of Object.keys(SOURCES_BY_NAME)) {
+      expect(manifest[name], `${name} is in SOURCES but not the manifest`).toBeDefined()
     }
   })
 

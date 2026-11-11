@@ -8,7 +8,9 @@ import { describe, expect, it } from 'vitest'
 import { BUDGETS } from '../../../scripts/check-bundle.mjs'
 import {
   assertSourceFiles,
+  blankRegion,
   entryProblems,
+  glbWithoutExternalImages,
   promote,
   sha256Hex,
   TRIANGLE_TOLERANCE,
@@ -181,5 +183,180 @@ describe('unknownModels (#202)', () => {
 describe('sha256Hex (#202)', () => {
   it('hashes bytes', () => {
     expect(sha256Hex(Buffer.from('abc'))).toBe(HELLO)
+  })
+})
+
+function glb(json: unknown, bin: Buffer): Buffer {
+  let text = Buffer.from(JSON.stringify(json), 'utf8')
+  text = Buffer.concat([text, Buffer.alloc((4 - (text.length % 4)) % 4, 0x20)])
+  const header = Buffer.alloc(12)
+  header.writeUInt32LE(0x46546c67, 0)
+  header.writeUInt32LE(2, 4)
+  header.writeUInt32LE(12 + 8 + text.length + 8 + bin.length, 8)
+  const jsonHead = Buffer.alloc(8)
+  jsonHead.writeUInt32LE(text.length, 0)
+  jsonHead.writeUInt32LE(0x4e4f534a, 4)
+  const binHead = Buffer.alloc(8)
+  binHead.writeUInt32LE(bin.length, 0)
+  binHead.writeUInt32LE(0x004e4942, 4)
+  return Buffer.concat([header, jsonHead, text, binHead, bin])
+}
+
+function jsonOf(bytes: Uint8Array): Record<string, unknown> {
+  const buf = Buffer.from(bytes)
+  return JSON.parse(buf.subarray(20, 20 + buf.readUInt32LE(12)).toString('utf8'))
+}
+
+describe('glbWithoutExternalImages (#194)', () => {
+  const bin = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8])
+  const source = {
+    asset: { version: '2.0' },
+    buffers: [{ byteLength: 8 }],
+    images: [{ uri: '..\\Terra.fbm\\solarpanels.tga' }],
+    textures: [{ source: 0, sampler: 0 }],
+    samplers: [{}],
+    materials: [
+      {
+        name: 'panel',
+        pbrMetallicRoughness: { baseColorTexture: { index: 0 }, baseColorFactor: [0, 0, 1, 1] },
+        emissiveTexture: { index: 0 },
+        emissiveFactor: [0, 0, 0.1],
+      },
+    ],
+  }
+
+  it('drops images, textures, samplers and texture references but keeps colours', () => {
+    const out = glbWithoutExternalImages(glb(source, bin))
+    const json = jsonOf(out)
+    expect(json['images']).toBeUndefined()
+    expect(json['textures']).toBeUndefined()
+    expect(json['samplers']).toBeUndefined()
+    expect(json['materials']).toEqual([
+      {
+        name: 'panel',
+        pbrMetallicRoughness: { baseColorFactor: [0, 0, 1, 1] },
+        emissiveFactor: [0, 0, 0.1],
+      },
+    ])
+  })
+
+  it('writes a well-formed GLB: lengths agree and the binary chunk is untouched', () => {
+    const out = Buffer.from(glbWithoutExternalImages(glb(source, bin)))
+    expect(out.readUInt32LE(8)).toBe(out.length)
+    expect(out.readUInt32LE(12) % 4).toBe(0)
+    expect(out.subarray(out.length - bin.length)).toEqual(bin)
+  })
+
+  it('refuses a file that embeds an image, so nothing is dropped silently', () => {
+    const embedded = { ...source, images: [{ bufferView: 0, mimeType: 'image/png' }] }
+    expect(() => glbWithoutExternalImages(glb(embedded, bin))).toThrow(/embeds an image/)
+  })
+
+  it('refuses bytes that are not a GLB', () => {
+    expect(() => glbWithoutExternalImages(Buffer.from('not a glb at all, no'))).toThrow(/not a GLB/)
+  })
+
+  it('does not treat a data: URI as an external image', () => {
+    const inline = { ...source, images: [{ uri: 'data:image/png;base64,iVBORw0KGgo=' }] }
+    expect(() => glbWithoutExternalImages(glb(inline, bin))).toThrow(/embeds an image/)
+  })
+
+  it('clears texture references inside material extensions too', () => {
+    const withExt = {
+      ...source,
+      materials: [
+        {
+          name: 'panel',
+          extensions: {
+            KHR_materials_specular: { specularTexture: { index: 0 }, specularFactor: 0.5 },
+            KHR_materials_clearcoat: {
+              clearcoatFactor: 1,
+              clearcoatTexture: { index: 0 },
+              clearcoatNormalTexture: { index: 0 },
+            },
+          },
+        },
+      ],
+    }
+    const json = jsonOf(glbWithoutExternalImages(glb(withExt, bin)))
+    expect(json['materials']).toEqual([
+      {
+        name: 'panel',
+        extensions: {
+          KHR_materials_specular: { specularFactor: 0.5 },
+          KHR_materials_clearcoat: { clearcoatFactor: 1 },
+        },
+      },
+    ])
+  })
+})
+
+describe('blankRegion (#194)', () => {
+  // 6 x 4 RGBA picture, all (60, 60, 60, 255) except a bright 2 x 2 patch at x 2..3, y 1..2.
+  const width = 6
+  const height = 4
+  const make = () => {
+    const px = Buffer.alloc(width * height * 4, 60)
+    for (let i = 3; i < px.length; i += 4) px[i] = 255
+    for (const [x, y] of [
+      [2, 1],
+      [3, 1],
+      [2, 2],
+      [3, 2],
+    ] as const) {
+      const at = (y * width + x) * 4
+      px[at] = 250
+      px[at + 1] = 250
+      px[at + 2] = 250
+    }
+    return px
+  }
+  const rect = { x: 2, y: 1, w: 2, h: 2 }
+
+  it('paints the rectangle with the mean colour of the pixels around it', () => {
+    const out = blankRegion(make(), width, height, 4, rect)
+    for (const [x, y] of [
+      [2, 1],
+      [3, 1],
+      [2, 2],
+      [3, 2],
+    ] as const) {
+      const at = (y * width + x) * 4
+      expect([out[at], out[at + 1], out[at + 2], out[at + 3]]).toEqual([60, 60, 60, 255])
+    }
+  })
+
+  it('leaves every pixel outside the rectangle alone and does not change its input', () => {
+    const input = make()
+    const copy = Buffer.from(input)
+    const out = blankRegion(input, width, height, 4, rect)
+    expect(input).toEqual(copy)
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const inside = x >= 2 && x <= 3 && y >= 1 && y <= 2
+        if (!inside) {
+          const at = (y * width + x) * 4
+          expect(out.subarray(at, at + 4)).toEqual(copy.subarray(at, at + 4))
+        }
+      }
+    }
+  })
+
+  it('refuses a rectangle that leaves the picture', () => {
+    expect(() => blankRegion(make(), width, height, 4, { x: 5, y: 0, w: 2, h: 2 })).toThrow(
+      /outside/,
+    )
+  })
+
+  it('refuses a rectangle that covers the whole picture, which leaves no ring to sample', () => {
+    expect(() =>
+      blankRegion(make(), width, height, 4, { x: 0, y: 0, w: width, h: height }),
+    ).toThrow(/ring/)
+  })
+
+  it('refuses a rectangle that reaches past the picture edge', () => {
+    expect(() => blankRegion(make(), width, height, 4, { x: 4, y: 3, w: 3, h: 2 })).toThrow(
+      /outside/,
+    )
   })
 })

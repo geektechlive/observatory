@@ -77,6 +77,90 @@ export function assertSourceFiles(name, entry, files) {
   }
 }
 
+const GLB_MAGIC = 0x46546c67
+const CHUNK_JSON = 0x4e4f534a
+
+/**
+ * Drop every `*Texture` reference from a material: top level, `pbrMetallicRoughness` and each
+ * entry of `extensions` (KHR_materials_specular's specularTexture and the like).
+ */
+function withoutTextureRefs(material) {
+  const strip = (obj) =>
+    Object.fromEntries(Object.entries(obj).filter(([key]) => !key.endsWith('Texture')))
+  const out = strip(material)
+  if (material.pbrMetallicRoughness) out.pbrMetallicRoughness = strip(material.pbrMetallicRoughness)
+  if (material.extensions) {
+    out.extensions = Object.fromEntries(
+      Object.entries(material.extensions).map(([name, ext]) => [name, strip(ext)]),
+    )
+  }
+  return out
+}
+
+/**
+ * A GLB's bytes with its texture images, samplers and the materials' texture references
+ * removed, so a model whose images are separate files that were never published (Terra
+ * names `..\Terra.fbm\solarpanels.tga`, which is not in NASA's repository) can still be read.
+ * Materials keep their colour factors. Throws if the file embeds an image (nothing is
+ * dropped silently) or is not a GLB. The source file and its hash are not changed.
+ */
+export function glbWithoutExternalImages(bytes) {
+  const buf = Buffer.from(bytes)
+  if (buf.length < 20 || buf.readUInt32LE(0) !== GLB_MAGIC) throw new Error('not a GLB file')
+  const jsonLength = buf.readUInt32LE(12)
+  if (buf.readUInt32LE(16) !== CHUNK_JSON) throw new Error('GLB: first chunk is not JSON')
+  const jsonEnd = 20 + jsonLength
+  const json = JSON.parse(buf.subarray(20, jsonEnd).toString('utf8'))
+  if ((json.images ?? []).some((image) => image.uri === undefined || image.uri.startsWith('data:'))) {
+    throw new Error('GLB embeds an image: only external images may be dropped')
+  }
+  delete json.images
+  delete json.textures
+  delete json.samplers
+  if (json.materials) json.materials = json.materials.map(withoutTextureRefs)
+  let text = Buffer.from(JSON.stringify(json), 'utf8')
+  text = Buffer.concat([text, Buffer.alloc((4 - (text.length % 4)) % 4, 0x20)])
+  const rest = buf.subarray(jsonEnd)
+  const header = Buffer.alloc(20)
+  header.writeUInt32LE(GLB_MAGIC, 0)
+  header.writeUInt32LE(2, 4)
+  header.writeUInt32LE(20 + text.length + rest.length, 8)
+  header.writeUInt32LE(text.length, 12)
+  header.writeUInt32LE(CHUNK_JSON, 16)
+  return new Uint8Array(Buffer.concat([header, text, rest]))
+}
+
+/**
+ * A copy of raw pixels (`channels` bytes each, row by row) with the rectangle `{ x, y, w, h }`
+ * painted the mean colour of the ring of pixels one step outside it. Used to blank a mark in
+ * an isolated spot of a texture, such as a small label plate, before the texture ships.
+ * Throws if the rectangle is empty or leaves the picture.
+ */
+export function blankRegion(pixels, width, height, channels, { x, y, w, h }) {
+  if (w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > width || y + h > height) {
+    throw new Error(`blankRegion: ${w} x ${h} at ${x},${y} is outside the ${width} x ${height} picture`)
+  }
+  const out = Buffer.from(pixels)
+  const sums = new Array(channels).fill(0)
+  let count = 0
+  for (let py = Math.max(0, y - 1); py <= Math.min(height - 1, y + h); py += 1) {
+    for (let px = Math.max(0, x - 1); px <= Math.min(width - 1, x + w); px += 1) {
+      if (px >= x && px < x + w && py >= y && py < y + h) continue
+      for (let c = 0; c < channels; c += 1) sums[c] += pixels[(py * width + px) * channels + c]
+      count += 1
+    }
+  }
+  if (count === 0) throw new Error('blankRegion: the rectangle covers the picture, no ring to sample')
+  for (let py = y; py < y + h; py += 1) {
+    for (let px = x; px < x + w; px += 1) {
+      for (let c = 0; c < channels; c += 1) {
+        out[(py * width + px) * channels + c] = Math.round(sums[c] / count)
+      }
+    }
+  }
+  return out
+}
+
 /** The requested model names that no manifest entry has. */
 export function unknownModels(requested, known) {
   return requested.filter((n) => !known.includes(n))

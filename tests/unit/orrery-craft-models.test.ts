@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { SPACECRAFT } from '@/lib/orrery/craft'
 import { attitudeDirection, CRAFT_MODELS, craftModelFor } from '@/lib/orrery/craftModels'
+import { SATELLITE_MODELS_BY_FAMILY, SATELLITE_MODELS_BY_NORAD } from '@/lib/orrery/modelDescriptor'
 
 const PUBLIC = resolve(__dirname, '../../public')
 const MODEL_DIR = resolve(PUBLIC, 'models/craft')
@@ -53,7 +54,11 @@ describe('spacecraft models (#115)', () => {
   })
 
   it('ships no model file the code does not use', () => {
-    const used = new Set(Object.values(CRAFT_MODELS).map((m) => m.file))
+    const used = new Set<string | null>([
+      ...Object.values(CRAFT_MODELS).map((m) => m.file),
+      ...Object.values(SATELLITE_MODELS_BY_NORAD).map((m) => m.file),
+      ...Object.values(SATELLITE_MODELS_BY_FAMILY).map((m) => m.file),
+    ])
     for (const file of readdirSync(MODEL_DIR)) {
       expect(used.has(`/models/craft/${file}`), file).toBe(true)
     }

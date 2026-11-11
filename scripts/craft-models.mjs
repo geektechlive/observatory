@@ -38,32 +38,21 @@ import { MeshoptSimplifier } from 'meshoptimizer'
 import sharp from 'sharp'
 
 import { BUDGETS } from './check-bundle.mjs'
-import { assertSourceFiles, promote, unknownModels, verifySources } from './craft-gate.mjs'
+import { dropNodes } from './craft-nodes.mjs'
+import { SOURCES } from './craft-sources.mjs'
+import {
+  assertSourceFiles,
+  blankRegion,
+  glbWithoutExternalImages,
+  promote,
+  sha256Hex,
+  unknownModels,
+  verifySources,
+} from './craft-gate.mjs'
 import { MANIFEST } from './craft-manifest.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OUT = join(ROOT, 'public', 'models', 'craft')
-
-/**
- * Output name -> how a single-file model is simplified. The source file and the triangle
- * budget come from the manifest (the one place they are recorded); a model with several
- * source files, New Horizons, is built by its own function.
- */
-export const SOURCES = {
-  voyager: {},
-  parker: {},
-  juno: {},
-  dscovr: {},
-  soho: {},
-  wind: {},
-  ace: {},
-  jwst: {},
-  // 35.7 MB, 203k triangles and 43 textures: its maps go (material colours stay) and it
-  // gets a looser error to reach the budget.
-  // It is thousands of small closed parts the simplifier cannot shrink, so components
-  // under 1.5% of a mesh's size (sub-pixel at a focused craft's ~150 px) go first.
-  clipper: { textures: false, error: 0.05, minPart: 0.015 },
-}
 
 const TEXTURE_SIZE = 512
 const SIMPLIFY_ERROR = 0.02
@@ -122,6 +111,34 @@ function stripAttributes(doc, keepTextures) {
 }
 
 /**
+ * Paint out marks in isolated spots of the textures the materials use: each region names a
+ * texture and a pixel rectangle, which becomes the colour around it (blankRegion). Throws when
+ * a region matches no texture, so a stale name or an edited source cannot pass unnoticed.
+ */
+async function blankTextures(doc, regions) {
+  for (const region of regions) {
+    const { texture: name, ...rect } = region
+    const used = new Set()
+    for (const material of doc.getRoot().listMaterials()) {
+      const t = material.getBaseColorTexture()
+      if (t && t.getName() === name) used.add(t)
+    }
+    if (used.size === 0) throw new Error(`blank: no texture named ${name} is used by a material`)
+    for (const texture of used) {
+      const { data, info } = await sharp(Buffer.from(texture.getImage()))
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      const painted = blankRegion(data, info.width, info.height, info.channels, rect)
+      const png = await sharp(painted, { raw: { width: info.width, height: info.height, channels: info.channels } })
+        .png()
+        .toBuffer()
+      texture.setImage(new Uint8Array(png)).setMimeType('image/png')
+    }
+    console.log(`blanked ${rect.w} x ${rect.h} at ${rect.x},${rect.y} in ${name}`)
+  }
+}
+
+/**
  * Remove disconnected components smaller than `error` (a share of each primitive's
  * size) with meshoptimizer's simplifyPrune. A model built of many small closed parts
  * cannot otherwise reach its budget: the simplifier never deletes a component.
@@ -152,16 +169,29 @@ function pruneSmallComponents(doc, error) {
 }
 
 async function build(io, name, source, srcDir, outDir) {
-  const { textures = true, error = SIMPLIFY_ERROR, minPart = 0 } = source
+  const {
+    textures = true,
+    error = SIMPLIFY_ERROR,
+    minPart = 0,
+    dropExternalImages = false,
+    aim,
+    blank = [],
+    dropNodes: dropList = [],
+  } = source
   const { triangles, sources } = MANIFEST[name]
   if (sources.length !== 1) throw new Error(`${name}: expects one source file, the manifest has ${sources.length}`)
   const file = sources[0].file
-  const doc = await io.read(join(srcDir, file))
+  const started = Date.now()
+  const doc = dropExternalImages
+    ? await io.readBinary(glbWithoutExternalImages(readFileSync(join(srcDir, file))))
+    : await io.read(join(srcDir, file))
   const before = triangleCount(doc)
+  dropNodes(doc, dropList)
   stripAttributes(doc, textures)
+  await blankTextures(doc, blank)
   await doc.transform(dedup(), weld())
   if (minPart > 0) pruneSmallComponents(doc, minPart)
-  const ratio = Math.min(1, triangles / Math.max(1, triangleCount(doc)))
+  const ratio = Math.min(1, (aim ?? triangles) / Math.max(1, triangleCount(doc)))
   await doc.transform(
     // error is a share of the model's size: 2% is invisible at the ~150 px a focused
     // craft draws at, and lets the simplifier reach the budget.
@@ -180,7 +210,7 @@ async function build(io, name, source, srcDir, outDir) {
   const bounds = getBounds(doc.getRoot().listScenes()[0])
   const size = bounds.max.map((v, i) => +(v - bounds.min[i]).toFixed(3))
   console.log(
-    `${name}: ${file} ${statSync(join(srcDir, file)).size} B, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B, extent ${size.join(' x ')}`,
+    `${name}: ${file} ${statSync(join(srcDir, file)).size} B, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B, extent ${size.join(' x ')}, ${((Date.now() - started) / 1000).toFixed(1)} s`,
   )
   return triangleCount(doc)
 }
@@ -269,6 +299,15 @@ async function main() {
       try {
         promote(name, staging, OUT, MANIFEST[name], BUDGETS.craftModelBytes, triangles)
         console.log(`promoted ${name} to public/models/craft/`)
+        // A rebuilt file must be pinned on purpose: say so, and fail, when the bytes moved.
+        const pinned = MANIFEST[name].outputSha256
+        if (pinned) {
+          const actual = sha256Hex(readFileSync(join(OUT, `${name}.glb`)))
+          if (actual !== pinned) {
+            console.warn(`${name}: output sha256 ${actual} differs from the manifest's outputSha256 ${pinned}; update the manifest`)
+            process.exitCode = 1
+          }
+        }
       } catch (e) {
         console.warn(e.message)
         process.exitCode = 1

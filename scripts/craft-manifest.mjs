@@ -47,6 +47,37 @@ function legacy({ files, sourceUrl, family, triangles, outputSha256 }) {
   }
 }
 
+// Satellites (#194), from NASA's 3D Resources on GitHub. The downloads are not kept in the
+// repository: build from a folder holding the files named below, fetched from the pinned
+// commit (raw.githubusercontent.com/nasa/NASA-3D-Resources/<sha>/3D%20Models/<folder>/<file>),
+// and the build checks each one against its hash.
+const NASA_REPO = 'https://github.com/nasa/NASA-3D-Resources'
+const NASA_SHA = '11ebb4ee043715aefbba6aeec8a61746fad67fa7'
+const NASA_REPO_EVIDENCE = {
+  text: 'README: "These assets are free and without copyright."',
+  url: `${NASA_REPO}/blob/${NASA_SHA}/README.md`,
+}
+const NASA_REPO_LOGOS_DATE = '2026-11-11'
+
+/** An entry for a model built from a file in NASA-3D-Resources at the pinned commit. */
+function nasaRepo({ folder, file, sha256, family, triangles, logos, transforms, outputSha256 }) {
+  return {
+    sources: [{ file, sha256 }],
+    sourceUrl: `${NASA_REPO}/tree/${NASA_SHA}/3D%20Models/${encodeURIComponent(folder)}`,
+    sourceVersion: NASA_SHA,
+    licence: NASA_LICENCE,
+    licenceEvidence: NASA_REPO_EVIDENCE,
+    family,
+    logosChecked: { date: NASA_REPO_LOGOS_DATE, result: 'clean', detail: logos },
+    triangles,
+    // The build-time edits (the same object as in scripts/craft-sources.mjs; a test fails when
+    // they differ) and the hash of the shipped bytes. A rebuild changes the bytes, so it must
+    // update outputSha256 here on purpose: the build prints the new one.
+    transforms,
+    outputSha256,
+  }
+}
+
 export const MANIFEST = {
   voyager: legacy({
     files: ['voyager.glb'],
@@ -122,5 +153,45 @@ export const MANIFEST = {
     family: 'new-horizons',
     triangles: 12_000,
     outputSha256: '83e3d3e5da0ae1898c77b55068d500bb05b0a272c990cca677828c409a24e5b3',
+  }),
+  iss: nasaRepo({
+    folder: 'International Space Station (ISS) (B)',
+    file: 'International Space Station (ISS) (B).glb',
+    sha256: '2ba4427413b0dd89a33d2acaf962dea8a96a3b1d8dceda05cc7aad547ffd3d16',
+    family: 'iss',
+    // 174,440 in the source. The simplifier overshoots its target on this model; see `aim` in
+    // craft-models.mjs. The build lands at about 14.1k, after dropping seven stray
+    // discs (dropNodes in craft-models.mjs; docs/reference/satellite-models.md).
+    triangles: 14_000,
+    transforms: {
+      aim: 11_700,
+      dropNodes: ['bendedtru1', 'bendedtru2', 'bendedtru3', 'bendedtrus', 'pCylinder1', 'pCylinder2', 'pCylinder8'],
+    },
+    outputSha256: 'e07333d387c913060a0f76202c2cfa10c9dcf627d28bf944f3a7ee8d45b3162e',
+    logos:
+      'No texture images in the file (19 plain grey materials). Read NASA\'s preview render and real-GPU renders from five angles: no insignia, flag or logo, modelled or painted.',
+  }),
+  hubble: nasaRepo({
+    folder: 'Hubble Space Telescope (A)',
+    file: 'Hubble Space Telescope (A).glb',
+    sha256: 'e5ba4de15c7d359ac8fa1ab7e286aff42dec09c0fadae3db99252587f39fa384',
+    family: 'hubble',
+    // The source has 7,672 triangles, under the 9k to 16k of the other craft: nothing to simplify.
+    triangles: 7_672,
+    transforms: { blank: [{ texture: 'hbltel_w', x: 128, y: 416, w: 34, h: 18 }] },
+    outputSha256: '7fcdf6f3bbe431ad278463b2b98c985a0ca879caadb3a939eaf4b45f87e6a396',
+    logos:
+      'Five 512 px textures (WebP, each with a PNG fallback of the same picture) viewed in full, the label areas enlarged. Panel sheets, instrument-bay plates (four 20 x 8 px serial plates, text unreadable), array cells, aperture and aft bulkhead. One 25 x 10 px plate on the aft bulkhead shows "30" beside a glyph about 6 px across that could not be identified even in the lossless fallback, so the build paints that plate out (blank, in craft-models.mjs) and the shipped texture was viewed again. No meatball, worm, patch, flag or company logo. Real-GPU renders from five angles: none.',
+  }),
+  terra: nasaRepo({
+    folder: 'Terra',
+    file: 'Terra.glb',
+    sha256: '8794857595f7a7d416184fe926ecb50e11bf267dbe471d1cf2728a85e8d017fa',
+    family: 'terra',
+    triangles: 14_000,
+    transforms: { dropExternalImages: true },
+    outputSha256: 'd6611f775706e6b5d7a7caf41ea173c1a1440100ee2379b31b3ec693733bfba1',
+    logos:
+      'No texture images shipped in the file: it names two external TGAs (Side_Panels_TERRA, solarpanels) that are not in NASA\'s repository, so the build drops them and keeps material colours; whatever they carried is not in the model. Read NASA\'s preview render and real-GPU renders from five angles: plain colours, no insignia, flag or logo, modelled or painted.',
   }),
 }
