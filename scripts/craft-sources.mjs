@@ -2,7 +2,7 @@
  * How each single-file model is built (#194, #202): data only, no imports, so the unit tests
  * can read it. The manifest (scripts/craft-manifest.mjs) records the same edits per model as
  * `transforms`, and tests/unit/scripts/craft-manifest.test.ts fails when the two differ.
- * Options: aim, error, minPart, textures, blank, dropNodes, dropExternalImages; see
+ * Options: aim, error, minPart, textures, blank, dropNodes, plain, dropExternalImages; see
  * scripts/craft-models.mjs for what each does.
  */
 /**
@@ -33,7 +33,15 @@ export const SOURCES = {
   // none, so they are dropped (dropNodes). Without them the model's extent is the station's.
   iss: {
     aim: 11_700,
-    dropNodes: ['bendedtru1', 'bendedtru2', 'bendedtru3', 'bendedtrus', 'pCylinder1', 'pCylinder2', 'pCylinder8'],
+    dropNodes: [
+      'bendedtru1',
+      'bendedtru2',
+      'bendedtru3',
+      'bendedtrus',
+      'pCylinder1',
+      'pCylinder2',
+      'pCylinder8',
+    ],
   },
   // One 25 x 10 px label plate on the aft bulkhead texture carries a small glyph too small to
   // identify, so it is painted out (blankTextures) rather than judged clean.
@@ -41,4 +49,14 @@ export const SOURCES = {
   // The file names two TGA textures that NASA's repository does not hold, so it is read
   // with its images dropped (glbWithoutExternalImages) and keeps its material colours.
   terra: { dropExternalImages: true },
+  // Second batch (#194).
+  'tdrs-gen1': {},
+  'tdrs-gen2': { aim: 12_000 },
+  goes: {},
+  landsat8: { aim: 8_000 },
+  // The source colours its array back ('shiny_panel') with the foil normal map, so it showed
+  // blue-violet crinkles; drawn plain dark grey instead (plainMaterials, craft-nodes.mjs).
+  aqua: { plain: { shiny_panel: [0.18, 0.18, 0.2, 1] } },
+  aura: {},
+  'suomi-npp': {},
 }

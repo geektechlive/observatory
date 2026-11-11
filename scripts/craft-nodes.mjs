@@ -21,3 +21,20 @@ export function dropNodes(doc, names) {
     }
   }
 }
+
+/**
+ * Draw named materials in a plain colour, without their colour texture (#194). For a source
+ * whose material shows the wrong picture, such as the Aqua (B) file's array back, coloured
+ * with a normal map. `colours` maps material name to an RGBA factor. Throws if a name matches
+ * no material, so an entry that no longer fits its source cannot pass silently.
+ */
+export function plainMaterials(doc, colours) {
+  for (const [name, colour] of Object.entries(colours)) {
+    const found = doc
+      .getRoot()
+      .listMaterials()
+      .filter((m) => m.getName() === name)
+    if (found.length === 0) throw new Error(`plainMaterials: no material named ${name}`)
+    for (const material of found) material.setBaseColorTexture(null).setBaseColorFactor(colour)
+  }
+}

@@ -165,11 +165,19 @@ export const MANIFEST = {
     triangles: 14_000,
     transforms: {
       aim: 11_700,
-      dropNodes: ['bendedtru1', 'bendedtru2', 'bendedtru3', 'bendedtrus', 'pCylinder1', 'pCylinder2', 'pCylinder8'],
+      dropNodes: [
+        'bendedtru1',
+        'bendedtru2',
+        'bendedtru3',
+        'bendedtrus',
+        'pCylinder1',
+        'pCylinder2',
+        'pCylinder8',
+      ],
     },
     outputSha256: 'e07333d387c913060a0f76202c2cfa10c9dcf627d28bf944f3a7ee8d45b3162e',
     logos:
-      'No texture images in the file (19 plain grey materials). Read NASA\'s preview render and real-GPU renders from five angles: no insignia, flag or logo, modelled or painted.',
+      "No texture images in the file (19 plain grey materials). Read NASA's preview render and real-GPU renders from five angles: no insignia, flag or logo, modelled or painted.",
   }),
   hubble: nasaRepo({
     folder: 'Hubble Space Telescope (A)',
@@ -192,6 +200,86 @@ export const MANIFEST = {
     transforms: { dropExternalImages: true },
     outputSha256: 'd6611f775706e6b5d7a7caf41ea173c1a1440100ee2379b31b3ec693733bfba1',
     logos:
-      'No texture images shipped in the file: it names two external TGAs (Side_Panels_TERRA, solarpanels) that are not in NASA\'s repository, so the build drops them and keeps material colours; whatever they carried is not in the model. Read NASA\'s preview render and real-GPU renders from five angles: plain colours, no insignia, flag or logo, modelled or painted.',
+      "No texture images shipped in the file: it names two external TGAs (Side_Panels_TERRA, solarpanels) that are not in NASA's repository, so the build drops them and keeps material colours; whatever they carried is not in the model. Read NASA's preview render and real-GPU renders from five angles: plain colours, no insignia, flag or logo, modelled or painted.",
+  }),
+  // Second batch (#194). TDRS is two designs: the first generation (TDRS 1 to 7, a box bus with
+  // two long arrays and two mesh dishes) and the later Boeing-bus satellites (TDRS 8 to 13,
+  // hexagonal bus, square arrays, gold dishes). Each model is shown for its own generation.
+  'tdrs-gen1': nasaRepo({
+    folder: 'Tracking and Data Relay Satellites (TDRS) (B)',
+    file: 'Tracking and Data Relay Satellites (TDRS) (B).glb',
+    sha256: 'ece0a822767ff7f4cde2a2c5cc5042fa4740528bdbb59095a32b049377f70f30',
+    family: 'tdrs',
+    triangles: 14_000,
+    transforms: {},
+    outputSha256: '4a4df9bfdca2cd318718ddd374bf142714d654ac096347e17ffa978384d7d3c6',
+    logos:
+      "Three textures: a 192 px radial gradient, a 256 px silver foil ramp and a 1024 px sheet (array cells, a perforated panel, a feed horn, a grey cylinder, a dark panel and feed elements), each with a PNG fallback of the same picture. The cylinder carries light and dark rectangles where labels were painted over before NASA published the file; a strip on the dark panel, contrast-stretched 8x, holds no resolvable glyph. NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  'tdrs-gen2': nasaRepo({
+    folder: 'Tracking and Data Relay Satellites (TRDS) (E)',
+    file: 'Tracking and Data Relay Satellites (TRDS) (E).glb',
+    sha256: '4508756798d827722608aa9001925f01ce6409b9e0fd910eacfde9c061139b9e',
+    family: 'tdrs',
+    triangles: 14_000,
+    transforms: { aim: 12_000 },
+    outputSha256: '50a6085c17ad6a4199108e61674b75bc77d4a50870bdd22a933d7bae533258f9',
+    logos:
+      "No texture images in the file (33 plain materials). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  goes: nasaRepo({
+    folder: 'Geostationary Operational Environmental Satellites',
+    file: 'Geostationary Operational Environmental Satellites.glb',
+    sha256: 'e2f690d3d59e101d6a75a8b0bdcbe1cf9f58a058d01eaceede8557460a6e9101',
+    family: 'goes',
+    triangles: 14_000,
+    transforms: {},
+    outputSha256: '5773008fc0d08263424e4f4212795f2a221f3006ae20be751a479c2ed1c78686',
+    logos:
+      'No texture images in the file (24 plain materials); NASA publishes no preview render for it. A row pattern on the array that looked like lettering at full view is solar-cell squares, checked at 3x. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  landsat8: nasaRepo({
+    folder: 'Landsat 8',
+    file: 'Landsat 8.glb',
+    sha256: '8b599e867be20589cd35e55ed1d46da104299b430b1827b548a25d3fad0a314d',
+    family: 'landsat',
+    triangles: 14_000,
+    transforms: { aim: 8_000 },
+    outputSha256: 'f466e7311e42df04e2698a1e3112b3a62497e9bf57a9a7111781011778743da4',
+    logos:
+      "No texture images in the file (33 plain materials). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  aqua: nasaRepo({
+    folder: 'Aqua (B)',
+    file: 'Aqua (B).glb',
+    sha256: 'f0761181a1d378b6b3e270e8eee8bf20c241b7d577933630369b0cffd4b521e1',
+    family: 'aqua',
+    triangles: 14_000,
+    transforms: { plain: { shiny_panel: [0.18, 0.18, 0.2, 1] } },
+    outputSha256: '36feccf8eb489420be491b47b0715722362202f93f4eae7cfc336ca7a67db594',
+    logos:
+      "Four textures, each with a PNG fallback of the same picture: a 1024 px sheet (array cells, a cable-run panel, foil, a grey panel, a cylinder and a small bracket, enlarged 6x), a 512 px foil normal map and two 256 px foil ramps. The source draws one panel material ('shiny_panel') with the normal map as its colour, which drew the back of the array as blue-violet crinkles; the build draws that material plain dark grey (plain, in craft-sources.mjs). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  aura: nasaRepo({
+    folder: 'Aura (A)',
+    file: 'Aura (A).glb',
+    sha256: '99d46cd9af551c7511befe47d3f24b9b957da6a9dc35a0e29fc784db9f55b381',
+    family: 'aura',
+    triangles: 6_135,
+    transforms: {},
+    outputSha256: 'd322027afb88206e0f2248eb60d24132ba3522ab4d33556164f8969461329f11',
+    logos:
+      "One 1024 px texture atlas (a WebP and a JPEG of the same picture): foil, panels, dishes, array cells; the right-hand rows enlarged 3x. NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  'suomi-npp': nasaRepo({
+    folder: 'Suomi National Polar-orbiting Partnership (Suomi NPP)',
+    file: 'Suomi National Polar-orbiting Partnership (Suomi NPP).glb',
+    sha256: '885278277ed8fa864368803b7da2046292754bff01033055d56fe86e8b951ee4',
+    family: 'jpss',
+    triangles: 4_024,
+    transforms: {},
+    outputSha256: 'b41799de2f48ed884c33de93fc530288dd38155d1d4c246629902a50a4a2cfd6',
+    logos:
+      'Five textures, each with a PNG fallback of the same picture: two 1024 px sheets of hardware photographs (array, cable-run panel, foil, radiators, instrument panels), a 1024 px ambient-occlusion map and two 256 px foil ramps. NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
   }),
 }

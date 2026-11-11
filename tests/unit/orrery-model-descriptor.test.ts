@@ -57,11 +57,10 @@ describe('spacecraftDescriptor (#202)', () => {
 })
 
 describe('modelForSatellite (#202)', () => {
-  it('holds the trial batch (#194) by NORAD id, every one its own, and no family stand-in yet', () => {
-    expect(Object.keys(SATELLITE_MODELS_BY_NORAD).sort()).toEqual(
-      ['20580', '25544', '25575', '25994', '26400', '26700', '36086', '49044'].sort(),
-    )
-    for (const model of Object.values(SATELLITE_MODELS_BY_NORAD)) expect(model.scope).toBe('own')
+  it('holds the trial batch (#194) by NORAD id as their own, and no family-wide table yet', () => {
+    for (const id of ['20580', '25544', '25575', '25994', '26400', '26700', '36086', '49044']) {
+      expect(SATELLITE_MODELS_BY_NORAD[id]?.scope).toBe('own')
+    }
     expect(Object.keys(SATELLITE_MODELS_BY_FAMILY)).toHaveLength(0)
     expect(modelForSatellite(25544, 'iss')?.file).toBe('/models/craft/iss.glb')
     expect(modelForSatellite(1, 'iss')).toBeUndefined()

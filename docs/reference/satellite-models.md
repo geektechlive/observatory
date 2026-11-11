@@ -108,33 +108,33 @@ One Starlink model would put a real shape behind two thirds of every satellite d
 ### NASA models
 
 From `https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/<name>`. Raw GLB sizes
-are from the repository tree (VERIFIED). Three are built and shipped, the trial batch of
-2026-11-11 (see "The trial batch" below); the rest are not built, and no other mesh has been
-checked for logos yet.
+are from the repository tree (VERIFIED). Ten are built and shipped, in two batches of 2026-11-11
+(see "The trial batch" and "The second batch" below); the rest are not built, and no other mesh
+has been checked for logos yet.
 
-| Model                              | Covers                                         | Raw GLB                                 | Notes                                                                     |
-| ---------------------------------- | ---------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
-| ISS (A) / ISS (B)                  | ISS: 6 CelesTrak records (see below)           | 39.7 kB / 477 kB                        | **(B) built**, credit "NASA/Michael D. Carbajal"; (D) is 95.9 MB, too big |
-| Hubble Space Telescope (A)         | HST                                            | 1.69 MB                                 | **Built**, credit "DigitalSpace Corporation" (the page's Source)          |
-| TDRS (A), (B), (E)                 | TDRS (8)                                       | 96.8 kB, 976 kB, 217 kB                 | Generations differ; one model for all is approximate                      |
-| Terra                              | Terra                                          | 2.15 MB                                 | **Built**, credit "NASA/Christian A. Lopez"; no textures (see below)      |
-| Aqua (B)                           | Aqua                                           | 1.10 MB                                 |                                                                           |
-| Aura (A)                           | Aura                                           | 476 kB                                  |                                                                           |
-| Landsat 8                          | Landsat 8, 9                                   | 780 kB                                  | Landsat 9 as a near twin is UNVERIFIED                                    |
-| Suomi NPP                          | Suomi NPP; look-alike for NOAA 20, 21          | 2.28 MB                                 |                                                                           |
-| GOES                               | GOES 14–19 (6)                                 | 336 kB                                  | Which generation it shows is UNVERIFIED                                   |
-| ICESat-2 (A)                       | ICESat-2                                       | 1.5 MB                                  |                                                                           |
-| OCO-2                              | OCO-2                                          | 280 kB                                  |                                                                           |
-| SORCE, SDO, Fermi, SWAS, Chandra   | 1 each                                         | 366 kB, 498 kB, 1.38 MB, 150 kB, 999 kB |                                                                           |
-| MMS (A)                            | MMS 1–4                                        | 336 kB                                  |                                                                           |
-| THEMIS                             | THEMIS A, D, E                                 | 683 kB                                  |                                                                           |
-| CYGNSS                             | CYGNSS (7)                                     | 1.62 MB                                 |                                                                           |
-| GRACE (A)                          | GRACE-FO 1, 2 (look-alike, predecessor design) | 22.6 kB                                 |                                                                           |
-| Jason-1 / OSTM                     | Jason-3 (look-alike)                           | 593 kB / 925 kB                         |                                                                           |
-| Jason CS                           | Sentinel-6A, 6B                                | 2.1 MB                                  | Same family                                                               |
-| GPM                                | GPM Core                                       | 2.26 MB                                 |                                                                           |
-| CubeSat 1RU, 2RU, ICECube, MiRaTa  | Generic stand-in for CubeSat fleets            | 149–445 kB                              | Flock and Lemur are 3U, so approximate                                    |
-| Satellite Kit (body, wings, radio) | Generic stand-in for any bus                   | 3–15 kB each                            | Assembled by us, as for New Horizons                                      |
+| Model                              | Covers                                         | Raw GLB                                 | Notes                                                                                                            |
+| ---------------------------------- | ---------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| ISS (A) / ISS (B)                  | ISS: 6 CelesTrak records (see below)           | 39.7 kB / 477 kB                        | **(B) built**, credit "NASA/Michael D. Carbajal"; (D) is 95.9 MB, too big                                        |
+| Hubble Space Telescope (A)         | HST                                            | 1.69 MB                                 | **Built**, credit "DigitalSpace Corporation" (the page's Source)                                                 |
+| TDRS (A), (B), (E)                 | TDRS (8)                                       | 96.8 kB, 976 kB, 217 kB                 | **(B) and (E) built**: (B) is the first generation (TDRS 1 to 7), (E) the later Boeing-bus design (TDRS 8 to 13) |
+| Terra                              | Terra                                          | 2.15 MB                                 | **Built**, credit "NASA/Christian A. Lopez"; no textures (see below)                                             |
+| Aqua (B)                           | Aqua                                           | 1.10 MB                                 | **Built**; the array back is redrawn plain grey (below)                                                          |
+| Aura (A)                           | Aura                                           | 476 kB                                  | **Built**                                                                                                        |
+| Landsat 8                          | Landsat 8, 9                                   | 780 kB                                  | **Built**; shown for Landsat 9 as a stand-in                                                                     |
+| Suomi NPP                          | Suomi NPP; look-alike for NOAA 20, 21          | 2.28 MB                                 | **Built**; shown for NOAA 20 and 21 as a stand-in                                                                |
+| GOES                               | GOES 14–19 (6)                                 | 336 kB                                  | **Built**; its shape is the GOES-R series (16 to 19); a stand-in for all six                                     |
+| ICESat-2 (A)                       | ICESat-2                                       | 1.5 MB                                  |                                                                                                                  |
+| OCO-2                              | OCO-2                                          | 280 kB                                  |                                                                                                                  |
+| SORCE, SDO, Fermi, SWAS, Chandra   | 1 each                                         | 366 kB, 498 kB, 1.38 MB, 150 kB, 999 kB |                                                                                                                  |
+| MMS (A)                            | MMS 1–4                                        | 336 kB                                  |                                                                                                                  |
+| THEMIS                             | THEMIS A, D, E                                 | 683 kB                                  |                                                                                                                  |
+| CYGNSS                             | CYGNSS (7)                                     | 1.62 MB                                 |                                                                                                                  |
+| GRACE (A)                          | GRACE-FO 1, 2 (look-alike, predecessor design) | 22.6 kB                                 |                                                                                                                  |
+| Jason-1 / OSTM                     | Jason-3 (look-alike)                           | 593 kB / 925 kB                         |                                                                                                                  |
+| Jason CS                           | Sentinel-6A, 6B                                | 2.1 MB                                  | Same family                                                                                                      |
+| GPM                                | GPM Core                                       | 2.26 MB                                 |                                                                                                                  |
+| CubeSat 1RU, 2RU, ICECube, MiRaTa  | Generic stand-in for CubeSat fleets            | 149–445 kB                              | Flock and Lemur are 3U, so approximate                                                                           |
+| Satellite Kit (body, wings, radio) | Generic stand-in for any bus                   | 3–15 kB each                            | Assembled by us, as for New Horizons                                                                             |
 
 About 53 active objects have a same-mission NASA model (including 8 look-alikes): few by count,
 but they are the named objects people click.
@@ -226,15 +226,13 @@ meatball, worm, patch, flag or company logo.
 - Terra: no textures in the shipped file (see above). Whatever the two missing textures carried is
   not in the model; the preview render and the renders show plain colours.
 
-**Where the models fall short** (found while taking the screenshots; not fixed here):
+**Where the models fell short** (found while taking the screenshots):
 
 - The ISS (B) source held seven stray parts. They are dropped in the build (`dropNodes` in
   `SOURCES`, `scripts/craft-nodes.mjs`), see the ISS build step above.
-- The default framing in "Look closer" crops all three: the ISS at its arrays, Hubble at the
-  top, Terra at its array. Hubble and Terra have no such stray parts, so the framing is a
-  separate matter.
-- **The credit line sits over the model** when the model fills the stage (seen on the ISS and
-  Hubble). A required credit is a licence term, so this needs a fix in the detail view.
+- The default framing in "Look closer" cropped all three, and the credit line sat over the model
+  when it filled the stage. Both were fixed in the detail view by #205 (framing by the model's
+  outline, and a credit band the canvas never covers); see docs/reference/orrery.md.
 - The attitude axes in `modelDescriptor.ts` are read from each model's frame but only matter once
   satellites are drawn as models in the orrery (not done yet). Terra (-Y, its antenna sits on a boom
   at +Y) comes from the mesh and renders. Hubble is `sun` with axis X: its barrel is Y and this
@@ -242,6 +240,63 @@ meatball, worm, patch, flag or company logo.
   it; X keeps the aperture off the Sun line and the arrays are drawn in one position. The ISS
   axis is the thin axis, X (the station flies with the truss across the orbit and the thin
   axis vertical), but which of +X and -X faces Earth was not determined.
+
+### The second batch (#194, 2026-11-11)
+
+Seven models through the same gate as the trial batch, from the same pinned commit. Each is
+registered by NORAD id in `SATELLITE_MODELS_BY_NORAD`; satellite ids are from CelesTrak's
+`active` group, 2026-11-10.
+
+| Model     | Source file (SHA-256 prefix)                                         | Raw         | Built     | Triangles (source, built, budget) | Shown for (scope)                        | Credit (the page's Source field)                 |
+| --------- | -------------------------------------------------------------------- | ----------- | --------- | --------------------------------- | ---------------------------------------- | ------------------------------------------------ |
+| tdrs-gen1 | `Tracking and Data Relay Satellites (TDRS) (B).glb` ece0a822         | 975,956 B   | 202,660 B | 20,014, 13,857, 14,000            | TDRS 3, 5, 6, 7 (family)                 | NASA/JPL/Eyes on the Solar System                |
+| tdrs-gen2 | `Tracking and Data Relay Satellites (TRDS) (E).glb` 45087567         | 216,892 B   | 170,820 B | 66,962, 13,901, 14,000            | TDRS 8, 11, 12, 13 (family)              | NASA/Christopher R. Meaney                       |
+| goes      | `Geostationary Operational Environmental Satellites.glb` e2f690d3    | 335,620 B   | 188,108 B | 40,935, 13,987, 14,000            | GOES 14 to 19 (family)                   | NASA/Christopher R. Meaney                       |
+| landsat8  | `Landsat 8.glb` 8b599e86                                             | 780,280 B   | 158,588 B | 85,364, 14,293, 14,000            | Landsat 8 (own), Landsat 9 (family)      | NASA/Christopher R. Meaney                       |
+| aqua      | `Aqua (B).glb` f0761181                                              | 1,104,016 B | 219,332 B | 49,401, 14,026, 14,000            | Aqua (own)                               | NASA/Brian E. Kumanchik; NASA/Christian A. Lopez |
+| aura      | `Aura (A).glb` 99d46cd9                                              | 476,264 B   | 116,352 B | 6,135, 6,135, 6,135               | Aura (own)                               | NASA/Ames Research Center                        |
+| suomi-npp | `Suomi National Polar-orbiting Partnership (Suomi NPP).glb` 88527827 | 2,283,576 B | 126,868 B | 4,024, 4,024, 4,024               | Suomi NPP (own), NOAA 20 and 21 (family) | NASA/Brian E. Kumanchik; NASA/Christian A. Lopez |
+
+The seven add 1,182,728 B; the models total 3,854,632 B. NORAD ids: TDRS 3 19548, 5 21639,
+6 22314, 7 23613, 8 26388, 11 39070, 12 39504, 13 42915; GOES 14 35491, 15 36411, 16 41866,
+17 43226, 18 51850, 19 60133; Landsat 8 39084, Landsat 9 49260; Aqua 27424; Aura 28376; Suomi NPP
+37849; NOAA 20 43013, NOAA 21 54234. TDRS 9 and 10 are not in the `active` group.
+
+**Which model is which.** TDRS (A) and (B) both show the first-generation design (a box bus with
+two long arrays, two mesh dishes and a rod antenna); (B) is textured, so it ships. TDRS (E) shows
+the later design (hexagonal bus, two square arrays, gold dishes). Identified from NASA's preview
+renders and the meshes; NASA's pages do not say which satellites each shows. GOES has one array
+wing and a long magnetometer boom, the GOES-R series' shape, but NASA does not say which
+satellite it is, so all six GOES show it as a stand-in. A `family` model makes "Look closer"
+say "A stand-in shared by this kind of satellite".
+
+**Build steps specific to these models:**
+
+- TDRS (E) and Landsat 8: the simplifier overshoots on these too, so `aim` is 12,000 and 8,000;
+  they land at 13,901 and 14,293 (2.1% over, inside the gate's 5%).
+- Aqua, a change we made: the source draws one material, `shiny_panel` (the back of the array),
+  with the foil normal map as its colour picture, so that face showed blue-violet crinkles, and
+  it is the face "Look closer" opens on. The build draws it plain dark grey instead (`plain` in
+  `SOURCES`, `plainMaterials` in `scripts/craft-nodes.mjs`).
+- Aura and Suomi NPP are under budget as published: nothing is simplified.
+
+**Logo check, 2026-11-11.** Every texture image was extracted and viewed, label-like areas
+enlarged; NASA's preview renders were viewed where NASA has one (not GOES or Suomi NPP); each
+shipped file was rendered on a real GPU along all six axes, and anything label-like was rendered
+close. None shows an insignia, meatball, worm, patch, flag or company logo. The details per model
+are in each manifest entry's `logosChecked.detail`. Two things looked like marks and are not:
+a strip on the TDRS (B) dark panel (contrast-stretched 8x, no glyph; the cylinder's labels were
+painted over before NASA published the file), and rows on the GOES array that are solar-cell
+squares.
+
+**Attitude axes.** Both TDRS models carry the multiple-access array and dish feeds on +Y, the
+Earth side. For GOES, Landsat 8, Aqua, Aura and Suomi NPP the Earth-facing side was not
+determined from the mesh: their axis is a placeholder (`PLACEHOLDER_EARTH` in
+`modelDescriptor.ts`). Attitude is unused for satellites until they are drawn as models in the
+orrery; that step must set these.
+
+**Where they fall short:** the simplifier left gaps in the GOES array's rows of cells. GOES and
+Suomi NPP have no preview render from NASA to compare with.
 
 ### Other models under CC BY 4.0
 
@@ -305,12 +360,14 @@ or stay a dot.
 
 ## Budget plan (#202)
 
-No budget has been raised yet: the trial batch (below) leaves the shipped total at 2,671,904 B,
-under the existing 3,000,000 B `craftModelTotal`. The per-model budget stays **500 kB** on the
-uncompressed shipped file (`craftModelBytes`). The ten models shipped today total 2,159,048 B (VERIFIED, `wc -c` on
-`public/models/craft/`; 110 kB to 426 kB each, mean 216 kB) against a `craftModelTotal` of
-3,000,000 B. Only the focused object's model is ever loaded, so the total is deploy size, not a
-visitor's download.
+**`craftModelTotal` was raised on 2026-11-11 to 8,500,000 B** with the second batch, which took
+the shipped total from 2,671,904 B to 3,854,632 B, past the old 3,000,000 B. The per-model budget
+stays **500 kB** on the uncompressed shipped file (`craftModelBytes`). Only the focused object's
+model is ever loaded, so the total is deploy size, not a visitor's download.
+
+The baseline the plan below started from: the ten spacecraft models shipped before the gate
+totalled 2,159,048 B (VERIFIED, `wc -c` on `public/models/craft/`; 110 kB to 426 kB each, mean
+216 kB) against the 3,000,000 B total of the time.
 
 Proposed ceiling per tier-A model, sized from the shipped mean and the raw sizes above (a
 proposal, not a measurement; raw sizes are before decimation):
@@ -332,16 +389,19 @@ triangle count (about 11 to 23 B per triangle, textures included), so a model ne
 costs 160 to 190 kB. Projecting the other 26 slots at the shipped mean (216 kB) gives 5.6 MB, at the
 trial mean (174 kB) 4.5 MB; adding the ten shipped models (2.16 MB) and the three trial models
 (0.52 MB) gives **7.2 to 8.3 MB**. Recommendation: **8.5 MB** for the tier-A total (the upper projection
-rounded up, as a tripwire), down from the provisional 9 MB, raised in the commit that brings the total past 3 MB, not before. Starlink
-(19,644 faces, textured) is the one model that could land above the mean; measure it before
-settling. Nothing is raised now: the three models fit in the existing 3 MB.
+rounded up, as a tripwire), down from the provisional 9 MB, to be raised in the commit that
+brought the total past 3 MB; done with the second batch (above). Starlink (19,644 faces,
+textured) is the one model that could land above the mean; measure it before settling.
 
 ### Status on #194's checklist, 2026-11-11
 
 Proposed wording for the issue's "NASA models" item (the issue is not edited from here):
 
 - [x] ISS (B), Hubble (A), Terra: built, gated and registered (trial batch).
-- [ ] TDRS, Aqua, Aura, Landsat 8/9, GOES, Suomi NPP and the smaller missions in the catalog.
+- [x] TDRS (two generations), GOES, Landsat 8 (and 9), Aqua, Aura, Suomi NPP (and NOAA 20, 21):
+      built, gated and registered (second batch).
+- [ ] ICESat-2, OCO-2, SORCE, SDO, Fermi, SWAS, Chandra, MMS, THEMIS, CYGNSS, GRACE, Jason,
+      Jason CS, GPM, and the CubeSat and Satellite Kit stand-ins.
 - [ ] Starlink (Malacodart): not downloaded or measured yet; it is the one model that could exceed
       the trial mean size.
 
@@ -351,7 +411,7 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
    budget, a look for logos and a visual check.
 2. NASA's guidelines don't mention modifying files; the README says "without copyright". This is
    the position we already took for the 10 craft.
-3. Only the ten shipped before the gate and the trial batch's three are checked for logos (the ten
-   as "unrecorded"). Every other model needs its textures viewed before it ships.
+3. Only the ten craft shipped before the gate (as "unrecorded") and the ten satellite models of
+   the two batches are checked for logos. Every other model needs its textures viewed before it ships.
 4. NASA's pages list a person or a company as "Source" (Hubble (A): DigitalSpace Corporation). The
    credit repeats it; the rights position is still the README's "free and without copyright".

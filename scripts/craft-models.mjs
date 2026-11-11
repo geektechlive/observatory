@@ -38,7 +38,7 @@ import { MeshoptSimplifier } from 'meshoptimizer'
 import sharp from 'sharp'
 
 import { BUDGETS } from './check-bundle.mjs'
-import { dropNodes } from './craft-nodes.mjs'
+import { dropNodes, plainMaterials } from './craft-nodes.mjs'
 import { SOURCES } from './craft-sources.mjs'
 import {
   assertSourceFiles,
@@ -177,6 +177,7 @@ async function build(io, name, source, srcDir, outDir) {
     aim,
     blank = [],
     dropNodes: dropList = [],
+    plain = {},
   } = source
   const { triangles, sources } = MANIFEST[name]
   if (sources.length !== 1) throw new Error(`${name}: expects one source file, the manifest has ${sources.length}`)
@@ -187,6 +188,7 @@ async function build(io, name, source, srcDir, outDir) {
     : await io.read(join(srcDir, file))
   const before = triangleCount(doc)
   dropNodes(doc, dropList)
+  plainMaterials(doc, plain)
   stripAttributes(doc, textures)
   await blankTextures(doc, blank)
   await doc.transform(dedup(), weld())

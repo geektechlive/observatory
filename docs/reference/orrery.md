@@ -219,7 +219,8 @@ A silhouette at a distance, a 3D model when focused.
   Horizons is assembled from NASA's 3D-printing parts, credited as approximate.
 - **One descriptor and a gate for every model (#202).** The layer takes a `ModelDescriptor`
   (`src/lib/orrery/modelDescriptor.ts`): spacecraft resolve by NAIF id, satellites by NORAD id and
-  then family (empty until #194). `loadModel` (`three/craftModelLoad.ts`) loads, centres and
+  then family (that table is still empty: shared stand-ins, such as one TDRS model for its
+  generation, are filed by NORAD id with `scope: 'family'`). `loadModel` (`three/craftModelLoad.ts`) loads, centres and
   fits one, with an `AbortSignal` and a `dispose`, for any view. Every shipped file needs a
   complete entry in `scripts/craft-manifest.mjs`; see
   [satellite-models.md](satellite-models.md#the-asset-gate).
@@ -233,7 +234,7 @@ A silhouette at a distance, a 3D model when focused.
   frame, on screen or not, and passes it to `CraftModelLayer.place`. The test probe
   `data-orrery-px` reports it as `model` (px, or null when none is drawn). Look closer shows the
   model full size, unaffected by this rule.
-- **`check-bundle` rules:** `craft-model-bytes` (500 kB each), `craft-model-total` (3 MB),
+- **`check-bundle` rules:** `craft-model-bytes` (500 kB each), `craft-model-total` (8.5 MB, sized for all of tier A; see satellite-models.md),
   `entry-has-no-craft-models`, `gltf-loader-gzip` (30 kB; 13.5 kB measured).
 
 ## The detail view, "Look closer" (#203)

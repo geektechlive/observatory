@@ -102,9 +102,12 @@ type NasaSatelliteFields = Pick<
   'file' | 'sourceUrl' | 'credit' | 'attitude' | 'axis' | 'attitudeNote'
 >
 
-/** A NASA 3D Resources model of the very satellite it is filed under. */
-function nasaSatellite(fields: NasaSatelliteFields): FileDescriptor {
-  return { ...fields, kind: 'file', licence: NASA_LICENCE, scope: 'own' }
+/**
+ * A NASA 3D Resources model of the very satellite it is filed under (`own`), or of its design
+ * or generation, shown for a sibling (`family`).
+ */
+function nasaSatellite(fields: NasaSatelliteFields, scope: ModelScope = 'own'): FileDescriptor {
+  return { ...fields, kind: 'file', licence: NASA_LICENCE, scope }
 }
 
 const RES = 'https://science.nasa.gov/3d-resources'
@@ -117,6 +120,56 @@ const ISS_MODEL = nasaSatellite({
   axis: ISS_AXIS,
   attitudeNote: 'Truss across the orbit, flat side toward Earth',
 })
+
+/** One descriptor filed under several NORAD ids. */
+function sharing(ids: readonly string[], model: ModelDescriptor): SatelliteModelTable {
+  return Object.fromEntries(ids.map((id) => [id, model]))
+}
+
+// TDRS is two designs, each with its own model: the first generation (TDRS 1 to 7) and the
+// later Boeing-bus satellites (TDRS 8 to 13). Both models carry the multiple-access array and
+// the dish feeds on +Y, the side that faces Earth.
+const TDRS_GEN1: NasaSatelliteFields = {
+  file: '/models/craft/tdrs-gen1.glb',
+  sourceUrl: `${RES}/tracking-and-data-relay-satellites-tdrs-b/`,
+  credit: 'NASA/JPL/Eyes on the Solar System',
+  attitude: 'earth',
+  axis: [0, 1, 0],
+  attitudeNote: 'Antenna side toward Earth',
+}
+const TDRS_GEN2: NasaSatelliteFields = {
+  ...TDRS_GEN1,
+  file: '/models/craft/tdrs-gen2.glb',
+  sourceUrl: `${RES}/tracking-and-data-relay-satellites-trds-e/`,
+  credit: 'NASA/Christopher R. Meaney',
+}
+
+// The Earth-facing side of these models was not determined from the mesh (#194). Attitude is
+// not used for satellites until they are drawn as models in the orrery, and that step must
+// set these axes; docs/reference/satellite-models.md lists them.
+const PLACEHOLDER_EARTH = {
+  attitude: 'earth',
+  axis: [0, -1, 0],
+  attitudeNote: 'Earth-pointing (model axis not yet checked)',
+} as const
+const GOES: NasaSatelliteFields = {
+  file: '/models/craft/goes.glb',
+  sourceUrl: `${RES}/geostationary-operational-environmental-satellites/`,
+  credit: 'NASA/Christopher R. Meaney',
+  ...PLACEHOLDER_EARTH,
+}
+const LANDSAT_8: NasaSatelliteFields = {
+  file: '/models/craft/landsat8.glb',
+  sourceUrl: `${RES}/landsat-8/`,
+  credit: 'NASA/Christopher R. Meaney',
+  ...PLACEHOLDER_EARTH,
+}
+const SUOMI_NPP: NasaSatelliteFields = {
+  file: '/models/craft/suomi-npp.glb',
+  sourceUrl: `${RES}/suomi-national-polar-orbiting-partnership-suomi-npp/`,
+  credit: 'NASA/Brian E. Kumanchik; NASA/Christian A. Lopez',
+  ...PLACEHOLDER_EARTH,
+}
 
 /**
  * By NORAD id, as a string: a model of that very object (`scope: 'own'`). The ISS is six
@@ -151,6 +204,28 @@ export const SATELLITE_MODELS_BY_NORAD: SatelliteModelTable = {
     axis: TERRA_AXIS,
     attitudeNote: 'Instrument side toward Earth, antenna away',
   }),
+  ...sharing(['19548', '21639', '22314', '23613'], nasaSatellite(TDRS_GEN1, 'family')), // TDRS 3, 5, 6, 7
+  ...sharing(['26388', '39070', '39504', '42915'], nasaSatellite(TDRS_GEN2, 'family')), // TDRS 8, 11, 12, 13
+  // GOES 14 to 19. The model's shape (one array wing, a long magnetometer boom) is the GOES-R
+  // series (16 to 19), but which satellite it shows is not stated, so all six are `family`.
+  ...sharing(['35491', '36411', '41866', '43226', '51850', '60133'], nasaSatellite(GOES, 'family')),
+  '39084': nasaSatellite(LANDSAT_8), // LANDSAT 8
+  '49260': nasaSatellite(LANDSAT_8, 'family'), // LANDSAT 9, a near twin
+  '27424': nasaSatellite({
+    file: '/models/craft/aqua.glb',
+    sourceUrl: `${RES}/aqua-b/`,
+    credit: 'NASA/Brian E. Kumanchik; NASA/Christian A. Lopez',
+    ...PLACEHOLDER_EARTH,
+  }),
+  '28376': nasaSatellite({
+    file: '/models/craft/aura.glb',
+    sourceUrl: `${RES}/aura-a/`,
+    credit: 'NASA/Ames Research Center',
+    ...PLACEHOLDER_EARTH,
+  }),
+  '37849': nasaSatellite(SUOMI_NPP), // SUOMI NPP
+  // NOAA 20 and 21 (JPSS-1, JPSS-2) fly the same instruments on a bus of the same family.
+  ...sharing(['43013', '54234'], nasaSatellite(SUOMI_NPP, 'family')),
 }
 
 /**

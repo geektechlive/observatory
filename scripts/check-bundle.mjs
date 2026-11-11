@@ -44,9 +44,11 @@ export const BUDGETS = {
   // single-thread WASM (the #97 bulk worker alone was ~44 kB) plus zod for the body check.
   satWorkerGzip: 80_000,
   // #115 measured the ten spacecraft models at 110-426 kB each, 2.16 MB together. Only the
-  // focused craft's model loads, so the total is disk, not a visitor's download.
+  // focused craft's model loads, so the total is disk, not a visitor's download. The total
+  // is sized for all of tier A (#194, docs/reference/satellite-models.md, "Budget plan"):
+  // 3.85 MB with the second batch.
   craftModelBytes: 500_000,
-  craftModelTotal: 3_000_000,
+  craftModelTotal: 8_500_000,
   // three's GLTFLoader, fetched with the first craft model (#115).
   gltfLoaderGzip: 30_000,
   // The orrery's guide drawer (#159): lessons, reference copy and the glossary, fetched
