@@ -224,10 +224,15 @@ A silhouette at a distance, a 3D model when focused.
   complete entry in `scripts/craft-manifest.mjs`; see
   [satellite-models.md](satellite-models.md#the-asset-gate).
 - **Only the focused craft has a model** (`three/craftModelLayer.ts`). It is fetched on focus
-  (GLTFLoader is its own chunk), disposed when the focus moves, sized `CRAFT_MODEL_PX` (100) in
-  radius by its body, not its booms (`craftModelFit.ts`), and seen three-quarter on
-  (`threeQuarterView`). The canvas's `data-orrery-model` reads `loading:`, `model:`,
-  `simplified:` or `failed:<naif>`.
+  (GLTFLoader is its own chunk), disposed when the focus moves, sized by its body, not its booms
+  (`craftModelFit.ts`), and seen three-quarter on (`threeQuarterView`). The canvas's
+  `data-orrery-model` reads `loading:`, `model:`, `simplified:` or `failed:<naif>`.
+- **The model is never bigger on screen than the Sun (#204).** Its radius is
+  `craftModelPx(sunPx)` (`three/pxClamp.ts`): 0.9 of the Sun's drawn radius, held between the
+  craft icon's radius (9 px) and 100 px. The renderer takes the Sun's projected radius each
+  frame, on screen or not, and passes it to `CraftModelLayer.place`. The test probe
+  `data-orrery-px` reports it as `model` (px, or null when none is drawn). Look closer shows the
+  model full size, unaffected by this rule.
 - **`check-bundle` rules:** `craft-model-bytes` (500 kB each), `craft-model-total` (3 MB),
   `entry-has-no-craft-models`, `gltf-loader-gzip` (30 kB; 13.5 kB measured).
 

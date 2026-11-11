@@ -83,7 +83,7 @@ import { loadGltfScene } from './gltfLoad'
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
-import { clampRadius, PX_CEILING } from './pxClamp'
+import { clampRadius, craftModelPx, PX_CEILING } from './pxClamp'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
@@ -317,6 +317,8 @@ export class OrreryRenderer {
   private readonly onContextLost: () => void
   private readonly clock: ClockReader
   private readonly scratch = new Vector3()
+  /** The focused craft model's drawn radius, px, this frame (null when none is drawn). */
+  private modelPx: number | null = null
   private preset: FocusPreset | null = DEFAULT_PRESET
   /** The view is still exactly a preset's (the user has not turned or zoomed): refit on resize. */
   private presetPristine = true
@@ -499,16 +501,18 @@ export class OrreryRenderer {
     mesh.scale.setScalar(clampRadius(mesh.scale.x, this.unitsPerPx(depth), px, maxPx))
   }
 
+  /** A mesh's drawn radius, px, from its scale and its distance to the camera. */
+  private drawnPx(mesh: Object3D): number {
+    return mesh.scale.x / this.unitsPerPx(mesh.position.distanceTo(this.camera.position))
+  }
+
   /**
    * Test probe (#195, #196): the drawn radii, px, as JSON on the canvas. Only runs when
    * a test has put `data-orrery-px` on the canvas, so production pays one attribute check.
    */
   private writePxProbe(): void {
     if (!this.canvas.hasAttribute('data-orrery-px')) return
-    const px = (mesh: Object3D): number =>
-      Math.round(
-        (mesh.scale.x / this.unitsPerPx(mesh.position.distanceTo(this.camera.position))) * 100,
-      ) / 100
+    const px = (mesh: Object3D): number => Math.round(this.drawnPx(mesh) * 100) / 100
     const maxOf = (meshes: Object3D[]): number | null =>
       meshes.length === 0 ? null : Math.max(...meshes.map(px))
     const sun = this.bodies.get('Sun')
@@ -520,6 +524,7 @@ export class OrreryRenderer {
         const side = maxOf(craft.map((c) => c.mesh))
         return side === null ? null : side / 2
       })(),
+      model: this.modelPx === null ? null : Math.round(this.modelPx * 100) / 100,
       moon: maxOf(this.moons.visible().map((m) => m.mesh)),
       l1: this.near.l1.visible ? px(this.near.l1) : null,
       asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
@@ -648,6 +653,7 @@ export class OrreryRenderer {
 
   /** The focused craft's model at its position, its axis along its attitude (#115). */
   private placeModel(): void {
+    this.modelPx = null
     const key = this.models.shownKey()
     this.craft.setModelKey(key)
     const model = this.models.shownDescriptor()
@@ -655,7 +661,15 @@ export class OrreryRenderer {
     const at = this.craft.position(key)
     const facing = this.craftFacing(key)
     if (!at || !facing) return
-    this.models.place(at, this.unitsPerPx(at.distanceTo(this.camera.position)), facing)
+    // Never bigger than the Sun as drawn, on screen or off it (#204).
+    const sun = this.bodies.get('Sun')
+    this.modelPx = craftModelPx(sun ? this.drawnPx(sun) : NaN)
+    this.models.place(
+      at,
+      this.unitsPerPx(at.distanceTo(this.camera.position)),
+      facing,
+      this.modelPx,
+    )
   }
 
   /** Scene direction a craft model's axis points along (its attitude), or null. */

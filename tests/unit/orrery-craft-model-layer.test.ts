@@ -1,7 +1,7 @@
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial, type Object3D, Vector3 } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { CRAFT_MODEL_PX, CraftModelLayer } from '@/components/orrery/three/craftModelLayer'
+import { CraftModelLayer } from '@/components/orrery/three/craftModelLayer'
 
 /** A stand-in for a loaded GLB: one 2 x 2 x 2 box, its dispose spied. */
 function fakeModel() {
@@ -102,12 +102,13 @@ describe('CraftModelLayer (#115)', () => {
     await flush()
     const dir = new Vector3(1, 0, 0)
     const unitsPerPx = 0.01
-    layer.place(new Vector3(5, 0, 0), unitsPerPx, dir)
+    const modelPx = 30
+    layer.place(new Vector3(5, 0, 0), unitsPerPx, dir, modelPx)
     const holder = layer.group.children[0] as Object3D
     const axis = new Vector3(0, 1, 0).applyQuaternion(holder.quaternion)
     expect(axis.distanceTo(dir)).toBeLessThan(1e-6)
     expect(holder.position.x).toBeCloseTo(5)
     // The fake box's robust radius is its corner distance, sqrt(3).
-    expect(holder.scale.x).toBeCloseTo((CRAFT_MODEL_PX * unitsPerPx) / Math.sqrt(3), 6)
+    expect(holder.scale.x).toBeCloseTo((modelPx * unitsPerPx) / Math.sqrt(3), 6)
   })
 })

@@ -13,9 +13,6 @@ import { buildStandIn } from './craftStandIns'
 
 export type { ModelLoader }
 
-/** A focused craft model's radius on screen, px (it is not to scale). */
-export const CRAFT_MODEL_PX = 100
-
 interface Shown {
   key: string
   naifId: string
@@ -110,12 +107,12 @@ export class CraftModelLayer {
     this.shown = null
   }
 
-  /** Put the model at `position`, CRAFT_MODEL_PX in radius, its axis along `direction`. */
-  place(position: Vector3, unitsPerPx: number, direction: Vector3): void {
+  /** Put the model at `position`, `px` in radius on screen, its axis along `direction`. */
+  place(position: Vector3, unitsPerPx: number, direction: Vector3, px: number): void {
     const s = this.shown
     if (!s) return
     s.holder.position.copy(position)
-    s.holder.scale.setScalar((CRAFT_MODEL_PX * unitsPerPx) / s.radius)
+    s.holder.scale.setScalar((px * unitsPerPx) / s.radius)
     this.axis.set(...s.model.axis).normalize()
     this.quaternion.setFromUnitVectors(this.axis, direction.clone().normalize())
     s.holder.quaternion.copy(this.quaternion)

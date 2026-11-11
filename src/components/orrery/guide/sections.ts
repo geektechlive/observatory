@@ -103,7 +103,7 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
-        text: 'Spacecraft and satellites that have a 3D model show a Look closer button above their facts. It fills the stage with the model while the orrery pauses behind it. Drag to turn the model, scroll or pinch to zoom, or use the arrow keys and the plus and minus buttons. Esc or Back to orrery returns to the orrery, and focus goes back to the button. Some models are simplified stand-ins, not the exact object, and say so. Every model shows its credit and licence underneath.',
+        text: 'Spacecraft and satellites that have a 3D model show a Look closer button above their facts. It fills the stage with the model while the orrery pauses behind it. Drag to turn the model, scroll or pinch to zoom, or use the arrow keys and the plus and minus buttons. Esc or Back to orrery returns to the orrery, and focus goes back to the button. On the orrery a model is drawn no bigger than the Sun, so Look closer is the way to see it full size. Some models are simplified stand-ins, not the exact object, and say so. Every model shows its credit and licence underneath.',
       },
       { kind: 'terms', ids: ['light-time', 'range-rate', 'dsn', 'coarse', 'epoch', 'tle-omm'] },
     ],

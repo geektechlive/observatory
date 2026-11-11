@@ -20,6 +20,7 @@ test.beforeEach(async ({ page }) => {
 interface Px {
   sun: number | null
   craft: number | null
+  model: number | null
   moon: number | null
   l1: number | null
   asteroid: number | null
@@ -50,6 +51,7 @@ async function readPx(page: Page): Promise<Px> {
     : {
         sun: null,
         craft: null,
+        model: null,
         moon: null,
         l1: null,
         asteroid: null,
@@ -113,6 +115,35 @@ test.describe('marker sizes against the Sun (#195, #196)', () => {
         .toBe(true)
       const px = await readPx(page)
       expect(px.sun ?? 0).toBeGreaterThan(px.craft ?? Infinity)
+    })
+  }
+
+  for (const [scale, view] of [
+    ['Big bodies', 'Inner'],
+    ['Log distance', 'Inner'],
+    ['Proportional', 'Inner'],
+    ['Big bodies', 'Heliosphere'],
+  ] as const) {
+    test(`${scale}, ${view}: the focused craft's model is no bigger than the Sun (#204)`, async ({
+      page,
+    }) => {
+      await openOrrery(page, true)
+      await page.getByRole('button', { name: scale, exact: true }).click()
+      await page.getByRole('button', { name: view, exact: true }).click()
+      await page.getByRole('combobox', { name: /find/i }).fill('Parker')
+      await page.getByRole('option', { name: 'Parker Solar Probe', exact: true }).click()
+      await expect(canvas(page)).toHaveAttribute('data-orrery-model', 'model:-96', {
+        timeout: 15_000,
+      })
+      const bounded = async () => {
+        await expect.poll(async () => (await readPx(page)).model).not.toBeNull()
+        const px = await readPx(page)
+        expect(px.sun, 'the Sun is measured').not.toBeNull()
+        expect(px.model ?? Infinity, 'model px against the Sun').toBeLessThanOrEqual(px.sun ?? 0)
+      }
+      await bounded()
+      await zoomIn(page)
+      await bounded()
     })
   }
 })

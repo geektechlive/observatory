@@ -4,6 +4,8 @@
  * shrinks to its px floor in the Earth frame.
  */
 
+import { CRAFT_ICON_PX } from './craftLayer'
+
 /**
  * A scene radius held between `minPx` and `maxPx` on screen, given the scene units that
  * cover one px. The ceiling wins if the floor sits above it. No `maxPx`: floor only.
@@ -30,3 +32,18 @@ export const PX_CEILING = {
   satMarker: 6,
   satReentry: 9,
 } as const
+
+/** The focused craft's model: never bigger than this share of the Sun's drawn radius. */
+const MODEL_SUN_SHARE = 0.9
+/** The most a craft's model draws at, px in radius, however big the Sun is. */
+export const CRAFT_MODEL_MAX_PX = 100
+
+/**
+ * The focused craft's model radius, px (#204): 0.9 of the Sun's drawn radius, held between
+ * the craft icon's radius and 100 px. A Sun radius that is not a number gives the floor.
+ */
+export function craftModelPx(sunPx: number): number {
+  const floor = CRAFT_ICON_PX / 2
+  if (Number.isNaN(sunPx)) return floor
+  return Math.min(CRAFT_MODEL_MAX_PX, Math.max(floor, sunPx * MODEL_SUN_SHARE))
+}
