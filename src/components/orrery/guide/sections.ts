@@ -36,7 +36,7 @@ export const SECTIONS: readonly Section[] = [
           'Mouse: drag to turn the view, scroll to zoom, and drag with the right button to slide it sideways.',
           'Touch: drag with one finger to turn, pinch to zoom, and drag with two fingers to slide.',
           'Keyboard: Tab moves between the labels on the stage and the controls, and Enter picks one. On the time slider the arrow keys step a day, and Shift with an arrow steps a week.',
-          'Click or tap a body, craft or label to open its inspector and fly the camera there. Esc closes this guide.',
+          'Click or tap a body, craft or label to open its inspector and fly the camera there. Esc closes this guide, or the close-up of a model when one is open.',
         ],
       },
       {
@@ -100,6 +100,10 @@ export const SECTIONS: readonly Section[] = [
       {
         kind: 'p',
         text: 'Each number is measured or modelled. The planets are modelled: computed from JPL’s approximate orbital elements, and the inspector gives their accuracy. A spacecraft’s path comes from JPL Horizons, reconstructed from tracking up to the last contact and predicted after it. A satellite’s position is modelled from orbit data fitted at an epoch. What is measured live is the solar wind at L1 (NOAA), the Sun’s picture (NOAA’s GOES SUVI) and which craft the Deep Space Network is talking to.',
+      },
+      {
+        kind: 'p',
+        text: 'Spacecraft and satellites that have a 3D model show a Look closer button above their facts. It fills the stage with the model while the orrery pauses behind it. Drag to turn the model, scroll or pinch to zoom, or use the arrow keys and the plus and minus buttons. Esc or Back to orrery returns to the orrery, and focus goes back to the button. Some models are simplified stand-ins, not the exact object, and say so. Every model shows its credit and licence underneath.',
       },
       { kind: 'terms', ids: ['light-time', 'range-rate', 'dsn', 'coarse', 'epoch', 'tle-omm'] },
     ],

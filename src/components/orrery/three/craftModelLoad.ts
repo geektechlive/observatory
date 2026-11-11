@@ -64,16 +64,25 @@ function positionsOf(root: Object3D): number[] {
   return out
 }
 
-/** Free the GPU resources (geometry, materials, textures) of everything under `root`. */
-export function disposeTree(root: Object3D): void {
+/** Every texture a material under `root` holds (a texture two slots share is listed once). */
+export function texturesOf(root: Object3D): Texture[] {
+  const found = new Set<Texture>()
   for (const mesh of meshes(root)) {
-    mesh.geometry.dispose()
     for (const m of materialsOf(mesh)) {
       for (const value of Object.values(m) as unknown[]) {
-        if (value instanceof Texture) value.dispose()
+        if (value instanceof Texture) found.add(value as Texture)
       }
-      m.dispose()
     }
+  }
+  return [...found]
+}
+
+/** Free the GPU resources (geometry, materials, textures) of everything under `root`. */
+export function disposeTree(root: Object3D): void {
+  for (const texture of texturesOf(root)) texture.dispose()
+  for (const mesh of meshes(root)) {
+    mesh.geometry.dispose()
+    for (const m of materialsOf(mesh)) m.dispose()
   }
 }
 

@@ -28,3 +28,4 @@ that makes the decision.
 | [0018](0018-the-header-judges-the-view-on-screen.md)          | The header's status judges the view on screen, by that view's own feeds                   | #178           |
 | [0019](0019-jonsson-maps-as-in-scene-textures.md)             | Björn Jónsson's maps stay, as downscaled in-scene textures, credited and linked           | #180           |
 | [0020](0020-models-ship-through-a-gate.md)                    | A 3D model ships only through the asset gate: licence evidence, a logo check and a budget | #202           |
+| [0021](0021-the-detail-view-has-its-own-canvas.md)            | The close-up model view has a canvas and renderer of its own, and the orrery steps aside  | #203           |

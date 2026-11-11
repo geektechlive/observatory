@@ -27,6 +27,7 @@ import {
   rangeRateKmS,
 } from '@/lib/orrery'
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
+import { modelForKey } from '@/lib/orrery/modelDescriptor'
 import { moonBodies } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
 import { reentriesWithin } from '@/lib/spaceTrackText'
@@ -39,6 +40,8 @@ import consoleStyles from '../consoles/console.module.css'
 import { buildCatalog, L1_KEY, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
+import { DetailLoading } from './DetailLoading'
+import { DETAIL_VIEW_ID } from './detailViewId'
 import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
@@ -56,6 +59,7 @@ import {
   toggleForGroup,
   withToggleOn,
 } from './satToggles'
+import type { DetailStats } from './three/DetailScene'
 import type {
   FocusPreset,
   OrreryRenderer,
@@ -66,6 +70,7 @@ import type {
   Visibility,
 } from './three/OrreryRenderer'
 import { TimeBar } from './TimeBar'
+import { useDetailViewModule } from './useDetailViewModule'
 import { useGuide } from './useGuide'
 import { useLookupTrack } from './useLookupTrack'
 import { useNearEarth } from './useNearEarth'
@@ -131,7 +136,7 @@ function acquire(width: number, height: number, reducedMotion: boolean) {
 }
 
 /** The view store's setters are stable: the page uses them like state setters. */
-const { setSelected, setScale, setPreset } = useOrreryView.getState()
+const { setSelected, setScale, setPreset, openDetail, closeDetail } = useOrreryView.getState()
 
 /** A pointer that moves further than this between down and up was a drag, not a tap. */
 const DRAG_PX = 5
@@ -224,6 +229,7 @@ export function OrreryPage() {
   const selected = useOrreryView((s) => s.selected)
   const scale = useOrreryView((s) => s.scale)
   const preset = useOrreryView((s) => s.preset)
+  const detail = useOrreryView((s) => s.detail)
   const [visibility, setVisibility] = useState<Visibility>({
     planets: true,
     orbits: true,
@@ -294,7 +300,6 @@ export function OrreryPage() {
   useEffect(() => {
     if (lost) return
     let cancelled = false
-    let attached: OrreryRenderer | null = null
     const el = host.current
     if (!el) return
     const onLost = () => {
@@ -305,8 +310,6 @@ export function OrreryPage() {
       .then((r) => {
         if (cancelled || !host.current) return
         r.resize(host.current.clientWidth, host.current.clientHeight)
-        r.attach(host.current)
-        attached = r
         setRenderer(r)
       })
       .catch((error: unknown) => {
@@ -318,9 +321,62 @@ export function OrreryPage() {
     return () => {
       cancelled = true
       if (pageOnLost === onLost) pageOnLost = null
-      attached?.detach()
     }
   }, [reducedMotion])
+
+  // The detail view (#203) has a canvas of its own, so the orrery steps aside while it is
+  // open: detach() stops the loop, the tick and the Sun image and takes the canvas off the
+  // page, keeping the scene. This effect is the only owner of attach and detach, so a
+  // page that unmounts with the view open leaves nothing attached.
+  const detailDescriptor = useMemo(
+    () => (detail ? modelForKey(detail, (key) => renderer?.satellite(key) ?? null) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- satState says a group loaded
+    [detail, renderer, satState],
+  )
+  const detailOpen = detail !== null && detailDescriptor !== undefined
+  // The view's chunk loads on first open, never with the page (scripts/check-bundle.mjs).
+  // If the fetch fails the view closes, so the orrery re-attaches and is never left detached.
+
+  const DetailViewComponent = useDetailViewModule(detailOpen, closeDetail)
+  useEffect(() => {
+    const el = host.current
+    if (!renderer || !el || detailOpen) return
+    renderer.resize(el.clientWidth, el.clientHeight)
+    renderer.attach(el)
+    return () => {
+      renderer.detach()
+    }
+  }, [renderer, detailOpen])
+
+  const lookCloserRef = useRef<HTMLButtonElement>(null)
+  // Closing the view returns focus to the button that opened it (#203).
+  // Only after Back to orrery or Escape: a close from a link, a lost context or a new
+  // selection must leave focus where the user put it.
+  const wasDetailOpen = useRef(false)
+  const returnFocus = useRef(false)
+  useEffect(() => {
+    if (detailOpen) {
+      wasDetailOpen.current = true
+    } else if (wasDetailOpen.current) {
+      wasDetailOpen.current = false
+      if (returnFocus.current) lookCloserRef.current?.focus()
+      returnFocus.current = false
+    }
+  }, [detailOpen])
+  const backToOrrery = useCallback(() => {
+    returnFocus.current = true
+    closeDetail()
+  }, [])
+  // How many detail scenes and models are alive, on the page root, for the leak test.
+  const reportDetailStats = useCallback((stats: DetailStats) => {
+    const el = root.current
+    if (!el) return
+    el.dataset['orreryDetailScenes'] = String(stats.scenes)
+    el.dataset['orreryDetailModels'] = String(stats.models)
+    el.dataset['orreryDetailOpened'] = String(stats.opened)
+    el.dataset['orreryDetailLeaked'] = String(stats.leaked)
+    el.dataset['orreryDetailLeakedTextures'] = String(stats.leakedTextures)
+  }, [])
 
   // Follow the stage's size.
   useEffect(() => {
@@ -675,9 +731,8 @@ export function OrreryPage() {
     applyPreset: onPreset,
     requestLookup: useLookupStore.getState().request,
     lookupFailed: lookup.failed,
-    // No model registry yet (#202): until the view lands, a `detail` link falls back to
-    // the focus with the inspector open.
-    hasModel: () => false,
+    // A `detail` link to an object with no model falls back to the focus alone.
+    hasModel: (key) => modelForKey(key, (k) => renderer?.satellite(k) ?? null) !== undefined,
     clearSelection: () => {
       setSelected(null)
     },
@@ -713,6 +768,9 @@ export function OrreryPage() {
       const b = bar?.getBoundingClientRect()
       const top = b && b.width > s.width * 0.6 ? b.bottom - s.top + GUIDE_BAR_GAP_PX : 0
       renderer.setViewInset(right, bottom, top)
+      // The detail view leaves this much free for the inspector (#203).
+      box.style.setProperty('--inspector-right', `${String(right)}px`)
+      box.style.setProperty('--inspector-bottom', `${String(bottom)}px`)
     }
     measure()
     if (typeof ResizeObserver === 'undefined') return
@@ -722,7 +780,7 @@ export function OrreryPage() {
     return () => {
       observer.disconnect()
     }
-  }, [renderer, selected, guide.mode, barHeight])
+  }, [renderer, selected, guide.mode, barHeight, detailOpen])
 
   const voice = voiceFor('orrery', {
     ...VOICE_EMPTY,
@@ -739,6 +797,16 @@ export function OrreryPage() {
   const satellite = selected && isSatKey(selected) ? (renderer?.satellite(selected) ?? null) : null
   // Its Space-Track catalogue entry (#101), passed to the inspector with the rest.
   const satCatalog = useSatcatEntry(satellite?.noradId ?? null)
+  // The button waits for a satellite's group to load, so it follows `satState` too.
+  const lookDescriptor = useMemo(
+    () => (selected ? modelForKey(selected, (k) => renderer?.satellite(k) ?? null) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- satState says a group loaded
+    [selected, renderer, satState],
+  )
+  const detailTitle =
+    (detail && isSatKey(detail) ? satellite?.name : tracks.find((t) => t.id === detail)?.name) ??
+    detail ??
+    ''
   const craftStatus = craftStatusText(
     bodies.status,
     craftTracks.length,
@@ -747,7 +815,12 @@ export function OrreryPage() {
   )
 
   return (
-    <div ref={root} className={styles.page ?? ''} data-orrery-page="">
+    <div
+      ref={root}
+      className={styles.page ?? ''}
+      data-orrery-page=""
+      data-detail={detailOpen ? 'open' : undefined}
+    >
       <div className={styles.voiceStrip ?? ''}>
         <p className={consoleStyles.voice ?? ''}>{voice}</p>
         <p className={consoleStyles.sub ?? ''}>
@@ -815,6 +888,7 @@ export function OrreryPage() {
         className={styles.stage ?? ''}
         aria-label="Orrery"
         data-guide={guide.mode}
+        data-detail={detailOpen ? 'open' : undefined}
         style={{ '--guide-bar-h': `${String(barHeight)}px` } as CSSProperties}
       >
         <div
@@ -1041,6 +1115,24 @@ export function OrreryPage() {
             />
           </Suspense>
         )}
+        {detail &&
+          detailDescriptor &&
+          (DetailViewComponent ? (
+            // eslint-disable-next-line react-hooks/static-components -- see above
+            <DetailViewComponent
+              key={detail}
+              descriptor={detailDescriptor}
+              title={detailTitle}
+              reducedMotion={reducedMotion}
+              onClose={(cause) => {
+                if (cause === 'user') backToOrrery()
+                else closeDetail()
+              }}
+              onStats={reportDetailStats}
+            />
+          ) : (
+            <DetailLoading onClose={backToOrrery} />
+          ))}
         {selected && (
           <Inspector
             ref={inspectorRef}
@@ -1059,6 +1151,18 @@ export function OrreryPage() {
             discos={discos}
             reentries={reentries}
             satCatalog={satCatalog}
+            lookCloser={
+              lookDescriptor
+                ? {
+                    onOpen: () => {
+                      openDetail(selected)
+                    },
+                    open: detailOpen,
+                    controls: detailOpen ? DETAIL_VIEW_ID : undefined,
+                  }
+                : undefined
+            }
+            lookCloserRef={lookCloserRef}
             onClose={() => {
               setSelected(null)
             }}

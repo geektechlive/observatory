@@ -79,6 +79,7 @@ import {
   lookupFocusView,
   sunlitFocusDirection,
 } from './framing'
+import { loadGltfScene } from './gltfLoad'
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
@@ -257,17 +258,11 @@ export class OrreryRenderer {
   private readonly moons = new MoonLayer()
   /**
    * The focused craft as a 3D model (#115). GLTFLoader is its own chunk, fetched with the
-   * first model; the models need no decoder (scripts/craft-models.mjs).
+   * first model, through the loader the detail view shares (gltfLoad.ts).
    */
-  private readonly models = new CraftModelLayer(
-    (url) =>
-      import('three/examples/jsm/loaders/GLTFLoader.js')
-        .then(({ GLTFLoader }) => new GLTFLoader().loadAsync(url))
-        .then((gltf) => gltf.scene),
-    () => {
-      this.markDirty()
-    },
-  )
+  private readonly models = new CraftModelLayer(loadGltfScene, () => {
+    this.markDirty()
+  })
   /** Earth's neighbourhood (#92): the Earth frame, close approaches, Sun–Earth line, L1. */
   private readonly near = new EarthNeighbourhood()
   /** An object looked up at JPL and shown (#145): its marker and orbit line. */
@@ -934,6 +929,9 @@ export class OrreryRenderer {
       next.bottom !== this.inset.bottom ||
       next.top !== this.inset.top
     this.inset = next
+    // The inset in force, for the e2e check that the view inset follows the inspector (#203).
+    this.canvas.dataset['orreryInset'] =
+      `${String(next.right)},${String(next.bottom)},${String(next.top)}`
     this.applyInset()
     // The picture moved by the sheet: a preset is fitted for where it now sits.
     if (changed) this.refitPreset()

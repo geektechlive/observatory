@@ -15,6 +15,7 @@ interface Finding {
 
 const BUDGETS = {
   orreryGuideGzip: 4_000,
+  detailViewGzip: 4_000,
   entryGzip: 4_000,
   lazyThreeGzip: 4_000,
   worldMapGzip: 4_000,
@@ -60,6 +61,7 @@ describe('checkBundle', () => {
     const dir = fakeDist({
       'assets/index-abc.js': 'x',
       'assets/OrreryPage-zz.js': `data-orrery-page ${noise}`,
+      'assets/DetailView-dd.js': 'data-detail-view',
       'assets/OrreryRenderer-yy.js': 'small',
       'assets/OrreryGuide-gg.js': 'data-guide-drawer',
     })
@@ -334,6 +336,7 @@ describe('checkBundle: the guide drawer', () => {
     const dir = fakeDist({
       'assets/index-abc.js': 'x',
       'assets/OrreryPage-zz.js': 'data-orrery-page data-guide-drawer',
+      'assets/DetailView-dd.js': 'data-detail-view',
       'assets/OrreryGuide-gg.js': 'data-guide-drawer',
     })
     expect(failures(checkBundle(dir, budgets))).toEqual(['orrery-page-has-no-guide'])
@@ -343,12 +346,14 @@ describe('checkBundle: the guide drawer', () => {
     const big = fakeDist({
       'assets/index-abc.js': 'x',
       'assets/OrreryPage-zz.js': 'data-orrery-page',
+      'assets/DetailView-dd.js': 'data-detail-view',
       'assets/OrreryGuide-gg.js': `data-guide-drawer ${noise}`,
     })
     expect(failures(checkBundle(big, budgets))).toEqual(['orrery-guide-gzip'])
     const small = fakeDist({
       'assets/index-abc.js': 'x',
       'assets/OrreryPage-zz.js': 'data-orrery-page',
+      'assets/DetailView-dd.js': 'data-detail-view',
       'assets/OrreryGuide-gg.js': 'data-guide-drawer',
     })
     const findings = checkBundle(small, budgets) as Finding[]
@@ -360,7 +365,53 @@ describe('checkBundle: the guide drawer', () => {
     const dir = fakeDist({
       'assets/index-abc.js': 'x',
       'assets/OrreryPage-zz.js': 'data-orrery-page',
+      'assets/DetailView-dd.js': 'data-detail-view',
     })
     expect(failures(checkBundle(dir, budgets))).toEqual(['orrery-guide-found'])
+  })
+})
+
+// #203: the "Look closer" view is its own lazy chunk, loaded on first open.
+describe('checkBundle: the detail view', () => {
+  const budgets = { ...BUDGETS, detailViewGzip: 4_000 }
+  const noise = Array.from({ length: 20_000 }, (_, i) =>
+    ((i * 2654435761) % 4093).toString(36),
+  ).join('')
+  const page = {
+    'assets/index-abc.js': 'x',
+    'assets/OrreryPage-zz.js': 'data-orrery-page',
+    'assets/OrreryGuide-gg.js': 'data-guide-drawer',
+  }
+
+  it('fails when the detail view lands in the first load', () => {
+    const dir = fakeDist(
+      { 'assets/index-abc.js': 'x', 'assets/shared-1.js': 'props["data-detail-view"]=""' },
+      'index-abc.js',
+      ['shared-1.js'],
+    )
+    expect(failures(checkBundle(dir, budgets))).toContain('entry-has-no-detail')
+  })
+
+  it('fails when the detail view is inlined into the orrery page chunk', () => {
+    const dir = fakeDist({
+      ...page,
+      'assets/OrreryPage-zz.js': 'data-orrery-page data-detail-view',
+      'assets/DetailView-dd.js': 'data-detail-view',
+    })
+    expect(failures(checkBundle(dir, budgets))).toEqual(['orrery-page-has-no-detail'])
+  })
+
+  it('budgets the detail chunk', () => {
+    const big = fakeDist({ ...page, 'assets/DetailView-dd.js': `data-detail-view ${noise}` })
+    expect(failures(checkBundle(big, budgets))).toEqual(['orrery-detail-gzip'])
+    const small = fakeDist({ ...page, 'assets/DetailView-dd.js': 'data-detail-view' })
+    const findings = checkBundle(small, budgets) as Finding[]
+    expect(failures(findings)).toEqual([])
+    expect(findings.some((f) => f.rule === 'orrery-detail-gzip')).toBe(true)
+  })
+
+  it('fails when the orrery page ships without a detail chunk, so a rename cannot switch the rule off', () => {
+    const dir = fakeDist(page)
+    expect(failures(checkBundle(dir, budgets))).toEqual(['orrery-detail-found'])
   })
 })

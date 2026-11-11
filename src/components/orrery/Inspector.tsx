@@ -28,6 +28,37 @@ import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
 import type { LookupView } from './useLookupTrack'
 
+/** The "Look closer" button (#203): the page passes it only for an object with a model. */
+export interface LookCloser {
+  onOpen: () => void
+  /** The detail view is open on this object. */
+  open: boolean
+  /** The id of the view the button opens, while it exists (aria-controls). */
+  controls?: string | undefined
+}
+
+function LookCloserButton({
+  lookCloser,
+  buttonRef,
+}: {
+  lookCloser: LookCloser | undefined
+  buttonRef: Ref<HTMLButtonElement> | undefined
+}) {
+  if (!lookCloser) return null
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      className={`${styles.chipBtn ?? ''} ${styles.lookCloser ?? ''}`}
+      aria-expanded={lookCloser.open}
+      aria-controls={lookCloser.controls}
+      onClick={lookCloser.onOpen}
+    >
+      Look closer
+    </button>
+  )
+}
+
 interface InspectorProps {
   /** The page measures the drawer to keep the focused body out from under it. */
   ref?: Ref<HTMLElement> | undefined
@@ -59,6 +90,10 @@ interface InspectorProps {
   reentries?: readonly Reentry[] | undefined
   /** The chosen satellite's Space-Track catalogue entry, once its shard loads (#101). */
   satCatalog?: SatcatEntry | null | undefined
+  /** Present when this object has a 3D model to look at (#203). */
+  lookCloser?: LookCloser | undefined
+  /** The button's ref, so the page can return focus to it when the view closes. */
+  lookCloserRef?: Ref<HTMLButtonElement> | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -91,6 +126,8 @@ export function Inspector({
   discos,
   reentries,
   satCatalog,
+  lookCloser,
+  lookCloserRef,
 }: InspectorProps) {
   const headingId = useId()
   if (isLookupKey(body)) {
@@ -127,6 +164,7 @@ export function Inspector({
             Close
           </button>
         </div>
+        <LookCloserButton lookCloser={lookCloser} buttonRef={lookCloserRef} />
         {satellite ? (
           <SatFacts
             info={satellite}
@@ -187,6 +225,7 @@ export function Inspector({
             Close
           </button>
         </div>
+        {track && !moon && <LookCloserButton lookCloser={lookCloser} buttonRef={lookCloserRef} />}
         {moon ? (
           <MoonFacts moon={moon} jd={jd} simMs={simMs} />
         ) : track ? (

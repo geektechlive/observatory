@@ -53,6 +53,9 @@ export const BUDGETS = {
   // on the first open. Measured 8.7 kB gzip, plus a small glossary chunk it shares with
   // the inspector's term buttons.
   orreryGuideGzip: 12_000,
+  // The "Look closer" view (#203): its own canvas, scene and chrome, fetched on the first
+  // open. It shares three.js and GLTFLoader with the orrery, so the chunk is small.
+  detailViewGzip: 8_000,
 }
 
 const THREE_MARKER = 'WebGLRenderer'
@@ -69,6 +72,8 @@ const SAT_MARKERS = ['sats.worker', 'fengyun-1c-debris']
 // The guide drawer (#159) names this on its root element; it lives in its own chunk,
 // loaded on first open, and may reach neither the first load nor the orrery page's chunk.
 const GUIDE_MARKER = 'data-guide-drawer'
+// The detail view (#203) names this on its root element; same rules as the guide.
+const DETAIL_MARKER = 'data-detail-view'
 
 // `import{a as b}from"./x.js"`, `import"./x.js"`, `export{a}from"./x.js"` and their spaced
 // forms. A dynamic `import("./x.js")` has no clause or quote right after `import`.
@@ -175,8 +180,18 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       : 'guide drawer not in first-load chunks',
   )
 
+  const withDetail = initial.filter((_, i) => bodies[i].includes(DETAIL_MARKER))
+  add(
+    'entry-has-no-detail',
+    withDetail.length === 0,
+    withDetail.length > 0
+      ? `${withDetail.join(', ')} contains the detail view: it must load on first open (OrreryPage.tsx lazy DetailView)`
+      : 'detail view not in first-load chunks',
+  )
+
   let sawOrreryPage = false
   let sawGuideChunk = false
+  let sawDetailChunk = false
   for (const name of readdirSync(join(distDir, 'assets'))) {
     if (!name.endsWith('.js') || initial.includes(`assets/${name}`)) continue
     const body = readFileSync(join(distDir, 'assets', name))
@@ -184,6 +199,10 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       sawGuideChunk = true
       const size = gz(body)
       add('orrery-guide-gzip', size <= budgets.orreryGuideGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGuideGzip)})`)
+    } else if (name.startsWith('DetailView-')) {
+      sawDetailChunk = true
+      const size = gz(body)
+      add('orrery-detail-gzip', size <= budgets.detailViewGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.detailViewGzip)})`)
     } else if (name.startsWith('SatBrowser-')) {
       const size = gz(body)
       add('sat-browser-gzip', size <= budgets.satBrowserGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satBrowserGzip)})`)
@@ -200,6 +219,11 @@ export function checkBundle(distDir, budgets = BUDGETS) {
           'orrery-page-has-no-guide',
           !body.includes(GUIDE_MARKER),
           body.includes(GUIDE_MARKER) ? `${name} contains the guide drawer: it must stay a separate lazy chunk` : `${name} does not contain the guide drawer`,
+        )
+        add(
+          'orrery-page-has-no-detail',
+          !body.includes(DETAIL_MARKER),
+          body.includes(DETAIL_MARKER) ? `${name} contains the detail view: it must stay a separate lazy chunk` : `${name} does not contain the detail view`,
         )
       }
       const size = gz(body)
@@ -219,6 +243,14 @@ export function checkBundle(distDir, budgets = BUDGETS) {
       'orrery-guide-found',
       sawGuideChunk,
       sawGuideChunk ? 'OrreryGuide chunk found' : 'no OrreryGuide-*.js chunk next to OrreryPage: its budget rule would not run',
+    )
+  }
+
+  if (sawOrreryPage) {
+    add(
+      'orrery-detail-found',
+      sawDetailChunk,
+      sawDetailChunk ? 'DetailView chunk found' : 'no DetailView-*.js chunk next to OrreryPage: its budget rule would not run',
     )
   }
 

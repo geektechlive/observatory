@@ -17,6 +17,10 @@ interface DescriptorBase {
   readonly credit: string
   /** The licence the model is used under, short and human readable. */
   readonly licence: string
+  /** A page with the licence's terms, linked from the credit (CC BY asks for one). */
+  readonly licenceUrl?: string | undefined
+  /** What was changed from the source model, when the licence asks for it ("Simplified for this site."). */
+  readonly changes?: string | undefined
   readonly attitude: Attitude
   /** The model-frame axis that points at the attitude target. */
   readonly axis: readonly [number, number, number]
@@ -110,4 +114,25 @@ export function modelForSatellite(
   const own = tables.byNorad[String(noradId)]
   if (own) return own
   return family === null ? undefined : tables.byFamily[family]
+}
+
+const NAIF_KEY_PREFIX = 'naif:'
+const SAT_KEY_PREFIX = 'sat:'
+
+/**
+ * The model for an orrery scene key (#203), or undefined: `naif:<id>` is a spacecraft
+ * (a moon's key has the same shape and is not in the table), `sat:<norad>` a satellite
+ * the renderer has loaded. `satellite` reads what the renderer knows of a satellite key;
+ * it has no family field yet, so only an object's own entry can match until it does.
+ */
+export function modelForKey(
+  key: string,
+  satellite: (key: string) => { readonly noradId: string } | null,
+  tables?: SatelliteTables,
+): ModelDescriptor | undefined {
+  if (key.startsWith(NAIF_KEY_PREFIX))
+    return spacecraftDescriptor(key.slice(NAIF_KEY_PREFIX.length))
+  if (!key.startsWith(SAT_KEY_PREFIX)) return undefined
+  const info = satellite(key)
+  return info ? modelForSatellite(info.noradId, null, tables) : undefined
 }

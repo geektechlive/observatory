@@ -230,3 +230,55 @@ A silhouette at a distance, a 3D model when focused.
   `simplified:` or `failed:<naif>`.
 - **`check-bundle` rules:** `craft-model-bytes` (500 kB each), `craft-model-total` (3 MB),
   `entry-has-no-craft-models`, `gltf-loader-gzip` (30 kB; 13.5 kB measured).
+
+## The detail view, "Look closer" (#203)
+
+A button in the inspector, for a spacecraft or satellite with a model, opens the model close up
+(ADR 0021).
+
+- **Its own canvas and renderer.** `DetailView.tsx` (a lazy chunk, `DetailView-*.js`) mounts only
+  while `detail` is set in `store/orreryView.ts`. `three/DetailScene.ts` makes the canvas, a
+  `WebGLRenderer`, two lights and an `OrbitControls` (damping, no panning, zoom 1.3 to 12 times
+  the model's radius). Frames are on demand: a camera change, damping still settling, a resize or
+  a new model asks for one; nothing runs otherwise. It creates its own canvas, so a canvas whose
+  context was force-lost is never reused.
+- **The orrery steps aside.** One effect in `OrreryPage.tsx` owns `attach` and `detach`: it
+  detaches while the view is open (loop, tick and Sun image stop, canvas leaves the page, scene
+  kept) and resizes and re-attaches on close. Nothing else attaches. `schedule()` is still the
+  only place the orrery requests a frame.
+- **Closing disposes everything.** Unmount aborts a load in flight, and the scene removes its
+  listeners, then disposes the controls, the model (`PreparedModel.dispose`) and the renderer, then
+  calls `forceContextLoss()`. A context lost while the view is open closes it.
+- **What it shows.** The inspector stays on top of the view as the facts column (right on wide
+  screens, a bottom sheet under 900px, capped at about 40% of the stage while the view is open so
+  the model keeps a band of at least 160 px); the page passes its size as `--inspector-right` and
+  `--inspector-bottom` on the stage. The view adds the model, a credit line from the descriptor, a
+  note when the model is a stand-in (`kind: 'standin'` or `scope: 'family'`), the "Back to orrery"
+  button, and Escape. The credit reads "Model: credit, licence, Source" for a NASA model. A
+  descriptor with `licenceUrl` or `changes` (CC BY, #194) reads "Model: credit (source),
+  licence (licence). Changes." with both links, and `changes` is "Simplified for this site."
+  Models ship uncompressed, so never write "compressed". Focus goes to Back to orrery on open and
+  returns to "Look closer" only after Back to orrery or Escape. A failed load keeps the view open
+  with "Model unavailable" (an alert) and Retry, which moves focus to the model.
+- **Keyboard and touch.** The model is a focusable group: arrow keys turn it about its centre,
+  plus and minus zoom within the controls' limits, and two zoom buttons give a single-pointer
+  way to zoom. `DetailScene` exposes `rotate` and `zoom`, each asking for a frame.
+- **Escape.** Bubble phase on `window`, skipped when the event was handled (a Term popover stops
+  it), came from an input or the Find combobox, or the guide is open: those dismiss first and a
+  second press closes the view.
+- **The chunk.** `useDetailViewModule` imports `DetailView` on first open. If the fetch fails
+  the page closes the view (the orrery re-attaches, never left detached). While it loads,
+  `DetailLoading` (a status, marked `data-detail-loading`) stands in and Escape leaves it.
+- **Which objects.** `modelForKey` (`modelDescriptor.ts`): `naif:<id>` through
+  `spacecraftDescriptor`, `sat:<norad>` through `modelForSatellite`. The renderer has no
+  satellite family field yet, so only an object's own entry can match; both tables are empty
+  until #194. A link with `detail=1` to an object with no model opens the focus alone.
+- **Probes for tests.** The page root carries `data-orrery-detail-scenes`, `-models` and
+  `-opened` (live scenes, live models, scenes ever made), `-leaked` and `-leaked-textures`
+  (what the renderer still held after each model's dispose; must stay 0), the detail canvas
+  `data-detail-geometries`, `-textures` and `-camera` (azimuth, polar angle, distance), and the
+  orrery canvas `data-orrery-inset` (right, bottom, top). The renderer keeps one texture of its
+  own, so a count of 1 with no model is normal.
+- **`check-bundle` rules:** `orrery-detail-gzip`, `orrery-detail-found`, `entry-has-no-detail`,
+  `orrery-page-has-no-detail`. `gltfLoad.ts` is the one GLB loader both the focused-model layer and
+  this view call, so GLTFLoader stays a single chunk.

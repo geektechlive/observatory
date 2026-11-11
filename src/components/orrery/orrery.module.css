@@ -142,6 +142,11 @@
   cursor: not-allowed;
 }
 
+/* The inspector's "Look closer" button (#203), above the facts. */
+.lookCloser {
+  margin-bottom: var(--space-3);
+}
+
 .stage {
   grid-area: stage;
   position: relative;
@@ -859,5 +864,36 @@
 
   .stage[data-guide='compact'] .notices {
     display: none;
+  }
+}
+
+/* While the "Look closer" view (#203) is open the orrery is detached, so what sits over the
+   stage goes quiet (hidden, so it keeps its size and nothing can be tabbed to or clicked)
+   and the inspector, which carries the facts, stays above the view. The view and its
+   fallback are the only other things that show. */
+.stage[data-detail='open'] > :not([data-detail-view], [data-detail-loading], .inspector) {
+  visibility: hidden;
+}
+
+.page[data-detail='open'] .rail {
+  visibility: hidden;
+}
+
+.stage[data-detail='open'] .inspector {
+  z-index: 5;
+}
+
+.detailLoading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: radial-gradient(circle at 50% 45%, var(--hull) 0%, var(--void) 70%);
+}
+
+/* On a phone the open view needs room for the model: the inspector sheet shrinks to about
+   40% of the stage and scrolls inside. */
+@media (width <= 899px) {
+  .stage[data-detail='open'] .inspector {
+    max-height: 40%;
   }
 }
