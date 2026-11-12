@@ -1,6 +1,7 @@
 // The dwarf planets in the orrery (#99 item 8): which ones, how Horizons is asked for
-// them, and the elements their orbit lines are drawn from. scripts/orrery-smallbodies.mjs
-// uses this in the refresh job; the page uses the names, keys and elements.
+// them, and the elements their orbit lines are drawn from; and Pluto's moon Charon.
+// scripts/orrery-dwarfs.mjs uses this in the refresh job; the page uses the names, keys
+// and elements.
 //
 // No imports and nothing but erasable syntax, so the .mjs job can import it under
 // Node's type stripping (like craft.ts and smallBodies.ts).
@@ -146,6 +147,63 @@ export const DWARFS: readonly DwarfSpec[] = [
   },
 ]
 
+/** Pluto's moon Charon: asked, keyed and drawn apart from the dwarf planets above. */
+export interface DwarfMoonSpec {
+  readonly name: string
+  readonly naifId: string
+  /** Horizons' COMMAND. */
+  readonly command: string
+  /** Horizons' CENTER body ('500@<center>'): the barycentre the parent's marker stands for. */
+  readonly center: string
+  /** Horizons' "Target body name", asserted exactly on every answer. */
+  readonly target: string
+  /** The dwarf planet it circles, by SPK-ID. */
+  readonly parentSpkid: string
+  readonly periodDays: number
+  /** Pluto-centred separation, km (Horizons' mean orbital data). */
+  readonly semiMajorAxisKm: number
+  readonly radiusKm: number
+  /** The parent's mean radius, km: the drawn pair is scaled to it. */
+  readonly parentRadiusKm: number
+  /** JPL's ephemeris for it, TDB (YYYY-MM-DD). */
+  readonly ephemerisFrom: string
+  readonly ephemerisTo: string
+}
+
+/**
+ * Charon (#99 item 8 follow-up), checked live 2026-11-12, one request at a time:
+ * - '901' centred on '500@9' answers "Charon (901)" from plu060, with "No ephemeris ...
+ *   prior to A.D. 1800-JAN-03" and data to 2199-12-29.
+ * - The physical-data header gives the radius (606 km), period (6.387222 d) and the
+ *   Pluto-centred a (19,600 km). Pluto's (999) gives its mean radius, 1188.3 km.
+ * - Asked from the barycentre, not from Pluto (999), because Pluto's marker is the
+ *   barycentre: Charon's drawn place is that point plus this vector, nothing else.
+ * - Only a fine span around each refresh ships (the moons' window and step, moons.ts):
+ *   the whole 1800-2199 window at 6 h is about 584,000 rows, which Horizons refuses
+ *   ("max. is 90000") and no lazy payload could carry.
+ */
+export const CHARON: DwarfMoonSpec = {
+  name: 'Charon',
+  naifId: '901',
+  command: '901',
+  center: '9',
+  target: 'Charon (901)',
+  parentSpkid: '20134340',
+  periodDays: 6.387222,
+  semiMajorAxisKm: 19_600,
+  radiusKm: 606,
+  parentRadiusKm: 1188.3,
+  ephemerisFrom: '1800-01-03',
+  ephemerisTo: '2199-12-29',
+}
+
+/**
+ * Charon's scene, search and link key: `sbc:` and its SPK ID, 901, like the dwarf
+ * planets'. No SBDB small body has an SPK-ID that short (numbered asteroids are
+ * 20000000 + n), so asteroid 901 Brunsia is `sbc:20000901`.
+ */
+export const CHARON_KEY = `sbc:${CHARON.naifId}`
+
 const DAY_MS = 86_400_000
 const JD_UNIX_EPOCH = 2440587.5
 
@@ -165,11 +223,13 @@ export function dwarfByName(name: string): DwarfSpec | undefined {
 
 /**
  * A link focus that needs the dwarf-planet data (#99 item 8): one's key, `sbc:<SPK-ID>`,
- * or its name (`focus=pluto`, `-` or `_` for spaces).
+ * or its name (`focus=pluto`, `-` or `_` for spaces). Charon's too (`sbc:901`, `charon`).
  */
 export function isDwarfFocus(focus: string): boolean {
+  if (focus === CHARON_KEY) return true
   if (focus.startsWith('sbc:')) return dwarfBySpkid(focus.slice(4)) !== undefined
-  return dwarfByName(focus.replace(/[-_]+/g, ' ')) !== undefined
+  const name = focus.replace(/[-_]+/g, ' ')
+  return dwarfByName(name) !== undefined || loose(name) === loose(CHARON.name)
 }
 
 /** The dwarf planet with this SPK-ID, or undefined. */

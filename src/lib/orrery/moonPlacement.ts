@@ -22,6 +22,26 @@ export const MOON_SPREAD = 1.2
 export const MOON_REF_KM = 100_000
 
 /**
+ * Charon (#99): a moon placed at true scale against its planet as drawn. Its vector is
+ * scaled so the planet's true radius is the drawn one: linear, so the pair keeps its real
+ * shape and ratios, magnified against the rest of the scene. Same axes as
+ * moonScenePosition below.
+ */
+export function toScaleMoonPosition(
+  parentScenePos: Vec3,
+  relVecAu: Vec3,
+  parentRadiusScene: number,
+  parentRadiusKm: number,
+): Vec3 {
+  const s = (parentRadiusScene * AU_KM) / parentRadiusKm
+  return {
+    x: parentScenePos.x + relVecAu.x * s,
+    y: parentScenePos.y + relVecAu.z * s,
+    z: parentScenePos.z - relVecAu.y * s,
+  }
+}
+
+/**
  * A moon's scene position from its planet's scene position, the moon's planet-centred
  * ecliptic J2000 vector (au), and the planet's drawn radius (scene units).
  */

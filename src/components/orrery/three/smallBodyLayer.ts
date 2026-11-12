@@ -23,11 +23,15 @@ import {
 } from 'three'
 
 import {
+  dwarfMoonRelative,
+  dwarfMoonShown,
   entryPath,
   entryState,
+  isDwarfMoon,
   type OrreryEntry,
   type OrreryEntryGroup,
 } from '@/lib/orrery/dwarfView'
+import { toScaleMoonPosition } from '@/lib/orrery/moonPlacement'
 import type { Vec3 } from '@/lib/orrery/scale'
 import { DWARF_HEX, LANES } from '@/lib/palette'
 
@@ -53,6 +57,8 @@ interface Item {
   line: Line<BufferGeometry, LineBasicMaterial>
   /** Heliocentric position now, au; null where no sample covers the date. */
   helio: Vec3 | null
+  /** Charon only: its vector from the Pluto barycentre now, au, or null. */
+  rel: Vec3 | null
 }
 
 export class SmallBodyLayer {
@@ -90,7 +96,7 @@ export class SmallBodyLayer {
       line.visible = false
       this.markers.add(mesh)
       this.paths.add(line)
-      this.items.set(entry.key, { entry, mesh, line, helio: null })
+      this.items.set(entry.key, { entry, mesh, line, helio: null, rel: null })
     }
     this.builtMode = ''
   }
@@ -121,6 +127,13 @@ export class SmallBodyLayer {
       const on = this.groups[item.entry.group]
       const s = on ? entryState(item.entry, jd) : null
       item.helio = s ? s.position : null
+      if (isDwarfMoon(item.entry)) {
+        // Placed around its planet as drawn, after the px clamp (placeMoons).
+        item.rel = s ? (dwarfMoonRelative(item.entry, jd)?.position ?? null) : null
+        item.mesh.visible = false
+        item.line.visible = false
+        continue
+      }
       item.mesh.visible = s !== null
       if (s) {
         item.mesh.position.copy(toScene(s.position))
@@ -137,15 +150,52 @@ export class SmallBodyLayer {
   /** Near Earth a marker joins the Earth frame (#92), as the craft do. */
   placeNear(move: (helio: Vec3) => Vector3 | null): void {
     for (const item of this.items.values()) {
-      if (!item.helio || !item.mesh.visible) continue
+      if (!item.helio || !item.mesh.visible || isDwarfMoon(item.entry)) continue
       const p = move(item.helio)
       if (p) item.mesh.position.copy(p)
     }
   }
 
-  /** Where it is drawn now, or null when it is hidden or not known. */
+  /**
+   * Charon (#99), each frame after the planets' px clamp: around Pluto's marker as drawn,
+   * to Pluto's own scale (toScaleMoonPosition), and only with Pluto or Charon focused
+   * (dwarfMoonShown). Its radius before the renderer's clamp is Pluto's drawn radius times
+   * the true ratio of the two.
+   */
+  placeMoons(focus: string | null): void {
+    for (const item of this.items.values()) {
+      const { entry, mesh, rel } = item
+      if (!isDwarfMoon(entry)) continue
+      const parent = this.items.get(entry.parent.key)?.mesh
+      mesh.visible = false
+      if (rel === null || !parent?.visible || !dwarfMoonShown(entry, focus)) continue
+      mesh.visible = true
+      const r = parent.scale.x
+      const p = toScaleMoonPosition(parent.position, rel, r, entry.spec.parentRadiusKm)
+      mesh.position.set(p.x, p.y, p.z)
+      mesh.scale.setScalar((r * entry.spec.radiusKm) / entry.spec.parentRadiusKm)
+    }
+  }
+
+  /** Charon's marker while drawn, for the renderer's px clamp. */
+  moonMeshes(): Mesh[] {
+    const out: Mesh[] = []
+    for (const item of this.items.values()) {
+      if (isDwarfMoon(item.entry) && item.mesh.visible) out.push(item.mesh)
+    }
+    return out
+  }
+
+  /**
+   * Where it is drawn now, or null when it is hidden or not known. For Charon, wherever
+   * its samples cover the date: the Pluto barycentre it circles, so the camera frames the
+   * pair (and can fly there before Charon itself shows).
+   */
   position(key: string): Vector3 | null {
     const item = this.items.get(key)
+    if (item && isDwarfMoon(item.entry)) {
+      return item.rel ? this.position(item.entry.parent.key) : null
+    }
     return item?.mesh.visible ? item.mesh.position.clone() : null
   }
 

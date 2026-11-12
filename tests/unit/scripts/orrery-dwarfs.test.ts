@@ -9,7 +9,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { DWARFS, dwarfWindowJd } from '@/lib/orrery/dwarfs'
+import { CHARON, DWARFS, dwarfWindowJd } from '@/lib/orrery/dwarfs'
 import { OrreryDwarfsSchema } from '@/schemas/orreryDwarfs'
 
 // @ts-expect-error plain ESM script, no type declarations
@@ -34,13 +34,21 @@ function answer(url: URL, rename?: string): string {
   const command = strip(url.searchParams.get('COMMAND'))
   const start = Number(strip(url.searchParams.get('START_TIME')).replace(/^JD/, ''))
   const stop = Number(strip(url.searchParams.get('STOP_TIME')).replace(/^JD/, ''))
-  const step = Number.parseFloat(strip(url.searchParams.get('STEP_SIZE')))
+  const stepText = strip(url.searchParams.get('STEP_SIZE'))
+  // STEP_SIZE is "120 d", "6 h" (Charon) or "30 m".
+  const perDay = stepText.endsWith(' h') ? 24 : stepText.endsWith(' m') ? 1440 : 1
+  const step = Number.parseFloat(stepText) / perDay
   const n = Math.floor((stop - start) / step) + 1
   const rows = Array.from(
     { length: n },
     (_, i) => `${String(start + i * step)}, A.D. x, 2, 0.123456789, -1.000000449, 0, 0, 0,`,
   )
-  const name = rename ?? DWARFS.find((d) => d.command === command)?.target ?? '?'
+  const name =
+    rename ??
+    (command === CHARON.command
+      ? CHARON.target
+      : DWARFS.find((d) => d.command === command)?.target) ??
+    '?'
   const head = HEAD.replace(/^Target body name:.*$/m, `Target body name: ${name}   {source: JPL#1}`)
   return `${head}$$SOE\n${rows.join('\n')}\n$$EOE\n`
 }
@@ -68,7 +76,7 @@ describe('buildOrreryDwarfs', () => {
     const { deps, urls } = fake()
     const { payload, requests } = await buildOrreryDwarfs(deps)
     expect(OrreryDwarfsSchema.parse(payload)).toBeTruthy()
-    expect(requests).toBe(5)
+    expect(requests).toBe(6)
     expect(
       urls.map((u) => [u.searchParams.get('COMMAND'), u.searchParams.get('STEP_SIZE')]),
     ).toEqual([
@@ -77,6 +85,7 @@ describe('buildOrreryDwarfs', () => {
       ["'136199;'", "'1826 d'"],
       ["'136472;'", "'1826 d'"],
       ["'136108;'", "'1826 d'"],
+      ["'901'", "'6 h'"],
     ])
     expect(payload.dwarfs.map((d: Dwarf) => [d.id, d.name, d.target])).toEqual([
       ['sb:20134340', 'Pluto', 'Pluto Barycenter (9)'],
@@ -141,7 +150,7 @@ describe('buildOrreryDwarfs', () => {
 
     const c = fake()
     await buildOrreryDwarfs({ ...c.deps, now: NOW + 25 * 3_600_000, previous })
-    expect(c.urls).toHaveLength(5)
+    expect(c.urls).toHaveLength(6)
   })
 
   it('keeps the last span of a body that fails, and says so', async () => {
@@ -149,9 +158,70 @@ describe('buildOrreryDwarfs', () => {
     const { deps } = fake(() => 'API down')
     const { payload } = await buildOrreryDwarfs({ ...deps, now: NOW + 25 * 3_600_000, previous })
     expect(payload.dwarfs).toEqual(previous.dwarfs)
-    expect(payload.missing.map((m: { id: string }) => m.id)).toEqual(
-      DWARFS.map((d) => `sb:${d.spkid}`),
+    expect(payload.missing.map((m: { id: string }) => m.id)).toEqual([
+      ...DWARFS.map((d) => `sb:${d.spkid}`),
+      'naif:901',
+    ])
+    expect(payload.charon).toEqual(previous.charon)
+  })
+
+  it('asks for Charon last, from the Pluto barycentre, ±15 days at 6 h, with velocities', async () => {
+    const { deps, urls } = fake()
+    const { payload } = await buildOrreryDwarfs(deps)
+    const last = urls.at(-1)
+    expect(last?.searchParams.get('COMMAND')).toBe("'901'")
+    expect(last?.searchParams.get('CENTER')).toBe("'500@9'")
+    const dayStart = Math.floor((NOW - 15 * 86_400_000) / 86_400_000) * 86_400_000
+    const startJd = dayStart / 86_400_000 + 2440587.5
+    expect(last?.searchParams.get('START_TIME')).toBe(`'JD${String(startJd)}'`)
+    expect(last?.searchParams.get('STOP_TIME')).toBe(`'JD${String(startJd + 30)}'`)
+    expect(payload.charon).toMatchObject({
+      id: 'naif:901',
+      naifId: '901',
+      name: 'Charon',
+      parentSpkid: '20134340',
+      center: '500@9',
+      target: 'Charon (901)',
+    })
+    expect(payload.charon.fine.step).toBe(0.25)
+    expect(payload.charon.fine.samples).toHaveLength(121 * 6)
+    expect(OrreryDwarfsSchema.parse(payload).charon?.name).toBe('Charon')
+  })
+
+  it('refetches Charon inside the day once fewer than 7 days of its samples remain ahead', async () => {
+    const DAY = 86_400_000
+    const { payload: old } = await buildOrreryDwarfs({ ...fake().deps, now: NOW - 10 * DAY })
+    // The dwarf planets' spans still count as fresh; Charon's run out about 5 days ahead.
+    const previous = { ...old, coarseFetchedAt: new Date(NOW - 3_600_000).toISOString() }
+    const a = fake()
+    const { payload } = await buildOrreryDwarfs({ ...a.deps, previous })
+    expect(a.urls.map((u) => u.searchParams.get('COMMAND'))).toEqual(["'901'"])
+    expect(payload.dwarfs).toEqual(old.dwarfs)
+    expect(payload.charon.fine.start).toBeGreaterThan(old.charon.fine.start)
+  })
+
+  it("refuses another body's answer for Charon, and still ships the dwarf planets", async () => {
+    const { deps } = fake((u) =>
+      u.searchParams.get('COMMAND') === "'901'" ? answer(u, 'Pluto (999)') : answer(u),
     )
+    const { payload } = await buildOrreryDwarfs(deps)
+    expect(payload.dwarfs).toHaveLength(5)
+    expect(payload.charon).toBeNull()
+    expect(payload.missing).toEqual([{ id: 'naif:901', reason: expect.stringMatching(/999/) }])
+  })
+
+  it('reuses Charon for a day with the others, and keeps the last copy if it fails', async () => {
+    const { payload: previous } = await buildOrreryDwarfs(fake().deps)
+    const later = await buildOrreryDwarfs({ ...fake().deps, now: NOW + 6 * 3_600_000, previous })
+    expect(later.payload.charon).toEqual(previous.charon)
+    const down = fake((u) => (u.searchParams.get('COMMAND') === "'901'" ? 'API down' : answer(u)))
+    const { payload } = await buildOrreryDwarfs({
+      ...down.deps,
+      now: NOW + 25 * 3_600_000,
+      previous,
+    })
+    expect(payload.charon).toEqual(previous.charon)
+    expect(payload.missing.map((m: { id: string }) => m.id)).toEqual(['naif:901'])
   })
 
   it('retries a body that failed on the next run, not a day later', async () => {

@@ -5,7 +5,9 @@
  * name: Jupiter (599)"). Period and semi-major axis are copied from the physical-data
  * header of the same answers; Horizons marks the Galilean values approximate (~).
  *
- * Charon is left out: the orrery draws no Pluto for it to circle.
+ * Charon is not here: it travels with the dwarf planets (dwarfs.ts, /api/orrery-dwarfs),
+ * placed around Pluto's px-clamped marker rather than a planet's drawn radius. It reuses
+ * this window and step (moonWindowDays, moonStepDays).
  *
  * Plain TypeScript with no imports, so scripts/orrery-bodies.mjs can import it directly
  * under Node's type stripping, like craft.ts.

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { DWARFS } from '@/lib/orrery/dwarfs'
+import { CHARON, DWARFS } from '@/lib/orrery/dwarfs'
 
 import {
   classifyFailure,
@@ -519,13 +519,16 @@ describe('refreshOrreryDwarfs (#99 item 8)', () => {
       const p = new URL(url).searchParams
       const start = Number((p.get('START_TIME') ?? '').replace(/'|JD/g, ''))
       const stop = Number((p.get('STOP_TIME') ?? '').replace(/'|JD/g, ''))
-      const step = Number.parseFloat((p.get('STEP_SIZE') ?? '').replace(/'/g, ''))
+      const stepText = (p.get('STEP_SIZE') ?? '').replace(/'/g, '')
+      // "1826 d", or "6 h" for Charon.
+      const step = Number.parseFloat(stepText) / (stepText.endsWith(' h') ? 24 : 1)
       const n = Math.floor((stop - start) / step) + 1
       const rows = Array.from(
         { length: n },
         (_, i) => `${String(start + i * step)}, A.D. x, 40, 1, 0, 0, 0, 0,`,
       )
-      const target = DWARFS.find((d) => `'${d.command}'` === p.get('COMMAND'))?.target ?? '?'
+      const target =
+        [...DWARFS, CHARON].find((d) => `'${d.command}'` === p.get('COMMAND'))?.target ?? '?'
       const head = (HEADER ?? '').replace(
         /^Target body name:.*$/m,
         `Target body name: ${target}   {source: JPL#1}`,
@@ -539,7 +542,8 @@ describe('refreshOrreryDwarfs (#99 item 8)', () => {
     const { entry, write } = await refreshOrreryDwarfs(null, deps())
     expect(entry.ok).toBe(true)
     expect(entry.warning).toBe(false)
-    expect(entry.detail).toMatch(/refresh:orrery-dwarfs 5 dwarf planets, 5 JPL requests/)
+    // The five, then Charon (#99).
+    expect(entry.detail).toMatch(/refresh:orrery-dwarfs 5 dwarf planets, 6 JPL requests/)
     expect(KEY_ORRERY_DWARFS).toBe('horizons:dwarfs:v1')
     expect(KEY_ORRERY_DWARFS).not.toBe(KEY_ORRERY_SMALLBODIES)
     expect(write.key).toBe(KEY_ORRERY_DWARFS)

@@ -945,7 +945,7 @@ export function OrreryPage() {
   // Craft and moons outside their data spans hide; the stage says so (#114).
   const noData = bodies.status === 'success' ? noDataNotice(catalog) : null
   // Dwarf planets outside their JPL span (#99 item 8): marker hidden, orbit still drawn.
-  const dwarfHidden = small.groups.dwarfs ? dwarfNotice(small.entries, jdNow) : null
+  const dwarfHidden = small.groups.dwarfs ? dwarfNotice(small.entries, jdNow, selected) : null
   // Satellites past ±3 days of their orbit data are hidden (#98); said while they'd show.
   const satHidden =
     satState && satState.mode !== 'hidden'

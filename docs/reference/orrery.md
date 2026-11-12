@@ -151,7 +151,8 @@ lives in `src/components/orrery/orreryLink.ts` (no three.js), and the hook in
   [orrery-data.md](orrery-data.md#comets-and-interstellar-objects-99-data-half).
 - **A dwarf planet is `focus=sbc:<SPK-ID>` or its name, `focus=pluto`** (#99 item 8). Either asks
   for the same lazy payload, waits, switches "Dwarf planets" on and opens it. Details in
-  [orrery-data.md](orrery-data.md#dwarf-planets-99-item-8).
+  [orrery-data.md](orrery-data.md#dwarf-planets-99-item-8). Charon is `focus=sbc:901` or
+  `focus=charon`, from the same payload ([Charon](orrery-data.md#charon-99)).
 - **A satellite is `focus=sat:<NORAD id>`** (#158; the scene key, so choosing one already writes
   it; six-digit ids exist). It is found among the loaded groups, not the catalog: the link opens
   the Earth orbit view (groups only load with the frame open), waits for the switched-on groups

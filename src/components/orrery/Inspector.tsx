@@ -19,6 +19,7 @@ import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
 import { Distance } from './Distance'
 import { DwarfFacts } from './DwarfFacts'
+import { DwarfMoonFacts } from './DwarfMoonFacts'
 import { ImageryFacts } from './ImageryFacts'
 import { LookupFacts } from './LookupFacts'
 import { MoonFacts } from './MoonFacts'
@@ -191,7 +192,9 @@ export function Inspector({
           </button>
         </div>
         <div id={bodyId} className={styles.inspectorBody ?? ''}>
-          {smallBody.group === 'dwarfs' ? (
+          {smallBody.group === 'dwarfs' && smallBody.kind === 'moon' ? (
+            <DwarfMoonFacts entry={smallBody} simMs={simMs} />
+          ) : smallBody.group === 'dwarfs' ? (
             <DwarfFacts entry={smallBody} simMs={simMs} />
           ) : (
             <SmallBodyFacts entry={smallBody} simMs={simMs} />

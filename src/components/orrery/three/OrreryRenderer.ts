@@ -85,7 +85,14 @@ import { loadGltfScene } from './gltfLoad'
 import { type LookupData, LookupLayer, lookupMarkerRadius } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
-import { clampRadius, craftModelPx, DWARF_MIN_PX, PX_CEILING, SMALL_BODY_MIN_PX } from './pxClamp'
+import {
+  clampRadius,
+  craftModelPx,
+  DWARF_MIN_PX,
+  DWARF_MOON_MIN_PX,
+  PX_CEILING,
+  SMALL_BODY_MIN_PX,
+} from './pxClamp'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { type SmallBodyGroups, SmallBodyLayer } from './smallBodyLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
@@ -506,6 +513,10 @@ export class OrreryRenderer {
       if (s.group === 'dwarfs') this.floorPx(s.mesh, DWARF_MIN_PX, PX_CEILING.dwarf)
       else this.floorPx(s.mesh, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)
     }
+    // Charon goes around Pluto's marker as just clamped, then gets its own clamp (#99).
+    this.small.placeMoons(this.focusBody)
+    for (const m of this.small.moonMeshes())
+      this.floorPx(m, DWARF_MOON_MIN_PX, PX_CEILING.dwarfMoon)
     for (const ring of this.sats.flagRings())
       this.floorPx(ring, SAT_REENTRY_MIN_PX, PX_CEILING.satReentry)
     for (const c of this.craft.visible()) {
@@ -578,6 +589,7 @@ export class OrreryRenderer {
           .filter((s) => s.group === 'dwarfs')
           .map((s) => s.mesh),
       ),
+      dwarfMoon: maxOf(this.small.moonMeshes()),
     })
   }
 

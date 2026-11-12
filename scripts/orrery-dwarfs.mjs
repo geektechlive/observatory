@@ -1,20 +1,22 @@
 // The orrery's dwarf planets for scripts/refresh-data.mjs (#99 item 8): Pluto, Ceres,
-// Eris, Makemake and Haumea, one coarse Horizons span each, positions only. Built here so
+// Eris, Makemake and Haumea, one coarse Horizons span each, positions only; and Pluto's
+// moon Charon, a fine span around now from the Pluto barycentre. Built here so
 // the Pages Function only passes the finished body through (10 ms CPU). Its own KV key
 // (horizons:dwarfs:v1), not the comets', so the Tonight panel never downloads them.
 //
 // JPL's Fair Use asks for "only one API request at a time", so every request goes through
 // one paced queue, and the step runs after the comet step in refresh-data.mjs, never
 // beside it.
-import { DWARFS, dwarfWindowJd } from '../src/lib/orrery/dwarfs.ts'
-import { BudgetExceeded, fetchSpan, toSpan } from './orrery-bodies.mjs'
+import { CHARON, DWARFS, dwarfWindowJd } from '../src/lib/orrery/dwarfs.ts'
+import { moonStepDays, moonWindowDays } from '../src/lib/orrery/moons.ts'
+import { BudgetExceeded, fetchSpan, jdFromMs, toSpan } from './orrery-bodies.mjs'
 
 const DAY_MS = 86_400_000
 /** Reuse the spans while they are younger than this. */
 const COARSE_MAX_AGE_MS = DAY_MS
 /** Pause before each JPL request (the comet step's last one may have just ended). */
 const DEFAULT_PAUSE_MS = 1000
-/** Five requests take about 11 s (measured 2026-11-12); a minute is plenty. */
+/** Six requests (the five and Charon) take about 11 s (measured 2026-11-12); a minute is plenty. */
 export const DEFAULT_BUDGET_MS = 60_000
 /** 1e-6 au (150 km) is far below a pixel at any dwarf planet's scale, and a third smaller. */
 const DWARF_DECIMALS = 6
@@ -86,6 +88,7 @@ export async function buildOrreryDwarfs({
   if (dwarfs.length === 0) {
     throw new Error(`no dwarf planet could be placed: ${missing.map((m) => m.reason).join('; ')}`)
   }
+  const charon = await charonSpan({ now, ask, previous, reuse, prevMissing, missing })
   return {
     payload: {
       generatedAt: new Date(now).toISOString(),
@@ -97,8 +100,63 @@ export async function buildOrreryDwarfs({
       sourceType: 'ephemeris',
       provider: 'jpl-horizons',
       dwarfs,
+      charon,
       missing,
     },
     requests: asked,
+  }
+}
+
+/** Charon's span is refetched, even inside the day's reuse, once fewer days than this remain ahead. */
+const CHARON_MIN_DAYS_AHEAD = 7
+
+/** Days a span's samples reach past `now` (positions and velocities, 6 per sample). */
+function daysAhead(span, now) {
+  const last = span.start + (Math.floor(span.samples.length / 6) - 1) * span.step
+  return last - jdFromMs(now)
+}
+
+/**
+ * Charon (#99): a fine span relative to the Pluto barycentre (500@9), the point Pluto's
+ * marker stands for, over the moons' window around now at their step (moons.ts: ±15
+ * days, 6 h). Reused with the dwarf planets' spans unless fewer than CHARON_MIN_DAYS_AHEAD
+ * remain ahead; one that fails keeps its last copy,
+ * is listed in `missing` and never fails the step.
+ */
+async function charonSpan({ now, ask, previous, reuse, prevMissing, missing }) {
+  const id = `naif:${CHARON.naifId}`
+  const prev = previous?.charon?.fine ? previous.charon : null
+  if (reuse && prev && !prevMissing.has(id) && daysAhead(prev.fine, now) >= CHARON_MIN_DAYS_AHEAD) {
+    return prev
+  }
+  try {
+    const days = moonWindowDays(CHARON.periodDays)
+    const startJd = jdFromMs(Math.floor((now - days * DAY_MS) / DAY_MS) * DAY_MS)
+    const got = await fetchSpan(
+      {
+        naifId: CHARON.naifId,
+        command: CHARON.command,
+        center: CHARON.center,
+        targetOk: (t) => t === CHARON.target,
+      },
+      startJd,
+      startJd + 2 * days,
+      moonStepDays(CHARON.periodDays),
+      ask,
+      now,
+    )
+    if (!got.samples) throw new Error('no samples in the window')
+    return {
+      id,
+      naifId: CHARON.naifId,
+      name: CHARON.name,
+      parentSpkid: CHARON.parentSpkid,
+      center: `500@${CHARON.center}`,
+      target: got.target,
+      fine: toSpan(got.samples, true),
+    }
+  } catch (err) {
+    missing.push({ id, reason: reasonOf(err) })
+    return prev
   }
 }

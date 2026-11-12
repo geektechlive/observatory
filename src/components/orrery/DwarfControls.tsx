@@ -21,7 +21,7 @@ export function DwarfControls({ on, onChange, status }: DwarfControlsProps) {
       </h2>
       <Switch
         label="Dwarf planets"
-        hint="Pluto, Ceres, Eris, Makemake and Haumea, placed by JPL Horizons. Pluto has data for the whole clock; the other four from 1600 to 2500, and outside that only their orbits are drawn"
+        hint="Pluto, Ceres, Eris, Makemake and Haumea, placed by JPL Horizons. Pluto has data for the whole clock; the other four from 1600 to 2500, and outside that only their orbits are drawn. Choose Pluto to see Charon"
         on={on}
         onChange={onChange}
       />

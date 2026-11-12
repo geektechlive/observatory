@@ -90,6 +90,11 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
+        // Charon (#99): fine samples around each data refresh only (docs/reference/orrery-data.md).
+        text: 'Charon shows when Pluto or Charon is chosen. At the scale of the rest of the scene it would sit inside Pluto’s marker, so the pair is drawn to Pluto’s own scale, magnified: Charon sits about 15 of Pluto’s radii from the barycentre, as it does in space. The site carries Charon’s positions for about two weeks either side of its last data refresh; at other dates it is hidden and the stage says so.',
+      },
+      {
+        kind: 'p',
         text: 'When nothing matches, the “Search JPL for …” option looks the name up in JPL’s Small-Body Database, which covers any asteroid or comet. The card shows its distance from the Sun and Earth and its speed, and Show in orrery draws it and flies there. JPL is asked one request at a time, so it can take a moment.',
       },
       {

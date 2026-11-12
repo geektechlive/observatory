@@ -63,7 +63,7 @@ const payload = { dwarfs: whole } as unknown as OrreryDwarfs
 const entries = dwarfEntries(payload)
 const byName = (name: string) => {
   const e = entries.find((x) => x.label === name)
-  if (!e) throw new Error(name)
+  if (!e || e.kind !== 'planet') throw new Error(name)
   return e
 }
 
@@ -129,7 +129,7 @@ describe('dwarfState: the marker, from the span only', () => {
     "%s: within 0.01 au of Horizons' own position halfway between samples",
     (name, b) => {
       const e = dwarfEntries({ dwarfs: [dwarf(name, b.coarse)] } as unknown as OrreryDwarfs)[0]
-      if (!e) throw new Error(name)
+      if (e?.kind !== 'planet') throw new Error(name)
       expect(b.target).toBe(spec(name).target)
       expect(b.coarse.step).toBe(spec(name).stepDays)
       expect(b.midpoints.length).toBeGreaterThan(15)
@@ -147,6 +147,7 @@ describe('dwarfState: the marker, from the span only', () => {
 describe('dwarfPath: the line, from the elements', () => {
   it('is the closed orbit through conicPath, wherever the marker is', () => {
     for (const e of entries) {
+      if (e.kind !== 'planet') continue
       const path = dwarfPath(e)
       expect(path.closed).toBe(true)
       expect(path.source).toBe('conic')

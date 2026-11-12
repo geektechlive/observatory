@@ -33,3 +33,4 @@ that makes the decision.
 | [0023](0023-optional-orrery-data-has-its-own-key.md)          | Optional orrery data gets its own key, so only the visitors who ask for it pay            | #99            |
 | [0024](0024-starlink-elements-from-supgp.md)                  | Starlink's elements come from CelesTrak SupGP, fetched once a run on the strictest terms  | #209           |
 | [0025](0025-tonight-comets-are-a-slice.md)                    | The Tonight panel's comets are a slice the refresh job cuts, under a key of their own     | #135           |
+| [0026](0026-charon-is-a-window-drawn-to-plutos-scale.md)      | Charon ships as a window around each refresh, drawn to Pluto's own scale                  | #99            |

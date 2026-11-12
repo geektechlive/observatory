@@ -37,7 +37,12 @@ export const PX_CEILING = {
   smallBody: 5,
   /** A dwarf planet (#99 item 8): a little more than a comet, still far under the Sun. */
   dwarf: 6,
+  /** Charon (#99): never bigger than a dwarf planet's marker can be. */
+  dwarfMoon: 5,
 } as const
+
+/** Charon (#99) never draws smaller than this, px; its ceiling is `PX_CEILING.dwarfMoon`. */
+export const DWARF_MOON_MIN_PX = 3
 
 /** A comet or interstellar object (#99) never draws smaller than this, px; its ceiling is `PX_CEILING.smallBody`. */
 export const SMALL_BODY_MIN_PX = 3

@@ -7,14 +7,16 @@
  *   and Haumea only JPL's 1600–2500.
  * - The line is the closed orbit from the SBDB elements in dwarfs.ts (conic.ts), drawn
  *   whenever the group is on, even where the marker is hidden.
+ * - Charon (#99) is an entry of its own kind ('moon'): its fine span from the Pluto
+ *   barycentre, drawn around Pluto's marker only with Pluto or Charon focused.
  *
  * Client only: the refresh job never imports this, so it may import freely.
  */
-import type { OrreryDwarf, OrreryDwarfs } from '@/schemas/orreryDwarfs'
+import type { OrreryDwarf, OrreryDwarfMoon, OrreryDwarfs } from '@/schemas/orreryDwarfs'
 import { SIM_MAX_MS, SIM_MIN_MS } from '@/store/orreryClock'
 
 import { conicPath } from './conic'
-import { dwarfBySpkid, type DwarfSpec } from './dwarfs'
+import { CHARON, CHARON_KEY, dwarfBySpkid, type DwarfMoonSpec, type DwarfSpec } from './dwarfs'
 import { stateAt, type TrackState } from './ephemeris'
 import {
   type SmallBodyEntry,
@@ -24,6 +26,7 @@ import {
   smallBodyPath,
   smallBodyState,
 } from './smallBodyView'
+import { AU_KM } from './units'
 
 const DAY_MS = 86_400_000
 const JD_UNIX_EPOCH = 2440587.5
@@ -35,23 +38,95 @@ export interface DwarfEntry {
   key: string
   label: string
   group: 'dwarfs'
+  kind: 'planet'
   body: OrreryDwarf
   spec: DwarfSpec
 }
 
+/**
+ * Charon (#99): in the dwarf group, under the same switch, placed around its planet as
+ * drawn (the layer's placeMoons), never on its own heliocentric spot, which would sit
+ * inside Pluto's marker at any zoom.
+ */
+export interface DwarfMoonEntry {
+  key: string
+  label: string
+  group: 'dwarfs'
+  kind: 'moon'
+  moon: OrreryDwarfMoon
+  spec: DwarfMoonSpec
+  parent: DwarfEntry
+}
+
 /** Everything the small-body layer draws: comets, the interstellar objects, dwarf planets. */
-export type OrreryEntry = SmallBodyEntry | DwarfEntry
+export type OrreryEntry = SmallBodyEntry | DwarfEntry | DwarfMoonEntry
 export type OrreryEntryGroup = SmallBodyGroup | 'dwarfs'
 
-/** The payload's dwarf planets this build knows, in its order (Pluto first). */
-export function dwarfEntries(data: OrreryDwarfs | undefined): DwarfEntry[] {
+/** Charon, as opposed to anything drawn on its own heliocentric position. */
+export const isDwarfMoon = (e: OrreryEntry): e is DwarfMoonEntry =>
+  e.group === 'dwarfs' && e.kind === 'moon'
+
+/** The payload's dwarf planets this build knows, in its order (Pluto first), then Charon. */
+export function dwarfEntries(data: OrreryDwarfs | undefined): (DwarfEntry | DwarfMoonEntry)[] {
   const out: DwarfEntry[] = []
   for (const body of data?.dwarfs ?? []) {
     const spec = dwarfBySpkid(body.spkid)
     if (!spec) continue
-    out.push({ key: smallBodyKey(body.spkid), label: body.name, group: 'dwarfs', body, spec })
+    out.push({
+      key: smallBodyKey(body.spkid),
+      label: body.name,
+      group: 'dwarfs',
+      kind: 'planet',
+      body,
+      spec,
+    })
   }
-  return out
+  const moon = data?.charon
+  const parent = moon ? out.find((d) => d.body.spkid === moon.parentSpkid) : undefined
+  if (!moon || !parent || moon.naifId !== CHARON.naifId) return out
+  return [
+    ...out,
+    {
+      key: CHARON_KEY,
+      label: moon.name,
+      group: 'dwarfs',
+      kind: 'moon',
+      moon,
+      spec: CHARON,
+      parent,
+    },
+  ]
+}
+
+/** Charon's vector from the Pluto barycentre (au, au/day), from its samples only, or null. */
+export function dwarfMoonRelative(entry: DwarfMoonEntry, jd: number): TrackState | null {
+  return stateAt({ fine: entry.moon.fine, coarse: null }, jd)
+}
+
+/** Charon's heliocentric state: Pluto's barycentre plus its own vector, or null. */
+export function dwarfMoonState(entry: DwarfMoonEntry, jd: number): TrackState | null {
+  const rel = dwarfMoonRelative(entry, jd)
+  const bary = rel ? dwarfState(entry.parent, jd) : null
+  if (!rel || !bary) return null
+  const add = (a: TrackState['position'], b: TrackState['position']) => ({
+    x: a.x + b.x,
+    y: a.y + b.y,
+    z: a.z + b.z,
+  })
+  return {
+    position: add(bary.position, rel.position),
+    velocity: add(bary.velocity, rel.velocity),
+    resolution: 'fine',
+  }
+}
+
+/**
+ * Whether Charon is drawn (its switch on and a sample covering the date aside): only
+ * with Pluto or Charon focused. It is drawn to Pluto's own scale around Pluto's marker,
+ * 15 of Pluto's radii out, which would crowd any wider view of the outer system.
+ */
+export function dwarfMoonShown(entry: DwarfMoonEntry, focus: string | null): boolean {
+  return focus === entry.key || focus === entry.parent.key
 }
 
 /** Where it is at a Julian date (TDB), from its span only, or null. */
@@ -71,12 +146,17 @@ export function dwarfPath(entry: DwarfEntry): SmallBodyPath {
 
 /** Where any drawn small body is, from its samples only, or null. */
 export function entryState(entry: OrreryEntry, jd: number): TrackState | null {
-  return entry.group === 'dwarfs' ? dwarfState(entry, jd) : smallBodyState(entry.body, jd)
+  if (entry.group !== 'dwarfs') return smallBodyState(entry.body, jd)
+  return entry.kind === 'moon' ? dwarfMoonState(entry, jd) : dwarfState(entry, jd)
 }
+
+/** Charon draws no line of its own. */
+const NO_PATH: SmallBodyPath = { points: [], closed: false, source: 'horizons' }
 
 /** The line drawn for any small body. */
 export function entryPath(entry: OrreryEntry): SmallBodyPath {
-  return entry.group === 'dwarfs' ? dwarfPath(entry) : smallBodyPath(entry.body)
+  if (entry.group !== 'dwarfs') return smallBodyPath(entry.body)
+  return entry.kind === 'moon' ? NO_PATH : dwarfPath(entry)
 }
 
 const msOfJd = (jd: number) => (jd - JD_UNIX_EPOCH) * DAY_MS
@@ -119,21 +199,53 @@ const listed = (names: readonly string[]) =>
  * The stage's line for dwarf planets whose markers are hidden at this date, grouped by
  * the window their own spans cover. Null when every marker is drawn.
  */
-export function dwarfNotice(entries: readonly OrreryEntry[], jd: number): string | null {
+export function dwarfNotice(
+  entries: readonly OrreryEntry[],
+  jd: number,
+  /** The chosen object: Charon is named only when it would show (dwarfMoonShown). */
+  focus: string | null = null,
+): string | null {
   const byWindow = new Map<string, string[]>()
+  const moons: string[] = []
   for (const e of entries) {
-    if (e.group !== 'dwarfs' || dwarfState(e, jd) !== null) continue
+    if (e.group !== 'dwarfs') continue
+    if (e.kind === 'moon') {
+      if (dwarfMoonShown(e, focus) && dwarfMoonRelative(e, jd) === null) {
+        moons.push(dwarfMoonNotice(e))
+      }
+      continue
+    }
+    if (dwarfState(e, jd) !== null) continue
     const window = spanYears(e)
     byWindow.set(window, [...(byWindow.get(window) ?? []), e.label])
   }
-  if (byWindow.size === 0) return null
-  return [...byWindow]
-    .map(([window, names]) =>
+  if (byWindow.size === 0 && moons.length === 0) return null
+  return [
+    ...[...byWindow].map(([window, names]) =>
       names.length === 1
         ? `${listed(names)} is hidden: JPL's ephemeris for it covers about ${window}. Its orbit is still drawn.`
         : `${listed(names)} are hidden: JPL's ephemerides for them cover about ${window}. Their orbits are still drawn.`,
-    )
-    .join(' ')
+    ),
+    ...moons,
+  ].join(' ')
+}
+
+const isoDay = (jd: number) => new Date(msOfJd(jd)).toISOString().slice(0, 10)
+const yearOf = (iso: string) => iso.slice(0, 4)
+
+/** The days Charon's samples cover: "2026-10-28 to 2026-11-27". */
+function moonSampleDays(entry: DwarfMoonEntry): string {
+  const { start, step, samples } = entry.moon.fine
+  const last = start + (Math.floor(samples.length / 6) - 1) * step
+  return `${isoDay(start)} to ${isoDay(last)}`
+}
+
+/** JPL's own window for Charon, in years: "1800 to 2199". */
+const moonEphemerisYears = (entry: DwarfMoonEntry) =>
+  `${yearOf(entry.spec.ephemerisFrom)} to ${yearOf(entry.spec.ephemerisTo)}`
+
+function dwarfMoonNotice(entry: DwarfMoonEntry): string {
+  return `${entry.label} is hidden: the site carries its samples for ${moonSampleDays(entry)}, around the last data refresh (JPL's ephemeris for it covers ${moonEphemerisYears(entry)}).`
 }
 
 interface StatusInput {
@@ -182,5 +294,34 @@ export function dwarfFacts(entry: DwarfEntry, simMs: number): DwarfFactsData {
     epochJd,
     target: entry.body.target,
     barycentre: entry.spec.command === '9',
+  }
+}
+
+export interface DwarfMoonFactsData {
+  /** Distance from the Pluto barycentre now, km, or null outside the samples. */
+  fromBarycentreKm: number | null
+  /** The days the site's samples cover. */
+  samples: string
+  /** JPL's own window for it, in years. */
+  ephemeris: string
+  periodDays: number
+  semiMajorAxisKm: number
+  radiusKm: number
+  target: string
+  center: string
+}
+
+/** What the inspector may say about Charon at a sim time. */
+export function dwarfMoonFacts(entry: DwarfMoonEntry, simMs: number): DwarfMoonFactsData {
+  const p = dwarfMoonRelative(entry, simMs / DAY_MS + JD_UNIX_EPOCH)?.position
+  return {
+    fromBarycentreKm: p ? Math.hypot(p.x, p.y, p.z) * AU_KM : null,
+    samples: moonSampleDays(entry),
+    ephemeris: moonEphemerisYears(entry),
+    periodDays: entry.spec.periodDays,
+    semiMajorAxisKm: entry.spec.semiMajorAxisKm,
+    radiusKm: entry.spec.radiusKm,
+    target: entry.moon.target,
+    center: entry.moon.center,
   }
 }

@@ -90,8 +90,8 @@ They ride in the same job and payload, relative to their planets.
 
 - The catalogue is `src/lib/orrery/moons.ts`: 14 moons of Mars, Jupiter, Saturn, Uranus and
   Neptune. It has no imports, like `craft.ts`. Each id was checked live on 2026-11-07, and period
-  and semi-major axis come from Horizons' physical-data header. Charon is left out (see
-  [Dwarf planets](#dwarf-planets-99-item-8)).
+  and semi-major axis come from Horizons' physical-data header. Charon is not in it: it travels
+  with the dwarf planets (see [Charon](#charon-99)).
 - The job asks `CENTER='500@<planet>'` at the coarsest step that gives 14 samples per orbit
   (`moonStepDays`): Phobos every 30 min (`stepSize` writes minutes), Io every 3 h, Enceladus,
   Miranda and Deimos every 2 h, Titan daily. Hermite stays within 100 km of Horizons for Io.
@@ -385,11 +385,48 @@ of their own. Owner's call, 2026-11-12: a "Dwarf planets" switch, off at first, 
 - **Keys and links:** `sbc:<SBDB SPK-ID>` like the comets (Pluto 20134340, Ceres 20000001), so a
   JPL lookup of one is drawn once. A link to one, or `focus=pluto` (any of the five names), asks
   for `/api/orrery-dwarfs` alone (`isDwarfFocus`) and waits for it.
-- **Charon is left out** (see #99). Horizons covers it ("Charon (901)", plu060, 1800 to 2199, today
-  included), so coverage is not the obstacle. Wiring is: the moon layer types a parent as a
-  planet and places and sizes a moon from its parent's drawn planet radius (`moonLayer.ts`,
-  `moonState.ts` drops any other parent), while Pluto is a px-clamped small-body marker with no
-  radius; and moon spans ship in `/api/orrery-bodies`, which every visit loads.
+- **Charon** has its own section below.
+
+## Charon (#99)
+
+Pluto's moon, in the dwarf planets' payload (`charon` in `horizons:dwarfs:v1`), under the same
+switch. Not in the moon layer: that types a parent as a planet and sizes a moon from the
+planet's drawn radius, while Pluto is a px-clamped small-body marker; and moon spans ship in
+`/api/orrery-bodies`, which every visit loads.
+
+- **Asked** as `'901'` with `CENTER='500@9'`, the Pluto system's barycentre, because Pluto's
+  marker is that barycentre: Charon's drawn place is the marker plus this vector, with no other
+  term. From Pluto (999) it would need Pluto's own 2,131 km offset as well. The target name is
+  asserted exactly ("Charon (901)"); a wrong answer goes in `missing` and never fails the step.
+- **Coverage, checked live 2026-11-12:** plu060 answers "No ephemeris ... prior to A.D.
+  1800-JAN-03" and has data to 2199-12-29 (`CHARON.ephemerisFrom`/`To` in `dwarfs.ts`).
+- **Only a window around each refresh ships**, not 1800 to 2199: the moons' window and step
+  (`moonWindowDays`, `moonStepDays`: ±15 days at 6 h, 25 samples an orbit of 6.387 days), with
+  velocities for the Hermite interpolation. The whole window at 6 h is about 584,000 rows;
+  asked directly, Horizons refuses it: "Output length exceeded, 337180 times requested, max. is
+  90000" (its own count, which does not match the rows; not explained). Positions-only at 14 samples an orbit would still be about 320,000 rows, several MB.
+  Outside the window Charon is hidden, never extrapolated, and the stage and inspector give
+  the sample days and JPL's 1800 to 2199.
+- **Reused** with the dwarf planets' spans for a day (so the window sits around the last daily
+  fetch, at worst about 14 days ahead), but refetched inside the day once fewer than 7 days of
+  samples remain ahead (`CHARON_MIN_DAYS_AHEAD`); one that fails keeps its last copy.
+- **The notice** names Charon only with Pluto or Charon chosen, when it would otherwise show.
+- **Measured** in a local dry run, 2026-11-12: 6 requests in 11 s; Charon 121 rows (2026-10-28 to
+  2026-11-27), 9,127 bytes, 17,461 to 17,467 km from the barycentre; the payload 140,402 bytes
+  (62,008 gzip), up from 131,315 (58,813).
+- **Drawn** (`smallBodyLayer.placeMoons`, after the dwarfs' px clamp) only with the switch on, a
+  sample covering the date, and Pluto or Charon focused (`dwarfMoonShown`). At the scene's
+  scale it is sub-pixel from Pluto at any zoom, so the pair is drawn to Pluto's own scale
+  (`toScaleMoonPosition`, linear): Charon about 14.7 of Pluto's radii (1,188.3 km) from the
+  marker, sized 606/1188.3 of it, then clamped to 3-5 px (`DWARF_MOON_MIN_PX`,
+  `PX_CEILING.dwarfMoon`), under the dwarf planets' 6 and the Sun's 10. With Pluto at 4 to 6 px
+  that is 59 to 88 px out. Not the moons' log scale: one moon needs no compression, and linear
+  keeps the true ratio. No orbit loop. The inspector says the pair is magnified and that
+  Pluto itself sits about 2,100 km from the marker.
+- **Focus:** the camera frames the barycentre (`position` answers Pluto's marker), so it does
+  not chase Charon round a 6-day orbit and can fly there before Charon shows.
+- **Key:** `sbc:901` (its SPK ID), or `focus=charon`; `isDwarfFocus` claims both. Numbered
+  asteroids' SPK-IDs are 20000000 + n, so asteroid 901 Brunsia is `sbc:20000901`.
 
 ## On-demand JPL (#100)
 
