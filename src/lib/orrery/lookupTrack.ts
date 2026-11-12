@@ -15,6 +15,7 @@ import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
 import { earthState } from './craftState'
 import { rangeRateFromStates, stateAt } from './ephemeris'
+import { closestSpanFrom, type LookupSpan } from './lookupSpan'
 import { osculatingLoop } from './moonOrbit'
 import type { Vec3 } from './scale'
 import { AU_KM, lightTimeSeconds } from './units'
@@ -35,46 +36,12 @@ export function lookupSpkid(key: string): string | null {
 
 export const isLookupKey = (key: string) => lookupSpkid(key) !== null
 
-/** Days between samples. */
-export const LOOKUP_STEP_DAYS = 2
-/** Days either side of the span's centre: 366 samples, inside the endpoint's 600. */
-const HALF_SPAN_DAYS = 365
-/** The span's centre moves on this grid, days; the date is always ≥ 305 days from an end. */
-const GRID_DAYS = 120
+// The spans themselves, shared with /api/trajectory, which takes no others (#223).
+export { LOOKUP_STEP_DAYS, type LookupSpan, lookupSpan } from './lookupSpan'
+
 const DAY_MS = 86_400_000
-/** /api/trajectory's dates (src/lib/orrery/jplLookup.ts). */
-const FIRST_DAY = '1900-01-01'
-const LAST_DAY = '2100-12-31'
-
-export interface LookupSpan {
-  /** YYYY-MM-DD, as /api/trajectory takes them. */
-  start: string
-  end: string
-  /** `<n>d`. */
-  step: string
-}
-
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 const dayMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`)
-
-/** The span to ask for around a sim time, or null outside 1900–2100. */
-export function lookupSpan(simMs: number): LookupSpan | null {
-  const first = dayMs(FIRST_DAY)
-  const last = dayMs(LAST_DAY)
-  if (!(simMs >= first && simMs < last + DAY_MS)) return null
-  const day = Math.floor(simMs / DAY_MS)
-  const centre = (Math.floor(day / GRID_DAYS) * GRID_DAYS + GRID_DAYS / 2) * DAY_MS
-  let start = centre - HALF_SPAN_DAYS * DAY_MS
-  let end = centre + HALF_SPAN_DAYS * DAY_MS
-  if (start < first) {
-    start = first
-    end = first + 2 * HALF_SPAN_DAYS * DAY_MS
-  } else if (end > last) {
-    end = last
-    start = last - 2 * HALF_SPAN_DAYS * DAY_MS
-  }
-  return { start: isoDay(start), end: isoDay(end), step: `${String(LOOKUP_STEP_DAYS)}d` }
-}
 
 const STEP_MINUTES: Record<string, number> = { m: 1, h: 60, d: 1440 }
 /** Golden-section steps for the closest approach, and bisection steps for the window's edges. */
@@ -97,8 +64,6 @@ export function spanCovers(fine: SampledSpan, jd: number): boolean {
  * cut-off the close approaches use for theirs (#142).
  */
 export const CLOSEST_MAX_AU = 0.001
-/** The dense span's step: 10 minutes, as #142's. */
-const CLOSEST_STEP = '10m'
 const JD_UNIX_EPOCH = 2440587.5
 const isoDayOfJd = (jd: number) => isoDay(Math.round(jd - JD_UNIX_EPOCH) * DAY_MS)
 
@@ -155,7 +120,8 @@ export function lookupClosestSpan(
     }
   }
   if (best < 0 || !(bestD < maxAu)) return null
-  return { start: isoDayOfJd(at(best - 1)), end: isoDayOfJd(at(best + 1)), step: CLOSEST_STEP }
+  // From the sample before the nearest to the one after (`closestSpanFrom`, #223).
+  return closestSpanFrom(isoDayOfJd(at(best - 1)))
 }
 
 /** The least of `dist` between `lo` and `hi`, by golden section. */

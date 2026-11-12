@@ -28,8 +28,18 @@ answers for a day with the Cache API.
 - Revisit if JPL publishes a rate limit that allows parallel requests, or the queue's daily
   budget is regularly reached.
 
+## Addendum, 2026-11-12 (#223)
+
+`/api/trajectory` answers 400 to any span the orrery does not ask for. It takes only a 2-day span
+from `lookupSpan` and a dense 10-minute span from one of its interior samples; both are built and
+checked in `src/lib/orrery/lookupSpan.ts`. A free choice of start, end and step let one script make
+a new cache miss, and so a new request against the daily budget, every time. Per object the keys
+drop from tens of millions to 37,667. It does not stop a determined script, because SPK-IDs and
+`/api/lookup`'s search text stay open. A separate, smaller daily share for trajectories is the next
+step if the budget is ever reached.
+
 ## Evidence
 
-- #100, #145; commit d64212a.
+- #100, #145, #223; commit d64212a.
 - `workers/jpl-queue/`, `wrangler.toml` (`JPL_QUEUE`).
 - [reference/orrery-data.md](../reference/orrery-data.md#on-demand-jpl-100).

@@ -18,6 +18,7 @@ import {
   toReport,
   // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/check-health.mjs'
+import { parseTrajectoryParams } from '../../../src/lib/orrery/jplLookup'
 
 /** Shape of a single check result, as runCheck produces it. */
 const result = (over: Record<string, unknown> = {}) => ({
@@ -422,11 +423,15 @@ describe('probed endpoints (#42, #61)', () => {
     )
     expect(traj).toBeDefined()
     expect(traj?.path).toBe(
-      '/api/trajectory?id=sb:20000433&start=2026-01-01&end=2026-01-03&step=1d',
+      '/api/trajectory?id=sb:20000433&start=2025-01-07&end=2027-01-07&step=2d',
     )
+    // A span the endpoint takes (#223): only the orrery's own spans are.
+    const query = new URL(`https://x${traj?.path ?? ''}`).searchParams
+    expect(parseTrajectoryParams(query).ok).toBe(true)
     expect(traj?.notConfiguredWarns).toBe(true)
     const object = { name: '433 Eros (A898 PA)' }
-    expect(traj?.check({ object, fine: { samples: Array(18).fill(0.1) } })).toBe(true)
+    expect(traj?.check({ object, fine: { samples: Array(2196).fill(0.1) } })).toBe(true)
+    expect(traj?.check({ object, fine: { samples: Array(18).fill(0.1) } })).toBe(false)
     expect(traj?.check({ object, fine: null })).toBe(false)
     expect(traj?.check({ object, fine: { samples: [] } })).toBe(false)
   })

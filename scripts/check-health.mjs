@@ -145,17 +145,18 @@ export const CHECKS = [
           (Array.isArray(x?.fine?.samples) || Array.isArray(x?.coarse?.samples)),
       ),
   },
-  // On-demand lookup (#100): JPL through the jpl-queue Durable Object. A fixed past span
-  // is cached for a day, so most runs never reach JPL. Until the Worker is deployed and
-  // bound, the endpoint says "not set up" (X-Not-Configured), which only warns.
+  // On-demand lookup (#100): JPL through the jpl-queue Durable Object. A fixed span is
+  // cached for a day, so most runs never reach JPL. It is one the orrery asks for (the
+  // 2-day span around 2026-01-15), as the endpoint takes no other (#223). Until the Worker
+  // is deployed and bound, the endpoint says "not set up" (X-Not-Configured), which only warns.
   {
-    path: '/api/trajectory?id=sb:20000433&start=2026-01-01&end=2026-01-03&step=1d',
-    requires: 'an object and 3 samples of position and velocity',
+    path: '/api/trajectory?id=sb:20000433&start=2025-01-07&end=2027-01-07&step=2d',
+    requires: 'an object and 366 samples of position and velocity',
     notConfiguredWarns: true,
     check: (b) =>
       typeof b?.object?.name === 'string' &&
       Array.isArray(b?.fine?.samples) &&
-      b.fine.samples.length === 18,
+      b.fine.samples.length === 2196,
   },
   // Space-Track (#101): KV-only, read by the refresh job with the owner's account. Some
   // weeks nothing is predicted to re-enter, so an empty TIP list passes; no list fails.

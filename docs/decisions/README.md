@@ -17,7 +17,7 @@ that makes the decision.
 | [0007](0007-upgrade-dont-pin.md)                              | Upgrade, don't pin; lazy bundle budgets are tripwires                                     | #96, #97, #103 |
 | [0008](0008-the-orrery-is-a-whole-page.md)                    | The orrery is a whole page, not a lens                                                    | #91            |
 | [0009](0009-horizons-sampled-in-the-refresh-job.md)           | Ephemerides are sampled in the refresh job; the client only interpolates                  | #88, #93       |
-| [0010](0010-on-demand-jpl-through-one-durable-object.md)      | On-demand JPL lookups go through one Durable Object queue                                 | #100           |
+| [0010](0010-on-demand-jpl-through-one-durable-object.md)      | On-demand JPL lookups go through one Durable Object queue                                 | #100, #223     |
 | [0011](0011-sgp4-runs-in-javascript-under-the-csp.md)         | Production propagates satellites in JavaScript; the CSP allows no WebAssembly             | #98            |
 | [0012](0012-satellites-live-in-the-earth-frame.md)            | Satellites live in the orrery's Earth frame, from points to haze                          | #98            |
 | [0013](0013-space-track-and-discosweb-on-their-terms.md)      | Space-Track and DISCOSweb are read on their own terms, in the refresh job only            | #101           |

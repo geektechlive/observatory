@@ -1,4 +1,5 @@
 import { targetMatchesDesignation } from './closeApproach'
+import { FIRST_DAY, isLookupSpan, LAST_DAY } from './lookupSpan'
 import { cometDesignation, targetMatchesSmallBody } from './smallBodies'
 
 // On-demand lookup of any small body (#100): the search string and trajectory request a
@@ -155,8 +156,8 @@ export function lookupTargetMatches(object: LookupObject, target: string | null)
 /** The most samples one trajectory request may ask for. */
 export const MAX_TRAJECTORY_SAMPLES = 600
 /** Horizons covers most small bodies across this range; outside it, refuse. */
-const MIN_DATE = '1900-01-01'
-const MAX_DATE = '2100-12-31'
+const MIN_DATE = FIRST_DAY
+const MAX_DATE = LAST_DAY
 /** 10 minutes: a close pass's dense span (#215), as the refresh job's for #142. */
 const MIN_STEP_MINUTES = 10
 
@@ -185,9 +186,13 @@ function stepMinutesOf(s: string | null): number {
   return m[2] === 'd' ? n * 1440 : m[2] === 'h' ? n * 60 : n
 }
 
-/** `id=sb:<SPK-ID>&start=YYYY-MM-DD&end=YYYY-MM-DD&step=<n>m|<n>h|<n>d`, checked and capped. */
+/**
+ * `id=sb:<SPK-ID>&start=YYYY-MM-DD&end=YYYY-MM-DD&step=<n>m|<n>h|<n>d`, checked and capped,
+ * and only a span the orrery asks for (`isLookupSpan`, #223): each new one is a Horizons
+ * request against the queue's daily budget. No leading zero, which would be a second key.
+ */
 export function parseTrajectoryParams(p: URLSearchParams): TrajectoryParams {
-  const id = /^sb:(\d{1,10})$/.exec(p.get('id') ?? '')
+  const id = /^sb:([1-9]\d{0,9})$/.exec(p.get('id') ?? '')
   if (!id?.[1]) return { ok: false, reason: 'id must be sb:<SPK-ID>' }
   const start = p.get('start')
   const end = p.get('end')
@@ -207,6 +212,9 @@ export function parseTrajectoryParams(p: URLSearchParams): TrajectoryParams {
   const value = { spkid: id[1], start, end, stepMinutes }
   if (trajectorySampleCount(value) > MAX_TRAJECTORY_SAMPLES) {
     return { ok: false, reason: `at most ${String(MAX_TRAJECTORY_SAMPLES)} samples` }
+  }
+  if (!isLookupSpan(start, end, stepMinutes)) {
+    return { ok: false, reason: 'not a span the orrery asks for (2-day grid or a close pass)' }
   }
   return { ok: true, value }
 }

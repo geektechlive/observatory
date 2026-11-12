@@ -147,14 +147,15 @@ describe('parseTrajectoryParams (#100)', () => {
 
   it('reads a valid request', () => {
     expect(
-      parseTrajectoryParams(params('id=sb:20000433&start=2026-11-01&end=2026-11-03&step=1d')),
+      parseTrajectoryParams(params('id=sb:20000433&start=2025-09-04&end=2027-09-04&step=2d')),
     ).toEqual({
       ok: true,
-      value: { spkid: '20000433', start: '2026-11-01', end: '2026-11-03', stepMinutes: 1440 },
+      value: { spkid: '20000433', start: '2025-09-04', end: '2027-09-04', stepMinutes: 2880 },
     })
+    // The same step written in hours is the same request (the cache key is in minutes).
     expect(
-      parseTrajectoryParams(params('id=sb:1004083&start=2026-11-01&end=2026-11-02&step=6h')),
-    ).toMatchObject({ ok: true, value: { stepMinutes: 360 } })
+      parseTrajectoryParams(params('id=sb:1004083&start=2025-09-04&end=2027-09-04&step=48h')),
+    ).toMatchObject({ ok: true, value: { stepMinutes: 2880 } })
     // A close pass's dense span (#215): four days at 10 minutes, 577 samples.
     expect(
       parseTrajectoryParams(params('id=sb:54670410&start=2026-11-10&end=2026-11-14&step=10m')),
@@ -195,7 +196,7 @@ describe('parseTrajectoryParams (#100)', () => {
     const r = parseTrajectoryParams(params('id=sb:1&start=2026-01-01&end=2028-01-01&step=1d'))
     expect(r.ok).toBe(false)
     expect(MAX_TRAJECTORY_SAMPLES).toBeLessThan(731)
-    const fits = parseTrajectoryParams(params('id=sb:1&start=2026-01-01&end=2028-01-01&step=2d'))
+    const fits = parseTrajectoryParams(params('id=sb:1&start=2025-09-04&end=2027-09-04&step=2d'))
     expect(fits.ok).toBe(true)
   })
 })

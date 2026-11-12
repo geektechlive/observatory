@@ -470,12 +470,24 @@ queue).
   `DES=<SPK-ID>;CAP;NOFRAG` for a comet, checked live 2026-11-07 on Eros, Apophis and 3I), checks
   the target name and the sample count, and caps a span at 600 samples between 1900 and 2100.
   Both cache a day with the Cache API.
+- **Only the orrery's own spans (#223).** Each new (SPK-ID, start, end, step) is a cache miss and
+  a Horizons request against the 2,000 a day, so `/api/trajectory` answers 400 to any span but a
+  2-day span `lookupSpan` builds or a dense 10-minute span from an interior 2-day sample
+  (`isLookupSpan` in `src/lib/orrery/lookupSpan.ts`, which builds both for the orrery too), and to
+  an SPK-ID with a leading zero. Per object that is 608 grid spans and 37,059 dense ones across
+  1900–2100 (`jpl-trajectory-span.test.ts`), where any start, end and step was a key before (over
+  40 million with whole-day steps alone). It does not close the budget: the dense spans and the
+  open-ended SPK-IDs (and `/api/lookup`'s free text, a key per spelling by design) still allow
+  more than 2,000 misses a day. The Function's in-isolate limit is 60 `/api/` requests a minute per IP
+  (`functions/_middleware.ts`; the zone's Rate Limiting rule is the real boundary); against a queue that serves one a second, one IP at that limit
+  spends the 2,000 in about 33 minutes. A smaller daily share for trajectories is the next step if
+  the budget is ever reached.
 - **The binding** is in `wrangler.toml` (`[[durable_objects.bindings]] name = "JPL_QUEUE"`,
   `class_name = "JplQueue"`, `script_name = "observatory-jpl-queue"`; the Worker was deployed
   first, 2026-11-07). Top-level bindings apply to previews and production alike. Without it both
   endpoints answer 503 `X-Error-Kind: upstream` plus `X-Not-Configured: jpl-queue`; the search
-  card says lookup isn't available yet, and the health probe (a fixed 2026-01 span of Eros,
-  cached, so most runs never reach JPL) only warns (`notConfiguredWarns`).
+  card says lookup isn't available yet, and the health probe (a fixed 2-day span of Eros
+  around 2026-01-15, 2025-01-07 to 2027-01-07, cached, so most runs never reach JPL) only warns (`notConfiguredWarns`).
 - **The search** (`SearchBox.tsx`): with no match among what the orrery carries, it offers
   "Search JPL for …". The card (`JplLookup.tsx`, its own lazy chunk) shows SBDB's answer and
   the distance from the Sun and Earth (Earth from the planet tables) and the speed at the sim

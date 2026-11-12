@@ -138,10 +138,52 @@ describe('/api/lookup (#100)', () => {
   })
 })
 
-describe('/api/trajectory (#100)', () => {
-  const path = '/api/trajectory?id=sb:20000433&start=2026-11-01&end=2026-11-03&step=1d'
+// The orrery's 2-day span around 2026-11-01 (`lookupSpan`): /api/trajectory takes only
+// the spans the orrery asks for (#223).
+const GRID_PATH = '/api/trajectory?id=sb:20000433&start=2025-09-04&end=2027-09-04&step=2d'
+const GRID_START_JD = 2460922.5
+const GRID_SAMPLES = 366
 
-  function queueFor(vectors: unknown = erosVectors) {
+/** The Eros fixture's answer stretched to `n` rows, `stepDays` apart, from `startJd`. */
+function erosRows(n: number, startJd = GRID_START_JD, stepDays = 2) {
+  const [head = '', rest = ''] = erosVectors.result.split('$$SOE\n')
+  const [rows = '', tail = ''] = rest.split('$$EOE')
+  const first = rows.split('\n')[0] ?? ''
+  const cells = first.split(',').slice(1).join(',')
+  const lines = Array.from(
+    { length: n },
+    (_, i) => `${(startJd + i * stepDays).toFixed(9)},${cells}`,
+  )
+  return { ...erosVectors, result: `${head}$$SOE\n${lines.join('\n')}\n$$EOE${tail}` }
+}
+
+describe('/api/trajectory (#100)', () => {
+  const path = GRID_PATH
+  const gridVectors = erosRows(GRID_SAMPLES)
+
+  it('refuses a span the orrery never asks for with 400, before asking JPL (#223)', async () => {
+    const { ns, asked } = queueFor()
+    for (const off of [
+      '/api/trajectory?id=sb:20000433&start=2026-11-01&end=2026-11-03&step=1d',
+      '/api/trajectory?id=sb:20000433&start=2025-09-05&end=2027-09-05&step=2d',
+      '/api/trajectory?id=sb:20000433&start=2026-11-11&end=2026-11-15&step=10m',
+      '/api/trajectory?id=sb:020000433&start=2025-09-04&end=2027-09-04&step=2d',
+    ]) {
+      const { res } = await run(trajectory, off, { JPL_QUEUE: ns })
+      expect(res.status, off).toBe(400)
+    }
+    expect(asked).toHaveLength(0)
+  })
+
+  it('takes a close pass’s dense span (#215)', async () => {
+    const dense = '/api/trajectory?id=sb:20000433&start=2026-11-10&end=2026-11-14&step=10m'
+    const { ns } = queueFor(erosRows(577, 2461354.5, 10 / 1440))
+    const { res } = await run(trajectory, dense, { JPL_QUEUE: ns })
+    expect(res.status).toBe(200)
+    expect(TrajectoryResponseSchema.parse(await res.json()).fine?.samples).toHaveLength(577 * 6)
+  })
+
+  function queueFor(vectors: unknown = gridVectors) {
     return fakeQueue((url) =>
       url.includes('sbdb.api') ? { jplStatus: 200, body: eros } : { jplStatus: 200, body: vectors },
     )
@@ -154,9 +196,9 @@ describe('/api/trajectory (#100)', () => {
     const body = TrajectoryResponseSchema.parse(await res.json())
     expect(body.object.name).toBe('433 Eros (A898 PA)')
     expect(body.target).toBe('433 Eros (A898 PA)')
-    expect(body.fine?.start).toBe(2461345.5)
-    expect(body.fine?.step).toBe(1)
-    expect(body.fine?.samples).toHaveLength(18)
+    expect(body.fine?.start).toBe(GRID_START_JD)
+    expect(body.fine?.step).toBe(2)
+    expect(body.fine?.samples).toHaveLength(GRID_SAMPLES * 6)
     expect(body.fine?.samples[0]).toBeCloseTo(0.2863368944893412, 12)
     expect(asked[0]).toBe('https://ssd-api.jpl.nasa.gov/sbdb.api?spk=20000433')
     expect(new URL(asked[1] ?? '').searchParams.get('COMMAND')).toBe("'DES=20000433;'")
@@ -164,8 +206,8 @@ describe('/api/trajectory (#100)', () => {
 
   it('refuses an answer for a different object', async () => {
     const wrong = {
-      ...erosVectors,
-      result: erosVectors.result.replace('433 Eros (A898 PA)', '248370 (2005 QN173)'),
+      ...gridVectors,
+      result: gridVectors.result.replace('433 Eros (A898 PA)', '248370 (2005 QN173)'),
     }
     const { ns } = queueFor(wrong)
     const { res } = await run(trajectory, path, { JPL_QUEUE: ns })
@@ -174,12 +216,9 @@ describe('/api/trajectory (#100)', () => {
   })
 
   it('refuses an answer with the wrong number of samples', async () => {
-    const { ns } = queueFor()
-    const { res } = await run(
-      trajectory,
-      '/api/trajectory?id=sb:20000433&start=2026-11-01&end=2026-11-05&step=1d',
-      { JPL_QUEUE: ns },
-    )
+    // Three samples where the span has 366.
+    const { ns } = queueFor(erosVectors)
+    const { res } = await run(trajectory, path, { JPL_QUEUE: ns })
     expect(res.status).toBe(500)
   })
 
@@ -238,7 +277,7 @@ describe('the client health contracts agree with these Functions (#148)', () => 
 
   it('accepts sampled vectors and an answer that says where the ephemeris ends', async () => {
     const required = SOURCES['jpl-trajectory'].required
-    const path = '/api/trajectory?id=sb:20000433&start=2026-11-01&end=2026-11-03&step=1d'
+    const path = GRID_PATH
     const answer = async (vectors: unknown) => {
       const { ns } = fakeQueue((url) =>
         url.includes('sbdb.api')
@@ -247,7 +286,7 @@ describe('the client health contracts agree with these Functions (#148)', () => 
       )
       return (await run(trajectory, path, { JPL_QUEUE: ns })).res.json()
     }
-    expect(required(await answer(erosVectors))).toBe(true)
+    expect(required(await answer(erosRows(GRID_SAMPLES)))).toBe(true)
     const refused = {
       signature: erosVectors.signature,
       result:

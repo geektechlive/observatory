@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { stateAt } from '@/lib/orrery/ephemeris'
+import { parseTrajectoryParams } from '@/lib/orrery/jplLookup'
 import {
   CLOSEST_MAX_AU,
   describeLookup,
@@ -55,6 +56,9 @@ describe('a looked-up object passing Earth (#215)', () => {
     expect(spanSampleCount(span ?? { start: '', end: '', step: '' })).toBe(577)
     // The span's ends are lookup samples, so the hand-over is at a shared Horizons state.
     expect(fixture.dense.start).toBeCloseTo(2461354.5, 6)
+    // /api/trajectory takes it (#223): it refuses spans the orrery never asks for.
+    const params = new URLSearchParams({ id: 'sb:54670410', ...(span ?? {}) })
+    expect(parseTrajectoryParams(params).ok).toBe(true)
   })
 
   it('asks nothing for an object that stays beyond 0.001 au', () => {
