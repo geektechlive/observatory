@@ -77,17 +77,27 @@ describe('local verify gate', () => {
   // There is no CI (#33): `pnpm verify` is the only gate before a merge to main,
   // so it must run every check CI used to run. Dropping one here drops it entirely.
   // test:coverage, not test:unit: vitest.config.ts enforces coverage thresholds.
+  // #224: the whole gate runs inside the machine-wide test lock, so two worktrees'
+  // gates never overlap; the checks themselves live in verify:gate.
+  it('runs the gate inside the test lock', () => {
+    expect(pkg.scripts?.verify).toBe('node scripts/test-lock.mjs pnpm verify:gate')
+  })
+
+  it.each(['test:unit', 'test:coverage', 'test:e2e'])('%s runs inside the test lock', (name) => {
+    expect(pkg.scripts?.[name] ?? '').toMatch(/^node scripts\/test-lock\.mjs /)
+  })
+
   it.each(['lint', 'typecheck', 'test:coverage', 'test:e2e', 'build', 'audit'])(
     'verify runs %s',
     (gate) => {
-      const verify = pkg.scripts?.verify ?? ''
+      const verify = pkg.scripts?.['verify:gate'] ?? ''
       expect(verify).toMatch(new RegExp(`pnpm (run )?${gate.replace(':', '\\:')}\\b`))
     },
   )
 
   it('checks the bundle budget after the build and before e2e (#46)', () => {
     // check-bundle reads dist/, so it must follow build; it runs before the slow e2e suite.
-    const steps = (pkg.scripts?.verify ?? '').split('&&').map((s) => s.trim())
+    const steps = (pkg.scripts?.['verify:gate'] ?? '').split('&&').map((s) => s.trim())
     const at = (name: string) => steps.findIndex((s) => s === `pnpm ${name}`)
     expect(at('check:bundle')).toBeGreaterThan(at('build'))
     expect(at('check:bundle')).toBeLessThan(at('test:e2e'))
@@ -95,7 +105,7 @@ describe('local verify gate', () => {
   })
 
   it('audits at the high level, so the accepted advisories in pnpm-workspace.yaml apply', () => {
-    expect(pkg.scripts?.verify ?? '').toContain('pnpm audit --audit-level=high')
+    expect(pkg.scripts?.['verify:gate'] ?? '').toContain('pnpm audit --audit-level=high')
   })
 })
 

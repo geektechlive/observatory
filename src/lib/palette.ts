@@ -345,7 +345,7 @@ export const GLOBE_GRADE: {
 export function renderPaletteCss(): string {
   const lines = [
     '/* GENERATED from src/lib/palette.ts by tests/unit/palette.test.ts. Do not edit.',
-    '   Regenerate with: pnpm exec vitest run tests/unit/palette.test.ts -u */',
+    '   Regenerate with: pnpm test:unit tests/unit/palette.test.ts -u */',
     ':root {',
   ]
   for (const [key, lane] of Object.entries(LANES)) {

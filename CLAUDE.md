@@ -17,6 +17,7 @@ Vite 8 + React 19 + TypeScript 7 strict (6 for lint only, ADR 0006) · Cloudflar
 - `pnpm build` then `pnpm pages:dev`: local Functions with KV and `.dev.vars`. `pages:dev` serves `dist/`, so rebuild after every edit.
 - `pnpm lint`: ESLint (`--max-warnings 0`, #113) + stylelint.
 - `pnpm typecheck`: `tsc` (TS 7).
+- **Tests run one at a time on this machine (ADR 0027).** `verify`, `test:unit`, `test:coverage` and `test:e2e` share a lock across all worktrees, with a cool-down after long runs; the runners refuse to start outside it. Run single files as `pnpm test:unit <file>` / `pnpm test:e2e <spec>`, never `pnpm exec vitest|playwright`.
 - `pnpm verify`: **the gate before every merge to `main`**: lint, typecheck, unit tests with coverage thresholds, build with `check-bundle`, e2e, `pnpm audit --audit-level=high`. There is no CI (ADR 0001).
 - `node scripts/og-image.mjs [baseURL]`: regenerate the share card ([docs/operations/share-card.md](docs/operations/share-card.md)).
 - More: [docs/operations/local-dev.md](docs/operations/local-dev.md) (secrets, JPL queue locally, real-GPU Playwright).
@@ -69,7 +70,7 @@ Details: [docs/reference/bundle-and-loading.md](docs/reference/bundle-and-loadin
 - `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`: CSS module lookups are `string | undefined`; use `?? ''` and `?: string | undefined` in props.
 - Stylelint disables `color-function-notation`, `property-no-vendor-prefix`, `selector-class-pattern` on purpose (see `stylelint.config.js`).
 - **`@keyframes`:** an empty line between each keyframe selector (`rule-empty-line-before`) and kebab-case names (`keyframes-name-pattern`).
-- **Colours have two sources:** `src/styles/tokens.css` and `src/lib/palette.ts` (hex, because MapLibre rejects `oklch()`). `src/styles/palette.css` is generated: regenerate with `pnpm exec vitest run tests/unit/palette.test.ts -u`, never hand-edit. Severity thresholds live in `src/lib/severity.ts` only. `design-lint.json` scopes the colour and 11px type-floor lint.
+- **Colours have two sources:** `src/styles/tokens.css` and `src/lib/palette.ts` (hex, because MapLibre rejects `oklch()`). `src/styles/palette.css` is generated: regenerate with `pnpm test:unit tests/unit/palette.test.ts -u`, never hand-edit. Severity thresholds live in `src/lib/severity.ts` only. `design-lint.json` scopes the colour and 11px type-floor lint.
 - Cyan is spacecraft and telemetry only; MCRN red is hazard only.
 - Layout follows the approved prototype (#63, `docs/design-history/mockups-v2.html`); under 900px the dial is a fixed bottom bar on purpose.
 - **maplibre-gl 6 needs `setWorkerUrl` wired by hand** (`WorldMap.tsx`), or every vector layer dies silently behind an HTTP 200.

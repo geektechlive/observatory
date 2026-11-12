@@ -28,9 +28,20 @@ There is no CI and there are no PRs ([ADR 0001](../decisions/0001-no-ci-no-prs.m
    merging. Roll back with `git revert`, or to the previous Pages deployment.
 7. A PR is only for when the owner wants to review something before it goes live.
 
+## One test run at a time
+
+Every test entry point runs inside a machine-wide lock, `scripts/test-lock.mjs`
+([ADR 0027](../decisions/0027-one-test-run-at-a-time.md), #224). Its lock directory sits in the
+git common dir, so every worktree shares it. After a run longer than 60 s, the next one waits
+30 s, then for the 1-minute load average to drop below half the cores (at most 3 minutes). The
+Playwright and Vitest configs refuse to start outside the lock, so use `pnpm test:unit <file>`
+and `pnpm test:e2e <spec>` for single files. A waiting run prints which command holds the lock
+and where. A lock whose holder has died is cleared automatically. To see who holds it now, read
+`.git/observatory-test.lock/owner.json` in the main checkout.
+
 ## The gate's own guard
 
-`tests/unit/ci-contract.test.ts` asserts that `pnpm verify` runs every check (using
+`tests/unit/ci-contract.test.ts` asserts that `pnpm verify` runs inside the test lock and that `verify:gate` runs every check (using
 `test:coverage`, because `vitest.config.ts` enforces thresholds), that `packageManager` pins pnpm,
 and that every `pnpm <script>` a remaining workflow invokes exists. Dropping a check from
 `verify` drops it entirely, because nothing else runs it.

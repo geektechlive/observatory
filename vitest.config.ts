@@ -1,6 +1,11 @@
 import { resolve } from 'path'
 import { defineConfig } from 'vitest/config'
 
+import { assertUnderTestLock } from './tests/testLockGuard'
+
+// One test run at a time on this machine (#224, ADR 0027): use `pnpm test:unit`.
+assertUnderTestLock(process.env, 'vitest')
+
 export default defineConfig({
   test: {
     environment: 'jsdom',

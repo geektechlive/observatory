@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
 import { e2ePort } from './tests/e2ePort'
+import { assertUnderTestLock } from './tests/testLockGuard'
+
+// One test run at a time on this machine (#224, ADR 0027): use `pnpm test:e2e`.
+assertUnderTestLock(process.env, 'playwright')
 
 // One preview server per checkout, so parallel worktrees never test each other's
 // build (#111).

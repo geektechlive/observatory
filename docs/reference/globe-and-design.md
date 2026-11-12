@@ -11,7 +11,7 @@ visual change. Decision: [ADR 0005](../decisions/0005-roci-v2-the-instrument.md)
 - `src/lib/palette.ts` holds the data colours. It emits hex, because MapLibre's parser rejects
   `oklch()`.
 - `src/styles/palette.css` is **generated** from `palette.ts`. A unit test fails on drift.
-  Regenerate with `pnpm exec vitest run tests/unit/palette.test.ts -u`, and never hand-edit it.
+  Regenerate with `pnpm test:unit tests/unit/palette.test.ts -u`, and never hand-edit it.
 - Severity thresholds live in `src/lib/severity.ts` only.
 - `design-lint.json` decides where the colour-literal and 11px type-floor lint applies. Add a
   directory when its reskin lands. Both stylelint and ESLint read it.
