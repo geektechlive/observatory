@@ -36,3 +36,4 @@ that makes the decision.
 | [0026](0026-charon-is-a-window-drawn-to-plutos-scale.md)      | Charon ships as a window around each refresh, drawn to Pluto's own scale                  | #99            |
 | [0027](0027-one-test-run-at-a-time.md)                        | One test run at a time on this machine, enforced by a lock with a cool-down               | #224           |
 | [0028](0028-stand-in-models-by-name-and-group.md)             | Satellites with no model get a labelled stand-in, picked by name and group                | #194           |
+| [0029](0029-jpl-feeds-built-by-the-job.md)                    | Planets, Sentry and fireball are built by the refresh job; visitors never call JPL        | #146           |

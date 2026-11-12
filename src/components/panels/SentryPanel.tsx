@@ -60,7 +60,9 @@ export function SentryPanel() {
     }
 
     if (view.kind === 'unavailable') {
-      return <PanelState kind="unavailable" detail="JPL Sentry is not answering" />
+      return (
+        <PanelState kind="unavailable" detail="The Sentry risk list is unavailable right now" />
+      )
     }
 
     if (sorted.length === 0) {

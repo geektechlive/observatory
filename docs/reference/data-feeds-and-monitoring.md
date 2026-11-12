@@ -54,7 +54,39 @@ mean day to day:
   `scripts/refresh-data.mjs` against a fresh copy.
 - **JPL Horizons answers 503 to overlapping requests from one address (#88, measured
   2026-11-06).** Nine parallel calls got two answers; the same nine one at a time all answered in
-  ~140 ms each. `/api/planets` asks one body at a time, and any new Horizons caller must too.
+  ~140 ms each. Any new Horizons caller must ask one at a time, and visitors never call it: the
+  refresh job does, for planets too (below).
+- **Planets, Sentry and fireball are built by the refresh job (#146, [ADR 0029](../decisions/0029-jpl-feeds-built-by-the-job.md)).**
+  `/api/planets`, `/api/sentry` and `/api/fireball` stream a finished KV body (`horizons:planets:v1`,
+  `jpl:sentry:v1`, `jpl:fireball:v1`) through `serveKvBodyCached` (`_kvBody.ts`): Cache API in
+  front, no live JPL fallback, our JSON 503 `X-Error-Kind: upstream` / `X-Data-Source: kv` until
+  the job has written the key. The bodies keep their old shape; `updatedAt` is the run's time, so
+  the panels' "N h ago" reads honestly in hours.
+  - Planets: Sun, Moon and the seven planets, one Horizons request each (geocentric
+    `500@399`, `QUANTITIES 1,9,23`, first row = 00:00 UTC of the run's date), so the copy is for
+    one UTC date and is degraded past 24 h. From 00:00 UTC until the 00:17 run (longer if
+    that run is late or fails: GitHub schedules can be delayed) it shows yesterday's positions. A body that fails is left out and the step warns
+    (`WARN missing Jupiter`); only no body at all is a failure. A partial build does not replace
+    a fuller copy still inside 24 h: that copy is kept (`kept the previous copy`), and no old body
+    is carried into a new one.
+  - Sentry: `sentry.api` whole (2,247 objects on 2026-11-12), the 50 highest `ps_cum`, only the
+    fields `src/schemas/sentry.ts` knows. Fireball: `fireball.api?limit=30`, columns mapped to
+    names. Both degraded past 48 h.
+  - 11 JPL requests, measured 12 s against live JPL on 2026-11-12 (`--dry-run --only=jpl-feeds`),
+    a 60 s budget inside the job's deadline. Bodies 1.0, 9.4 and 4.3 KB. Three KV writes a run,
+    12 a day.
+  - **First deploy:** a Functions deploy that lands before a refresh run shows 503s on these
+    three panels. Seed the keys first with `node scripts/refresh-data.mjs --only=jpl-feeds` from a
+    checkout with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set: it writes exactly these
+    three keys (the old Functions ignore them) and nothing else. The alternative is
+    `gh workflow run data-refresh.yml` after the push, which runs the whole job and counts as that
+    day's SATCAT download if after 17:00 UTC (satellites.md). Check with
+    `curl -sI https://observatory.geektechlive.com/api/planets` for `X-Data-Source: kv`; if the
+    zone's cache rule holds the old answer, purge that URL (last bullet of the zone notes).
+    Health probes the three paths (a 503 with `X-Error-Kind: upstream` opens an issue only on the
+    4th run in a row).
+  - Order inside the step: Sentry, fireball, then the nine planets, so a Horizons outage that
+    makes each body burn its retries uses up the 60 s budget on the planets alone.
 - **NOAA SWPC feed drift (2026-09):** `noaa-planetary-k-index.json` became an array of objects,
   and `solar-wind/{plasma,mag}-7-day.json` returned 404. Solar wind and Bz now come from
   `products/geospace/propagated-solar-wind-1-hour.json` via the shared `functions/api/_swpc.ts`.
@@ -256,7 +288,8 @@ Both data-refresh jobs write `incident-report.json`, and `scripts/report-inciden
   6 h. Rejected payloads are logged with their keys plus a 300-character excerpt.
 - **One deadline, 6 minutes (#128), inside the workflow's 10-minute `timeout-minutes`.** A job
   killed by that limit writes no incident report, so its failures would go unreported. The JPL
-  steps' own budgets (4, 2 and 1.5 min) are capped by what is left of it (`stepBudget`), and no
+  steps' own budgets (4, 2, 1.5, 1 and 1 min: craft, close approaches, comets, dwarf
+  planets, and planets with Sentry and fireball) are capped by what is left of it (`stepBudget`), and no
   source, TLE or CelesTrak group starts a fetch once it has passed (`beforeDeadline`). Starlink's
   SupGP download (#209) also takes its timeout from `stepBudget` (60 s, or less if less is
   left), so it never runs past the deadline. A source

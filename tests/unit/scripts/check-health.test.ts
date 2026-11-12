@@ -396,6 +396,18 @@ describe('probed endpoints (#42, #61)', () => {
     expect(sb?.check({ comets: [], interstellar: [{ fine: null }] })).toBe(false)
   })
 
+  it('probes the KV-built JPL feeds: planets, Sentry and fireball each carry their list (#146)', () => {
+    const planets = byPath('/api/planets')
+    const sentry = byPath('/api/sentry')
+    const fireball = byPath('/api/fireball')
+    expect(planets?.check({ bodies: [{ name: 'Sun' }] })).toBe(true)
+    expect(planets?.check({ bodies: [] })).toBe(false)
+    expect(sentry?.check({ data: [{ des: '1' }] })).toBe(true)
+    expect(sentry?.check({ data: [] })).toBe(false)
+    expect(fireball?.check({ data: [{ date: 'd' }] })).toBe(true)
+    expect(fireball?.check({ data: [] })).toBe(false)
+  })
+
   it('probes orrery dwarf planets: a non-empty list, each with its span (#99 item 8)', () => {
     const d = byPath('/api/orrery-dwarfs')
     expect(d).toBeDefined()

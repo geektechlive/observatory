@@ -162,7 +162,13 @@ export const SOURCES: Record<SourceName, SourceContract> = {
   eonet: { label: 'EONET Events', headline: true, maxAgeMs: 12 * HOUR, required: hasContent },
   epic: { label: 'EPIC', headline: false, maxAgeMs: 2 * DAY, required: hasContent },
   exoplanets: { label: 'Exoplanets', headline: false, maxAgeMs: 7 * DAY, required: hasContent },
-  fireball: { label: 'Fireballs', headline: false, maxAgeMs: 2 * DAY, required: hasContent },
+  fireball: {
+    // Built by the refresh job into KV every run (#146); an empty list is a broken refresh.
+    label: 'Fireballs',
+    headline: false,
+    maxAgeMs: 2 * DAY,
+    required: (data) => nonEmptyArrayField(data, 'data'),
+  },
   fires: { label: 'Fires', headline: false, maxAgeMs: 12 * HOUR, required: hasContent },
   gdacs: { label: 'Disasters', headline: false, maxAgeMs: 6 * HOUR, required: hasContent },
   geomag: {
@@ -266,7 +272,14 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     maxAgeMs: 7 * DAY,
     required: hasContent,
   },
-  planets: { label: 'Planets', headline: false, maxAgeMs: DAY, required: hasContent },
+  planets: {
+    // Built by the refresh job into KV every run (#146), for that run's UTC date, so a
+    // copy past a day is for another date.
+    label: 'Planets',
+    headline: false,
+    maxAgeMs: DAY,
+    required: (data) => nonEmptyArrayField(data, 'bodies'),
+  },
   quakes: { label: 'Earthquakes', headline: true, maxAgeMs: 3 * HOUR, required: hasContent },
   satellites: {
     // Not headline: the only caller is `useSatellites(layers.satellites || tracking)`
@@ -279,7 +292,13 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     maxAgeMs: 36 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'satellites'),
   },
-  sentry: { label: 'Sentry Risk', headline: false, maxAgeMs: 7 * DAY, required: hasContent },
+  sentry: {
+    // Built by the refresh job into KV every run (#146); the list changes rarely.
+    label: 'Sentry Risk',
+    headline: false,
+    maxAgeMs: 2 * DAY,
+    required: (data) => nonEmptyArrayField(data, 'data'),
+  },
   'solar-activity': {
     label: 'Solar Activity',
     headline: false,

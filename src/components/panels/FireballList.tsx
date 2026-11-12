@@ -24,7 +24,7 @@ export function FireballList() {
   if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Fireballs">
-        <PanelState kind="unavailable" detail="JPL's fireball feed is not answering" />
+        <PanelState kind="unavailable" detail="The fireball list is unavailable right now" />
       </GlassPanel>
     )
   }

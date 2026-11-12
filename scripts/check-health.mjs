@@ -122,6 +122,22 @@ export const CHECKS = [
       b.interstellar.length > 0 &&
       b.interstellar.every((x) => typeof x?.elements?.e === 'number'),
   },
+  // The planets, Sentry and fireball feeds (#146): KV-only, built from JPL by the refresh job.
+  {
+    path: '/api/planets',
+    requires: 'a non-empty bodies array',
+    check: (b) => Array.isArray(b?.bodies) && b.bodies.length > 0,
+  },
+  {
+    path: '/api/sentry',
+    requires: 'a non-empty data array',
+    check: (b) => Array.isArray(b?.data) && b.data.length > 0,
+  },
+  {
+    path: '/api/fireball',
+    requires: 'a non-empty data array',
+    check: (b) => Array.isArray(b?.data) && b.data.length > 0,
+  },
   // The orrery's dwarf planets (#99 item 8): KV-only, their own key, written by the refresh job.
   {
     path: '/api/orrery-dwarfs',

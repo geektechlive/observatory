@@ -35,7 +35,7 @@ Vite 8 + React 19 + TypeScript 7 strict (6 for lint only, ADR 0006) · Cloudflar
 
 Details: [docs/reference/data-feeds-and-monitoring.md](docs/reference/data-feeds-and-monitoring.md).
 
-- Upstreams that block Workers (CelesTrak, RocketLaunch.live) or need paced, authenticated or slow fetches (Horizons, CAD, Space-Track, DISCOSweb, APOD's page) are **KV-first from the refresh job** (ADR 0003, 0009).
+- Upstreams that block Workers (CelesTrak, RocketLaunch.live) or need paced, authenticated or slow fetches (Horizons, CAD, Sentry, fireball, Space-Track, DISCOSweb, APOD's page) are **KV-first from the refresh job** (ADR 0003, 0009, 0029); no Function calls JPL.
 - **JPL gets one request at a time from any caller.** Horizons 503s overlapping requests (#88). Visitor lookups go only through the `JplQueue` Durable Object (ADR 0010).
 - **Every source has a content contract** in `src/lib/health.ts`; write the `required` predicate with the fetcher. HTTP 200 is not evidence of data (ADR 0004). The header judges each view by its own list, `VIEW_HEADLINES`: moving a headline feed between views, or adding a view, updates it (ADR 0018).
 - **Never answer 502 or 504** (#61): the custom domain replaces the body. `upstreamError()` is 503 with `X-Upstream-Status`; `contractError()` is 500. A test scans `functions/`.

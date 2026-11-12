@@ -36,3 +36,7 @@ outside the samples a body is hidden and the inspector says "no data for this da
 - `scripts/orrery-bodies.mjs`, `scripts/orrery-neo.mjs`, `scripts/orrery-smallbodies.mjs`,
   `src/lib/orrery/ephemeris.ts`.
 - [reference/orrery-data.md](../reference/orrery-data.md).
+
+## Addendum 2026-11-12
+
+[ADR 0029](0029-jpl-feeds-built-by-the-job.md) applies the same rule to `/api/planets`, `/api/sentry` and `/api/fireball` (#146), which had still called JPL from their Functions.

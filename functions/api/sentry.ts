@@ -1,38 +1,36 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { SentryResponseSchema } from '../../src/schemas/sentry'
-import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
+import { type KvCacheContext, type KvStreamReader, serveKvBodyCached } from './_kvBody'
 
-const SENTRY_API = 'https://ssd-api.jpl.nasa.gov/sentry.api'
-const CACHE_TTL_SECONDS = 21600 // 6 h
+// JPL Sentry's 50 highest Palermo scale impact-risk objects (#146). The refresh job
+// (jpl-feeds.mjs) fetches the whole catalogue (2000+ objects), sorts and cuts it, and
+// stores the finished body in KV; this handler only passes it through (_kvBody.ts). JPL
+// asks for one request at a time, so it is never called from here.
 
-export const onRequest: PagesFunction = (ctx) =>
-  cachedJson(ctx, 'nasa:sentry:top50', CACHE_TTL_SECONDS, async () => {
-    // JPL Sentry is not gated by the NASA_API_KEY — no quota header to surface here.
-    const upstream = await fetchUpstream(SENTRY_API)
-    if (!upstream.ok) return upstreamError(upstream.status, 'JPL Sentry upstream error')
+/** KV key written by scripts/refresh-data.mjs. */
+export const KV_SENTRY_KEY = 'jpl:sentry:v1'
+/** The job rewrites it every run; the list changes rarely, so two days is still sound. */
+export const FRESH_SECONDS = 48 * 3600
 
-    const raw: unknown = await upstream.json()
-    const parsed = SentryResponseSchema.safeParse(raw)
-    if (!parsed.success) {
-      console.warn('[sentry] invalid upstream response', parsed.error.issues)
-      return contractError('Invalid Sentry response')
-    }
+interface Env {
+  OBSERVATORY_CACHE: KvStreamReader
+}
 
-    // Sort by Palermo Scale descending and cap at 50 before caching — full catalog is 2000+ objects
-    const top50 = [...parsed.data.data]
-      .sort((a, b) => {
-        const aPs = parseFloat(a.ps_cum ?? '') || -Infinity
-        const bPs = parseFloat(b.ps_cum ?? '') || -Infinity
-        return bPs - aPs
-      })
-      .slice(0, 50)
+export function serveSentry(
+  ctx: KvCacheContext,
+  kv: KvStreamReader,
+  now = Date.now(),
+): Promise<Response> {
+  return serveKvBodyCached(
+    ctx,
+    kv,
+    {
+      key: KV_SENTRY_KEY,
+      freshSeconds: FRESH_SECONDS,
+      notYet: 'Sentry list not yet in KV: the refresh job writes it',
+    },
+    now,
+  )
+}
 
-    return {
-      body: JSON.stringify({
-        count: parsed.data.count,
-        data: top50,
-        updatedAt: new Date().toISOString(),
-      }),
-    }
-  })
+export const onRequest: PagesFunction<Env> = (ctx) => serveSentry(ctx, ctx.env.OBSERVATORY_CACHE)

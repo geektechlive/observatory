@@ -1,110 +1,40 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
-import { z } from 'zod'
 
-import { parseHorizons } from '../../src/lib/horizons'
-import { cachedJson, fetchUpstream, upstreamError } from './_cache'
+import { type KvCacheContext, type KvStreamReader, serveKvBodyCached } from './_kvBody'
 
-// JPL Horizons wraps its fixed-width ephemeris table in a JSON `result` string.
-const HorizonsRawSchema = z.object({ result: z.string().optional() })
+// The Sky view's Sun, Moon and planets: the geocentric position for the UTC date of the
+// last refresh run, from JPL Horizons (#146). scripts/refresh-data.mjs asks Horizons one
+// body at a time (jpl-feeds.mjs) every 6 h and stores the finished body in KV; this
+// handler only passes it through (_kvBody.ts). Horizons is never called here: it answers
+// 503 to overlapping requests (#88), and every visitor would be one.
+//
+// A copy is for one UTC date, so for the minutes after 00:00 UTC until the 00:17 run (longer if
+// that run is late or fails) it shows yesterday's positions (the Moon moves about 13 degrees a day).
 
-// JPL Horizons geocentric ephemerides for the planets, Moon and Sun. Public, no key.
-const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
-const CACHE_TTL_SECONDS = 3600 // 1h
-// Horizons answers 503 to overlapping requests from one address (#88), so the bodies
-// are asked one at a time (~140 ms each). A body gets 4 s; past 10 s in all, the rest
-// are skipped and the answer goes out degraded.
-const BODY_TIMEOUT_MS = 4000
-const TOTAL_BUDGET_MS = 10_000
+/** KV key written by scripts/refresh-data.mjs. */
+export const KV_PLANETS_KEY = 'horizons:planets:v1'
+/** The job rewrites it every run; past a day it is for another date, so it is degraded. */
+export const FRESH_SECONDS = 24 * 3600
 
-const BODIES: { name: string; id: string }[] = [
-  { name: 'Sun', id: '10' },
-  { name: 'Moon', id: '301' },
-  { name: 'Mercury', id: '199' },
-  { name: 'Venus', id: '299' },
-  { name: 'Mars', id: '499' },
-  { name: 'Jupiter', id: '599' },
-  { name: 'Saturn', id: '699' },
-  { name: 'Uranus', id: '799' },
-  { name: 'Neptune', id: '899' },
-]
-
-function ymd(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`
+interface Env {
+  OBSERVATORY_CACHE: KvStreamReader
 }
 
-async function fetchBody(
-  name: string,
-  id: string,
-  start: string,
-  stop: string,
-): Promise<{
-  name: string
-  raHours: number
-  decDeg: number
-  mag: number | null
-  elongation: number
-} | null> {
-  const params = new URLSearchParams({
-    format: 'json',
-    COMMAND: id,
-    EPHEM_TYPE: 'OBSERVER',
-    CENTER: '500@399',
-    START_TIME: start,
-    STOP_TIME: stop,
-    STEP_SIZE: '1d',
-    QUANTITIES: "'1,9,23'",
-  })
-  try {
-    const res = await fetchUpstream(
-      `${HORIZONS}?${params.toString()}`,
-      { headers: { Accept: 'application/json', 'User-Agent': 'observatory.geektechlive.com' } },
-      { timeoutMs: BODY_TIMEOUT_MS },
-    )
-    if (!res.ok) return null
-    const parsedJson = HorizonsRawSchema.safeParse(await res.json())
-    if (!parsedJson.success || !parsedJson.data.result) return null
-    const obs = parseHorizons(parsedJson.data.result)
-    if (!obs) return null
-    return {
-      name,
-      raHours: obs.raHours,
-      decDeg: obs.decDeg,
-      mag: Number.isFinite(obs.mag) ? obs.mag : null,
-      elongation: obs.elongation,
-    }
-  } catch {
-    return null
-  }
+export function servePlanets(
+  ctx: KvCacheContext,
+  kv: KvStreamReader,
+  now = Date.now(),
+): Promise<Response> {
+  return serveKvBodyCached(
+    ctx,
+    kv,
+    {
+      key: KV_PLANETS_KEY,
+      freshSeconds: FRESH_SECONDS,
+      notYet: 'Planets not yet in KV: the refresh job writes them',
+    },
+    now,
+  )
 }
 
-export const onRequest: PagesFunction = (ctx) => {
-  const start = ymd(new Date())
-  return cachedJson(ctx, `horizons:planets:v2:${start}`, CACHE_TTL_SECONDS, async () => {
-    const stop = ymd(new Date(Date.now() + 86_400_000))
-    const started = Date.now()
-    const bodies: NonNullable<Awaited<ReturnType<typeof fetchBody>>>[] = []
-    for (const b of BODIES) {
-      if (Date.now() - started > TOTAL_BUDGET_MS) break
-      const body = await fetchBody(b.name, b.id, start, stop)
-      if (body) bodies.push(body)
-    }
-    const degraded = bodies.length < BODIES.length
-
-    if (bodies.length === 0) return upstreamError(0, 'JPL Horizons unavailable')
-    if (degraded) {
-      console.warn(
-        `[planets] ${String(BODIES.length - bodies.length)} of 9 bodies missing; answering degraded`,
-      )
-    }
-
-    return {
-      body: JSON.stringify({ bodies, updatedAt: new Date().toISOString() }),
-      // A degraded answer says why and who served it (#71), or its outages page at once.
-      ...(degraded
-        ? { extraHeaders: { 'X-Error-Kind': 'upstream', 'X-Data-Source': 'horizons' } }
-        : {}),
-      degraded,
-    }
-  })
-}
+export const onRequest: PagesFunction<Env> = (ctx) => servePlanets(ctx, ctx.env.OBSERVATORY_CACHE)

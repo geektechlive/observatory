@@ -64,6 +64,19 @@ describe('SOURCES', () => {
     ).toBe(true)
   })
 
+  it('grades the KV-built JPL feeds by their lists, and ages them as the job writes them (#146)', () => {
+    // Rewritten every run: planets are for one UTC date; the other two change rarely.
+    expect(SOURCES.planets.maxAgeMs).toBe(24 * 3_600_000)
+    expect(SOURCES.sentry.maxAgeMs).toBe(48 * 3_600_000)
+    expect(SOURCES.fireball.maxAgeMs).toBe(48 * 3_600_000)
+    expect(SOURCES.planets.required({ bodies: [], updatedAt: 'x' })).toBe(false)
+    expect(SOURCES.planets.required({ bodies: [{ name: 'Sun' }], updatedAt: 'x' })).toBe(true)
+    expect(SOURCES.sentry.required({ count: '0', data: [] })).toBe(false)
+    expect(SOURCES.sentry.required({ count: '1', data: [{ des: '1' }] })).toBe(true)
+    expect(SOURCES.fireball.required({ count: '0', data: [] })).toBe(false)
+    expect(SOURCES.fireball.required({ count: '1', data: [{ date: 'd' }] })).toBe(true)
+  })
+
   it('grades orrery dwarf planets by a non-empty list, 72 h before degraded, never headline (#99)', () => {
     // Fetched only when the Dwarf planets switch or a link asks, so never on a view's list (ADR 0018).
     expect(SOURCES['orrery-dwarfs'].headline).toBe(false)

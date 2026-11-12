@@ -40,7 +40,7 @@ export function PlanetsPanel() {
   if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
-        <PanelState kind="unavailable" detail="JPL Horizons is not answering" />
+        <PanelState kind="unavailable" detail="Planet positions are unavailable right now" />
       </GlassPanel>
     )
   }

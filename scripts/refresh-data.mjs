@@ -7,7 +7,9 @@
 // /api/orrery-neo (#92: close approaches placed with Horizons, JPL Scout and ESA NEOCC;
 // see orrery-neo.mjs), and /api/orrery-smallbodies (#99: comets and the interstellar
 // objects; see orrery-smallbodies.mjs), and /api/orrery-dwarfs (#99 item 8: the dwarf
-// planets, a key of their own; see orrery-dwarfs.mjs), and /api/spacetrack (#101: re-entries, the
+// planets, a key of their own; see orrery-dwarfs.mjs), and /api/planets, /api/sentry and
+// /api/fireball (#146: JPL asks for one request at a time, so visitors never call it; see
+// jpl-feeds.mjs), and /api/spacetrack (#101: re-entries, the
 // satellite catalogue, the Box Score and a few objects' element history from
 // Space-Track.org, with the owner's account; see spacetrack.mjs).
 //
@@ -33,6 +35,8 @@
 //                                            just the comets and interstellar objects (#99)
 //   ... --dry-run --only=orrery-dwarfs --dwarfs-out=/tmp/dwarfs.json
 //                                            just the dwarf planets (#99 item 8)
+//   ... --dry-run --only=jpl-feeds --jpl-feeds-out=/tmp/feeds.json
+//                                            just the planets, Sentry and fireball (#146)
 //   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
 //   ... --sats-out=dir                       with it, save each group's body and the raw
 //                                            Starlink SupGP answer (#209) in dir
@@ -67,6 +71,7 @@ import {
 } from './orrery-smallbodies.mjs'
 import { buildCometsTonight } from './comets-tonight.mjs'
 import { buildOrreryDwarfs, DEFAULT_BUDGET_MS as DWARFS_BUDGET_MS } from './orrery-dwarfs.mjs'
+import { buildJplFeeds, DEFAULT_BUDGET_MS as JPL_FEEDS_BUDGET_MS } from './jpl-feeds.mjs'
 import { HISTORY_OBJECTS } from '../src/lib/spacetrack.ts'
 import { buildDiscos, discosToken } from './discos.mjs'
 import {
@@ -113,6 +118,18 @@ export const KEY_ORRERY_DWARFS = 'horizons:dwarfs:v1'
 const DWARFS_SIGNATURE = 'refresh:orrery-dwarfs'
 /** Rewritten every run (spans reused for a day), so a copy past 72 h means refreshes failed. */
 const DWARFS_MAX_AGE_MS = 72 * 3_600_000
+/**
+ * The Sky view's planets, the Sentry risk list and the recent fireballs (#146): finished
+ * bodies built from JPL by jpl-feeds.mjs, so a visitor request never reaches JPL.
+ */
+export const KEY_PLANETS = 'horizons:planets:v1'
+export const KEY_SENTRY = 'jpl:sentry:v1'
+export const KEY_FIREBALL = 'jpl:fireball:v1'
+/** Rewritten every run; planets are for a UTC date, so a copy past a day is wrong, not just old. */
+const PLANETS_MAX_AGE_MS = 24 * 3_600_000
+/** The risk list and the fireball table change rarely; two days is still sound. */
+const SENTRY_MAX_AGE_MS = 48 * 3_600_000
+const FIREBALL_MAX_AGE_MS = 48 * 3_600_000
 /** Space-Track (#101): re-entries, recent decays, the Box Score; see spacetrack.mjs. */
 export const KEY_SPACETRACK_CATALOG = 'spacetrack:catalog:v1'
 /** GP_HISTORY element sets, each month asked once ever; rewritten only when it grows. */
@@ -930,6 +947,117 @@ export async function refreshOrreryDwarfs(config, deps = {}) {
   }
 }
 
+/** The three JPL feeds of #146: key, report signature, how old a copy may be, how to describe it. */
+const JPL_FEEDS = [
+  {
+    name: 'planets',
+    key: KEY_PLANETS,
+    signature: 'refresh:planets',
+    maxAgeMs: PLANETS_MAX_AGE_MS,
+    metadata: (r) => ({ bodies: r.payload.bodies.length, missing: r.missing.length }),
+    summary: (r) => `${String(r.payload.bodies.length)} bodies`,
+    warn: (r) => (r.missing.length ? `missing ${r.missing.join(', ')}` : ''),
+  },
+  {
+    name: 'sentry',
+    key: KEY_SENTRY,
+    signature: 'refresh:sentry',
+    maxAgeMs: SENTRY_MAX_AGE_MS,
+    metadata: (r) => ({ objects: r.payload.data.length }),
+    summary: (r) => `${String(r.payload.data.length)} of ${r.payload.count} objects`,
+    warn: () => '',
+  },
+  {
+    name: 'fireball',
+    key: KEY_FIREBALL,
+    signature: 'refresh:fireball',
+    maxAgeMs: FIREBALL_MAX_AGE_MS,
+    metadata: (r) => ({ events: r.payload.data.length }),
+    summary: (r) => `${String(r.payload.data.length)} events`,
+    warn: () => '',
+  },
+]
+
+/**
+ * A partial planets build (fewer bodies than the copy in KV) does not replace that copy
+ * while it is inside the feed's freshness limit: Jupiter would vanish for a run's 6 h.
+ * No old body is carried into a new copy (the Moon would go stale). Absent, unreadable
+ * or older than the limit, the partial build is written.
+ */
+function keepsPreviousCopy(feed, result, previousText, now) {
+  if (feed.name !== 'planets' || result.missing.length === 0) return false
+  const previous = parseJsonOrNull(previousText)
+  if (!Array.isArray(previous?.bodies) || previous.bodies.length <= result.payload.bodies.length) {
+    return false
+  }
+  const at = Date.parse(previous.updatedAt)
+  return Number.isFinite(at) && now - at <= feed.maxAgeMs
+}
+
+/**
+ * The planets, Sentry and fireball feeds (#146): three finished bodies, each in one KV
+ * write with its time in the metadata. They fail separately: each failed feed is judged
+ * by the age of the copy it would replace, and the Functions keep serving that copy.
+ * Returns the three report entries and the writes.
+ */
+export async function refreshJplFeeds(config, deps = {}) {
+  const now = deps.now ?? Date.now()
+  const previousTexts = await Promise.all(
+    JPL_FEEDS.map((f) =>
+      deps.previousTexts && f.name in deps.previousTexts
+        ? deps.previousTexts[f.name]
+        : readKv(f.key, config),
+    ),
+  )
+  const built = await buildJplFeeds({
+    now,
+    fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
+    fetchJson: deps.fetchJson ?? fetchJplJson,
+    ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+    ...budgetDeps(deps),
+  })
+  const entries = []
+  const writes = []
+  JPL_FEEDS.forEach((feed, i) => {
+    const result = built[feed.name]
+    if (result.payload && keepsPreviousCopy(feed, result, previousTexts[i], now)) {
+      const detail =
+        `ok ${feed.signature} ${feed.summary(result)}; WARN ${feed.warn(result)}; ` +
+        'kept the previous copy'
+      console.warn(detail)
+      entries.push({ signature: feed.signature, ok: true, warning: true, detail })
+      return
+    }
+    if (result.payload) {
+      const note = feed.warn(result)
+      const detail = `ok ${feed.signature} ${feed.summary(result)}` + (note ? `; WARN ${note}` : '')
+      console.log(detail)
+      const entry = { signature: feed.signature, ok: true, warning: note !== '', detail }
+      entries.push(entry)
+      writes.push({
+        key: feed.key,
+        value: JSON.stringify(result.payload),
+        metadata: { fetchedAt: result.payload.updatedAt, ...feed.metadata(result) },
+        entry,
+      })
+      return
+    }
+    const previousText = previousTexts[i]
+    const previous = parseJsonOrNull(previousText)
+    const verdict = classifyFailure({
+      err: new Error(result.error),
+      envelopeText: previous ? JSON.stringify({ fetchedAt: previous.updatedAt }) : previousText,
+      maxAgeMs: feed.maxAgeMs,
+      now,
+    })
+    const detail = `${feed.signature} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    entries.push({ ...verdict, signature: feed.signature, detail })
+  })
+  console.log(`  ${String(built.requests)} JPL requests for planets, Sentry and fireball`)
+  return { entries, writes }
+}
+
 /**
  * Space-Track (#101): the catalogue every run, the SATCAT shards once a day, and the
  * history when it gained months, each a finished body with its time in the metadata.
@@ -1107,6 +1235,9 @@ async function main(argv) {
     .find((a) => a.startsWith('--smallbodies-out='))
     ?.slice('--smallbodies-out='.length)
   const dwarfsOut = argv.find((a) => a.startsWith('--dwarfs-out='))?.slice('--dwarfs-out='.length)
+  const jplFeedsOut = argv
+    .find((a) => a.startsWith('--jpl-feeds-out='))
+    ?.slice('--jpl-feeds-out='.length)
   const stOut = argv.find((a) => a.startsWith('--spacetrack-out='))?.slice('--spacetrack-out='.length)
   const discosOut = argv.find((a) => a.startsWith('--discos-out='))?.slice('--discos-out='.length)
   const satsOut = argv.find((a) => a.startsWith('--sats-out='))?.slice('--sats-out='.length)
@@ -1195,6 +1326,24 @@ async function main(argv) {
         await writeFile(dwarfsOut, write.value)
         console.log(`  saved ${KEY_ORRERY_DWARFS} to ${dwarfsOut} (${String(write.value.length)} bytes)`)
       }
+    }
+  }
+
+  // After the dwarf-planet step, never beside it: JPL takes one request at a time (#146).
+  if (!only || only === 'jpl-feeds') {
+    const began = Date.now()
+    const { entries, writes: feedWrites } = await refreshJplFeeds(config, {
+      budgetMs: stepBudget(JPL_FEEDS_BUDGET_MS, deadline),
+    })
+    console.log(`  jpl-feeds took ${String(Math.round((Date.now() - began) / 1000))} s`)
+    report.push(...entries)
+    writes.push(...feedWrites)
+    if (dryRun && jplFeedsOut) {
+      await writeFile(
+        jplFeedsOut,
+        JSON.stringify(Object.fromEntries(feedWrites.map((w) => [w.key, JSON.parse(w.value)]))),
+      )
+      console.log(`  saved the JPL feed bodies to ${jplFeedsOut}`)
     }
   }
 

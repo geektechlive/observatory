@@ -82,3 +82,7 @@ empties the trajectory share cannot touch the 1,400 lookups rely on.
   `functions/api/_jpl.ts` (`askJpl`'s `share`).
 - `workers/jpl-queue/`, `wrangler.toml` (`JPL_QUEUE`).
 - [reference/orrery-data.md](../reference/orrery-data.md#on-demand-jpl-100).
+
+## Addendum, 2026-11-12 (#146)
+
+The line above about `/api/planets`, `/api/sentry` and `/api/fireball` calling JPL directly is out of date: [ADR 0029](0029-jpl-feeds-built-by-the-job.md) (#146) moved them into the refresh job, so no Function calls JPL.

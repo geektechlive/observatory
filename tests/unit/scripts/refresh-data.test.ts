@@ -11,12 +11,16 @@ import {
   fetchWithRetry,
   isValidLaunchesPayload,
   KEY_COMETS_TONIGHT,
+  KEY_FIREBALL,
   KEY_ORRERY_BODIES,
   KEY_ORRERY_DWARFS,
   KEY_ORRERY_NEO,
   KEY_ORRERY_SMALLBODIES,
+  KEY_PLANETS,
+  KEY_SENTRY,
   kvPutInit,
   parseTle,
+  refreshJplFeeds,
   refreshOrreryBodies,
   refreshOrreryDwarfs,
   refreshOrreryNeo,
@@ -581,5 +585,177 @@ describe('refreshOrreryDwarfs (#99 item 8)', () => {
     const b = await refreshOrreryDwarfs(null, { ...failing, previousText: old })
     expect(b.entry.ok).toBe(false)
     expect(b.entry.detail).toMatch(/refresh:orrery-dwarfs/)
+  })
+})
+
+describe('refreshJplFeeds (#146)', () => {
+  const NOW = Date.UTC(2026, 10, 12, 6, 17)
+  const RESULT = `$$SOE
+ 2026-Nov-12 00:00     03 18 14.81 +17 47 39.4    1.333   4.226   34.5789 /L
+$$EOE`
+  const deps = (overrides: Record<string, unknown> = {}) => ({
+    now: NOW,
+    pauseMs: 0,
+    previousTexts: { planets: null, sentry: null, fireball: null },
+    fetchHorizonsText: () => Promise.resolve(RESULT),
+    fetchJson: (url: string) =>
+      Promise.resolve(
+        url.includes('sentry')
+          ? { count: '1', data: [{ des: '99942', ps_cum: '-2.7' }] }
+          : {
+              count: '1',
+              fields: ['date', 'energy'],
+              data: [['2026-11-10 01:02:03', '1.1']],
+            },
+      ),
+    ...overrides,
+  })
+
+  it('writes three keys of their own, each with its age and counts as KV metadata', async () => {
+    const { entries, writes } = await refreshJplFeeds(null, deps())
+    expect(entries.map((e: { signature: string }) => e.signature)).toEqual([
+      'refresh:planets',
+      'refresh:sentry',
+      'refresh:fireball',
+    ])
+    expect(entries.every((e: { ok: boolean }) => e.ok)).toBe(true)
+    expect([KEY_PLANETS, KEY_SENTRY, KEY_FIREBALL]).toEqual([
+      'horizons:planets:v1',
+      'jpl:sentry:v1',
+      'jpl:fireball:v1',
+    ])
+    const at = new Date(NOW).toISOString()
+    expect(writes.map((w: { key: string }) => w.key)).toEqual([
+      KEY_PLANETS,
+      KEY_SENTRY,
+      KEY_FIREBALL,
+    ])
+    expect(writes.map((w: { metadata: unknown }) => w.metadata)).toEqual([
+      { fetchedAt: at, bodies: 9, missing: 0 },
+      { fetchedAt: at, objects: 1 },
+      { fetchedAt: at, events: 1 },
+    ])
+    expect(JSON.parse(writes[1].value).data[0].des).toBe('99942')
+  })
+
+  it('warns, and still writes, when some planets are missing', async () => {
+    const { entries, writes } = await refreshJplFeeds(
+      null,
+      deps({
+        fetchHorizonsText: (url: string) =>
+          url.includes('COMMAND=599')
+            ? Promise.reject(new Error('HTTP 503'))
+            : Promise.resolve(RESULT),
+      }),
+    )
+    expect(entries[0].ok).toBe(true)
+    expect(entries[0].warning).toBe(true)
+    expect(entries[0].detail).toMatch(/8 bodies.*WARN missing Jupiter/)
+    expect(writes[0].metadata).toMatchObject({ bodies: 8, missing: 1 })
+  })
+
+  describe('a partial planets build against the copy already in KV', () => {
+    const body = (name: string) => ({ name, raHours: 1, decDeg: 2, mag: 3, elongation: 4 })
+    const NAMES = [
+      'Sun',
+      'Moon',
+      'Mercury',
+      'Venus',
+      'Mars',
+      'Jupiter',
+      'Saturn',
+      'Uranus',
+      'Neptune',
+    ]
+    const copy = (hoursOld: number, names: string[] = NAMES) =>
+      JSON.stringify({
+        bodies: names.map(body),
+        updatedAt: new Date(NOW - hoursOld * HOUR).toISOString(),
+      })
+    const noJupiter = (url: string) =>
+      url.includes('COMMAND=599') ? Promise.reject(new Error('HTTP 503')) : Promise.resolve(RESULT)
+
+    it('keeps a complete copy that is still inside 24 h, and says so', async () => {
+      const { entries, writes } = await refreshJplFeeds(
+        null,
+        deps({
+          fetchHorizonsText: noJupiter,
+          previousTexts: { planets: copy(6), sentry: null, fireball: null },
+        }),
+      )
+      expect(writes.map((w: { key: string }) => w.key)).not.toContain(KEY_PLANETS)
+      expect(entries[0].ok).toBe(true)
+      expect(entries[0].warning).toBe(true)
+      expect(entries[0].detail).toMatch(/WARN missing Jupiter; kept the previous copy/)
+    })
+
+    it('writes the partial one when the previous copy is older than 24 h', async () => {
+      const { writes } = await refreshJplFeeds(
+        null,
+        deps({
+          fetchHorizonsText: noJupiter,
+          previousTexts: { planets: copy(25), sentry: null, fireball: null },
+        }),
+      )
+      expect(writes[0].key).toBe(KEY_PLANETS)
+      expect(writes[0].metadata).toMatchObject({ bodies: 8, missing: 1 })
+    })
+
+    it('writes the partial one when there is no previous copy', async () => {
+      const { writes } = await refreshJplFeeds(null, deps({ fetchHorizonsText: noJupiter }))
+      expect(writes[0].key).toBe(KEY_PLANETS)
+    })
+
+    it('writes a partial one over an equally partial or smaller copy', async () => {
+      const { writes } = await refreshJplFeeds(
+        null,
+        deps({
+          fetchHorizonsText: noJupiter,
+          previousTexts: { planets: copy(6, NAMES.slice(0, 8)), sentry: null, fireball: null },
+        }),
+      )
+      expect(writes[0].key).toBe(KEY_PLANETS)
+    })
+
+    it('replaces a full copy with a full one', async () => {
+      const { entries, writes } = await refreshJplFeeds(
+        null,
+        deps({ previousTexts: { planets: copy(6), sentry: null, fireball: null } }),
+      )
+      expect(writes[0].key).toBe(KEY_PLANETS)
+      expect(entries[0].warning).toBe(false)
+    })
+  })
+
+  it('judges each failed feed by the age of its own KV copy (24 h, 48 h, 48 h)', async () => {
+    const copy = (hoursOld: number) =>
+      JSON.stringify({ updatedAt: new Date(NOW - hoursOld * HOUR).toISOString() })
+    const down = () => Promise.reject(new Error('HTTP 503'))
+    const young = await refreshJplFeeds(
+      null,
+      deps({
+        fetchHorizonsText: down,
+        fetchJson: down,
+        previousTexts: { planets: copy(20), sentry: copy(40), fireball: copy(40) },
+      }),
+    )
+    expect(young.writes).toEqual([])
+    expect(young.entries.map((e: { ok: boolean }) => e.ok)).toEqual([true, true, true])
+    const old = await refreshJplFeeds(
+      null,
+      deps({
+        fetchHorizonsText: down,
+        fetchJson: down,
+        previousTexts: { planets: copy(26), sentry: copy(50), fireball: copy(40) },
+      }),
+    )
+    expect(old.entries.map((e: { ok: boolean }) => e.ok)).toEqual([false, false, true])
+    expect(old.entries[0].detail).toMatch(/^refresh:planets FAIL/)
+  })
+
+  it('pages at once when there is no copy to fall back on', async () => {
+    const down = () => Promise.reject(new Error('HTTP 503'))
+    const { entries } = await refreshJplFeeds(null, deps({ fetchJson: down }))
+    expect(entries.map((e: { ok: boolean }) => e.ok)).toEqual([true, false, false])
   })
 })

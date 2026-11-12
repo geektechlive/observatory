@@ -1,56 +1,36 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
-import { z } from 'zod'
 
-import { type Fireball, FireballResponseSchema } from '../../src/schemas/fireball'
-import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
+import { type KvCacheContext, type KvStreamReader, serveKvBodyCached } from './_kvBody'
 
-const FIREBALL_API = 'https://ssd-api.jpl.nasa.gov/fireball.api'
-const CACHE_TTL_SECONDS = 3600 // 1 h
+// The 30 most recent fireballs JPL reports (#146). The refresh job (jpl-feeds.mjs) maps
+// JPL's column table to named rows and stores the finished body in KV; this handler only
+// passes it through (_kvBody.ts). JPL asks for one request at a time, so it is never
+// called from here.
 
-// Map columnar API response to named objects
-// JPL returns a column-oriented table: `fields` names the columns, `data` holds the rows.
-const FireballRawSchema = z.object({
-  count: z.string().optional(),
-  fields: z.array(z.string()).optional(),
-  data: z.array(z.array(z.string().nullable())).optional(),
-})
+/** KV key written by scripts/refresh-data.mjs. */
+export const KV_FIREBALL_KEY = 'jpl:fireball:v1'
+/** The job rewrites it every run; new events are rare, so two days is still sound. */
+export const FRESH_SECONDS = 48 * 3600
 
-function parseFireballData(fields: string[], rows: (string | null)[][]): Fireball[] {
-  const idx = (name: string) => fields.indexOf(name)
-  return rows.map((row) => ({
-    date: row[idx('date')] ?? '',
-    energy: row[idx('energy')] ?? null,
-    impactE: row[idx('impact-e')] ?? null,
-    lat: row[idx('lat')] ?? null,
-    latDir: row[idx('lat-dir')] ?? null,
-    lon: row[idx('lon')] ?? null,
-    lonDir: row[idx('lon-dir')] ?? null,
-    alt: row[idx('alt')] ?? null,
-    vel: row[idx('vel')] ?? null,
-  }))
+interface Env {
+  OBSERVATORY_CACHE: KvStreamReader
 }
 
-export const onRequest: PagesFunction = (ctx) =>
-  cachedJson(ctx, 'nasa:fireball:recent30', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetchUpstream(`${FIREBALL_API}?limit=30`)
-    if (!upstream.ok) return upstreamError(upstream.status, 'JPL Fireball upstream error')
+export function serveFireball(
+  ctx: KvCacheContext,
+  kv: KvStreamReader,
+  now = Date.now(),
+): Promise<Response> {
+  return serveKvBodyCached(
+    ctx,
+    kv,
+    {
+      key: KV_FIREBALL_KEY,
+      freshSeconds: FRESH_SECONDS,
+      notYet: 'Fireballs not yet in KV: the refresh job writes them',
+    },
+    now,
+  )
+}
 
-    const rawParsed = FireballRawSchema.safeParse(await upstream.json())
-    if (!rawParsed.success) {
-      console.warn('[fireball] invalid upstream response', rawParsed.error.issues)
-      return contractError('Invalid JPL Fireball response')
-    }
-    const raw = rawParsed.data
-
-    const fireballs = parseFireballData(raw.fields ?? [], raw.data ?? [])
-    const normalized = { count: raw.count ?? String(fireballs.length), data: fireballs }
-
-    const parsed = FireballResponseSchema.safeParse(normalized)
-    if (!parsed.success) {
-      console.warn('[fireball] invalid upstream response', parsed.error.issues)
-      return contractError('Invalid Fireball response')
-    }
-
-    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
-    return { body: JSON.stringify(body) }
-  })
+export const onRequest: PagesFunction<Env> = (ctx) => serveFireball(ctx, ctx.env.OBSERVATORY_CACHE)

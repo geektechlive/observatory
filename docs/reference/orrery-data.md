@@ -444,8 +444,8 @@ planet's drawn radius, while Pluto is a px-clamped small-body marker; and moon s
 A visitor's search goes through one Durable Object, `JplQueue`, in its own Worker
 (`workers/jpl-queue/`, deployed as `observatory-jpl-queue`). It reaches JPL only through it, one
 request at a time, as JPL's Fair Use asks ("only one API request at a time"). `/api/planets`,
-`/api/sentry` and `/api/fireball` still call JPL from their own Functions (cached, outside the
-queue).
+`/api/sentry` and `/api/fireball` never call JPL: the refresh job builds them into KV (#146,
+[ADR 0029](../decisions/0029-jpl-feeds-built-by-the-job.md)).
 
 - **Why a separate Worker:** Pages can't host one. "You cannot create and deploy a Durable Object
   within a Pages project", and a Pages binding "require[s] the `script_name` key"
