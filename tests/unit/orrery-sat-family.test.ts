@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SatGroupId } from '@/lib/orbit/satCatalog'
 import { modelForKey } from '@/lib/orrery/modelDescriptor'
-import { satFamily } from '@/lib/orrery/satFamily'
+import { PASSIVE_SPHERES, satFamily } from '@/lib/orrery/satFamily'
 
 describe('satFamily (#194, tier C)', () => {
   it.each([
@@ -11,19 +11,19 @@ describe('satFamily (#194, tier C)', () => {
     ['LEMUR-1', 'other'],
     ['LEMUR-2-WILSON', 'other'],
   ] as const)('puts %s in the CubeSat family', (name, group) => {
-    expect(satFamily(name, group)).toBe('cubesat')
+    expect(satFamily(name, group, '99999')).toBe('cubesat')
   })
 
   it('does not take a name that only contains one of the words', () => {
-    expect(satFamily('NOT-A-FLOCK 1', 'other')).toBe('generic-bus')
-    expect(satFamily('FLOCKING 1', 'other')).toBe('generic-bus')
-    expect(satFamily('LEMURIA', 'other')).toBe('generic-bus')
+    expect(satFamily('NOT-A-FLOCK 1', 'other', '99999')).toBe('generic-bus')
+    expect(satFamily('FLOCKING 1', 'other', '99999')).toBe('generic-bus')
+    expect(satFamily('LEMURIA', 'other', '99999')).toBe('generic-bus')
   })
 
   it.each(['gps-ops', 'weather', 'science', 'other'] as const)(
     'gives an active %s satellite the generic bus',
     (group) => {
-      expect(satFamily('SOMETHING-1', group)).toBe('generic-bus')
+      expect(satFamily('SOMETHING-1', group, '99999')).toBe('generic-bus')
     },
   )
 
@@ -34,15 +34,45 @@ describe('satFamily (#194, tier C)', () => {
     'iridium-33-debris',
     'fengyun-1c-debris',
   ] as const)('gives nothing in %s a stand-in', (group) => {
-    expect(satFamily('SOMETHING-1', group)).toBeNull()
+    expect(satFamily('SOMETHING-1', group, '99999')).toBeNull()
   })
 
   it('keeps a debris object out of the CubeSat family even if its name matches', () => {
-    expect(satFamily('FLOCK 4A-1', 'cosmos-2251-debris')).toBeNull()
+    expect(satFamily('FLOCK 4A-1', 'cosmos-2251-debris', '99999')).toBeNull()
   })
 
   it('knows nothing of a satellite whose group is not known yet', () => {
-    expect(satFamily('FLOCK 4A-1', undefined)).toBeNull()
+    expect(satFamily('FLOCK 4A-1', undefined, '99999')).toBeNull()
+  })
+
+  // Passive spheres and laser reflectors have no bus, arrays or radio (owner, 2026-11-12).
+  it.each([
+    ['900', 'CALSPHERE 1'],
+    ['902', 'CALSPHERE 2'],
+    ['1361', 'LCS 1'],
+    ['1520', 'CALSPHERE 4A'],
+    ['25398', 'WESTPAC'],
+    ['27944', 'LARETS'],
+    ['5398', 'RIGIDSPHERE 2 (LCS 4)'],
+    ['7646', 'STARLETTE'],
+    ['8820', 'LAGEOS 1'],
+    ['16908', 'AJISAI (EGS)'],
+    ['19751', 'COSMOS 1989 (ETALON 1)'],
+    ['20026', 'COSMOS 2024 (ETALON 2)'],
+    ['22195', 'LAGEOS 2'],
+    ['22824', 'STELLA'],
+    ['38077', 'LARES'],
+    ['53105', 'LARES-2'],
+  ] as const)('gives the passive sphere %s (%s) no stand-in', (noradId, name) => {
+    expect(satFamily(name, 'other', noradId)).toBeNull()
+  })
+
+  it('lists the 16 spheres counted in docs/reference/satellite-models.md', () => {
+    expect(PASSIVE_SPHERES.size).toBe(16)
+  })
+
+  it('still gives a CubeSat whose name contains a sphere name its stand-in', () => {
+    expect(satFamily('LEMUR-2-STELLA', 'other', '60533')).toBe('cubesat')
   })
 })
 
@@ -81,6 +111,12 @@ describe('modelForKey with the family stand-ins (#194, tier C)', () => {
     const model = modelForKey('sat:20580', loaded('20580', 'HST', 'science'))
     expect(model?.file).toBe('/models/craft/hubble.glb')
     expect(model?.scope).toBe('own')
+  })
+
+  it('gives ETALON 1, a passive reflector sphere, no model', () => {
+    expect(
+      modelForKey('sat:19751', loaded('19751', 'COSMOS 1989 (ETALON 1)', 'other')),
+    ).toBeUndefined()
   })
 
   it('gives debris, Starlink and the stations no model', () => {

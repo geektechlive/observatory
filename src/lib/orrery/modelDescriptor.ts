@@ -440,6 +440,6 @@ export function modelForKey(
   if (!key.startsWith(SAT_KEY_PREFIX)) return undefined
   const info = satellite(key)
   if (!info) return undefined
-  const family = info.name === undefined ? null : satFamily(info.name, info.group)
+  const family = info.name === undefined ? null : satFamily(info.name, info.group, info.noradId)
   return modelForSatellite(info.noradId, family, tables)
 }

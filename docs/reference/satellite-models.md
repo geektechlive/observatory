@@ -471,11 +471,17 @@ mid-height strip: hardware blocks only, no lettering, insignia or logo.
 `splitGroups` does; objects that have a model of their own are left out; counted by a
 throwaway script, so give or take one):
 
-| Stand-in    | Rule (`satFamily` in `src/lib/orrery/satFamily.ts`)                    | Objects |
-| ----------- | ---------------------------------------------------------------------- | ------- |
-| cubesat     | name starts `FLOCK ` or `LEMUR-` (109 Flock, 95 Lemur), in a bus group | 204     |
-| generic-bus | any other object in `gps-ops`, `weather`, `science` or `other`         | 5,429   |
-| none        | `starlink` (11,195), `stations` (16 without a model), debris           | 11,211  |
+| Stand-in    | Rule (`satFamily` in `src/lib/orrery/satFamily.ts`)                              | Objects |
+| ----------- | -------------------------------------------------------------------------------- | ------- |
+| cubesat     | name starts `FLOCK ` or `LEMUR-` (109 Flock, 95 Lemur), in a bus group           | 204     |
+| generic-bus | any other object in `gps-ops`, `weather`, `science` or `other`                   | 5,413   |
+| none        | `starlink` (11,195), `stations` (16 without a model), 16 passive spheres, debris | 11,227  |
+
+**Passive spheres get none** (owner, 2026-11-12): a laser-ranging or calibration sphere has
+no bus, arrays or radio, so the generic bus would be a wrong picture. They are listed by
+NORAD id in `PASSIVE_SPHERES` (`satFamily.ts`): the Calspheres and LCS 1/4, Starlette,
+Stella, LAGEOS 1/2, Ajisai, ETALON 1/2, WESTPAC, LARETS, LARES and LARES-2, as read from the
+live groups that day. A new passive sphere needs adding there by hand.
 
 The generic bus therefore also shows for GPS (32 in `gps-ops`) and GLONASS (28 of the 144 `COSMOS` rows in
 `other`) until models of their own land. Starlink and

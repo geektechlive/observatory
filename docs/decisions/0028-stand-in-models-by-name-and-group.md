@@ -1,9 +1,9 @@
 # 0028. Satellites with no model get a labelled stand-in, picked by name and group
 
-Status: Proposed · Date: 2026-11-12
+Status: Accepted · Date: 2026-11-12
 
-<!-- Proposed, not Accepted: the reach below (which groups get the generic bus) was chosen while
-building #194 tier C, not by the owner. The owner's call on it is open; see Consequences. -->
+<!-- Proposed while building #194 tier C; accepted by the owner the same day with one change,
+recorded in the addendum at the end. -->
 
 ## Context
 
@@ -57,3 +57,11 @@ The owner also said that no Starlink, GLONASS, GPS or Tianhe model is built here
 - `docs/reference/satellite-models.md`, "Stand-ins, labelled as stand-ins" and "The fourth
   batch".
 - Issue #194; ADR 0020 (the asset gate).
+
+## Addendum, 2026-11-12: owner's decision
+
+The owner accepted this reach with one change: passive spheres and laser reflectors (ETALON
+1/2, LAGEOS, LARES, the Calspheres and the like) get no stand-in, because a bus with arrays is
+a wrong picture of a ball. They are listed by NORAD id in `PASSIVE_SPHERES`, not matched by
+name, so a CubeSat such as LEMUR-2-STELLA keeps its stand-in. The count is in
+`docs/reference/satellite-models.md`.

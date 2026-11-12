@@ -26,8 +26,37 @@ const CUBESAT_NAME = /^(?:FLOCK |LEMUR-)/
  */
 const BUS_GROUPS: ReadonlySet<SatGroupId> = new Set(['gps-ops', 'weather', 'science', 'other'])
 
-/** A satellite's stand-in family by name and group, or null when it gets none. */
-export function satFamily(name: string, group: SatGroupId | undefined): SatFamily | null {
+/**
+ * Passive spheres and laser reflectors in those groups: no bus, arrays or radio, so the
+ * generic bus would be a wrong picture (owner, 2026-11-12). By NORAD id, not name: a name
+ * match on "STELLA" would also catch LEMUR-2-STELLA. Read from the live groups 2026-11-12.
+ */
+export const PASSIVE_SPHERES: ReadonlySet<string> = new Set([
+  '900', // CALSPHERE 1
+  '902', // CALSPHERE 2
+  '1361', // LCS 1
+  '1520', // CALSPHERE 4A
+  '5398', // RIGIDSPHERE 2 (LCS 4)
+  '7646', // STARLETTE
+  '8820', // LAGEOS 1
+  '16908', // AJISAI (EGS)
+  '19751', // COSMOS 1989 (ETALON 1)
+  '20026', // COSMOS 2024 (ETALON 2)
+  '22195', // LAGEOS 2
+  '22824', // STELLA
+  '25398', // WESTPAC
+  '27944', // LARETS
+  '38077', // LARES
+  '53105', // LARES-2
+])
+
+/** A satellite's stand-in family by name, group and NORAD id, or null when it gets none. */
+export function satFamily(
+  name: string,
+  group: SatGroupId | undefined,
+  noradId: string,
+): SatFamily | null {
   if (group === undefined || !BUS_GROUPS.has(group)) return null
+  if (PASSIVE_SPHERES.has(noradId)) return null
   return CUBESAT_NAME.test(name) ? 'cubesat' : 'generic-bus'
 }
