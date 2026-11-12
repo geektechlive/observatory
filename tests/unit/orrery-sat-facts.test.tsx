@@ -112,4 +112,48 @@ describe('<SatFacts> (#98)', () => {
     )
     expect(document.body.textContent).toMatch(/No position at this date/)
   })
+
+  it('never says "no position" while its position is still being worked out (#206)', () => {
+    render(
+      <SatFacts
+        info={{
+          key: 'sat:40059',
+          noradId: '40059',
+          name: 'OCO 2',
+          group: 'science',
+          epochMs: T0 - 13 * 3_600_000,
+          teme: null,
+          pending: true,
+          computed: false,
+        }}
+        simMs={T0}
+      />,
+    )
+    const text = document.body.textContent
+    expect(text).not.toMatch(/No position/)
+    expect(text).toMatch(/Working out its position/)
+    expect(text).toMatch(/13 h before this date/)
+  })
+
+  it('says neither when no pass is coming and none has landed (#206)', () => {
+    render(
+      <SatFacts
+        info={{
+          key: 'sat:40059',
+          noradId: '40059',
+          name: 'OCO 2',
+          group: 'science',
+          epochMs: T0 - 13 * 3_600_000,
+          teme: null,
+          pending: false,
+          computed: false,
+        }}
+        simMs={T0}
+      />,
+    )
+    const text = document.body.textContent
+    expect(text).not.toMatch(/No position at this date/)
+    expect(text).not.toMatch(/Working out/)
+    expect(text).toMatch(/Position not available right now/)
+  })
 })

@@ -74,6 +74,12 @@ at a time, 2 s apart.
     cadence wakes the renderer when it falls due.
   - A frame computed for an older field goes back to the worker. In the haze the last pass stays,
     refreshed only when the clock has moved 6 h from it.
+  - A new field (a group loaded or unloaded, or a stale pass dropped) is passed at once, at the
+    last tick's date, without waiting for a tick: Look closer detaches the orrery, which then
+    draws and ticks nothing, and every position stayed null (#206). Until a pass covers the
+    field, the inspector never says "No position at this date": it says "Working out its
+    position…" while a pass is in flight, and "Position not available right now." when none is
+    coming (the Earth frame was closed at the last tick, or the pass failed).
 - **The Earth orbit preset** holds `ORBIT_PRESET_RADII` (7.2) around Earth.
   - OrbitControls' `minDistance` comes from `cameraMinDistance`: 2 frame Earth radii when the
     target is near Earth, 0.5 scene units elsewhere. The old fixed 0.5 held this view at 59 R⊕,

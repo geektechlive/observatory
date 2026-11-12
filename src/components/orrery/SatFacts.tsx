@@ -37,6 +37,8 @@ interface SatFactsProps {
  */
 export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsProps) {
   const altKm = info.teme ? satAltitudeKm(info.teme) : null
+  // Without a pass for the loaded objects a null position says nothing about the date (#206).
+  const computed = info.computed !== false
   const radar = catalog ? rcsText(catalog.rcsSize) : null
   return (
     <>
@@ -52,7 +54,14 @@ export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsPr
           Predicted to re-enter {reentryWhen(reentry)} (Space-Track.org TIP message).
         </p>
       )}
-      {altKm === null && (
+      {altKm === null && !computed && (
+        <p className={styles.inspectorText ?? ''} role="status">
+          {info.pending === true
+            ? 'Working out its position…'
+            : 'Position not available right now.'}
+        </p>
+      )}
+      {altKm === null && computed && (
         <p className={styles.inspectorText ?? ''} role="status">
           No position at this date: satellites are drawn only within {String(WINDOW_DAYS)} days of
           their orbit data, where it stays accurate.

@@ -2,7 +2,9 @@
  * The orrery's satellite layer, minus the drawing (#98): which CelesTrak groups to fetch,
  * loading them into the worker, when to ask it for a pass, and which frame is current.
  * The renderer ticks it on every drawn frame and draws what `frame()` holds
- * (three/satLayer.ts); `onChange` asks the renderer for another frame.
+ * (three/satLayer.ts); `onChange` asks the renderer for another frame. Passes are asked
+ * from the tick, and also when a new field arrives with no frame for it (#206), at the
+ * last tick's date, since a detached orrery does not tick.
  *
  * A group is fetched only when it is switched on and the Earth frame is open, so a
  * visitor who never comes near Earth downloads nothing. Positions come from the worker,
@@ -72,6 +74,8 @@ export class SatController {
   private info: SatFieldInfo | null = null
   private current: (SatFrame & { version: number }) | null = null
   private inFlight = false
+  /** The last tick: a field that changes after it is passed at its date (#206). */
+  private lastTick: SatTick | null = null
   private lastPassWall = Number.NEGATIVE_INFINITY
   private lastPassSim = Number.NaN
   private passMs: number | null = null
@@ -102,6 +106,7 @@ export class SatController {
   /** Once per drawn frame. */
   tick(t: SatTick): void {
     if (this.disposed) return
+    this.lastTick = t
     this.syncGroups(t.near)
     this.maybePass(t)
   }
@@ -115,6 +120,11 @@ export class SatController {
 
   field(): SatFieldInfo | null {
     return this.info
+  }
+
+  /** A pass is on its way from the worker (#206: "pending" means one will land). */
+  passing(): boolean {
+    return this.inFlight
   }
 
   snapshot(): SatSnapshot {
@@ -219,7 +229,19 @@ export class SatController {
     // Replies can arrive out of order across fetches; keep the newest field.
     if (this.info && field.version < this.info.version) return
     this.info = field
+    this.passForField()
     this.onChange()
+  }
+
+  /**
+   * A new field leaves no current frame until the worker passes it. Ask now, at the last
+   * tick's date, rather than wait for the next tick: while Look closer is open the orrery
+   * is detached and does not tick, and every position would stay null (#206).
+   */
+  private passForField(): void {
+    const t = this.lastTick
+    if (this.disposed || !t || this.frame() !== null) return
+    this.maybePass(t)
   }
 
   private due(t: SatTick): number | 'now' | null {
@@ -257,6 +279,7 @@ export class SatController {
         const frame = { positions: reply.positions, status: reply.status, version: reply.version }
         if (!this.info || reply.version !== this.info.version) {
           worker.release(frame)
+          this.passForField()
           this.onChange()
           return
         }

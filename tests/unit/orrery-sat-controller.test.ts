@@ -197,6 +197,90 @@ describe('SatController (#98)', () => {
     expect(worker.propagations).toHaveLength(1)
   })
 
+  // #206: Look closer detaches the orrery, so no drawn frame ticks the controller while it
+  // is open. A field that changes then (a later group landing) must still get a pass, or
+  // every satellite's position stays null and the inspector says "No position".
+  describe('without a tick after the field changes (#206)', () => {
+    /** Load `first`, then switch `second` on and tick once: its load is the last event. */
+    async function secondGroupLands(first: SatGroupId, second: SatGroupId) {
+      const s = setup()
+      s.ctl.setEnabled(new Set<SatGroupId>([first]))
+      s.ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+      await flush()
+      s.ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+      expect(s.worker.propagations).toHaveLength(1)
+      return {
+        ...s,
+        enableSecond: (simMs = T0) => {
+          s.ctl.setEnabled(new Set<SatGroupId>([first, second]))
+          s.ctl.tick({ near: true, cadenceMs: 1000, simMs, wallMs: 10 })
+        },
+      }
+    }
+
+    it('asks again when a stale pass comes back after the last tick', async () => {
+      const { ctl, worker, enableSecond } = await secondGroupLands('stations', 'science')
+      // The pass for the old field is still in flight when the new group lands.
+      enableSecond()
+      await flush()
+      expect(ctl.frame()).toBeNull()
+      // No tick from here on: the view is open and the orrery is detached.
+      worker.answer(SAT_OK, worker.version - 1)
+      await flush()
+      expect(worker.propagations).toHaveLength(1)
+      worker.answer()
+      await flush()
+      expect(ctl.frame()?.status[1]).toBe(SAT_OK)
+    })
+
+    it('asks for a pass when a group lands with no pass in flight', async () => {
+      const { ctl, worker, enableSecond } = await secondGroupLands('stations', 'science')
+      worker.answer()
+      await flush()
+      expect(ctl.frame()).not.toBeNull()
+      enableSecond()
+      await flush()
+      expect(worker.propagations).toHaveLength(1)
+      worker.answer()
+      await flush()
+      expect(ctl.frame()?.status[1]).toBe(SAT_OK)
+    })
+
+    it('passes at the last tick’s date, never a later one', async () => {
+      const { worker, enableSecond } = await secondGroupLands('stations', 'science')
+      worker.answer()
+      await flush()
+      // The clock moved a minute; the cadence holds that tick's own pass back.
+      enableSecond(T0 + 60_000)
+      expect(worker.propagations).toHaveLength(0)
+      await flush()
+      expect(worker.propagations).toHaveLength(1)
+      expect(worker.propagations[0]?.date.getTime()).toBe(T0 + 60_000)
+    })
+
+    it('asks nothing once the Earth frame was closed at the last tick', async () => {
+      const { ctl, worker, enableSecond } = await secondGroupLands('stations', 'science')
+      enableSecond()
+      // The camera pulls away from Earth before the group lands.
+      ctl.tick({ near: false, cadenceMs: null, simMs: T0, wallMs: 20 })
+      await flush()
+      worker.answer(SAT_OK, worker.version - 1)
+      await flush()
+      expect(ctl.field()?.ids).toHaveLength(2)
+      expect(worker.propagations).toHaveLength(0)
+    })
+
+    it('asks nothing after dispose', async () => {
+      const { ctl, worker, enableSecond } = await secondGroupLands('stations', 'science')
+      enableSecond()
+      await flush()
+      ctl.dispose()
+      worker.answer(SAT_OK, worker.version - 1)
+      await flush()
+      expect(worker.propagations).toHaveLength(0)
+    })
+  })
+
   it('stops the worker in the haze but gives the haze one pass to show', async () => {
     const { ctl, worker } = setup()
     ctl.setEnabled(new Set<SatGroupId>(['stations']))

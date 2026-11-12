@@ -5,7 +5,7 @@
  * inspector.
  */
 import { Vector3 } from 'three'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { satKey, SatLayer } from '@/components/orrery/three/satLayer'
 import { SAT_OK, SAT_OUT_OF_WINDOW } from '@/lib/orbit/bulk/satField'
@@ -206,8 +206,68 @@ describe('SatLayer (#98)', () => {
     expect(alpha(50)).toBeGreaterThan(0)
   })
 
+  describe('before a pass covers the loaded field (#206)', () => {
+    /** The ISS's info once its group has landed, with `propagate` as given. */
+    async function landed(
+      propagate: SatWorker['propagate'],
+      closeBeforeLanding = false,
+    ): Promise<ReturnType<SatLayer['info']>> {
+      const worker = fakeWorker([])
+      worker.propagate = propagate
+      const layer = new SatLayer(() => undefined, {
+        fetchGroup: (g) =>
+          Promise.resolve({
+            body: new TextEncoder().encode(g).buffer,
+            degraded: false,
+            dataAgeSeconds: 0,
+          }),
+        worker: () => Promise.resolve(worker),
+      })
+      layer.setEnabled(new Set<SatGroupId>(['stations']))
+      const at = (openness: number) => ({
+        jd: JD,
+        simMs: T0,
+        wallMs: 0,
+        rate: 1,
+        earth: new Vector3(1, 0, 0),
+        radius: 0.01,
+        openness,
+        camera: new Vector3(1, 0, 0.2),
+        pixelRatio: 1,
+      })
+      layer.place(at(1))
+      // The camera pulls away from Earth before the group lands: no pass is asked.
+      if (closeBeforeLanding) layer.place(at(0))
+      await flush()
+      return layer.info(satKey('25544'))
+    }
+
+    it('is pending while a pass is on its way', async () => {
+      const info = await landed(() => new Promise<SatFrameReply>(() => undefined))
+      expect(info?.teme).toBeNull()
+      expect(info?.pending).toBe(true)
+      expect(info?.computed).toBe(false)
+    })
+
+    it('is not pending once the pass failed', async () => {
+      const info = await landed(() => Promise.reject(new Error('worker')))
+      expect(info?.pending).toBe(false)
+      expect(info?.computed).toBe(false)
+    })
+
+    it('is not pending when no pass was asked (Earth frame closed)', async () => {
+      const ask = vi.fn(() => new Promise<SatFrameReply>(() => undefined))
+      const info = await landed(ask, true)
+      expect(ask).not.toHaveBeenCalled()
+      expect(info?.pending).toBe(false)
+      expect(info?.computed).toBe(false)
+    })
+  })
+
   it('has no position for an object outside its epoch window', async () => {
     const { layer } = await loadedLayer(['stations'], [SAT_OUT_OF_WINDOW])
+    expect(layer.info(satKey('25544'))?.pending).toBe(false)
+    expect(layer.info(satKey('25544'))?.computed).toBe(true)
     expect(layer.info(satKey('25544'))?.teme).toBeNull()
     expect(layer.snapshot()).toMatchObject({ drawn: 0, outOfWindow: 1 })
   })

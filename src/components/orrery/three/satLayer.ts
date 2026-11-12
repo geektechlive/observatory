@@ -153,6 +153,13 @@ export interface SatInfo {
   epochMs: number
   /** TEME km now, or null when it has no position at this date. */
   teme: [number, number, number] | null
+  /**
+   * A pass covers the loaded objects, so a null `teme` means no position at this date.
+   * False after a field change until a pass lands (#206); absent means true.
+   */
+  computed?: boolean
+  /** Not computed yet, and a pass is on its way from the worker (#206). */
+  pending?: boolean
 }
 
 export interface SatPlace {
@@ -441,6 +448,7 @@ export class SatLayer {
     const i = this.indexOf(id)
     if (!field || i < 0) return null
     const span = field.groups.find((g) => i >= g.start && i < g.start + g.count)
+    const computed = this.ctl.frame() !== null
     return {
       key,
       noradId: id,
@@ -448,6 +456,8 @@ export class SatLayer {
       group: span?.group ?? 'other',
       epochMs: field.epochMs[i] ?? Number.NaN,
       teme: this.temeAt(i),
+      computed,
+      pending: !computed && this.ctl.passing(),
     }
   }
 
