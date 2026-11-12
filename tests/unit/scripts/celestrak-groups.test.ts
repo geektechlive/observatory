@@ -9,9 +9,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildSatGroups,
-  celestrakFetchText,
   celestrakGroupUrl,
   celestrakStrictFetch,
+  createCelestrakGate,
   refreshSatGroups,
   SAT_KEY,
   SATS_MAX_AGE_MS,
@@ -19,7 +19,7 @@ import {
   // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/celestrak-groups.mjs'
 // @ts-expect-error plain ESM script, no type declarations
-import { classifyFailure } from '../../../scripts/refresh-data.mjs'
+import { classifyFailure, fetchTle } from '../../../scripts/refresh-data.mjs'
 
 const SAMPLES = JSON.parse(
   readFileSync(join(__dirname, '..', 'fixtures', 'celestrak-omm.json'), 'utf8'),
@@ -106,9 +106,9 @@ describe('buildSatGroups', () => {
     expect(starlink.fields[1]).toBe('id')
   })
 
-  it('a source that fails takes only its own groups with it', async () => {
+  it('a source whose answer will not parse takes only its own groups with it', async () => {
     const fetchText = (url: string) =>
-      groupOf(url) === 'weather' ? Promise.reject(new Error('HTTP 503')) : fromSamples(url)
+      groupOf(url) === 'weather' ? Promise.resolve('<html>busy</html>') : fromSamples(url)
     const { groups, failed } = await buildSatGroups({ now: NOW, fetchText, pauseMs: 0 })
     const ids = groups.map((g: { id: string }) => g.id)
     expect(ids).not.toContain('weather')
@@ -116,6 +116,24 @@ describe('buildSatGroups', () => {
     expect(ids).not.toContain('other')
     expect(ids).toContain('starlink')
     expect(failed.map((f: { group: string }) => f.group).sort()).toEqual(['other', 'weather'])
+  })
+
+  it('asks no further group once a download fails (#212)', async () => {
+    const asked: string[] = []
+    const fetchText = (url: string) => {
+      asked.push(groupOf(url))
+      return groupOf(url) === 'stations'
+        ? Promise.reject(new Error('CelesTrak: HTTP 503, not retried'))
+        : fromSamples(url)
+    }
+    const { requests, failed } = await buildSatGroups({ now: NOW, fetchText, pauseMs: 0 })
+    expect(asked).toEqual(['active', 'stations'])
+    expect(requests).toBe(2)
+    const why = Object.fromEntries(
+      failed.map((f: { group: string; reason: string }) => [f.group, f.reason]),
+    )
+    expect(why['stations']).toMatch(/HTTP 503/)
+    expect(why['gps-ops']).toMatch(/not asked: CelesTrak stopped this run after stations failed/)
   })
 
   it('treats a non-array or mostly unusable answer as a failure, not an empty group', async () => {
@@ -150,7 +168,7 @@ describe('buildSatGroups', () => {
   })
 })
 
-describe('celestrakFetchText', () => {
+describe('the run-wide CelesTrak gate (#212)', () => {
   // CelesTrak's answer when the same address asks again inside its 2 h update cycle
   // (seen live 2026-11-07, after a probe had fetched `active` minutes before).
   const NOT_UPDATED =
@@ -158,28 +176,113 @@ describe('celestrakFetchText', () => {
     'download of GROUP=active at 2026-11-07 04:34:21 UTC.\n' +
     'Data is updated once every 2 hours.'
 
-  it('does not retry a 403 "not updated" and says what it means', async () => {
-    let calls = 0
-    const fetchImpl = () => {
-      calls += 1
-      return Promise.resolve(new Response(NOT_UPDATED, { status: 403 }))
+  /** A fake CelesTrak: `status(url)` answers each request; every URL asked is kept. */
+  function fakeCelestrak(status: (url: string) => number) {
+    const asked: string[] = []
+    const fetchImpl = (url: string) => {
+      asked.push(url)
+      const code = status(url)
+      if (code !== 200) return Promise.resolve(new Response('busy', { status: code }))
+      const body = url === SUPGP_STARLINK_URL ? '[]' : JSON.stringify(SAMPLES[groupOf(url)] ?? [])
+      return Promise.resolve(new Response(body, { status: 200 }))
     }
-    const retrying = () => Promise.reject(new Error('should not be asked'))
-    await expect(
-      celestrakFetchText(celestrakGroupUrl('active'), { fetchImpl, retrying }),
-    ).rejects.toThrow(/not updated since this address last downloaded it/)
-    expect(calls).toBe(1)
-  })
+    return { asked, fetchImpl }
+  }
 
   it('returns the body of a 200', async () => {
     const fetchImpl = () => Promise.resolve(new Response('[]', { status: 200 }))
-    await expect(celestrakFetchText('u', { fetchImpl, retrying: fetchImpl })).resolves.toBe('[]')
+    const gate = createCelestrakGate({ fetchImpl })
+    await expect(gate.fetchText('u')).resolves.toBe('[]')
+    expect(gate.stoppedBy()).toBeNull()
   })
 
-  it('hands any other failure to the retrying fetch', async () => {
-    const fetchImpl = () => Promise.resolve(new Response('busy', { status: 503 }))
-    const retrying = () => Promise.resolve('[1]')
-    await expect(celestrakFetchText('u', { fetchImpl, retrying })).resolves.toBe('[1]')
+  it.each([301, 403, 404, 429, 500, 503])(
+    'stops at once on HTTP %i, with no retry',
+    async (status) => {
+      const { asked, fetchImpl } = fakeCelestrak(() => status)
+      const gate = createCelestrakGate({ fetchImpl })
+      await expect(gate.fetchText(celestrakGroupUrl('active'))).rejects.toThrow(
+        new RegExp(`HTTP ${String(status)}, not retried`),
+      )
+      expect(asked).toHaveLength(1)
+    },
+  )
+
+  it('says what a 403 "not updated" means, and stops the run on it too', async () => {
+    const fetchImpl = () => Promise.resolve(new Response(NOT_UPDATED, { status: 403 }))
+    const gate = createCelestrakGate({ fetchImpl })
+    await expect(gate.fetchText(celestrakGroupUrl('active'))).rejects.toThrow(
+      /not updated since the last download/,
+    )
+    expect(gate.stoppedBy()).toMatch(/403/)
+  })
+
+  it('a network error or timeout stops the run as well', async () => {
+    let calls = 0
+    const fetchImpl = () => {
+      calls += 1
+      return Promise.reject(new TypeError('fetch failed'))
+    }
+    const gate = createCelestrakGate({ fetchImpl })
+    await expect(gate.fetchText('a')).rejects.toThrow(/fetch failed/)
+    await expect(gate.fetchText('b')).rejects.toThrow(/not asked/)
+    expect(calls).toBe(1)
+  })
+
+  it('asks nothing when no time is left, and that does not stop the run', async () => {
+    const { asked, fetchImpl } = fakeCelestrak(() => 200)
+    const gate = createCelestrakGate({ fetchImpl })
+    await expect(gate.fetchText('u', { timeoutMs: -1 })).rejects.toThrow(/no time left/)
+    expect(asked).toHaveLength(0)
+    expect(gate.stoppedBy()).toBeNull()
+  })
+
+  it('a 503 on the first group makes no further CelesTrak request that run', async () => {
+    const { asked, fetchImpl } = fakeCelestrak((url) => (groupOf(url) === 'active' ? 503 : 200))
+    const gate = createCelestrakGate({ fetchImpl })
+    const { groups, failed, requests, supplemental } = await buildSatGroups({
+      now: NOW,
+      fetchText: (url: string) => gate.fetchText(url),
+      fetchSupText: (url: string) => gate.fetchText(url, { label: 'CelesTrak SupGP' }),
+      pauseMs: 0,
+    })
+    expect(asked).toEqual([celestrakGroupUrl('active')])
+    expect(requests).toBe(1)
+    expect(groups).toEqual([])
+    const why = Object.fromEntries(
+      failed.map((f: { group: string; reason: string }) => [f.group, f.reason]),
+    )
+    expect(why['active'] ?? why['starlink']).toMatch(/HTTP 503/)
+    expect(why['weather']).toMatch(/not asked/)
+    expect(supplemental.error).toMatch(/not asked/)
+  })
+
+  it('a failure earlier in the run (an ISS TLE) means no group is asked at all', async () => {
+    const { asked, fetchImpl } = fakeCelestrak((url) => (url.includes('CATNR=') ? 503 : 200))
+    const gate = createCelestrakGate({ fetchImpl })
+    await expect(fetchTle(25544, gate)).rejects.toThrow(/HTTP 503, not retried/)
+    const { groups, requests } = await buildSatGroups({
+      now: NOW,
+      fetchText: (url: string) => gate.fetchText(url),
+      fetchSupText: (url: string) => gate.fetchText(url, { label: 'CelesTrak SupGP' }),
+      pauseMs: 0,
+    })
+    expect(asked).toHaveLength(1)
+    expect(requests).toBe(0)
+    expect(groups).toEqual([])
+  })
+
+  it('a 200 that will not parse fails only its own group; the rest are still asked', async () => {
+    const { asked, fetchImpl } = fakeCelestrak(() => 200)
+    const gate = createCelestrakGate({ fetchImpl })
+    const { failed } = await buildSatGroups({
+      now: NOW,
+      fetchText: (url: string) =>
+        groupOf(url) === 'stations' ? Promise.resolve('No GP data found') : gate.fetchText(url),
+      pauseMs: 0,
+    })
+    expect(asked).toHaveLength(7)
+    expect(failed.map((f: { group: string }) => f.group).sort()).toEqual(['other', 'stations'])
   })
 })
 
@@ -359,7 +462,7 @@ describe('refreshSatGroups', () => {
     await refreshSatGroups({
       now: NOW,
       fetchText: (url: string) =>
-        groupOf(url) === 'weather' ? Promise.reject(new Error('down')) : fromSamples(url),
+        groupOf(url) === 'weather' ? Promise.resolve('down') : fromSamples(url),
       pauseMs: 0,
       readPrevious: (key: string) => {
         read.push(key)

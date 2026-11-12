@@ -12,6 +12,7 @@ import { OrreryBodiesSchema } from '@/schemas/orreryBodies'
 
 import {
   buildOrreryBodies,
+  fetchSpan,
   horizonsUrl,
   stepSize,
   // @ts-expect-error plain ESM script, no type declarations
@@ -339,5 +340,44 @@ describe('buildOrreryBodies', () => {
     })
     const x = payload.bodies[0]?.fine?.samples[0] as number
     expect(String(x).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(8)
+  })
+})
+
+describe('the reason a span failed (#150)', () => {
+  // Horizons' answer to `DES=2099 ZZ999;`, recorded live 2026-11-12 (the `result` string).
+  const noMatches = fixture('no-matches')
+  const spec = { naifId: '2099 ZZ999', command: 'DES=2099 ZZ999;', targetOk: () => true }
+  const reasonFor = async (text: string) => {
+    try {
+      await fetchSpan(spec, 2461340.5, 2461400.5, 1, () => Promise.resolve(text), NOW)
+    } catch (err) {
+      return (err as Error).message
+    }
+    throw new Error('fetchSpan did not fail')
+  }
+
+  it("keeps Horizons' message, not its banner and header", async () => {
+    const reason = await reasonFor(noMatches)
+    expect(reason).toMatch(/^no data and no ephemeris limit: /)
+    expect(reason).toMatch(/No matches found/)
+    expect(reason).toMatch(/DES = 2099 ZZ999;/)
+    expect(reason).not.toMatch(/\*\*\*/)
+    expect(reason).not.toMatch(/\n/)
+  })
+
+  it('is the same every run: the header time is dropped, so the incident line holds still', async () => {
+    const later = noMatches.replace('2026-Nov-11 22:32:19', '2026-Nov-12 04:32:20')
+    expect(later).not.toBe(noMatches)
+    expect(await reasonFor(later)).toBe(await reasonFor(noMatches))
+    expect(await reasonFor(noMatches)).not.toMatch(/22:32/)
+  })
+
+  it('stays bounded, and keeps the end of a long answer where the error sits', async () => {
+    const header = Array.from({ length: 60 }, (_, i) => `Header line ${String(i)} of an answer`)
+    const long = `${header.join('\n')}\nCannot interpret date. Type "?!" for more information.\n`
+    const reason = await reasonFor(long)
+    expect(reason.length).toBeLessThanOrEqual(450)
+    expect(reason).toMatch(/Header line 0 /)
+    expect(reason).toMatch(/Cannot interpret date\./)
   })
 })

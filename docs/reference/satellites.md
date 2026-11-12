@@ -27,8 +27,8 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
   replaced rows first and stores their number as `supgpCount` in the Starlink body. SupGP
   objects that aren't in `active`'s Starlink slice are dropped, so no object lands in two groups.
   - **CelesTrak's usage policy** asks for SupGP no more than once per 2 h update; the job runs
-    every 6 h and asks once. `celestrakStrictFetch` accepts only a 200 and never retries, as the
-    policy says. It is not asked at all when `active` gave no Starlink slice or any GP request
+    every 6 h and asks once. Like every CelesTrak request (below), it accepts only a 200 and is
+    never retried. It is not asked at all when `active` gave no Starlink slice or any GP request
     in the same run failed. Its timeout is 60 s, capped by what is left of the job's deadline.
   - **A failed SupGP download is a warning, not an incident**: Starlink is stored on GP elements
     (`supgpCount: 0`). That overwrites the last SupGP copy for 6 h, until the next run; GP was
@@ -48,10 +48,19 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
 - **Rows, not OMM objects** (`src/lib/orbit/satCatalog.ts`, no imports, so the `.mjs` job
   imports it): `SAT_FIELDS` order, NORAD ids as strings (six-digit numbers since 2026-07:
   SARAMAGO is 100000). `rowToOmm` gives json2satrec what it reads.
+- **The first CelesTrak request that isn't a 200 stops CelesTrak for the rest of the run
+  (#212).** The usage policy says "M2M (machine-to-machine) software should immediately stop
+  querying when it receives any non-HTTP 200 responses" and that ignoring this gets an address
+  firewalled. Every CelesTrak request in a run (the ISS and satellite TLEs, the eight GP groups,
+  SupGP) goes through one gate, `createCelestrakGate` in `celestrak-groups.mjs`: one try, a 200
+  only, never retried. A non-200, or no answer at all (a network error or timeout), stops the
+  gate, and the later requests fail at once without being sent ("not asked: CelesTrak stopped
+  this run after …"). A 200 whose body won't parse fails only its own group. Each source that
+  isn't refreshed keeps its KV copy and is judged by its age (36 h).
 - **CelesTrak answers 403 "GP data has not updated since your last successful download"** when
-  one address asks again inside its 2 h update cycle (seen 2026-11-07 after a local probe).
-  `celestrakFetchText` doesn't retry it. A failed group is judged by its copy's age (36 h);
-  copies are read back only for failed groups, because Starlink's is 1.7 MB.
+  one address asks again inside its 2 h update cycle (seen 2026-11-07 after a local probe). It is
+  a non-200, so it stops the run too, and the reason names it. Copies are read back only for
+  failed groups, because Starlink's is 1.7 MB.
 - Measured from 2026-11-07's data: 19,540 objects, 2.87 MB (938 kB gzip) across nine keys, so 36
   KV writes a day at four runs.
 - `/api/orrery-sats?group=` streams one group (`_kvBody.ts`), allow-listed, 400 otherwise. The

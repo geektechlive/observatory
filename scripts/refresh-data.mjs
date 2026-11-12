@@ -55,8 +55,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 import {
-  celestrakFetchText,
-  celestrakStrictFetch,
+  createCelestrakGate,
   refreshSatGroups,
   SUPGP_TIMEOUT_MS,
 } from './celestrak-groups.mjs'
@@ -140,9 +139,11 @@ const FETCH_RETRIES = 3
  */
 export const JOB_DEADLINE_MS = 6 * 60_000
 /**
- * The longest one fetch can still run once the deadline passes: CelesTrak's first try,
- * then fetchWithRetry's three attempts and its 5 s and 15 s waits (100 s). A Horizons
- * fetch is one fetchWithRetry (80 s).
+ * The longest one fetch can still run once the deadline passes (100 s). It was sized
+ * for CelesTrak's old first try plus a fetchWithRetry; since #212 a CelesTrak request
+ * is one try (20 s for a TLE, 30 s for a group, SupGP capped by stepBudget), and the
+ * longest fetch is one fetchWithRetry: three 20 s attempts and its 5 s and 15 s waits
+ * (80 s, a Horizons, launches or APOD fetch). The 100 s is kept as margin.
  */
 export const WORST_FETCH_MS = FETCH_TIMEOUT_MS + FETCH_RETRIES * FETCH_TIMEOUT_MS + 5_000 + 15_000
 /**
@@ -424,18 +425,20 @@ async function loadSats() {
   }
 }
 
-function fetchTle(catnr) {
-  return fetchWithRetry(
-    CELESTRAK_TLE(catnr),
-    { headers: { Accept: 'text/plain' } },
-    {
-      validate: (text) => {
-        const parsed = parseTle(text)
-        if (!parsed) throw new Error(`TLE for CATNR ${String(catnr)} failed validation`)
-        return parsed
-      },
-    },
-  )
+/**
+ * One TLE from CelesTrak GP, through the run's CelesTrak gate (#212): one request, a
+ * 200 only, never retried; any other answer stops CelesTrak for the rest of the run.
+ */
+export async function fetchTle(catnr, celestrak) {
+  const text = await celestrak.fetchText(CELESTRAK_TLE(catnr), {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    label: `CelesTrak TLE ${String(catnr)}`,
+  })
+  const parsed = parseTle(text)
+  if (!parsed) {
+    throw new Error(`TLE for CATNR ${String(catnr)} failed validation: ${describePayload(text)}`)
+  }
+  return parsed
 }
 
 function fetchLaunches() {
@@ -555,7 +558,13 @@ export function stepBudget(ownMs, deadline) {
 /** `fetch`, refused once the deadline has passed (the caller then judges by KV age). */
 export function beforeDeadline(fetch, deadline) {
   return (...args) => {
-    if (deadline.passed()) return Promise.reject(new Error('job deadline reached (#128)'))
+    // `asked: false`: nothing was sent, so it neither counts as a request nor, for
+    // CelesTrak, stops the run (#212).
+    if (deadline.passed()) {
+      return Promise.reject(
+        Object.assign(new Error('job deadline reached (#128)'), { asked: false }),
+      )
+    }
     return fetch(...args)
   }
 }
@@ -585,22 +594,33 @@ async function saveSatsDryRun(dir, satWrites, supText) {
 // ---------------------------------------------------------------- main
 
 /** Fetch every tracked satellite; fails only if none validate. */
-async function fetchSatellites(deadline) {
+async function fetchSatellites(deadline, celestrak) {
   const records = []
   for (const sat of await loadSats()) {
     if (deadline?.passed()) {
       console.error(`FAIL sat     stopped at ${sat.label}: job deadline reached (#128)`)
       break
     }
+    if (celestrak.stoppedBy() !== null) {
+      console.error(`FAIL sat     stopped at ${sat.label}: CelesTrak stopped this run (#212)`)
+      break
+    }
     try {
-      const tle = await fetchTle(sat.catnr)
+      const tle = await fetchTle(sat.catnr, celestrak)
       records.push({ label: sat.label, catnr: sat.catnr, ...tle })
       console.log(`ok  sat     ${sat.label} (${String(sat.catnr)})`)
     } catch (err) {
       console.error(`FAIL sat     ${sat.label} (${String(sat.catnr)}): ${err.message}`)
     }
   }
-  if (records.length === 0) throw new Error('no satellite TLEs validated')
+  if (records.length === 0) {
+    const stoppedBy = celestrak.stoppedBy()
+    throw new Error(
+      stoppedBy === null
+        ? 'no satellite TLEs validated'
+        : `no satellite TLEs: CelesTrak stopped this run after ${stoppedBy}`,
+    )
+  }
   return records
 }
 
@@ -610,7 +630,7 @@ const SOURCES = [
     key: KEY_ISS,
     maxAgeMs: 36 * HOUR_MS,
     source: 'celestrak',
-    fetch: () => fetchTle(ISS_CATNR),
+    fetch: (_deadline, celestrak) => fetchTle(ISS_CATNR, celestrak),
     summary: (iss) => `${iss.name} epoch ${iss.line1.slice(18, 32)}`,
   },
   {
@@ -640,9 +660,9 @@ const SOURCES = [
   },
 ]
 
-async function refreshSource(spec, config, deadline) {
+async function refreshSource(spec, config, deadline, celestrak) {
   try {
-    const data = await beforeDeadline(spec.fetch, deadline)(deadline)
+    const data = await beforeDeadline(spec.fetch, deadline)(deadline, celestrak)
     const detail = `ok ${spec.signature} ${spec.summary(data)}`
     console.log(detail)
     return {
@@ -1082,9 +1102,11 @@ async function main(argv) {
   const report = []
   const writes = []
   const deadline = createDeadline()
+  // One gate for every CelesTrak request this run: the first non-200 stops them all (#212).
+  const celestrak = createCelestrakGate()
 
   for (const spec of only ? [] : SOURCES) {
-    const { entry, write } = await refreshSource(spec, config, deadline)
+    const { entry, write } = await refreshSource(spec, config, deadline, celestrak)
     report.push(entry)
     if (write) writes.push({ key: spec.key, value: write, entry })
   }
@@ -1162,18 +1184,17 @@ async function main(argv) {
 
   if (!only || only === 'celestrak-groups') {
     // The orrery's satellites (#98), one KV key per group; see celestrak-groups.mjs.
-    // Starlink's SupGP (#209): one strict request, its timeout inside the deadline.
+    // Every request goes through the run's CelesTrak gate (#212); Starlink's SupGP
+    // (#209) has its own timeout, inside the deadline.
     let supText = null
     const began = Date.now()
     const { entry, writes: satWrites } = await refreshSatGroups({
       now: Date.now(),
-      fetchText: beforeDeadline(
-        (url) => celestrakFetchText(url, { retrying: (u) => fetchWithRetry(u) }),
-        deadline,
-      ),
+      fetchText: beforeDeadline((url) => celestrak.fetchText(url), deadline),
       fetchSupText: beforeDeadline(async (url) => {
-        supText = await celestrakStrictFetch(url, {
+        supText = await celestrak.fetchText(url, {
           timeoutMs: stepBudget(SUPGP_TIMEOUT_MS, deadline),
+          label: 'CelesTrak SupGP',
         })
         return supText
       }, deadline),

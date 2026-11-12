@@ -42,6 +42,32 @@ const round = (value, decimals) => Number(value.toFixed(decimals))
 
 export class BudgetExceeded extends Error {}
 
+/** A failure reason's length: it is stored in KV's `missing` and quoted in incidents. */
+const REASON_MAX_CHARS = 400
+/** When a reason is cut, this much of the end is kept: a long answer's error sits last. */
+const REASON_TAIL_CHARS = 150
+const BANNER_LINE = /^\*+$/
+/** Horizons stamps its header line with the time of the answer ("2026-Nov-11 22:32:19"). */
+const HEADER_STAMP = /\b\d{4}-[A-Z][a-z]{2}-\d{2} \d{2}:\d{2}:\d{2}\b/
+
+/**
+ * What a Horizons answer without data says, as one line for `missing` (#150). The
+ * asterisk banners go, and so does a first line carrying the answer's time: it changed
+ * every run, so the incident line did too. A long answer keeps its start and its end.
+ * Built from Horizons' text only, never the URL; Horizons takes no credentials.
+ */
+export function horizonsReason(text) {
+  const lines = String(text)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !BANNER_LINE.test(line))
+  const body = HEADER_STAMP.test(lines[0] ?? '') ? lines.slice(1) : lines
+  const reason = body.join(' ').replace(/\s+/g, ' ')
+  if (reason.length <= REASON_MAX_CHARS) return reason
+  const head = reason.slice(0, REASON_MAX_CHARS - REASON_TAIL_CHARS - 3)
+  return `${head} … ${reason.slice(-REASON_TAIL_CHARS)}`
+}
+
 /** Horizons' STEP_SIZE: "30 m" below an hour (Phobos, #107), "12 h" below a day, else days. */
 export function stepSize(days) {
   if (days < 1 / 24) return `${String(Math.round(days * 1440))} m`
@@ -95,7 +121,7 @@ export async function fetchSpan(spec, startJd, stopJd, step, ask, now) {
       return { samples: parsed.samples, ...learnt, target: parsed.target }
     }
     const limit = parseEphemerisLimit(text)
-    if (!limit) throw new Error(`no data and no ephemeris limit: ${text.slice(0, 160)}`)
+    if (!limit) throw new Error(`no data and no ephemeris limit: ${horizonsReason(text)}`)
     const limitJd = jdFromMs(Date.parse(limit.iso))
     if (limit.side === 'after') {
       learnt.availableTo = limit.iso

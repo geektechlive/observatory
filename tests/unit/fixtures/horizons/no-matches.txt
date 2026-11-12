@@ -1,0 +1,10 @@
+*******************************************************************************
+JPL/DASTCOM            Small-body Index Search Results     2026-Nov-11 22:32:19
+
+ Comet AND asteroid index search:
+
+    DES = 2099 ZZ999;
+
+ Matching small-bodies: 
+    No matches found.
+*******************************************************************************

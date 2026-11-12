@@ -32,22 +32,6 @@ export const celestrakGroupUrl = (group) =>
 
 const FETCH_TIMEOUT_MS = 30_000
 
-/**
- * One CelesTrak download. CelesTrak answers 403 "GP data has not updated since your
- * last successful download…" when the same address asks again inside its 2 h update
- * cycle (seen 2026-11-07). That is no outage and a retry only adds load, so it fails
- * at once with a plain reason; the stored copy is then judged by its age. Any other
- * failure goes to `retrying` (the job's fetchWithRetry).
- */
-export async function celestrakFetchText(url, { fetchImpl = fetch, retrying }) {
-  const res = await fetchImpl(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
-  if (res.ok) return res.text()
-  const body = await res.text().catch(() => '')
-  if (res.status === 403 && /has not updated/i.test(body))
-    throw new Error('CelesTrak: not updated since this address last downloaded it (403)')
-  return retrying(url)
-}
-
 /** One CelesTrak answer as rows; throws when it isn't a usable catalogue. */
 function parseGroup(text, group) {
   let records
@@ -74,18 +58,52 @@ export const SUPGP_STARLINK_URL =
 /** Its own timeout: 5 MB takes longer than a GP group. The job caps it by its deadline. */
 export const SUPGP_TIMEOUT_MS = 60_000
 
+/** An error for a request that was never sent: it neither counts nor stops the run. */
+const notAsked = (message) => Object.assign(new Error(message), { asked: false })
+
 /**
  * One CelesTrak download under the usage policy's strictest reading: "M2M software
  * should immediately stop querying when it receives any non-HTTP 200 responses". Only
- * a 200 is accepted, and nothing is retried.
+ * a 200 is accepted, and nothing is retried. A 403 "GP data has not updated since your
+ * last successful download" (the same address asking again inside the 2 h update
+ * cycle, seen 2026-11-07) is named as such. CelesTrak's body is never quoted: the
+ * reason ends up in public incident issues.
  */
-export async function celestrakStrictFetch(url, { fetchImpl = fetch, timeoutMs = SUPGP_TIMEOUT_MS }) {
-  if (!(timeoutMs > 0)) throw new Error('CelesTrak SupGP: no time left in the job (#128)')
+export async function celestrakStrictFetch(
+  url,
+  { fetchImpl = fetch, timeoutMs = SUPGP_TIMEOUT_MS, label = 'CelesTrak SupGP' } = {},
+) {
+  if (!(timeoutMs > 0)) throw notAsked(`${label}: no time left in the job (#128)`)
   const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
   if (res.status === 200) return res.text()
   const body = await res.text().catch(() => '')
   const why = /has not updated/i.test(body) ? ', not updated since the last download' : ''
-  throw new Error(`CelesTrak SupGP: HTTP ${String(res.status)}${why}, not retried`)
+  throw new Error(`${label}: HTTP ${String(res.status)}${why}, not retried`)
+}
+
+/**
+ * Every CelesTrak request in one refresh run goes through one gate (#212): the TLEs,
+ * the GP groups and SupGP. The first request that doesn't come back 200 (an HTTP error,
+ * or no answer at all) stops the gate, and every later request that run fails at once
+ * without being sent, as the usage policy asks. Sources it refuses keep their KV copy
+ * and are judged by its age.
+ */
+export function createCelestrakGate({ fetchImpl = fetch } = {}) {
+  let stoppedBy = null
+  return {
+    /** What stopped the gate this run, or null. */
+    stoppedBy: () => stoppedBy,
+    async fetchText(url, { timeoutMs = FETCH_TIMEOUT_MS, label = 'CelesTrak' } = {}) {
+      if (stoppedBy !== null)
+        throw notAsked(`${label}: not asked, CelesTrak stopped this run after ${stoppedBy}`)
+      try {
+        return await celestrakStrictFetch(url, { fetchImpl, timeoutMs, label })
+      } catch (err) {
+        if (err?.asked !== false) stoppedBy = err instanceof Error ? err.message : String(err)
+        throw err
+      }
+    },
+  }
 }
 
 /**
@@ -119,19 +137,40 @@ async function supplementStarlink({ gp, sourceErrors, fetchSupText, pauseMs }) {
 }
 
 /**
- * Download every source group and build the stored payloads. A source that fails
- * takes only the groups made from it (and `other`, which needs every named group).
+ * Download every source group and build the stored payloads. An answer that won't
+ * parse takes only the groups made from it (and `other`, which needs every named
+ * group). A download that fails stops the rest (#212): CelesTrak's usage policy says
+ * to stop querying after any non-200, so the later sources are not asked this run.
  * With `fetchSupText`, Starlink's elements come from SupGP where it has them (#209).
  */
 export async function buildSatGroups({ now, fetchText, fetchSupText, pauseMs = DEFAULT_PAUSE_MS }) {
   const fetched = {}
   const sourceErrors = {}
   let requests = 0
+  let stopped = null
   for (const [i, source] of CELESTRAK_FETCH.entries()) {
+    if (stopped !== null) {
+      sourceErrors[source] = stopped
+      continue
+    }
     if (i > 0 && pauseMs > 0) await new Promise((r) => setTimeout(r, pauseMs))
-    requests += 1
+    let text
     try {
-      fetched[source] = parseGroup(await fetchText(celestrakGroupUrl(source)), source)
+      text = await fetchText(celestrakGroupUrl(source))
+      requests += 1
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
+      sourceErrors[source] = reason
+      if (err?.asked === false) {
+        stopped = reason
+      } else {
+        requests += 1
+        stopped = `not asked: CelesTrak stopped this run after ${source} failed`
+      }
+      continue
+    }
+    try {
+      fetched[source] = parseGroup(text, source)
     } catch (err) {
       sourceErrors[source] = err instanceof Error ? err.message : String(err)
     }

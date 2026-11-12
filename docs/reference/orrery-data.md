@@ -22,6 +22,14 @@ They come from JPL Horizons, sampled by the refresh job, never on the request pa
     asked again.
   - A reply naming the wrong target is rejected, and a failed object goes into `missing` while
     the rest still ship.
+  - **A reply with no data and no limit keeps Horizons' message as its reason (#150).**
+    `horizonsReason` (`orrery-bodies.mjs`) drops the asterisk banners and a header line stamped
+    with the answer's time, joins the rest into one line and caps it at 400 characters, keeping
+    the start and the last 150. The old 160-character cut kept only the banner and header, so
+    the reason 2026 VO5 failed was lost (#149; Horizons had most likely not indexed the new
+    object yet, and its wording was never captured), and the time in the header changed the
+    incident line every run. The no-match fixture is the answer to a made-up `DES=2099 ZZ999;`. Every Horizons step (bodies, close approaches, comets, dwarf
+    planets) goes through `fetchSpan`, so all get it.
 - **One KV write, value and metadata together** (`kvPutInit`'s multipart form): key
   `horizons:bodies:v1`, about 240 KB (100 KB gzip), about 4 writes a day.
 - **The Function streams that body through without parsing it** (10 ms of CPU).
@@ -156,7 +164,7 @@ budget).
 - A CAD failure fails the step, judged by the KV copy's age (36 h). Scout, NEOCC, the PHA filter
   or a single asteroid failing ships as a warning listed in `missing`.
 - Measured in a live dry run on 2026-11-07 (#136): 43 JPL requests in 67 s, 39 of 40 placed
-  (2026 VO5 is in CAD but not yet in Horizons' small-body index: "No matches found"), 414 KB
+  (2026 VO5 failed; most likely Horizons had not indexed it yet, see #149), 414 KB
   (139 KB gzip). Before #136: 28 requests, 38 s, 25 objects, 391 KB (132 KB gzip).
 - `/api/orrery-neo` streams it through like `/api/orrery-bodies` (both use
   `functions/api/_kvBody.ts`), degraded past 36 h. `useOrreryNeo` fetches it, through

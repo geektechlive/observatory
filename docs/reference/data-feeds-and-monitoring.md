@@ -31,8 +31,10 @@ mean day to day:
   `FALLBACK_TLE`.
 - **CelesTrak's usage policy** (https://celestrak.org/usage-policy.php, read 2026-11-12): "only
   download data once per update"; GP and SupGP both update every 2 hours; "M2M (machine-to-machine)
-  software should immediately stop querying when it receives any non-HTTP 200 responses". The orrery's groups
-  and Starlink's SupGP follow it as [satellites.md](satellites.md) describes. The page states no
+  software should immediately stop querying when it receives any non-HTTP 200 responses". Every
+  CelesTrak request the refresh job makes (TLEs, the orrery's groups, Starlink's SupGP) follows
+  it: one try, and the first non-200 stops CelesTrak for the rest of the run (#212), as
+  [satellites.md](satellites.md) describes. The page states no
   numeric error limit and no attribution or redistribution terms.
 - **RocketLaunch.live is unreachable from Workers egress too** (seen 2026-10-09, #30), though it
   answers laptops and GitHub runners. `/api/launches` is KV-first: it serves
