@@ -675,6 +675,10 @@
   }
 
   .stage {
+    /* Where a lesson's bar starts, under the Controls and Guide toggles: the bar
+       (guide.module.css) and the notices under it (#164) both read it. */
+    --guide-bar-top: 48px;
+
     height: var(--stage-h);
   }
 
@@ -857,8 +861,8 @@
     left: var(--space-3);
   }
 
-  /* A lesson on show: the stage is small, so the bar is one row, the inspector sheet is
-     short, and the notices wait, leaving the scene the lesson is about in view. */
+  /* A lesson on show: the stage is small, so the bar is one row and the inspector sheet is
+     short, leaving the scene the lesson is about in view. */
   .stage[data-guide='compact'] .inspector {
     top: auto;
 
@@ -866,8 +870,20 @@
     max-height: max(72px, min(30%, calc(100% - var(--guide-bar-h, 0px) - 64px)));
   }
 
+  /* The notices still matter during a lesson (#164): they say why something in it is
+     missing, such as the moons on Voyager 1's 2012 date. They sit under the bar, full width
+     and in full (they take no pointer, so a clipped tail could never be read), and the page
+     counts them in the camera's top inset, so the focused body is framed below them. */
   .stage[data-guide='compact'] .notices {
-    display: none;
+    top: calc(var(--guide-bar-top) + var(--guide-bar-h, 0px) + var(--space-2));
+    right: var(--space-2);
+    left: var(--space-2);
+    gap: var(--space-1);
+    max-width: none;
+  }
+
+  .stage[data-guide='compact'] .notice {
+    padding: var(--space-1) var(--space-2);
   }
 }
 

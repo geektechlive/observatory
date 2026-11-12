@@ -4,28 +4,10 @@ import { Label } from '@/components/ui/Label'
 import { PLAYBACK_RATES, simAtEdge, useOrreryClock } from '@/store/orreryClock'
 
 import styles from './orrery.module.css'
+import { RATE_LABEL, RATE_SHORT } from './rateLabels'
 import { DAY_MS, formatSimUtc, parseSimDate, SCRUB_DAYS, scrubCentre, toDateField } from './simDate'
 import { useSimTime } from './useSimTime'
 
-/** What each rate button shows: short, so seven fit one row (#114). Its name is RATE_LABEL. */
-const RATE_SHORT: Record<(typeof PLAYBACK_RATES)[number], string> = {
-  1: '1×',
-  60: 'min/s',
-  3600: 'h/s',
-  86_400: 'day/s',
-  604_800: 'wk/s',
-  2_592_000: 'mo/s',
-  31_536_000: 'yr/s',
-}
-const RATE_LABEL: Record<(typeof PLAYBACK_RATES)[number], string> = {
-  1: '1×',
-  60: '1 min/s',
-  3600: '1 h/s',
-  86_400: '1 day/s',
-  604_800: '1 wk/s',
-  2_592_000: '1 mo/s',
-  31_536_000: '1 yr/s',
-}
 const WEEK = 7
 
 interface TimeBarProps {

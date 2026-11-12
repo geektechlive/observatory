@@ -135,10 +135,22 @@ here?" chip open `guide/OrreryGuide.tsx`. Decision:
   `src/lib/orrery/retrograde.ts` finds the same turning points from the orrery's own planet maths
   within 3 days (`orrery-guide-facts.test.ts`). The lesson says what the scene does show: Earth
   overtaking Mars.
+- **A lesson's rate is a button, not a link parameter (#163).** A lesson whose tip says "Press
+  Play at 1 day/s" carries `rate`, and the bar shows that button; it calls the page's `playAt`,
+  which does what a time-bar rate button does (`setRate`, then `play` if paused). Show me still
+  stops the clock on the lesson's date, and a shared address never starts playing.
+  `orrery-guide-lessons.test.ts` keeps every tip's rate and its `rate` field in step.
 - **The drawer collapses to a bar while a lesson shows**, because the inspector opens in the same
   right-hand slot (on a phone, the bottom sheet) and the camera's view inset only knows about the
   inspector. The inspector moves below the bar (`.stage[data-guide='compact']`); on a phone the
-  bar is one row, the sheet shorter and the notices hidden.
+  bar is one row and the sheet shorter.
+- **On a phone the stage notices stay during a lesson (#164)**, because each says why something
+  in the scene is missing (Voyager 1's 2012 date has no moon data). They sit under the bar, full
+  width and in full (never clamped: they take no pointer, so a hidden tail could not be read;
+  the bar and the notices share `--guide-bar-top`), and `OrreryPage`'s view-inset `measure()` takes the lower of the
+  bar's and the notices' bottoms as the top inset, so the focused body is framed below both. The
+  notices element is observed too, so one that appears after the lesson applies refits the view.
+  e2e: "a lesson keeps the stage notices" at 390x844.
 - **`OrreryGuide` calls `useOrreryNeo()` itself and takes no data props.** This was once
   load-bearing: a lazy chunk that reached `react` but not react-dom, react-query or zustand split
   `react`/`jsx-runtime` out of the `client` chunk into a fifth first-load file. Since #162 the

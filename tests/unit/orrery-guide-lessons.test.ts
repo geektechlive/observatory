@@ -140,6 +140,21 @@ describe('the lessons (#159)', () => {
     expect(text.toLowerCase()).toContain('potentially hazardous')
   })
 
+  it('carries the rate its tip asks for, so the bar can play at it (#163)', () => {
+    const rateIn = (text: string) => /\b1 (h|day)\/s\b/.exec(text)?.[1] as 'h' | 'day' | undefined
+    const seconds = { h: 3600, day: 86_400 } as const
+    const withRate = lessons.filter((l) => rateIn(l.tryIt) !== undefined).map((l) => l.id)
+    expect(withRate.sort()).toEqual(
+      ['closest-asteroid', 'jupiter-moons', 'mars-retrograde', 'oumuamua', 'voyager-1'].sort(),
+    )
+    for (const l of lessons) {
+      const unit = rateIn(l.tryIt)
+      expect(l.rate, l.id).toBe(unit === undefined ? undefined : seconds[unit])
+      // The tip names the bar's button, so a newcomer knows where to press.
+      if (unit !== undefined) expect(l.tryIt, l.id).toContain(`Play at 1 ${unit}/s`)
+    }
+  })
+
   it('shows the asteroid lesson as waiting when there is no data yet', () => {
     const none = buildLessons({ approaches: [] }).find((x) => x.id === 'closest-asteroid')
     expect(none?.link).toBeNull()

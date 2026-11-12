@@ -154,6 +154,26 @@ test.describe('The guide (#159)', () => {
     await expect.poll(() => hash(page)).not.toMatch(HAS_TIME)
   })
 
+  test('a lesson’s Play at button plays at the speed its tip asks for (#163)', async ({ page }) => {
+    await openOrrery(page)
+    await openGuide(page)
+    await showLesson(page, 'voyager-1')
+    const rate = page.getByRole('group', { name: 'Playback rate' })
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible()
+    await bar(page).getByRole('button', { name: 'Play at 1 day/s' }).click()
+    await expect(rate.getByRole('button', { name: '1 day/s' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible()
+    // The address keeps the lesson's link: no rate is written into it.
+    expect(await hash(page)).not.toMatch(/rate=/)
+    // A lesson with no rate in its tip offers no button.
+    await backToGuide(page)
+    await showLesson(page, 'l1')
+    await expect(bar(page).getByRole('button', { name: /^Play at/ })).toHaveCount(0)
+  })
+
   test('Show me works again after the camera has moved', async ({ page }) => {
     await openOrrery(page)
     await openGuide(page)
@@ -395,6 +415,55 @@ test.describe('The guide on a phone (#159)', () => {
     const sheetOpen = await inspector.boundingBox()
     expect(
       (sheetOpen?.y ?? 0) + (sheetOpen?.height ?? 0) <= (stage?.y ?? 0) + (stage?.height ?? 0),
+    ).toBe(true)
+  })
+
+  test('a lesson keeps the stage notices, under the bar and clear of the craft (#164)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openOrrery(page)
+    await page.getByRole('button', { name: 'Open the guide' }).click()
+    await showLesson(page, 'voyager-1')
+    // On 25 August 2012 the moons have no data: the stage says so during the lesson too.
+    const notice = page.locator('[data-orrery-nodata]')
+    await expect(notice).toBeVisible()
+    await expect(notice).toContainText('no data for this date')
+    // All of it is readable: nothing clipped, since the notices take no pointer to scroll.
+    await expect(notice).toContainText('Positions are never extrapolated.')
+    expect(await notice.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
+    const inspector = page.getByRole('complementary', { name: 'Voyager 1' })
+    const label = page.locator('button[data-kind="craft"]', { hasText: 'Voyager 1' })
+    const apart = (
+      a: { y: number; height: number } | null,
+      b: { y: number; height: number } | null,
+    ) => !a || !b || a.y + a.height <= b.y + 4 || b.y + b.height <= a.y + 4
+    await expect(label).toBeVisible()
+    // Judge fresh boxes once the camera is still: the refit after the notice arrives is a
+    // short flight (#182).
+    await expect
+      .poll(
+        async () => {
+          const still = (await canvas(page).getAttribute('data-orrery-animating')) === 'false'
+          const noticeBox = await notice.boundingBox()
+          const labelBox = await label.boundingBox()
+          return (
+            still &&
+            apart(noticeBox, await bar(page).boundingBox()) &&
+            apart(noticeBox, await inspector.boundingBox()) &&
+            apart(noticeBox, labelBox) &&
+            apart(labelBox, await inspector.boundingBox())
+          )
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true)
+    // Under the bar, not on top of it, and inside the phone's width.
+    const barBox = await bar(page).boundingBox()
+    const noticeBox = await notice.boundingBox()
+    expect((noticeBox?.y ?? 0) >= (barBox?.y ?? 0) + (barBox?.height ?? 0)).toBe(true)
+    expect(
+      (noticeBox?.x ?? -1) >= 0 && (noticeBox?.x ?? 0) + (noticeBox?.width ?? 999) <= 390,
     ).toBe(true)
   })
 

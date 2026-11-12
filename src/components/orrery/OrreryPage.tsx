@@ -770,6 +770,14 @@ export function OrreryPage() {
   const guide = useGuide(applyLink, guideFocus)
   // The guide's collapsed bar grows with its tip; the inspector starts below it.
   const [barHeight, setBarHeight] = useState(0)
+  const noticesRef = useRef<HTMLDivElement>(null)
+  // A lesson's "Play at" (#163) does what the time bar's rate buttons do; the clock
+  // subscription above redraws, so nothing here asks for a frame.
+  const playAt = useCallback((rate: number) => {
+    const clock = useOrreryClock.getState()
+    clock.setRate(rate)
+    if (!clock.playing) clock.play()
+  }, [])
 
   // With the inspector open over the stage, centre the focus in the part it leaves free:
   // a drawer on the right on wide screens, a sheet along the bottom on phones. On a phone
@@ -791,7 +799,13 @@ export function OrreryPage() {
       }
       const bar = box.querySelector<HTMLElement>('[data-guide-bar]')
       const b = bar?.getBoundingClientRect()
-      const top = b && b.width > s.width * 0.6 ? b.bottom - s.top + GUIDE_BAR_GAP_PX : 0
+      let top = 0
+      if (b && b.width > s.width * 0.6) {
+        // The notices sit under a spanning bar (#164): frame the focus below them too.
+        const n = noticesRef.current?.getBoundingClientRect()
+        const below = n && n.height > 0 ? Math.max(b.bottom, n.bottom) : b.bottom
+        top = below - s.top + GUIDE_BAR_GAP_PX
+      }
       renderer.setViewInset(right, bottom, top)
       // The detail view leaves this much free for the inspector (#203).
       box.style.setProperty('--inspector-right', `${String(right)}px`)
@@ -802,6 +816,8 @@ export function OrreryPage() {
     const observer = new ResizeObserver(measure)
     if (panel) observer.observe(panel)
     observer.observe(box)
+    // A notice that appears or goes once the lesson is showing changes the free band.
+    if (noticesRef.current) observer.observe(noticesRef.current)
     return () => {
       observer.disconnect()
     }
@@ -1117,7 +1133,7 @@ export function OrreryPage() {
         <p className={styles.badge ?? ''} data-label-obstacle="">
           {scale === 'proportional' ? 'SIZES NOT TO SCALE' : 'NOT TO SCALE'}
         </p>
-        <div className={styles.notices ?? ''}>
+        <div ref={noticesRef} className={styles.notices ?? ''}>
           {failed && (
             <p className={styles.notice ?? ''} role="status">
               The 3D view needs WebGL, which this browser could not start. Reload to try again.
@@ -1176,6 +1192,7 @@ export function OrreryPage() {
               mode={guide.mode}
               shown={guide.shown}
               onShow={guide.show}
+              onPlay={playAt}
               onExpand={guide.expand}
               onClose={guide.close}
               onBarHeight={setBarHeight}

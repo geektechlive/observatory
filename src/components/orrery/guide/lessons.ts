@@ -15,6 +15,10 @@ import { AU_KM, LD_KM } from '@/lib/orrery/units'
 
 import { L1_KEY } from '../catalog'
 import type { OrreryLink } from '../orreryLink'
+import type { PlaybackRate } from '../rateLabels'
+
+const HOUR_S = 3600
+const DAY_S = 86_400
 
 /** What a lesson needs of a close approach (the orrery's OrreryApproach has more). */
 export interface LessonApproach {
@@ -41,6 +45,11 @@ export interface Lesson {
   tryIt: string
   /** The link "Show me" applies; null while the lesson's data has not arrived. */
   link: OrreryLink | null
+  /**
+   * The play speed the tip asks for (#163): the lesson bar offers a "Play at" button for it.
+   * Kept out of the link, so a shared address never starts playing.
+   */
+  rate?: PlaybackRate
   /** Why `link` is null. */
   unavailable?: string
   /** Where the facts come from. */
@@ -120,8 +129,9 @@ function asteroidLesson(ctx: LessonContext): Lesson {
       'Show me jumps the clock to that moment, frames Earth and selects the asteroid. Amber marks an asteroid, and red marks one on the hazardous list.',
     ],
     tryIt:
-      'Read the inspector: the miss distance comes with a range of uncertainty, and the size is an estimate from the asteroid’s brightness unless JPL has measured it. Press play at 1 h/s to watch it move past.',
+      'Read the inspector: the miss distance comes with a range of uncertainty, and the size is an estimate from the asteroid’s brightness unless JPL has measured it. Press Play at 1 h/s to watch it move past.',
     link: { ...NONE, t: ms, focus: pick.id, preset: 'earth' },
+    rate: HOUR_S,
   }
 }
 
@@ -147,8 +157,9 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'At that distance a radio signal takes about 17 hours to reach Earth. Radio travels at the speed of light, so no message could get there faster.',
       ],
       tryIt:
-        'Find the faint dashed ring marked “approx.” and the Light time row in the inspector. Voyager 1 is as far from the Sun as the ring is, but it won’t sit on it: the ring lies flat in the plane of the planets, and Voyager 1 is heading out about 35 degrees north of that plane, so on screen it floats above the ring. The ring is only a slice of the Sun’s bubble through the planets’ plane. Follow the thin line down from the craft to the cross on the plane, the spot directly beneath it. Then play at 1 day/s to watch it carry on outward. On a narrow screen the ring’s label is hidden.',
+        'Find the faint dashed ring marked “approx.” and the Light time row in the inspector. Voyager 1 is as far from the Sun as the ring is, but it won’t sit on it: the ring lies flat in the plane of the planets, and Voyager 1 is heading out about 35 degrees north of that plane, so on screen it floats above the ring. The ring is only a slice of the Sun’s bubble through the planets’ plane. Follow the thin line down from the craft to the cross on the plane, the spot directly beneath it. Then press Play at 1 day/s to watch it carry on outward. On a narrow screen the ring’s label is hidden.',
       link: { t: Date.UTC(2012, 7, 25), focus: 'naif:-31', preset: 'heliosphere', detail: false },
+      rate: DAY_S,
       sources: [
         'NASA and JPL date Voyager 1’s crossing of the heliopause to 25 August 2012 (news release of 12 September 2013)',
         'JPL Horizons puts Voyager 1 at 121.60 au from the Sun on that day, and its ecliptic latitude at about 35 degrees north (from Horizons vectors for 25 August 2012 00:00 TDB: z = 1.042e10 km over 1.491e10 km in the plane, queried November 2026)',
@@ -182,8 +193,9 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'Nothing really reversed. Earth, on a faster inner orbit, overtook Mars on 16 January 2025, when Mars stood opposite the Sun in our sky.',
       ],
       tryIt:
-        'Show me stops the clock on that day. Press play at 1 day/s and watch Earth swing past Mars on the inside track. The orrery looks down on the system from above, so the backward loop itself, which is what you would see in the night sky, is not drawn.',
+        'Show me stops the clock on that day. Press Play at 1 day/s and watch Earth swing past Mars on the inside track. The orrery looks down on the system from above, so the backward loop itself, which is what you would see in the night sky, is not drawn.',
       link: { t: Date.UTC(2025, 0, 16), focus: 'Mars', preset: 'inner', detail: false },
+      rate: DAY_S,
       sources: [
         'JPL Horizons observer table from Earth’s centre, Mars (queried 7 November 2026): its ecliptic longitude peaks on 7 December 2024 and bottoms out on 24 February 2025 (UTC, daily samples at 00:00; popular sources give 6 December and 23 February), and the Sun–Earth–Mars angle peaks on 16 January 2025',
         'The orrery’s own planet maths finds the same turning points within 3 days',
@@ -213,8 +225,9 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'It swung past the Sun on 9 September 2017, at 0.26 au, closer than Mercury ever gets, about six weeks before anyone saw it.',
       ],
       tryIt:
-        'Show me switches on the Interstellar objects, with Borisov and 3I/ATLAS, and loads their paths, which takes a moment. Then play at 1 day/s to follow it in and out.',
+        'Show me switches on the Interstellar objects, with Borisov and 3I/ATLAS, and loads their paths, which takes a moment. Then press Play at 1 day/s to follow it in and out.',
       link: { ...NONE, t: Date.UTC(2017, 8, 9, 12, 0, 0), focus: 'sbc:50788063', preset: null },
+      rate: DAY_S,
       sources: [
         'JPL Small-Body Database, 1I/ʻOumuamua (ssd-api.jpl.nasa.gov/sbdb.api?sstr=1I, read 7 November 2026): eccentricity 1.2011, perihelion distance 0.2559 au, perihelion at JD 2458006.007 TDB, which is 9 September 2017, 12:10 UTC',
         'NASA Science, ʻOumuamua: the first known interstellar object to visit our solar system, discovered by Pan-STARRS1 on 19 October 2017 (science.nasa.gov/solar-system/comets/oumuamua)',
@@ -229,8 +242,9 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'The orrery stretches their distances from Jupiter so they stay readable; don’t read them as true to scale.',
       ],
       tryIt:
-        'Play at 1 h/s: Io goes round in under a minute. Choose a moon in the Find box to read its orbital period and distance.',
+        'Press Play at 1 h/s: Io goes round in under a minute. Choose a moon in the Find box to read its orbital period and distance.',
       link: { ...NONE, focus: 'Jupiter', preset: null },
+      rate: HOUR_S,
       sources: [
         'Orbital periods: JPL Horizons physical data for each moon, read 7 November 2026',
         'NASA Science, Jupiter’s moons: the four largest were first observed by Galileo Galilei in 1610 (science.nasa.gov/jupiter/moons, read 7 November 2026)',

@@ -4,6 +4,7 @@ import { useOrreryNeo } from '@/hooks/useOrreryNeo'
 import { GLOSSARY, glossaryEntry } from '@/lib/orrery/glossary'
 
 import type { OrreryLink } from '../orreryLink'
+import { type PlaybackRate, RATE_LABEL } from '../rateLabels'
 import styles from './guide.module.css'
 import { buildLessons, type Lesson } from './lessons'
 import { type Block, DATA_SOURCES, SECTIONS } from './sections'
@@ -14,6 +15,8 @@ export interface ShownLesson {
   id: string
   title: string
   tryIt: string
+  /** The play speed the tip asks for, if any (#163). */
+  rate?: PlaybackRate | undefined
 }
 
 interface OrreryGuideProps {
@@ -22,6 +25,8 @@ interface OrreryGuideProps {
   shown: ShownLesson | null
   /** Apply a lesson's link to the scene (the page runs it through useOrreryLink). */
   onShow: (lesson: ShownLesson, link: OrreryLink) => void
+  /** Set the clock playing at a rate, as the time bar's rate buttons do (#163). */
+  onPlay: (rate: PlaybackRate) => void
   onExpand: () => void
   onClose: () => void
   /** The collapsed bar's height in px, 0 when it is not showing: the inspector sits below it. */
@@ -125,6 +130,7 @@ export function OrreryGuide({
   mode,
   shown,
   onShow,
+  onPlay,
   onExpand,
   onClose,
   onBarHeight,
@@ -224,7 +230,8 @@ export function OrreryGuide({
               key={l.id}
               lesson={l}
               onShow={() => {
-                if (l.link) onShow({ id: l.id, title: l.title, tryIt: l.tryIt }, l.link)
+                if (l.link)
+                  onShow({ id: l.id, title: l.title, tryIt: l.tryIt, rate: l.rate }, l.link)
               }}
             />
           ))}
@@ -276,6 +283,17 @@ export function OrreryGuide({
         >
           <p className={styles.barTitle ?? ''}>{shown?.title ?? 'Guide'}</p>
           <div className={styles.barActions ?? ''}>
+            {shown?.rate !== undefined && (
+              <button
+                type="button"
+                className={`${styles.show ?? ''} ${styles.barPlay ?? ''}`}
+                onClick={() => {
+                  if (shown.rate !== undefined) onPlay(shown.rate)
+                }}
+              >
+                Play at {RATE_LABEL[shown.rate]}
+              </button>
+            )}
             <button ref={back} type="button" className={styles.btn ?? ''} onClick={onExpand}>
               Back to guide
             </button>
