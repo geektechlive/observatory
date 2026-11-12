@@ -7,24 +7,12 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
-import { lookupTrajectory } from './lookupPayload'
 import { moonPayload } from './moonPayload'
 import { serveNeo } from './neoPayload'
 import { serveSats } from './satPayload'
+import { OUMUAMUA_ID, serveSmallBodies } from './smallBodiesPayload'
 import { offlineSun } from './swpc'
 import { voyager1 } from './voyagerPayload'
-
-const oumuamua = {
-  id: 'sb:50788063',
-  spkid: '50788063',
-  name: '1I/ʻOumuamua (A/2017 U1)',
-  designation: 'A/2017 U1',
-  prefix: 'A',
-  kind: 'asteroid',
-  orbitClass: { code: 'HYA', name: 'Hyperbolic Asteroid' },
-  neo: false,
-  pha: false,
-}
 
 async function mockAll(page: Page) {
   await offlineSun(page)
@@ -40,26 +28,8 @@ async function mockAll(page: Page) {
   )
   await serveNeo(page)
   await serveSats(page)
-  await page.route('**/api/lookup?*', (route) =>
-    route.fulfill({
-      json: {
-        query: 'oumuamua',
-        provider: 'jpl-sbdb',
-        result: { type: 'object', object: oumuamua },
-      },
-    }),
-  )
-  await page.route('**/api/trajectory?*', (route) => {
-    const url = new URL(route.request().url())
-    return route.fulfill({
-      json: lookupTrajectory(
-        oumuamua,
-        url.searchParams.get('start') ?? '',
-        url.searchParams.get('end') ?? '',
-        url.searchParams.get('step') ?? '1d',
-      ),
-    })
-  })
+  // The 'Oumuamua lesson opens it from the comet data (#99), loaded on demand.
+  await serveSmallBodies(page, { withOumuamua: true })
 }
 
 async function openOrrery(page: Page) {
@@ -156,13 +126,19 @@ test.describe('The guide (#159)', () => {
       timeout: 20_000,
     })
 
-    // 6. 'Oumuamua: fetched from JPL on demand, then focused on its perihelion day.
+    // 6. 'Oumuamua: the comet data loads on demand, its switch comes on, and it is focused
+    // on its perihelion day, drawn once (#99).
     await backToGuide(page)
     await showLesson(page, 'oumuamua')
-    await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'lookup:50788063', {
+    await expect(canvas(page)).toHaveAttribute('data-orrery-focus', OUMUAMUA_ID, {
       timeout: 20_000,
     })
-    await expect(page.getByRole('complementary', { name: oumuamua.name })).toBeVisible()
+    await expect(page.getByRole('complementary', { name: '1I/ʻOumuamua' })).toBeVisible()
+    await expect(page.getByRole('switch', { name: 'Interstellar objects' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    await expect(canvas(page)).toHaveAttribute('data-orrery-lookup', '')
     await expect.poll(() => hash(page)).toContain('t=2017-09-09T12:00:00Z')
 
     // 7. Jupiter's moons: only drawn if the clock really went back to now.

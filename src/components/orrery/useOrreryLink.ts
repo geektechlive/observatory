@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { lookupSpkid } from '@/lib/orrery/lookupTrack'
+import { isSmallBodyKey } from '@/lib/orrery/smallBodyView'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 import { useOrreryView } from '@/store/orreryView'
 
@@ -38,6 +39,12 @@ interface LinkOptions {
    */
   requestLookup: (spkid: string) => void
   lookupFailed: boolean
+  /**
+   * Comets and the interstellar objects (`sbc:<SPK-ID>`, #99) load only when asked. A link
+   * to such a key the catalog lacks asks for them and waits until they have answered
+   * (`settled`). No other key asks.
+   */
+  smallBodies?: { request: () => void; settled: boolean } | undefined
   /**
    * A link to a satellite (`sat:<NORAD id>`, #158) opens the Earth orbit view, waits for
    * its group, and widens to every group once if it isn't in the loaded ones (see
@@ -194,6 +201,11 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
     } else {
       key = want.focus === null ? null : resolveFocus(want.focus, catalog)
       if (spkid === null && want.focus !== null && key === null && !settled) return // still loading
+      const small = latest.current.smallBodies
+      if (key === null && small && want.focus !== null && isSmallBodyKey(want.focus)) {
+        small.request()
+        if (!small.settled) return
+      }
     }
     satOpened.current = false
     pending.current = null
@@ -210,7 +222,16 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
     else closeDetail()
     // An unknown focus, or a preset already showing, changes no state: write now.
     write.current()
-  }, [renderer, catalog, settled, lookupFailed, linkSeq, o.sats.version, o.sats.allOn])
+  }, [
+    renderer,
+    catalog,
+    settled,
+    lookupFailed,
+    linkSeq,
+    o.sats.version,
+    o.sats.allOn,
+    o.smallBodies?.settled,
+  ])
 
   const { selected, preset } = o
   // Opening or closing the detail view rewrites the address (never a new entry).

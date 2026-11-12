@@ -6,7 +6,7 @@
  */
 import type { GlossaryId } from '@/lib/orrery/glossary'
 
-export type Tone = 'cyan' | 'amber' | 'red' | 'bone' | 'faint'
+export type Tone = 'cyan' | 'amber' | 'red' | 'bone' | 'faint' | 'comet' | 'interstellar'
 
 export type Block =
   | { kind: 'p'; text: string }
@@ -77,6 +77,14 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
+        text: 'The Comets & interstellar controls have two switches, both off at first so nothing extra loads. Comets draws the comets JPL’s magnitude forecast puts brightest tonight. Interstellar objects draws ʻOumuamua, Borisov and 3I/ATLAS, visitors from other stars. Once a switch has loaded them, they are in the Find box too.',
+      },
+      {
+        kind: 'p',
+        text: 'A comet’s position always comes from JPL Horizons, which supplies 30 days either side of today. Outside them the comet and its line are hidden. The line is drawn from its orbital elements, as a line only. The interstellar objects follow the paths JPL gives them, from three years before they passed the Sun to five years from now. Their inspector shows the eccentricity (above 1, so the Sun cannot hold them), the speed they keep far from the Sun, the discovery date, and whether the date shown lies inside the observations the orbit is fitted to or is extrapolated from them.',
+      },
+      {
+        kind: 'p',
         text: 'When nothing matches, the “Search JPL for …” option looks the name up in JPL’s Small-Body Database, which covers any asteroid or comet. The card shows its distance from the Sun and Earth and its speed, and Show in orrery draws it and flies there. JPL is asked one request at a time, so it can take a moment.',
       },
       {
@@ -129,6 +137,16 @@ export const SECTIONS: readonly Section[] = [
             tone: 'red',
             name: 'Red',
             text: 'A potentially hazardous asteroid. The label describes its orbit and size, not a forecast of impact.',
+          },
+          {
+            tone: 'comet',
+            name: 'Pale blue',
+            text: 'A comet, with its orbit line.',
+          },
+          {
+            tone: 'interstellar',
+            name: 'Violet',
+            text: 'An interstellar object and its path, or an object you looked up at JPL.',
           },
           {
             tone: 'faint',

@@ -136,6 +136,53 @@ export function conicPosition(el: ConicElements, jd: number): ConicPosition {
   return { ...toEcliptic(el, xp, yp), r }
 }
 
+/**
+ * The point on the conic at true anomaly ν (radians), heliocentric ecliptic au. Any
+ * shape: r = q(1 + e) / (1 + e cos ν). For drawing an orbit line, not for a date.
+ */
+export function conicPointAt(el: ConicElements, nu: number): ConicPosition {
+  const r = (el.q * (1 + el.e)) / (1 + el.e * Math.cos(nu))
+  return { ...toEcliptic(el, r * Math.cos(nu), r * Math.sin(nu)), r }
+}
+
+/** Points along an orbit line (#99). */
+const PATH_SAMPLES = 360
+
+export interface ConicPath {
+  /** Heliocentric ecliptic au, in the direction of motion. */
+  readonly points: readonly ConicPosition[]
+  /** A whole ellipse inside the cut: the line closes on its first point. */
+  readonly closed: boolean
+}
+
+/**
+ * The orbit as a line (#99), sampled evenly in true anomaly, so the bend at perihelion
+ * stays smooth. A bounded ellipse whose aphelion lies inside `maxR` (au) is closed;
+ * anything else is the arc inside `maxR`: a near-parabolic comet's aphelion can be 1,600
+ * au out, and a hyperbola runs to infinity. Nothing when the orbit never comes inside
+ * `maxR` or the elements are not numbers.
+ */
+export function conicPath(el: ConicElements, maxR: number): ConicPath {
+  const { e, q } = el
+  const none: ConicPath = { points: [], closed: false }
+  if (!(e >= 0) || !(q > 0) || !(maxR >= q)) return none
+  const aphelion = e < 1 ? (q * (1 + e)) / (1 - e) : Number.POSITIVE_INFINITY
+  if (aphelion <= maxR) {
+    const points: ConicPosition[] = []
+    for (let k = 0; k < PATH_SAMPLES; k += 1) {
+      points.push(conicPointAt(el, -Math.PI + (2 * Math.PI * k) / PATH_SAMPLES))
+    }
+    return { points, closed: true }
+  }
+  const cosMax = Math.min(1, Math.max(-1, ((q * (1 + e)) / maxR - 1) / e))
+  const nuMax = Math.acos(cosMax)
+  const points: ConicPosition[] = []
+  for (let k = 0; k <= PATH_SAMPLES; k += 1) {
+    points.push(conicPointAt(el, -nuMax + (2 * nuMax * k) / PATH_SAMPLES))
+  }
+  return { points, closed: false }
+}
+
 /** The speed a hyperbolic body keeps far from the Sun, km/s; null for a bound orbit. */
 export function vInfinityKms(el: { readonly e: number; readonly q: number }): number | null {
   if (el.e <= 1) return null

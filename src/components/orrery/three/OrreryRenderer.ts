@@ -56,6 +56,7 @@ import {
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
 import { ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
+import { lookupTwinKey, type SmallBodyEntry } from '@/lib/orrery/smallBodyView'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
@@ -83,14 +84,16 @@ import { loadGltfScene } from './gltfLoad'
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
-import { clampRadius, craftModelPx, PX_CEILING } from './pxClamp'
+import { clampRadius, craftModelPx, PX_CEILING, SMALL_BODY_MIN_PX } from './pxClamp'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
+import { type SmallBodyGroups, SmallBodyLayer } from './smallBodyLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
 export type { CraftFilter } from '../craftFilter'
 export type { FocusPreset } from './framing'
 export type { LookupData } from './lookupLayer'
 export type { SatInfo, SatMode, SatViewState } from './satLayer'
+export type { SmallBodyGroups } from './smallBodyLayer'
 export type { SunImageState } from './sunImage'
 export type ScaleMode = 'exaggerated' | 'log' | 'proportional'
 /** A planet or the Sun by name, or a craft by its namespaced id (`naif:-31`). */
@@ -112,9 +115,19 @@ export interface ProjectedBody {
    * 'ring': the heliopause marker's label anchor (#93), not a body. 'asteroid': a close
    * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92). 'satellite': the
    * chosen satellite (#98); the others have no labels. 'lookup': an object looked up at
-   * JPL and shown (#145).
+   * JPL and shown (#145). 'smallbody': a comet or interstellar object (#99), its group
+   * in `group`.
    */
-  kind: 'body' | 'craft' | 'moon' | 'ring' | 'asteroid' | 'marker' | 'satellite' | 'lookup'
+  kind:
+    | 'body'
+    | 'craft'
+    | 'moon'
+    | 'ring'
+    | 'asteroid'
+    | 'marker'
+    | 'satellite'
+    | 'lookup'
+    | 'smallbody'
   /** Screen position, px; may lie outside the canvas (rim markers use that). */
   x: number
   y: number
@@ -267,6 +280,8 @@ export class OrreryRenderer {
   private readonly near = new EarthNeighbourhood()
   /** An object looked up at JPL and shown (#145): its marker and orbit line. */
   private readonly lookup = new LookupLayer()
+  /** Comets and the interstellar objects (#99), each group behind its own switch. */
+  private readonly small = new SmallBodyLayer()
   /** Satellites in the Earth frame (#98); a pass or a group arriving asks for a frame. */
   private readonly sats: SatLayer
   private onSatState: ((s: SatViewState) => void) | null = null
@@ -378,9 +393,11 @@ export class OrreryRenderer {
       this.near.group,
       this.sats.group,
       this.lookup.marker,
+      this.small.markers,
     )
-    // Its orbit line is an orbit: the Orbits switch hides it with the planets' (#145).
-    this.orbitGroup.add(this.heliopause, this.lookup.path)
+    // Its orbit line is an orbit: the Orbits switch hides it with the planets' (#145), and
+    // the comets' and interstellar objects' lines with them (#99).
+    this.orbitGroup.add(this.heliopause, this.lookup.path, this.small.paths)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
     // they sit with the planets' orbit lines under the Orbits switch too.
     this.bodyGroup.add(this.moons.group)
@@ -472,6 +489,8 @@ export class OrreryRenderer {
     if (this.sats.marker.visible)
       this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX, PX_CEILING.satMarker)
     if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
+    for (const s of this.small.visible())
+      this.floorPx(s.mesh, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)
     for (const ring of this.sats.flagRings())
       this.floorPx(ring, SAT_REENTRY_MIN_PX, PX_CEILING.satReentry)
     for (const c of this.craft.visible()) {
@@ -530,6 +549,7 @@ export class OrreryRenderer {
       asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
       satMarker: this.sats.marker.visible ? px(this.sats.marker) : null,
       satReentry: maxOf(this.sats.flagRings()),
+      smallBody: maxOf(this.small.visible().map((s) => s.mesh)),
     })
   }
 
@@ -573,6 +593,7 @@ export class OrreryRenderer {
     // the frame with the Moon and the close approaches, so they share one scale.
     this.craft.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
     this.lookup.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
+    this.small.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
     this.near.place(this.lastJd, frame)
   }
 
@@ -786,7 +807,28 @@ export class OrreryRenderer {
     }
     this.skins.orient(jd)
     this.craft.place(jd)
-    this.lookup.place(jd, (p) => this.toScene(p), this.mode)
+    // The comets first: a looked-up object whose twin they draw hides its own copy (#99).
+    this.small.place(jd, (p) => this.toScene(p), this.mode)
+    this.lookup.place(jd, (p) => this.toScene(p), this.mode, this.lookupTwin() !== null)
+  }
+
+  /**
+   * A looked-up object (#145) that is also in the comet data (#99: 1I, 2I, 3I or a bright
+   * comet looked up by name), while that copy is drawn: its key there, else null. The
+   * object is then drawn once, from the comet data, and the lookup key follows it.
+   */
+  private lookupTwin(): SceneKey | null {
+    const key = this.lookup.key()
+    const twin = key === null ? null : lookupTwinKey(key)
+    return twin !== null && this.small.drawn(twin) ? twin : null
+  }
+
+  /** Where a looked-up object is drawn: its own marker, or its twin's (lookupTwin). */
+  private lookupPosition(name: SceneKey): Vector3 | null {
+    const own = this.lookup.position(name)
+    if (own || !this.lookup.has(name)) return own
+    const twin = this.lookupTwin()
+    return twin === null ? null : this.small.position(twin)
   }
 
   /** Where a body or craft is drawn now, scene space. */
@@ -799,8 +841,9 @@ export class OrreryRenderer {
     if (isBody(name)) return this.bodies.get(name)?.position.clone() ?? null
     const near = this.nearPosition(name)
     if (near) return near
-    const looked = this.lookup.position(name)
+    const looked = this.lookupPosition(name)
     if (looked) return looked
+    if (this.small.has(name)) return this.small.position(name)
     if (this.moons.has(name)) {
       const parent = this.moons.parentOf(name)
       return this.moons.position(name) ?? (parent ? this.drawnPosition(parent) : null)
@@ -837,6 +880,35 @@ export class OrreryRenderer {
     if (followed && this.focusBody !== null && !this.lookup.has(this.focusBody)) {
       this.focusBody = null
       this.models.show(null, null)
+      delete this.canvas.dataset['orreryFocus']
+    }
+    this.updateBodies(true)
+    this.markDirty()
+  }
+
+  /** Comets and the interstellar objects from /api/orrery-smallbodies (#99). */
+  setSmallBodies(entries: readonly SmallBodyEntry[]): void {
+    const followed = this.focusBody !== null && this.small.has(this.focusBody)
+    this.small.set(entries)
+    this.afterSmallChange(followed)
+  }
+
+  /** The "Comets & interstellar" switches (#99). */
+  setSmallBodyGroups(groups: SmallBodyGroups): void {
+    const followed = this.focusBody !== null && this.small.has(this.focusBody)
+    this.small.setGroups(groups)
+    this.afterSmallChange(followed)
+  }
+
+  /**
+   * The camera was on a comet or interstellar object whose group is now off, or which is
+   * gone from the data: drop the focus rather than keep a key that draws nothing (#186).
+   * The camera stays where it is.
+   */
+  private afterSmallChange(followed: boolean): void {
+    const focus = this.focusBody
+    if (followed && focus !== null && !this.small.groupOn(focus)) {
+      this.focusBody = null
       delete this.canvas.dataset['orreryFocus']
     }
     this.updateBodies(true)
@@ -950,8 +1022,16 @@ export class OrreryRenderer {
     // The picture moved by the sheet: a preset is fitted for where it now sits.
     if (changed) this.refitPreset()
     // The inspector opens after a looked-up object is focused: refit it to the room left.
+    // Not while it is hidden (past its samples): bodyPosition would answer the Sun's origin
+    // and the camera would swing there; it holds instead, as followFocus does (#186).
     const focus = this.focusBody
-    if (changed && this.lookupFramed && focus && this.lookup.has(focus)) {
+    if (
+      changed &&
+      this.lookupFramed &&
+      focus &&
+      (this.lookup.has(focus) || this.small.has(focus)) &&
+      this.drawnPosition(focus) !== null
+    ) {
       this.focusLookup(focus, this.reducedMotion)
     }
     this.markDirty()
@@ -1116,7 +1196,8 @@ export class OrreryRenderer {
       !isBody(name) &&
       !this.craft.position(name) &&
       !this.nearPosition(name) &&
-      !this.lookup.position(name)
+      !this.lookupPosition(name) &&
+      !this.small.position(name)
     ) {
       return
     }
@@ -1126,7 +1207,7 @@ export class OrreryRenderer {
     // A focused craft draws as its 3D model (#115); anything else drops the model.
     const craftNaif = isBody(name) ? null : this.craft.naifIdOf(name)
     this.models.show(craftNaif ? name : null, craftNaif)
-    if (this.lookup.has(name)) {
+    if (this.lookup.has(name) || this.small.has(name)) {
       this.focusLookup(name, instant)
       return
     }
@@ -1167,13 +1248,14 @@ export class OrreryRenderer {
   }
 
   /**
-   * A looked-up object (#145) is seen with the Sun, and Earth when within a few au, apart
-   * on screen in the part of the stage the inspector and time bar leave free: alone, a far
-   * visitor like 3I/ATLAS at 13 au read as nowhere.
+   * A looked-up object (#145), comet or interstellar object (#99) is seen with the Sun,
+   * and Earth when within a few au, apart on screen in the part of the stage the
+   * inspector and time bar leave free: alone, a far visitor like 3I/ATLAS at 13 au read
+   * as nowhere.
    */
   private focusLookup(name: SceneKey, instant: boolean): void {
     const others = [this.bodyPosition('Sun')]
-    const helio = this.lookup.helioNow()
+    const helio = this.small.has(name) ? this.small.helio(name) : this.lookup.helioNow()
     if (helio) {
       const e = earthState(this.earthTrack, this.lastJd).position
       if (Math.hypot(helio.x - e.x, helio.y - e.y, helio.z - e.z) <= LOOKUP_WITH_EARTH_AU) {
@@ -1353,6 +1435,15 @@ export class OrreryRenderer {
         ...this.projectOne(this.lookup.marker),
       })
     }
+    for (const s of this.small.visible()) {
+      out.push({
+        name: s.key,
+        label: s.label,
+        kind: 'smallbody',
+        group: s.group,
+        ...this.projectOne(s.mesh),
+      })
+    }
     const sat = this.sats.selectedLabel()
     if (sat) {
       out.push({
@@ -1514,6 +1605,14 @@ export class OrreryRenderer {
     // The looked-up object (#145): its key while drawn, and its orbit line's points.
     d['orreryLookup'] = this.lookup.labelled()?.key ?? ''
     d['orreryLookupPath'] = String(this.lookup.pathPoints())
+    // Comets and interstellar objects (#99): markers drawn, lines drawn, and their keys.
+    const small = this.small.counts()
+    d['orrerySmallBodies'] = String(small.drawn)
+    d['orrerySmallBodyPaths'] = String(small.paths)
+    d['orrerySmallBodyKeys'] = this.small
+      .visible()
+      .map((s) => s.key)
+      .join(',')
     // Satellites (#98): how they show, objects loaded, drawn and hidden past their epoch
     // window, the groups loaded, and the last worker pass (the phone target is ≤ 300 ms).
     const sats = this.sats.snapshot()
@@ -1554,6 +1653,7 @@ export class OrreryRenderer {
     this.craft.dispose()
     this.near.dispose()
     this.lookup.dispose()
+    this.small.dispose()
     this.sats.dispose()
     this.models.dispose()
     this.moons.dispose()

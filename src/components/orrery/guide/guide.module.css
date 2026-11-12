@@ -206,6 +206,17 @@
   background: var(--bone);
 }
 
+/* Comets and interstellar objects (#99), in their markers' colours. */
+.dot[data-tone='comet'] {
+  border-color: var(--data-hydro-emit);
+  background: var(--data-hydro-emit);
+}
+
+.dot[data-tone='interstellar'] {
+  border-color: var(--data-space-emit);
+  background: var(--data-space-emit);
+}
+
 .terms {
   margin: var(--space-2) 0;
 }

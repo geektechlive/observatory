@@ -9,6 +9,7 @@ import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodie
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
+import type { SmallBodyEntry } from '@/lib/orrery/smallBodyView'
 import type { SatcatEntry } from '@/lib/spacetrack'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryNeo } from '@/schemas/orreryNeo'
@@ -23,6 +24,7 @@ import { AsteroidFacts, type L1Cme, L1Facts, type L1Wind, ScoutFacts } from './N
 import styles from './orrery.module.css'
 import { SatFacts } from './SatFacts'
 import { formatSimUtc } from './simDate'
+import { SmallBodyFacts } from './SmallBodyFacts'
 import { Term } from './Term'
 import type { SatInfo } from './three/OrreryRenderer'
 import type { SunImageState } from './three/sunImage'
@@ -132,6 +134,8 @@ interface InspectorProps {
   lookCloserRef?: Ref<HTMLButtonElement> | undefined
   /** Present while the detail view is open: the phone sheet folds and this opens it (#205). */
   facts?: FactsToggle | undefined
+  /** The selected comet or interstellar object (#99), when that is what `body` names. */
+  smallBody?: SmallBodyEntry | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -167,9 +171,33 @@ export function Inspector({
   lookCloser,
   lookCloserRef,
   facts,
+  smallBody,
 }: InspectorProps) {
   const headingId = useId()
   const bodyId = useId()
+  if (smallBody && smallBody.key === body) {
+    return (
+      <aside
+        ref={ref}
+        className={styles.inspector ?? ''}
+        aria-labelledby={headingId}
+        data-facts={factsState(facts)}
+      >
+        <div className={styles.inspectorHead ?? ''}>
+          <h2 id={headingId} className={styles.inspectorTitle ?? ''}>
+            {smallBody.label}
+          </h2>
+          <FactsButton facts={facts} controls={bodyId} />
+          <button type="button" className={styles.chipBtn ?? ''} onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div id={bodyId} className={styles.inspectorBody ?? ''}>
+          <SmallBodyFacts entry={smallBody} simMs={simMs} />
+        </div>
+      </aside>
+    )
+  }
   if (isLookupKey(body)) {
     return (
       <aside

@@ -31,7 +31,12 @@ export const PX_CEILING = {
   asteroid: 6,
   satMarker: 6,
   satReentry: 9,
+  /** A comet or an interstellar object (#99): a point, never a disc. */
+  smallBody: 5,
 } as const
+
+/** A comet or interstellar object (#99) never draws smaller than this, px; its ceiling is `PX_CEILING.smallBody`. */
+export const SMALL_BODY_MIN_PX = 3
 
 /** The focused craft's model: never bigger than this share of the Sun's drawn radius. */
 const MODEL_SUN_SHARE = 0.9

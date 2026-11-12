@@ -130,7 +130,7 @@ export function stateAt(
 }
 
 /** The whole-mission path, oldest first, for the trajectory line (spec Part 14). */
-export function trajectoryPoints(track: OrreryTrack): (Vec3 & { jd: number })[] {
+export function trajectoryPoints(track: Pick<OrreryTrack, 'coarse'>): (Vec3 & { jd: number })[] {
   const span = track.coarse
   if (!span) return []
   const out: (Vec3 & { jd: number })[] = []

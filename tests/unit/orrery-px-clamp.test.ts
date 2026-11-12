@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { clampRadius, PX_CEILING } from '@/components/orrery/three/pxClamp'
+import { clampRadius, PX_CEILING, SMALL_BODY_MIN_PX } from '@/components/orrery/three/pxClamp'
 
 describe('clampRadius', () => {
   it('leaves a radius between the floor and the ceiling alone', () => {
@@ -32,5 +32,16 @@ describe('PX_CEILING', () => {
   const SUN_FLOOR_PX = 10
   it.each(Object.entries(PX_CEILING))('%s stays under the Sun’s floor radius', (_name, px) => {
     expect(px).toBeLessThan(SUN_FLOOR_PX)
+  })
+
+  it('holds the comet and interstellar markers (#99) between 3 and 5 px, under the Sun', () => {
+    expect(SMALL_BODY_MIN_PX).toBe(3)
+    expect(PX_CEILING.smallBody).toBe(5)
+    expect(SMALL_BODY_MIN_PX).toBeLessThan(PX_CEILING.smallBody)
+    expect(PX_CEILING.smallBody).toBeLessThan(SUN_FLOOR_PX)
+    // However big the scene radius, a marker draws at the ceiling: 5 px at 0.1 units/px.
+    expect(clampRadius(100, 0.1, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)).toBeCloseTo(0.5, 9)
+    // However small, at the floor: 3 px.
+    expect(clampRadius(0, 0.1, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)).toBeCloseTo(0.3, 9)
   })
 })

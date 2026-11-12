@@ -75,16 +75,25 @@ export class LookupLayer {
     return this.data?.key === key
   }
 
+  /** The shown object's key, or null when none is. */
+  key(): string | null {
+    return this.data?.key ?? null
+  }
+
   /** Its heliocentric position now, au, or null where no sample covers the date. */
   helioNow(): Vec3 | null {
     return this.helio
   }
 
-  /** Place the marker for a date and (re)build the line if the object or mode changed. */
-  place(jd: number, toScene: (p: Vec3) => Vector3, mode: string): void {
+  /**
+   * Place the marker for a date and (re)build the line if the object or mode changed.
+   * `hidden`: the same object is drawn from the comet data (#99), so this copy hides its
+   * marker, line and label; it is still placed, so the camera can frame it.
+   */
+  place(jd: number, toScene: (p: Vec3) => Vector3, mode: string, hidden = false): void {
     const s = this.data ? stateAt({ fine: this.data.fine, coarse: null }, jd) : null
     this.helio = s ? s.position : null
-    this.marker.visible = s !== null
+    this.marker.visible = s !== null && !hidden
     if (s) {
       this.marker.position.copy(toScene(s.position))
       this.marker.scale.setScalar(MARKER_RADIUS)

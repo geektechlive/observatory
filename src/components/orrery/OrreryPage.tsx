@@ -59,6 +59,7 @@ import {
   toggleForGroup,
   withToggleOn,
 } from './satToggles'
+import { SmallBodyControls } from './SmallBodyControls'
 import type { DetailStats } from './three/DetailScene'
 import type {
   FocusPreset,
@@ -76,6 +77,7 @@ import { useLookupTrack } from './useLookupTrack'
 import { useNearEarth } from './useNearEarth'
 import { useOrreryLink } from './useOrreryLink'
 import { useSimTime } from './useSimTime'
+import { useSmallBodies } from './useSmallBodies'
 
 /** Clear space kept under a phone's guide bar for the labels of what the lesson shows. */
 const GUIDE_BAR_GAP_PX = 28
@@ -285,6 +287,9 @@ export function OrreryPage() {
     () => buildCatalog(tracks, catalogDay + 0.5, moons, nearCatalog, stations),
     [tracks, catalogDay, moons, nearCatalog, stations],
   )
+  // Comets and the interstellar objects (#99): fetched once a switch or a link asks.
+  const small = useSmallBodies(renderer, catalogDay + 0.5)
+  const showSmallGroupOf = small.showGroupOf
 
   // The label pass runs per drawn frame, outside React: it reads these through refs.
   const selectedRef = useRef<SceneKey | null>(null)
@@ -636,20 +641,23 @@ export function OrreryPage() {
         const toggle = group ? toggleForGroup(group) : 'stations'
         setSatToggles((t) => withToggleOn(t, toggle))
       }
+      // A comet or interstellar object chosen in search or by a link is drawn (#99).
+      showSmallGroupOf(key)
       // A moon moves fast around its planet: the camera holds the planet's neighbourhood,
       // where the moon is drawn (#107).
       renderer?.focusOn(moonParent.get(key) ?? key)
     },
-    [renderer, moonParent],
+    [renderer, moonParent, showSmallGroupOf],
   )
 
   // An object looked up at JPL and shown (#145): drawn, searchable and linkable. Removing
   // it, from the search card or the inspector, closes its inspector.
   const lookup = useLookupTrack({ renderer, simMs: sim, select })
-  const items = useMemo(
-    () => (lookup.item ? [...catalog, lookup.item] : catalog),
-    [catalog, lookup.item],
-  )
+  const smallCatalog = small.catalog
+  const items = useMemo(() => {
+    const listed = [...catalog, ...smallCatalog]
+    return lookup.item ? [...listed, lookup.item] : listed
+  }, [catalog, smallCatalog, lookup.item])
   useEffect(
     () =>
       useLookupStore.subscribe((s, prev) => {
@@ -739,6 +747,7 @@ export function OrreryPage() {
     applyPreset: onPreset,
     requestLookup: useLookupStore.getState().request,
     lookupFailed: lookup.failed,
+    smallBodies: { request: small.request, settled: small.settled },
     // A `detail` link to an object with no model falls back to the focus alone.
     hasModel: (key) => modelForKey(key, (k) => renderer?.satellite(k) ?? null) !== undefined,
     clearSelection: () => {
@@ -858,6 +867,13 @@ export function OrreryPage() {
         onCraftFilter={setCraftFilter}
         craftStatus={craftStatus}
         dsnCount={craftTracks.filter((t) => dsnIds.has(t.naifId)).length}
+        smallBodies={
+          <SmallBodyControls
+            groups={small.groups}
+            onGroups={small.setGroups}
+            status={small.status}
+          />
+        }
         nearEarth={
           <NeoControls
             filter={near.filter}
@@ -1040,6 +1056,25 @@ export function OrreryPage() {
               {lookup.label}
             </button>
           )}
+          {small.entries.map((e) => (
+            <button
+              key={e.key}
+              type="button"
+              hidden
+              data-kind="smallbody"
+              ref={(el) => {
+                if (el) labelNodes.current.set(e.key, el)
+                else labelNodes.current.delete(e.key)
+              }}
+              className={`${styles.label ?? ''} ${(e.group === 'comets' ? styles.cometLabel : styles.interstellarLabel) ?? ''}`}
+              aria-pressed={selected === e.key}
+              onClick={() => {
+                select(e.key)
+              }}
+            >
+              {e.label}
+            </button>
+          ))}
           {moons.map((m) => (
             <button
               key={m.key}
@@ -1156,6 +1191,7 @@ export function OrreryPage() {
             satellite={satellite}
             lookup={lookup}
             onRemoveLookup={useLookupStore.getState().clear}
+            smallBody={small.find(selected)}
             discos={discos}
             reentries={reentries}
             satCatalog={satCatalog}

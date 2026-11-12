@@ -11,6 +11,7 @@ import { PLANETS } from '@/lib/orrery'
 import { CRAFT } from '@/lib/orrery/craft'
 import { lookupSpkid } from '@/lib/orrery/lookupTrack'
 import { INTERSTELLAR } from '@/lib/orrery/smallBodies'
+import { smallBodyKey } from '@/lib/orrery/smallBodyView'
 
 function approach(over: Partial<LessonApproach> & { id: string; distAu: number }): LessonApproach {
   const { id, distAu, ...rest } = over
@@ -98,6 +99,7 @@ describe('the lessons (#159)', () => {
     const planets = new Set<string>(PLANETS)
     const craft = new Set(CRAFT.map((c) => `naif:${c.naifId}`))
     const lookups = new Set(INTERSTELLAR.map((o) => o.spkid))
+    const visitors = new Set(INTERSTELLAR.map((o) => smallBodyKey(o.spkid)))
     for (const l of lessons) {
       const focus = l.link?.focus
       if (!focus || focus.startsWith('sb:')) continue
@@ -105,9 +107,15 @@ describe('the lessons (#159)', () => {
         planets.has(focus) ||
         craft.has(focus) ||
         focus === L1_KEY ||
+        visitors.has(focus) ||
         lookups.has(lookupSpkid(focus) ?? '')
       expect(ok, `${l.id}: ${focus}`).toBe(true)
     }
+  })
+
+  it("opens 'Oumuamua from the orrery's own data, so it is drawn once (#99)", () => {
+    const link = lessons.find((l) => l.id === 'oumuamua')?.link
+    expect(link?.focus).toBe('sbc:50788063')
   })
 
   it('keeps the dated lessons on their dates, and the live ones live', () => {

@@ -243,8 +243,34 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
 - Measured in a live dry run on 2026-11-07: 19 JPL requests in 26 s, all 15 placed, 164 KB (72
   KB gzip). One KV write a run.
 - `/api/orrery-smallbodies` streams it through `_kvBody.ts`, degraded past 72 h. Health requires
-  a non-empty `interstellar` list, since comets can be few. `useOrrerySmallBodies` fetches it;
-  the orrery doesn't draw it yet.
+  a non-empty `interstellar` list, since comets can be few. `useOrrerySmallBodies` fetches it,
+  for the Tonight panel and the orrery (below).
+- **In the orrery (#99, drawing half):**
+  - **Switches:** "Comets & interstellar" in the controls (`SmallBodyControls.tsx`), Comets and
+    Interstellar objects, both off at first. The payload (72 KB gzip) is fetched only once a
+    switch or a link asks (`useOrrerySmallBodies({ enabled })`, `useSmallBodies.ts`), so a plain
+    visit to the orrery fetches nothing new. Once loaded, the objects are in the Find box.
+  - **Marker from the samples only** (`smallBodyState` in `smallBodyView.ts`): the fine span
+    (±30 days, `FINE_WINDOW_DAYS`), then for 1I/2I/3I the coarse span. Outside them the marker
+    and its line are hidden; the conic never places a position.
+  - **Lines** (`smallBodyLayer.ts`): an interstellar object's coarse positions, every one (1I
+    has about 1,300). A comet's orbit from its elements (`conicPath` in `conic.ts`), sampled in
+    true anomaly, closed for an ellipse whose aphelion is inside the cut, else the arc inside
+    it. The cut is max(8 au, 2q, 1.25 × the farthest fine sample) (`pathCutAu`). Elements years
+    from their epoch (161P's are from 2021) can leave the line visibly off the marker.
+  - **Size:** 3 px floor, `PX_CEILING.smallBody` 5 px, under the Sun's 10 px floor (#195).
+  - **Colours:** comets in the hydro lane's pale blue, interstellar objects in the "Space
+    objects" violet that a looked-up object also uses.
+  - **Inspector** (`SmallBodyFacts.tsx`): only what the payload carries. Eccentricity for all;
+    "hyperbolic", v∞ and the discovery date for 1I/2I/3I only. The solution, and whether the
+    date shown lies inside the data arc it is fitted to (`solutionAt`, whole UTC days).
+  - **Keys and links:** `sbc:<SPK-ID>` (`smallBodyKey`), not the payload's `sb:` id: close
+    approaches are `sb:<designation or number>` (`scripts/orrery-neo.mjs`) and the renderer
+    looks them up first, so a shared prefix could hide a comet. A link to an `sbc:` key the
+    catalog lacks asks for the payload, waits for it, switches the object's group on and
+    opens it (`useOrreryLink.ts`); no other key triggers that fetch.
+  - **Drawn once:** a JPL lookup of the same object (`lookup:<SPK-ID>`, #145) hides its own
+    marker and line while the payload's copy is drawn, and its key follows that copy.
 - **"Comets tonight" in the Tonight panel (#99)** is our stand-in for JPL's missing sb_obs
   (`CometsTonight.tsx`, `src/lib/sky/`). It is fetched only once the user shares a location,
   from our own API, so the location goes nowhere new.

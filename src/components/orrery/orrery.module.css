@@ -610,6 +610,15 @@
   color: var(--bone-faint);
 }
 
+/* Comets and the interstellar objects (#99), in their markers' colours. */
+.cometLabel {
+  color: var(--data-hydro-emit);
+}
+
+.interstellarLabel {
+  color: var(--data-space-emit);
+}
+
 /* The four impact terms (#92, spec Part 12): each yes or no, with what it means. */
 .terms {
   margin: 0;

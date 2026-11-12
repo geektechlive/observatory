@@ -213,8 +213,8 @@ export function buildLessons(ctx: LessonContext): Lesson[] {
         'It swung past the Sun on 9 September 2017, at 0.26 au, closer than Mercury ever gets, about six weeks before anyone saw it.',
       ],
       tryIt:
-        'This object is not in the orrery’s own data, so Show me asks JPL for its path and takes a moment. Then play at 1 day/s to follow it in and out.',
-      link: { ...NONE, t: Date.UTC(2017, 8, 9, 12, 0, 0), focus: 'lookup:50788063', preset: null },
+        'Show me switches on the Interstellar objects, with Borisov and 3I/ATLAS, and loads their paths, which takes a moment. Then play at 1 day/s to follow it in and out.',
+      link: { ...NONE, t: Date.UTC(2017, 8, 9, 12, 0, 0), focus: 'sbc:50788063', preset: null },
       sources: [
         'JPL Small-Body Database, 1I/ʻOumuamua (ssd-api.jpl.nasa.gov/sbdb.api?sstr=1I, read 7 November 2026): eccentricity 1.2011, perihelion distance 0.2559 au, perihelion at JD 2458006.007 TDB, which is 9 September 2017, 12:10 UTC',
         'NASA Science, ʻOumuamua: the first known interstellar object to visit our solar system, discovered by Pan-STARRS1 on 19 October 2017 (science.nasa.gov/solar-system/comets/oumuamua)',

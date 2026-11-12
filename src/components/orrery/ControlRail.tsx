@@ -52,6 +52,8 @@ interface ControlRailProps {
   nearEarth?: ReactNode
   /** The Earth orbit group (#98): the satellite switches. */
   earthOrbit?: ReactNode
+  /** The "Comets & interstellar" group (#99). */
+  smallBodies?: ReactNode
 }
 
 /**
@@ -77,6 +79,7 @@ export function ControlRail({
   dsnCount,
   nearEarth,
   earthOrbit,
+  smallBodies,
 }: ControlRailProps) {
   return (
     <div
@@ -182,6 +185,8 @@ export function ControlRail({
           )}
         </section>
       )}
+
+      {smallBodies}
 
       {nearEarth}
 

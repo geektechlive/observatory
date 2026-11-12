@@ -9,11 +9,25 @@ import { PLANETS } from '@/lib/orrery/elements'
 import { stateAt } from '@/lib/orrery/ephemeris'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { ISS_NORAD_ID, satKey } from '@/lib/orrery/satView'
+import {
+  type SmallBodyEntry,
+  type SmallBodyGroup,
+  smallBodyState,
+} from '@/lib/orrery/smallBodyView'
 import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
-/** 'lookup': an object looked up at JPL and shown (#145). */
+/** 'lookup': an object looked up at JPL and shown (#145). 'smallbody': a comet or interstellar object (#99). */
 export type CatalogKind =
-  'star' | 'planet' | 'moon' | 'craft' | 'asteroid' | 'scout' | 'marker' | 'satellite' | 'lookup'
+  | 'star'
+  | 'planet'
+  | 'moon'
+  | 'craft'
+  | 'asteroid'
+  | 'scout'
+  | 'marker'
+  | 'satellite'
+  | 'lookup'
+  | 'smallbody'
 
 export interface CatalogItem {
   /** A planet's name, or a namespaced id for the Moon and craft (`naif:-31`). */
@@ -74,6 +88,26 @@ export function noDataNotice(items: readonly CatalogItem[]): string | null {
   const list =
     parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}` : parts[0]
   return `${list ?? ''} have no data for this date and are hidden. ${tail}`
+}
+
+const SMALL_BODY_GROUP: Record<SmallBodyGroup, string> = {
+  comets: 'Comets',
+  interstellar: 'Interstellar objects',
+}
+
+/**
+ * Comets and the interstellar objects (#99), once /api/orrery-smallbodies has answered.
+ * Not counted by noDataNotice: a comet's ±30 days of samples run out within seconds of
+ * a fast scrub, and the stage would say so all the time.
+ */
+export function smallBodyCatalog(entries: readonly SmallBodyEntry[], jd: number): CatalogItem[] {
+  return entries.map((e) => ({
+    key: e.key,
+    label: e.label,
+    kind: 'smallbody',
+    group: SMALL_BODY_GROUP[e.group],
+    available: smallBodyState(e.body, jd) !== null,
+  }))
 }
 
 export function buildCatalog(

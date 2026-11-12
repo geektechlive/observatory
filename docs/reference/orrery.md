@@ -84,6 +84,10 @@ lives in `src/components/orrery/orreryLink.ts` (no three.js), and the hook in
   is dropped once the bodies have arrived and the close approaches have answered (`settled`). A
   failed bodies fetch is not settled: the link waits for the next fetch rather than losing its
   focus (seen once on the preview: the focus vanished, and a failed fetch reproduces it).
+- **A comet or interstellar object is `focus=sbc:<SPK-ID>`** (#99). Their data loads only on
+  demand, so an `sb:` focus still unknown once the rest has settled asks for it and waits; when
+  it has answered, the object is selected and its switch turned on. Details in
+  [orrery-data.md](orrery-data.md#comets-and-interstellar-objects-99-data-half).
 - **A satellite is `focus=sat:<NORAD id>`** (#158; the scene key, so choosing one already writes
   it; six-digit ids exist). It is found among the loaded groups, not the catalog: the link opens
   the Earth orbit view (groups only load with the frame open), waits for the switched-on groups

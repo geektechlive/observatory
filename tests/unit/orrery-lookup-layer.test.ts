@@ -90,6 +90,20 @@ describe('LookupLayer (#145)', () => {
     expect(layer.has('lookup:1')).toBe(false)
   })
 
+  it('hides marker, line and label while its twin in the comet data is drawn (#99)', () => {
+    const layer = new LookupLayer()
+    layer.set(data)
+    layer.place(START + 50, toScene, 'exaggerated', true)
+    expect(layer.marker.visible).toBe(false)
+    expect(layer.pathPoints()).toBe(0)
+    expect(layer.labelled()).toBeNull()
+    expect(layer.position('lookup:20099942')).toBeNull()
+    // Still placed: the camera frames the twin from where the samples put it.
+    expect(layer.helioNow()).not.toBeNull()
+    layer.place(START + 50, toScene, 'exaggerated', false)
+    expect(layer.marker.visible).toBe(true)
+  })
+
   it('clearing it removes marker, line and label', () => {
     const layer = new LookupLayer()
     layer.set(data)
