@@ -754,10 +754,12 @@
   }
 }
 
-/* Under 430 px the sentence takes three lines in the Georgia fallback, and in Fraunces too
-   for the longer ones (320–390 px). Two lines of room let Fraunces arriving at about 3.8 s
-   on a slow phone pull the stage up 31 px (#174), so reserve three. The stage keeps its
-   height: Look closer's phone model band needs every pixel of it (#205). */
+/* Under 430 px the longer sentences take three lines in Fraunces (320–390 px), and plain
+   Georgia set most of them in three: Fraunces arriving at about 3.8 s on a slow phone pulled
+   the stage up 31 px (#174), so reserve three. The metric-matched fallback (#220) cut the
+   rewraps to about one sentence in seven, not to none, and the three-line sentences still
+   need the room. The stage keeps its height: Look closer's phone model band needs every
+   pixel of it (#205). */
 @media (width <= 429px) {
   .voiceStrip > p:first-child {
     min-height: calc(3 * 1.3 * 1.45rem);

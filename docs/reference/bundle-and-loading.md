@@ -168,6 +168,37 @@ code scored 0.044 and 0.019 there); it also loads `#orrery` at 390 px with Fraun
 2 s and holds the voice strip and stage at zero shift. Real-visitor CLS is re-checked under
 #177.
 
+**Metric-matched fallback (#220).** `--font-display` is `'Fraunces', 'Fraunces Fallback',
+georgia, serif`. `typography.css` declares `Fraunces Fallback` three times (italic, weights 300,
+400 and 500, the weights the site sets) on `local('Georgia Italic')`, each with its own
+`size-adjust`, `ascent-override`, `descent-override` and `line-gap-override`. How the values were
+derived (2026-11-12, scratch scripts, nothing added to the app):
+
+- Vertical metrics from the files with fontTools: Fraunces sets USE_TYPO_METRICS, typo ascender
+  1956, descender -510, line gap 0, 2000 units per em. Each override is that value divided by
+  the weight's `size-adjust`.
+- `size-adjust` from HarfBuzz shaping (kerning on) of the text the site sets in Fraunces: 104
+  voice sentences for weight 300, guide, inspector and About titles for 500, both for 400.
+  Fraunces advance over Georgia Italic advance: 92.00%, 96.64% and 100.05%. A plain English
+  letter-frequency average gave 94.22% for weight 300 and left the voice line 2.5% wide in
+  Chromium, because the sentences carry capitals, digits and punctuation.
+- Checked in Chromium: the voice sentence in the fallback is within 1% of Fraunces's width (it
+  was 8 to 10% wider in plain Georgia Italic).
+
+Wraps still differ near a line end, so the three-line reserve above stays: over 210 orrery
+sentences at 390 px, 29 wrap differently in the fallback (114 did in plain Georgia), and 42 are
+three lines in Fraunces itself. Cold-load CLS (Slow 4G, 4x CPU, the layout-shift spec's feed
+fixtures, 3 runs, 390 and 1920 px on `/`, `#orrery`, `#sun`, `#sky`, `#orbit`) was the same
+before and after, and no shift landed at the swap except one 0.0014 readout shift on phone
+`#orbit` (a mono readout, not a Fraunces element): with the reserve and the voice line's
+`min-height`, the fixtures' sentences did not reflow on the swap before the change either. The fallback helps visitors whose sentence
+the reserve does not cover and every other Fraunces line (headings, titles). It needs Georgia
+Italic installed (Android has none); without it the stack falls through to `georgia` and
+`serif` unmatched, as before. Inter Tight and IBM Plex Mono have no matched fallback: their stacks fall back to
+`system-ui` and `ui-monospace`, which `local()` cannot name, and both are preloaded. Special
+Elite sets one uppercase word, "OBSERVATORY", whose advance width in Courier New is within 1%
+of its own, at `line-height: 1`, so it does not reflow either.
+
 The ticker's first fill waits for Space-Track (up to 3 s; with reduced motion, whose still
 strip shows 8 items, until it answers or fails) so its re-entries lead the strip
 (#101); after that it keeps items in arrival order, and it places its loop copy by a transform

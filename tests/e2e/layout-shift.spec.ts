@@ -212,3 +212,90 @@ test('a cold 390px #orrery load does not move the stage when the display font ar
   )
   expect(shifts, 'the voice line or the stage moved').toEqual([])
 })
+
+/** Orrery sentences of every length the voice can say (voice.ts), for the width sweep. */
+const ORRERY_SENTENCES = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'].flatMap((name) =>
+  ['0.28', '1.37', '10.12'].flatMap((au) =>
+    ['closing', 'pulling away'].flatMap((motion) =>
+      ['1.2', '38.7'].map(
+        (rate) => `${name} is the nearest planet, ${au} au away and ${motion} at ${rate} km/s.`,
+      ),
+    ),
+  ),
+)
+
+/**
+ * The display font's fallback is metric-matched (#220): `Fraunces Fallback` is local Georgia
+ * Italic scaled to Fraunces's advance widths at each weight the site uses, with Fraunces's
+ * vertical metrics, so text set before Fraunces arrives takes about the room it will keep.
+ * Plain Georgia Italic ran 8 to 10% wider than Fraunces 300 and wrapped the orrery's sentence
+ * to three lines at 390 px where Fraunces needs two. The test sets the voice line's own text,
+ * and a sweep of orrery sentences, in the fallback stack and in Fraunces. Glyph widths still
+ * differ by up to about 1% per sentence, so a sentence near a line end can still wrap
+ * differently: that, and sentences that are three lines in Fraunces, is why #174's
+ * three-line reserve stays. It can only fail where Georgia is installed: elsewhere the stack
+ * falls through to the next serif.
+ */
+test('the voice line is as wide in its fallback as in Fraunces (#220)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.clock.setFixedTime(new Date(NOW))
+  await page.goto('/#orrery')
+  const hasGeorgia = await page.evaluate(() =>
+    new FontFace('georgia-probe', "local('Georgia Italic'), local('Georgia-Italic')").load().then(
+      () => true,
+      () => false,
+    ),
+  )
+  test.skip(!hasGeorgia, 'Georgia Italic is not installed here, so the fallback cannot be measured')
+  const voice = page.locator('[data-orrery-page] > :first-child > p').first()
+  await expect(voice).toContainText('nearest planet')
+  await expect
+    .poll(() => page.evaluate(() => document.fonts.check('italic 300 16px Fraunces')))
+    .toBe(true)
+  const result = await voice.evaluate((el, sweep) => {
+    const cs = getComputedStyle(el)
+    // The stack the browser draws with until Fraunces arrives: everything after Fraunces.
+    const fallback = cs.fontFamily.split(',').slice(1).join(',')
+    function set(text: string, family: string, width: string) {
+      const p = document.createElement('p')
+      Object.assign(p.style, {
+        position: 'absolute',
+        visibility: 'hidden',
+        margin: '0',
+        width,
+        whiteSpace: width === 'max-content' ? 'nowrap' : 'normal',
+        font: `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} / ${cs.lineHeight} ${family}`,
+        textWrap: cs.textWrap,
+      })
+      p.textContent = text
+      document.body.append(p)
+      const range = document.createRange()
+      range.selectNodeContents(p)
+      const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size
+      const w = p.getBoundingClientRect().width
+      p.remove()
+      return { lines, w }
+    }
+    const width = `${String(el.getBoundingClientRect().width)}px`
+    const text = el.textContent
+    const ratio = (t: string) =>
+      set(t, fallback, 'max-content').w / set(t, 'Fraunces', 'max-content').w
+    return {
+      fallback,
+      lines: {
+        fallback: set(text, fallback, width).lines,
+        fraunces: set(text, 'Fraunces', width).lines,
+      },
+      // The sentence furthest from Fraunces's width, of the real one and the sweep.
+      worst: Math.max(...[text, ...sweep].map((t) => Math.abs(ratio(t) - 1))),
+    }
+  }, ORRERY_SENTENCES)
+  expect
+    .soft(result.fallback, 'the fallback stack starts with the matched face')
+    .toContain('Fraunces Fallback')
+  // Within 2% of Fraunces's width (about 1% measured); plain Georgia Italic is 8 to 10% wider.
+  expect.soft(result.worst, `worst width error ${result.worst.toFixed(3)}`).toBeLessThan(0.02)
+  expect(result.lines.fallback, 'the voice line wraps the same before and after the swap').toBe(
+    result.lines.fraunces,
+  )
+})

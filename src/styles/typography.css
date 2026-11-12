@@ -54,6 +54,44 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Metric-matched fallback for Fraunces (#220): local Georgia Italic scaled to Fraunces's
+   advance width at each weight the site sets, with Fraunces's vertical metrics, so text set
+   before Fraunces arrives wraps where it will stay. Plain Georgia Italic ran about 9% wider
+   than Fraunces 300 and rewrapped the voice line on the swap. Derivation and the
+   measurements: docs/reference/bundle-and-loading.md, "Layout shift". */
+@font-face {
+  font-family: 'Fraunces Fallback';
+  font-style: italic;
+  font-weight: 300;
+  src: local('Georgia Italic'), local('Georgia-Italic');
+  size-adjust: 92%;
+  ascent-override: 106.31%;
+  descent-override: 27.72%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Fraunces Fallback';
+  font-style: italic;
+  font-weight: 400;
+  src: local('Georgia Italic'), local('Georgia-Italic');
+  size-adjust: 96.64%;
+  ascent-override: 101.2%;
+  descent-override: 26.39%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Fraunces Fallback';
+  font-style: italic;
+  font-weight: 500;
+  src: local('Georgia Italic'), local('Georgia-Italic');
+  size-adjust: 100.05%;
+  ascent-override: 97.75%;
+  descent-override: 25.49%;
+  line-gap-override: 0%;
+}
+
 body {
   font-family: var(--font-body);
   font-size: var(--text-base);

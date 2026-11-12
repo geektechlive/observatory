@@ -54,7 +54,7 @@
   --orange: oklch(0.72 0.15 50);
 
   /* TYPOGRAPHY */
-  --font-display: 'Fraunces', georgia, serif;
+  --font-display: 'Fraunces', 'Fraunces Fallback', georgia, serif;
   --font-editorial: var(--font-display);
   --font-body: 'Inter Tight', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
