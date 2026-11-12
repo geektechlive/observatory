@@ -70,6 +70,8 @@ describe('tier-A satellite models (#194)', () => {
   // to their folder in NASA's repository.
   it.each([
     ['40059', 'oco2', 'own', 'NASA/Christopher R. Meaney'], // OCO 2
+    ['43613', 'icesat2', 'own', 'NASA/Christopher R. Meaney'], // ICESAT-2
+    ['33053', 'fermi', 'own', 'NASA/Christopher R. Meaney'], // FGRST (GLAST)
     ['27651', 'sorce', 'own', 'NASA'], // SORCE
     ['36395', 'sdo', 'own', 'NASA'], // SDO
     ['25560', 'swas', 'own', 'NASA/Christopher R. Meaney'], // SWAS

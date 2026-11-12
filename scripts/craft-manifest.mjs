@@ -415,4 +415,26 @@ export const MANIFEST = {
     logos:
       'No texture images in the file (48 plain materials). NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
   }),
+  fermi: nasaRepo({
+    folder: 'Fermi Gamma-ray Large Area Space Telescope',
+    file: 'Fermi Gamma-ray Large Area Space Telescope.glb',
+    sha256: 'd345f3b0595f7792f699acf33b28d7401cb53cc2a20b735bca00e95644e3813c',
+    family: 'fermi',
+    triangles: 26000,
+    transforms: { aim: 14_000, keep: ['GPMcore-SolarFaces'] },
+    outputSha256: '48516a436cc2410e070c2ff81f1ef8b653b294b0912319413863921cc8752661',
+    logos:
+      'No texture images in the file (27 plain materials). Real-GPU renders of the shipped file along all six axes, and close renders of the body: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  icesat2: nasaRepo({
+    folder: 'Ice, Clouds, and Land Elevation Satellite-2 (ICESat-2) (A)',
+    file: 'Ice, Clouds, and Land Elevation Satellite-2 (ICESat-2) (A).glb',
+    sha256: 'e7d260d69852fcd3367c8e7a3c236f8c0551c591abc5a8e8f42c0356a2eebf38',
+    family: 'icesat',
+    triangles: 42000,
+    transforms: { aim: 14_000, keep: ['ICESAT2-Solar'] },
+    outputSha256: '9b442be269b44ca420408589707f61c5b88987f811caeaf2471f17c96a501c2b',
+    logos:
+      "No texture images in the file (26 plain materials; 'ICESAT2-instrumentimage' is a plain white material, not a picture). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close renders of the body: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
 }

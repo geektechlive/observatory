@@ -119,9 +119,10 @@ describe('promote (#202)', () => {
   })
 
   it('refuses an output over the per-model budget', () => {
-    const { staging, out } = staged(500_001)
-    expect(() => promote('m', staging, out, complete(), BUDGETS.craftModelBytes, 9000)).toThrow(
-      /500001/,
+    const max = BUDGETS.craftModelBytes as number
+    const { staging, out } = staged(max + 1)
+    expect(() => promote('m', staging, out, complete(), max, 9000)).toThrow(
+      new RegExp(`${max + 1} B is over`),
     )
     expect(readdirSync(out)).toEqual([])
   })

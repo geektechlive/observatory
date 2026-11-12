@@ -46,8 +46,9 @@ export const BUDGETS = {
   // #115 measured the ten spacecraft models at 110-426 kB each, 2.16 MB together. Only the
   // focused craft's model loads, so the total is disk, not a visitor's download. The total
   // is sized for all of tier A (#194, docs/reference/satellite-models.md, "Budget plan"):
-  // 6.05 MB with the third batch.
-  craftModelBytes: 500_000,
+  // 7.27 MB with the third batch, Fermi and ICESat-2. Per model 850 kB, raised from 500 kB for
+  // ICESat-2, whose solar arrays are kept unsimplified.
+  craftModelBytes: 850_000,
   craftModelTotal: 8_500_000,
   // three's GLTFLoader, fetched with the first craft model (#115).
   gltfLoaderGzip: 30_000,
@@ -79,7 +80,8 @@ const DETAIL_MARKER = 'data-detail-view'
 
 // `import{a as b}from"./x.js"`, `import"./x.js"`, `export{a}from"./x.js"` and their spaced
 // forms. A dynamic `import("./x.js")` has no clause or quote right after `import`.
-const STATIC_IMPORT = /\b(?:import|export)\s*(?:[\w$*\s,{}]*?\bfrom\s*)?["'`]\.\/([^"'`/]+\.js)["'`]/g
+const STATIC_IMPORT =
+  /\b(?:import|export)\s*(?:[\w$*\s,{}]*?\bfrom\s*)?["'`]\.\/([^"'`/]+\.js)["'`]/g
 
 /** The `assets/` files reachable from `entryPath` through static imports (entry excluded). */
 function staticGraph(distDir, entryPath) {
@@ -108,7 +110,11 @@ export function checkBundle(distDir, budgets = BUDGETS) {
 
   const html = readFileSync(join(distDir, 'index.html'), 'utf8')
   const entryMatch = /<script[^>]+type="module"[^>]+src="\/(assets\/[^"]+\.js)"/.exec(html)
-  add('entry-found', Boolean(entryMatch), entryMatch ? entryMatch[1] : 'index.html names no module script')
+  add(
+    'entry-found',
+    Boolean(entryMatch),
+    entryMatch ? entryMatch[1] : 'index.html names no module script',
+  )
   if (!entryMatch) return findings
 
   // First-load JavaScript is the entry plus every chunk it imports statically, which Vite
@@ -116,12 +122,18 @@ export function checkBundle(distDir, budgets = BUDGETS) {
   // they share with the entry sits in its own chunk; measuring the entry file alone
   // read 140.8 kB while first paint still loaded about 180 kB.
   const entryPath = entryMatch[1]
-  const preloads = [...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1])
+  const preloads = [
+    ...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="\/(assets\/[^"]+\.js)"/g),
+  ].map((m) => m[1])
   const initial = [entryPath, ...preloads]
   const bodies = initial.map((path) => readFileSync(join(distDir, path)))
   const initialGzip = bodies.reduce((sum, body) => sum + gz(body), 0)
   const parts = preloads.length > 0 ? ` + ${preloads.join(', ')}` : ''
-  add('entry-gzip', initialGzip <= budgets.entryGzip, `${entryPath}${parts} ${kb(initialGzip)} gzip (budget ${kb(budgets.entryGzip)})`)
+  add(
+    'entry-gzip',
+    initialGzip <= budgets.entryGzip,
+    `${entryPath}${parts} ${kb(initialGzip)} gzip (budget ${kb(budgets.entryGzip)})`,
+  )
 
   // #155: no chain. A file the entry reaches through static imports but index.html does
   // not preload is requested only after its parent has arrived and run; on a phone that
@@ -138,13 +150,19 @@ export function checkBundle(distDir, budgets = BUDGETS) {
   // A tripwire against accidental fragmentation, not a target: over HTTP/2 the count costs
   // a request each and slightly worse compression, never a connection limit.
   const maxFiles = budgets.firstLoadFiles ?? BUDGETS.firstLoadFiles
-  add('first-load-files', initial.length <= maxFiles, `${initial.length} files (ceiling ${maxFiles})`)
+  add(
+    'first-load-files',
+    initial.length <= maxFiles,
+    `${initial.length} files (ceiling ${maxFiles})`,
+  )
 
   const withThree = initial.filter((_, i) => bodies[i].includes(THREE_MARKER))
   add(
     'entry-has-no-three',
     withThree.length === 0,
-    withThree.length > 0 ? `${withThree.join(', ')} contains ${THREE_MARKER}: three.js must be a lazy chunk` : 'three.js not in first-load chunks',
+    withThree.length > 0
+      ? `${withThree.join(', ')} contains ${THREE_MARKER}: three.js must be a lazy chunk`
+      : 'three.js not in first-load chunks',
   )
   const withSgp4 = initial.filter((_, i) => bodies[i].includes(SGP4_MARKER))
   add(
@@ -200,42 +218,78 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     if (name.startsWith('OrreryGuide-')) {
       sawGuideChunk = true
       const size = gz(body)
-      add('orrery-guide-gzip', size <= budgets.orreryGuideGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGuideGzip)})`)
+      add(
+        'orrery-guide-gzip',
+        size <= budgets.orreryGuideGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGuideGzip)})`,
+      )
     } else if (name.startsWith('DetailView-')) {
       sawDetailChunk = true
       const size = gz(body)
-      add('orrery-detail-gzip', size <= budgets.detailViewGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.detailViewGzip)})`)
+      add(
+        'orrery-detail-gzip',
+        size <= budgets.detailViewGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.detailViewGzip)})`,
+      )
     } else if (name.startsWith('SatBrowser-')) {
       const size = gz(body)
-      add('sat-browser-gzip', size <= budgets.satBrowserGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satBrowserGzip)})`)
+      add(
+        'sat-browser-gzip',
+        size <= budgets.satBrowserGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.satBrowserGzip)})`,
+      )
     } else if (name.startsWith('sats.worker-')) {
       const size = gz(body)
-      add('sat-worker-gzip', size <= budgets.satWorkerGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`)
+      add(
+        'sat-worker-gzip',
+        size <= budgets.satWorkerGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.satWorkerGzip)})`,
+      )
     } else if (name.startsWith('GLTFLoader-')) {
       const size = gz(body)
-      add('gltf-loader-gzip', size <= budgets.gltfLoaderGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.gltfLoaderGzip)})`)
+      add(
+        'gltf-loader-gzip',
+        size <= budgets.gltfLoaderGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.gltfLoaderGzip)})`,
+      )
     } else if (name.startsWith('OrreryPage-') || name.startsWith('OrreryRenderer-')) {
       if (name.startsWith('OrreryPage-')) {
         sawOrreryPage = true
         add(
           'orrery-page-has-no-guide',
           !body.includes(GUIDE_MARKER),
-          body.includes(GUIDE_MARKER) ? `${name} contains the guide drawer: it must stay a separate lazy chunk` : `${name} does not contain the guide drawer`,
+          body.includes(GUIDE_MARKER)
+            ? `${name} contains the guide drawer: it must stay a separate lazy chunk`
+            : `${name} does not contain the guide drawer`,
         )
         add(
           'orrery-page-has-no-detail',
           !body.includes(DETAIL_MARKER),
-          body.includes(DETAIL_MARKER) ? `${name} contains the detail view: it must stay a separate lazy chunk` : `${name} does not contain the detail view`,
+          body.includes(DETAIL_MARKER)
+            ? `${name} contains the detail view: it must stay a separate lazy chunk`
+            : `${name} does not contain the detail view`,
         )
       }
       const size = gz(body)
-      add('orrery-gzip', size <= budgets.orreryGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGzip)})`)
+      add(
+        'orrery-gzip',
+        size <= budgets.orreryGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.orreryGzip)})`,
+      )
     } else if (body.includes(THREE_MARKER)) {
       const size = gz(body)
-      add('lazy-three-gzip', size <= budgets.lazyThreeGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.lazyThreeGzip)})`)
+      add(
+        'lazy-three-gzip',
+        size <= budgets.lazyThreeGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.lazyThreeGzip)})`,
+      )
     } else if (name.startsWith('WorldMap-')) {
       const size = gz(body)
-      add('worldmap-gzip', size <= budgets.worldMapGzip, `${name} ${kb(size)} gzip (budget ${kb(budgets.worldMapGzip)})`)
+      add(
+        'worldmap-gzip',
+        size <= budgets.worldMapGzip,
+        `${name} ${kb(size)} gzip (budget ${kb(budgets.worldMapGzip)})`,
+      )
     }
   }
 
@@ -244,7 +298,9 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     add(
       'orrery-guide-found',
       sawGuideChunk,
-      sawGuideChunk ? 'OrreryGuide chunk found' : 'no OrreryGuide-*.js chunk next to OrreryPage: its budget rule would not run',
+      sawGuideChunk
+        ? 'OrreryGuide chunk found'
+        : 'no OrreryGuide-*.js chunk next to OrreryPage: its budget rule would not run',
     )
   }
 
@@ -252,7 +308,9 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     add(
       'orrery-detail-found',
       sawDetailChunk,
-      sawDetailChunk ? 'DetailView chunk found' : 'no DetailView-*.js chunk next to OrreryPage: its budget rule would not run',
+      sawDetailChunk
+        ? 'DetailView chunk found'
+        : 'no DetailView-*.js chunk next to OrreryPage: its budget rule would not run',
     )
   }
 
@@ -261,7 +319,11 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     for (const name of readdirSync(textureDir)) {
       const stat = statSync(join(textureDir, name))
       if (!stat.isFile()) continue
-      add('texture-bytes', stat.size <= budgets.textureBytes, `textures/${name} ${kb(stat.size)} (budget ${kb(budgets.textureBytes)})`)
+      add(
+        'texture-bytes',
+        stat.size <= budgets.textureBytes,
+        `textures/${name} ${kb(stat.size)} (budget ${kb(budgets.textureBytes)})`,
+      )
     }
   }
 
@@ -271,9 +333,17 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     for (const name of readdirSync(planetDir)) {
       const bytes = statSync(join(planetDir, name)).size
       total += bytes
-      add('planet-texture-bytes', bytes <= budgets.textureBytes, `textures/planets/${name} ${kb(bytes)} (budget ${kb(budgets.textureBytes)})`)
+      add(
+        'planet-texture-bytes',
+        bytes <= budgets.textureBytes,
+        `textures/planets/${name} ${kb(bytes)} (budget ${kb(budgets.textureBytes)})`,
+      )
     }
-    add('planet-texture-total', total <= budgets.planetTextureTotal, `textures/planets ${kb(total)} (budget ${kb(budgets.planetTextureTotal)})`)
+    add(
+      'planet-texture-total',
+      total <= budgets.planetTextureTotal,
+      `textures/planets ${kb(total)} (budget ${kb(budgets.planetTextureTotal)})`,
+    )
   }
   const modelDir = join(distDir, 'models', 'craft')
   if (existsSync(modelDir)) {
@@ -281,19 +351,31 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     for (const name of readdirSync(modelDir)) {
       const bytes = statSync(join(modelDir, name)).size
       total += bytes
-      add('craft-model-bytes', bytes <= budgets.craftModelBytes, `models/craft/${name} ${kb(bytes)} (budget ${kb(budgets.craftModelBytes)})`)
+      add(
+        'craft-model-bytes',
+        bytes <= budgets.craftModelBytes,
+        `models/craft/${name} ${kb(bytes)} (budget ${kb(budgets.craftModelBytes)})`,
+      )
     }
-    add('craft-model-total', total <= budgets.craftModelTotal, `models/craft ${kb(total)} (budget ${kb(budgets.craftModelTotal)})`)
+    add(
+      'craft-model-total',
+      total <= budgets.craftModelTotal,
+      `models/craft ${kb(total)} (budget ${kb(budgets.craftModelTotal)})`,
+    )
   }
   add(
     'entry-has-no-craft-models',
     !html.includes('/models/craft/'),
-    html.includes('/models/craft/') ? 'index.html names a craft model: they load with a focused craft (#115)' : 'no craft model in index.html',
+    html.includes('/models/craft/')
+      ? 'index.html names a craft model: they load with a focused craft (#115)'
+      : 'no craft model in index.html',
   )
   add(
     'entry-has-no-planet-textures',
     !html.includes('/textures/planets/'),
-    html.includes('/textures/planets/') ? 'index.html names a planet map: they load with the orrery tab (#105)' : 'no planet map in index.html',
+    html.includes('/textures/planets/')
+      ? 'index.html names a planet map: they load with the orrery tab (#105)'
+      : 'no planet map in index.html',
   )
   return findings
 }

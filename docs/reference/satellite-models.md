@@ -13,7 +13,8 @@ land, licences are answered or new families appear.
 
 - The licence allows free public display on a website **and** modification (we decimate and
   simplify every model at build time).
-- Under 500 kB per model, measured on the file we ship. That file is **uncompressed**:
+- Under 850 kB per model, measured on the file we ship (500 kB until 2026-11-11; raised for
+  ICESat-2, below). That file is **uncompressed**:
   the build decodes Draco and meshopt and writes plain quantized GLB, because the CSP has no
   `'wasm-unsafe-eval'` for a decoder (ADR 0011, `scripts/craft-models.mjs`). The budget is
   `check-bundle`'s `craft-model-bytes`.
@@ -108,7 +109,7 @@ One Starlink model would put a real shape behind two thirds of every satellite d
 ### NASA models
 
 From `https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/<name>`. Raw GLB sizes
-are from the repository tree (VERIFIED). Twenty-two are built and shipped, in three batches of 2026-11-11
+are from the repository tree (VERIFIED). Twenty-four are built and shipped, all on 2026-11-11: three batches, then Fermi and ICESat-2
 (see "The trial batch", "The second batch" and "The third batch" below); the rest are not built, and no other mesh
 has been checked for logos yet.
 
@@ -123,9 +124,9 @@ has been checked for logos yet.
 | Landsat 8                          | Landsat 8, 9                                   | 780 kB                                  | **Built**; shown for Landsat 9 as a stand-in                                                                     |
 | Suomi NPP                          | Suomi NPP; look-alike for NOAA 20, 21          | 2.28 MB                                 | **Built**; shown for NOAA 20 and 21 as a stand-in                                                                |
 | GOES                               | GOES 14–19 (6)                                 | 336 kB                                  | **Built**; its shape is the GOES-R series (16 to 19); a stand-in for all six                                     |
-| ICESat-2 (A)                       | ICESat-2                                       | 1.5 MB                                  | **Held**: the simplifier breaks its arrays (third batch, below)                                                  |
+| ICESat-2 (A)                       | ICESat-2                                       | 1.5 MB                                  | **Built** (third batch, kept arrays below)                                                                       |
 | OCO-2                              | OCO-2                                          | 280 kB                                  | **Built**                                                                                                        |
-| SORCE, SDO, Fermi, SWAS, Chandra   | 1 each                                         | 366 kB, 498 kB, 1.38 MB, 150 kB, 999 kB | **Built** except Fermi (held, third batch); SORCE and SDO have no NASA page                                      |
+| SORCE, SDO, Fermi, SWAS, Chandra   | 1 each                                         | 366 kB, 498 kB, 1.38 MB, 150 kB, 999 kB | **Built**, Fermi after the third batch (kept arrays below); SORCE and SDO have no NASA page                      |
 | MMS (A)                            | MMS 1–4                                        | 336 kB                                  | **Built**; shown for all four as a stand-in                                                                      |
 | THEMIS                             | THEMIS A, D, E                                 | 683 kB                                  | **Built**; shown for all three as a stand-in                                                                     |
 | CYGNSS                             | CYGNSS (7)                                     | 1.62 MB                                 | **Built**; shown for all seven as a stand-in; credit NASA (the page names no source)                             |
@@ -301,7 +302,7 @@ Suomi NPP have no preview render from NASA to compare with.
 ### The third batch (#194, 2026-11-11)
 
 Twelve models through the same gate, from the same pinned commit, for 25 active satellites. Two
-more, Fermi and ICESat-2, were built and held back (below).
+more, Fermi and ICESat-2, were held back and shipped after (below).
 
 | Model     | Source file (SHA-256 prefix)                                                                | Raw         | Built     | Triangles (source, built, budget) | Shown for (scope)                          | Credit                            |
 | --------- | ------------------------------------------------------------------------------------------- | ----------- | --------- | --------------------------------- | ------------------------------------------ | --------------------------------- |
@@ -343,13 +344,33 @@ box. OSTM (Jason-2) for Jason-3, which is close to a copy of Jason-2.
   map as its colour picture, so it showed magenta; the build draws it in the gold of the other
   underside (`plain`).
 
-**Held back: Fermi and ICESat-2.** Both build within budget, but the simplifier punches holes in
-their solar arrays: each panel is a substrate with a recess filled by separate cell quads, and
-simplifying removes cells and leaves the recess open (Fermi: large black triangles and rectangles
-in every panel; ICESat-2: one panel shredded). Tried and not enough: a 24k triangle budget for
-Fermi (holes stay), pruning small parts, and locking part borders (keeps the cells but lands at
-34k and 73k triangles, over the 500 kB file budget). They need a build step that merges each
-panel's cells first. Their downloads, hashes and logo check are done (no logos).
+**Held back, then shipped: Fermi and ICESat-2 (2026-11-11).** The simplifier punched holes in
+their solar arrays: each array is hundreds of small cell quads over a backing, and simplifying
+removed cells (Fermi: large black triangles and rectangles in every panel; ICESat-2: one panel
+shredded). Tried and not enough: a 24k triangle budget for Fermi (holes stay), pruning small
+parts, and locking open edges in the whole model (keeps the cells but lands at 34k and 73k
+triangles, 558 kB and 1.27 MB). Locking open edges only in the array materials kept the cells
+but still thinned the grid inside a panel, so ICESat-2's panels showed see-through wedges when
+close.
+
+What shipped: a build step that leaves the array materials as they are and simplifies the rest
+as before (`keep`, `scripts/craft-simplify.mjs`): Fermi `GPMcore-SolarFaces*`, ICESat-2
+`ICESAT2-Solar*`. Rendered close on a real GPU against the unsimplified source, the arrays match
+it. `aim` is still a share of the whole model's triangles, but only the other materials are
+simplified, so they are reduced as much as for any model and the kept arrays come on top. The
+owner chose a bigger budget over a cell-merging step:
+
+| Model   | Source file (SHA-256 prefix)                                              | Raw         | Built     | Triangles (source, built, budget) | Shown for (scope)         | Credit                     |
+| ------- | ------------------------------------------------------------------------- | ----------- | --------- | --------------------------------- | ------------------------- | -------------------------- |
+| fermi   | `Fermi Gamma-ray Large Area Space Telescope.glb` d345f3b0                 | 1,379,016 B | 413,640 B | 172,788, 24,994, 26,000           | FGRST (GLAST) 33053 (own) | NASA/Christopher R. Meaney |
+| icesat2 | `Ice, Clouds, and Land Elevation Satellite-2 (ICESat-2) (A).glb` e7d260d6 | 1,499,504 B | 805,664 B | 201,656, 41,655, 42,000           | ICESAT-2 43613 (own)      | NASA/Christopher R. Meaney |
+
+ICESat-2 is over the old 500 kB per-model budget, so `craftModelBytes` is now 850,000 B. The
+two add 1,219,304 B; the models total 7,270,268 B, under the 8,500,000 B `craftModelTotal`.
+Fermi's panel backs show dark cut-outs from behind: the source's cells are one-sided, and the
+unsimplified source looks the same. Attitude: ICESat-2 Earth-pointing placeholder; Fermi, which
+surveys the sky, `PLACEHOLDER_NONE`. Logo check: no texture images in either file; six-axis and
+close real-GPU renders show no insignia or logo.
 
 **Logo check, 2026-11-11.** Every texture image extracted and viewed, label-like areas enlarged;
 NASA's preview renders viewed where NASA has one (OCO-2, SDO, MMS, GRACE A and B, ICESat-2); every
@@ -432,8 +453,9 @@ or stay a dot.
 
 **`craftModelTotal` was raised on 2026-11-11 to 8,500,000 B** with the second batch, which took
 the shipped total from 2,671,904 B to 3,854,632 B, past the old 3,000,000 B. The third batch
-brought it to 6,050,964 B. The per-model budget
-stays **500 kB** on the uncompressed shipped file (`craftModelBytes`). Only the focused object's
+brought it to 6,050,964 B, and Fermi and ICESat-2 to 7,270,268 B. The per-model budget on the
+uncompressed shipped file (`craftModelBytes`) was **raised from 500 kB to 850 kB** on 2026-11-11
+for ICESat-2 (805,664 B), whose solar arrays are kept unsimplified. Only the focused object's
 model is ever loaded, so the total is deploy size, not a visitor's download.
 
 The baseline the plan below started from: the ten spacecraft models shipped before the gate
@@ -473,7 +495,7 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
       built, gated and registered (second batch).
 - [x] OCO-2, SORCE, SDO, SWAS, Chandra, MMS, THEMIS, CYGNSS, GRACE (for GRACE-FO), OSTM (for
       Jason-3), Sentinel-6, GPM: built, gated and registered (third batch).
-- [ ] Fermi and ICESat-2: held, their arrays need a cell-merging build step.
+- [x] Fermi and ICESat-2: shipped with their arrays kept whole (`keep`).
 - [ ] The CubeSat and Satellite Kit stand-ins (they need family lookup, not built yet).
 - [ ] Starlink (Malacodart): not downloaded or measured yet; it is the one model that could exceed
       the trial mean size.
@@ -484,7 +506,7 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
    budget, a look for logos and a visual check.
 2. NASA's guidelines don't mention modifying files; the README says "without copyright". This is
    the position we already took for the 10 craft.
-3. Only the ten craft shipped before the gate (as "unrecorded"), the twenty-two satellite models of
-   the three batches, and the two held back (Fermi, ICESat-2), are checked for logos. Every other model needs its textures viewed before it ships.
+3. Only the ten craft shipped before the gate (as "unrecorded") and the twenty-four satellite models
+   (the three batches, Fermi and ICESat-2) are checked for logos. Every other model needs its textures viewed before it ships.
 4. NASA's pages list a person or a company as "Source" (Hubble (A): DigitalSpace Corporation). The
    credit repeats it; the rights position is still the README's "free and without copyright".

@@ -35,6 +35,7 @@ import {
 } from '@gltf-transform/functions'
 import draco3d from 'draco3dgltf'
 import { MeshoptSimplifier } from 'meshoptimizer'
+import { simplifyKeeping } from './craft-simplify.mjs'
 import sharp from 'sharp'
 
 import { BUDGETS } from './check-bundle.mjs'
@@ -129,7 +130,9 @@ async function blankTextures(doc, regions) {
         .raw()
         .toBuffer({ resolveWithObject: true })
       const painted = blankRegion(data, info.width, info.height, info.channels, rect)
-      const png = await sharp(painted, { raw: { width: info.width, height: info.height, channels: info.channels } })
+      const png = await sharp(painted, {
+        raw: { width: info.width, height: info.height, channels: info.channels },
+      })
         .png()
         .toBuffer()
       texture.setImage(new Uint8Array(png)).setMimeType('image/png')
@@ -178,9 +181,11 @@ async function build(io, name, source, srcDir, outDir) {
     blank = [],
     dropNodes: dropList = [],
     plain = {},
+    keep = [],
   } = source
   const { triangles, sources } = MANIFEST[name]
-  if (sources.length !== 1) throw new Error(`${name}: expects one source file, the manifest has ${sources.length}`)
+  if (sources.length !== 1)
+    throw new Error(`${name}: expects one source file, the manifest has ${sources.length}`)
   const file = sources[0].file
   const started = Date.now()
   const doc = dropExternalImages
@@ -194,10 +199,17 @@ async function build(io, name, source, srcDir, outDir) {
   await doc.transform(dedup(), weld())
   if (minPart > 0) pruneSmallComponents(doc, minPart)
   const ratio = Math.min(1, (aim ?? triangles) / Math.max(1, triangleCount(doc)))
+  // error is a share of the model's size: 2% is invisible at the ~150 px a focused
+  // craft draws at, and lets the simplifier reach the budget.
+  if (keep.length > 0) {
+    // Solar arrays built of cell quads are kept whole (craft-simplify.mjs).
+    await simplifyKeeping(doc, { simplifier: MeshoptSimplifier, ratio, error, keep })
+  } else {
+    await doc.transform(
+      simplify({ simplifier: MeshoptSimplifier, ratio, error, lockBorder: false }),
+    )
+  }
   await doc.transform(
-    // error is a share of the model's size: 2% is invisible at the ~150 px a focused
-    // craft draws at, and lets the simplifier reach the budget.
-    simplify({ simplifier: MeshoptSimplifier, ratio, error, lockBorder: false }),
     prune(),
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEXTURE_SIZE, TEXTURE_SIZE] }),
     quantize(),
@@ -249,7 +261,11 @@ async function buildNewHorizons(io, srcDir, outDir) {
       .setType('VEC3')
       .setArray(readStl(join(srcDir, file)))
       .setBuffer(buffer)
-    const material = doc.createMaterial().setBaseColorFactor(colour).setMetallicFactor(0.3).setRoughnessFactor(0.6)
+    const material = doc
+      .createMaterial()
+      .setBaseColorFactor(colour)
+      .setMetallicFactor(0.3)
+      .setRoughnessFactor(0.6)
     const prim = doc.createPrimitive().setAttribute('POSITION', positions).setMaterial(material)
     const node = doc.createNode(file).setMesh(doc.createMesh(file).addPrimitive(prim))
     node.setTranslation(translation)
@@ -265,13 +281,20 @@ async function buildNewHorizons(io, srcDir, outDir) {
   await doc.transform(dedup(), weld())
   const before = triangleCount(doc)
   await doc.transform(
-    simplify({ simplifier: MeshoptSimplifier, ratio: Math.min(1, MANIFEST['new-horizons'].triangles / before), error: SIMPLIFY_ERROR, lockBorder: false }),
+    simplify({
+      simplifier: MeshoptSimplifier,
+      ratio: Math.min(1, MANIFEST['new-horizons'].triangles / before),
+      error: SIMPLIFY_ERROR,
+      lockBorder: false,
+    }),
     prune(),
     quantize(),
   )
   const out = join(outDir, 'new-horizons.glb')
   await io.write(out, doc)
-  console.log(`new-horizons: 3 STL parts, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B`)
+  console.log(
+    `new-horizons: 3 STL parts, ${before} tris -> ${triangleCount(doc)} tris, ${statSync(out).size} B`,
+  )
   return triangleCount(doc)
 }
 
@@ -306,7 +329,9 @@ async function main() {
         if (pinned) {
           const actual = sha256Hex(readFileSync(join(OUT, `${name}.glb`)))
           if (actual !== pinned) {
-            console.warn(`${name}: output sha256 ${actual} differs from the manifest's outputSha256 ${pinned}; update the manifest`)
+            console.warn(
+              `${name}: output sha256 ${actual} differs from the manifest's outputSha256 ${pinned}; update the manifest`,
+            )
             process.exitCode = 1
           }
         }

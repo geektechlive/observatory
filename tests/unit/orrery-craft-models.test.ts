@@ -7,6 +7,9 @@ import { SPACECRAFT } from '@/lib/orrery/craft'
 import { attitudeDirection, CRAFT_MODELS, craftModelFor } from '@/lib/orrery/craftModels'
 import { SATELLITE_MODELS_BY_FAMILY, SATELLITE_MODELS_BY_NORAD } from '@/lib/orrery/modelDescriptor'
 
+// @ts-expect-error plain ESM script, no type declarations
+import { BUDGETS } from '../../scripts/check-bundle.mjs'
+
 const PUBLIC = resolve(__dirname, '../../public')
 const MODEL_DIR = resolve(PUBLIC, 'models/craft')
 
@@ -85,9 +88,11 @@ describe('spacecraft models (#115)', () => {
     expect(directive('img-src')).toContain('blob:')
   })
 
-  it('keeps every model under 500 kB', () => {
+  it('keeps every model within the per-model budget', () => {
     for (const file of readdirSync(MODEL_DIR)) {
-      expect(readFileSync(resolve(MODEL_DIR, file)).length, file).toBeLessThan(500_000)
+      expect(readFileSync(resolve(MODEL_DIR, file)).length, file).toBeLessThanOrEqual(
+        BUDGETS.craftModelBytes,
+      )
     }
   })
 })

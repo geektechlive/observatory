@@ -72,4 +72,7 @@ export const SOURCES = {
   jason2: {},
   sentinel6: {},
   gpm: { aim: 9_800, minPart: 0.005 },
+  // Their solar arrays are hundreds of cell quads: kept whole (craft-simplify.mjs).
+  fermi: { aim: 14_000, keep: ['GPMcore-SolarFaces'] },
+  icesat2: { aim: 14_000, keep: ['ICESAT2-Solar'] },
 }

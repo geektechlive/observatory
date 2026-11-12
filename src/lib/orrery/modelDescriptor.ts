@@ -235,6 +235,19 @@ const BATCH3_MODELS: SatelliteModelTable = {
   '40059': nasaSatellite(
     batch3('oco2', `${RES}/orbiting-carbon-observatory-oco-2/`, MEANEY, PLACEHOLDER_EARTH),
   ),
+  // ICESat-2 and Fermi keep their solar arrays whole at build time (craft-simplify.mjs).
+  '43613': nasaSatellite(
+    batch3(
+      'icesat2',
+      `${RES}/ice-clouds-and-land-elevation-satellite-2-icesat-2-a/`,
+      MEANEY,
+      PLACEHOLDER_EARTH,
+    ),
+  ),
+  // FGRST (GLAST): Fermi surveys the sky, so neither Earth- nor Sun-pointing.
+  '33053': nasaSatellite(
+    batch3('fermi', `${RES}/fermi-gamma-ray-large-area-space-telescope/`, MEANEY, PLACEHOLDER_NONE),
+  ),
   // SORCE and SDO have no page on science.nasa.gov: credit NASA, source the repository folder.
   '27651': nasaSatellite(
     batch3(
