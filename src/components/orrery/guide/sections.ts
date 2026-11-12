@@ -6,7 +6,7 @@
  */
 import type { GlossaryId } from '@/lib/orrery/glossary'
 
-export type Tone = 'cyan' | 'amber' | 'red' | 'bone' | 'faint' | 'comet' | 'interstellar'
+export type Tone = 'cyan' | 'amber' | 'red' | 'bone' | 'faint' | 'comet' | 'interstellar' | 'dwarf'
 
 export type Block =
   | { kind: 'p'; text: string }
@@ -85,6 +85,11 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
+        // Coverage checked against Horizons 2026-11-12 (docs/reference/orrery-data.md).
+        text: 'The Dwarf planets switch draws Pluto, Ceres, Eris, Makemake and Haumea. It starts off, so nothing extra loads; a link that names one turns it on. Each position comes from JPL Horizons. Pluto is placed at the centre of mass it shares with its moon Charon, its barycentre, which JPL covers for the whole span of the clock. The other four have JPL data only from 1600 to 2500: outside those years their markers hide, their orbits stay drawn, and the stage says so. The orbit line is drawn from orbital elements for one date, so far from it the marker can sit a little off the line.',
+      },
+      {
+        kind: 'p',
         text: 'When nothing matches, the “Search JPL for …” option looks the name up in JPL’s Small-Body Database, which covers any asteroid or comet. The card shows its distance from the Sun and Earth and its speed, and Show in orrery draws it and flies there. JPL is asked one request at a time, so it can take a moment.',
       },
       {
@@ -147,6 +152,11 @@ export const SECTIONS: readonly Section[] = [
             tone: 'interstellar',
             name: 'Violet',
             text: 'An interstellar object and its path, or an object you looked up at JPL.',
+          },
+          {
+            tone: 'dwarf',
+            name: 'Pale rose',
+            text: 'A dwarf planet, with its orbit line.',
           },
           {
             tone: 'faint',

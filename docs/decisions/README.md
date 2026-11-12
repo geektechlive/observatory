@@ -30,3 +30,4 @@ that makes the decision.
 | [0020](0020-models-ship-through-a-gate.md)                    | A 3D model ships only through the asset gate: licence evidence, a logo check and a budget | #202           |
 | [0021](0021-the-detail-view-has-its-own-canvas.md)            | The close-up model view has a canvas and renderer of its own, and the orrery steps aside  | #203           |
 | [0022](0022-visitors-see-only-the-sources-the-orrery-uses.md) | Visitors see only the sources the orrery uses; the full registry lives in docs            | #207           |
+| [0023](0023-optional-orrery-data-has-its-own-key.md)          | Optional orrery data gets its own key, so only the visitors who ask for it pay            | #99            |

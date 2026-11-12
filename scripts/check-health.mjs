@@ -119,6 +119,15 @@ export const CHECKS = [
       b.interstellar.length > 0 &&
       b.interstellar.every((x) => typeof x?.elements?.e === 'number'),
   },
+  // The orrery's dwarf planets (#99 item 8): KV-only, their own key, written by the refresh job.
+  {
+    path: '/api/orrery-dwarfs',
+    requires: 'a non-empty dwarfs array, each with its sampled span',
+    check: (b) =>
+      Array.isArray(b?.dwarfs) &&
+      b.dwarfs.length > 0 &&
+      b.dwarfs.every((x) => Array.isArray(x?.coarse?.samples)),
+  },
   // On-demand lookup (#100): JPL through the jpl-queue Durable Object. A fixed past span
   // is cached for a day, so most runs never reach JPL. Until the Worker is deployed and
   // bound, the endpoint says "not set up" (X-Not-Configured), which only warns.

@@ -33,10 +33,15 @@ export const PX_CEILING = {
   satReentry: 9,
   /** A comet or an interstellar object (#99): a point, never a disc. */
   smallBody: 5,
+  /** A dwarf planet (#99 item 8): a little more than a comet, still far under the Sun. */
+  dwarf: 6,
 } as const
 
 /** A comet or interstellar object (#99) never draws smaller than this, px; its ceiling is `PX_CEILING.smallBody`. */
 export const SMALL_BODY_MIN_PX = 3
+
+/** A dwarf planet (#99 item 8) never draws smaller than this, px; its ceiling is `PX_CEILING.dwarf`. */
+export const DWARF_MIN_PX = 4
 
 /** The focused craft's model: never bigger than this share of the Sun's drawn radius. */
 const MODEL_SUN_SHARE = 0.9

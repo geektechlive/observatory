@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { isDwarfFocus } from '@/lib/orrery/dwarfs'
 import { lookupSpkid } from '@/lib/orrery/lookupTrack'
 import { isSmallBodyKey } from '@/lib/orrery/smallBodyView'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
@@ -40,11 +41,12 @@ interface LinkOptions {
   requestLookup: (spkid: string) => void
   lookupFailed: boolean
   /**
-   * Comets and the interstellar objects (`sbc:<SPK-ID>`, #99) load only when asked. A link
-   * to such a key the catalog lacks asks for them and waits until they have answered
-   * (`settled`). No other key asks.
+   * Comets, the interstellar objects and the dwarf planets (`sbc:<SPK-ID>`, #99) load only
+   * when asked. A link to such a key the catalog lacks, or to a dwarf planet by name
+   * (`focus=pluto`), asks for them and waits until they have answered (`settled`): the
+   * comets' payload or the dwarf planets' own, whichever the focus needs. No other focus asks.
    */
-  smallBodies?: { request: () => void; settled: boolean } | undefined
+  smallBodies?: { request: (focus: string) => void; settled: boolean } | undefined
   /**
    * A link to a satellite (`sat:<NORAD id>`, #158) opens the Earth orbit view, waits for
    * its group, and widens to every group once if it isn't in the loaded ones (see
@@ -202,8 +204,10 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
       key = want.focus === null ? null : resolveFocus(want.focus, catalog)
       if (spkid === null && want.focus !== null && key === null && !settled) return // still loading
       const small = latest.current.smallBodies
-      if (key === null && small && want.focus !== null && isSmallBodyKey(want.focus)) {
-        small.request()
+      const wantsSmall =
+        want.focus !== null && (isSmallBodyKey(want.focus) || isDwarfFocus(want.focus))
+      if (key === null && small && want.focus !== null && wantsSmall) {
+        small.request(want.focus)
         if (!small.settled) return
       }
     }

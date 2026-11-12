@@ -5,18 +5,17 @@
  * in the list, marked: "no data for this date" is an answer, not an absence.
  */
 import { shortName } from '@/lib/orrery/asteroids'
+import { entryState, type OrreryEntry, type OrreryEntryGroup } from '@/lib/orrery/dwarfView'
 import { PLANETS } from '@/lib/orrery/elements'
 import { stateAt } from '@/lib/orrery/ephemeris'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { ISS_NORAD_ID, satKey } from '@/lib/orrery/satView'
-import {
-  type SmallBodyEntry,
-  type SmallBodyGroup,
-  smallBodyState,
-} from '@/lib/orrery/smallBodyView'
 import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
-/** 'lookup': an object looked up at JPL and shown (#145). 'smallbody': a comet or interstellar object (#99). */
+/**
+ * 'lookup': an object looked up at JPL and shown (#145). 'smallbody': a comet or
+ * interstellar object (#99). 'dwarf': a dwarf planet (#99 item 8).
+ */
 export type CatalogKind =
   | 'star'
   | 'planet'
@@ -28,6 +27,7 @@ export type CatalogKind =
   | 'satellite'
   | 'lookup'
   | 'smallbody'
+  | 'dwarf'
 
 export interface CatalogItem {
   /** A planet's name, or a namespaced id for the Moon and craft (`naif:-31`). */
@@ -90,23 +90,25 @@ export function noDataNotice(items: readonly CatalogItem[]): string | null {
   return `${list ?? ''} have no data for this date and are hidden. ${tail}`
 }
 
-const SMALL_BODY_GROUP: Record<SmallBodyGroup, string> = {
+const SMALL_BODY_GROUP: Record<OrreryEntryGroup, string> = {
   comets: 'Comets',
   interstellar: 'Interstellar objects',
+  dwarfs: 'Dwarf planets',
 }
 
 /**
- * Comets and the interstellar objects (#99), once /api/orrery-smallbodies has answered.
- * Not counted by noDataNotice: a comet's ±30 days of samples run out within seconds of
- * a fast scrub, and the stage would say so all the time.
+ * Comets, the interstellar objects and the dwarf planets (#99), once
+ * /api/orrery-smallbodies has answered. Not counted by noDataNotice: a comet's ±30 days
+ * of samples run out within seconds of a fast scrub, and the stage would say so all the
+ * time; the dwarf planets have their own line (dwarfNotice in dwarfView.ts).
  */
-export function smallBodyCatalog(entries: readonly SmallBodyEntry[], jd: number): CatalogItem[] {
+export function smallBodyCatalog(entries: readonly OrreryEntry[], jd: number): CatalogItem[] {
   return entries.map((e) => ({
     key: e.key,
     label: e.label,
-    kind: 'smallbody',
+    kind: e.group === 'dwarfs' ? 'dwarf' : 'smallbody',
     group: SMALL_BODY_GROUP[e.group],
-    available: smallBodyState(e.body, jd) !== null,
+    available: entryState(e, jd) !== null,
   }))
 }
 

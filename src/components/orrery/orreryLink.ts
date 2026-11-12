@@ -5,9 +5,9 @@
  *   It is clamped to the planet tables' range. A link with `t` opens paused there.
  * - `focus` is a catalog key: `Sun` and the planets by name, craft, Earth's Moon and the
  *   other moons as `naif:<id>` (NAIF ids, which never change), close-approach asteroids
- *   as `sb:<number or designation>`, comets and the interstellar objects as
- *   `sbc:<SPK-ID>` (#99), and `L1`. On reading, a name works too, ignoring
- *   case, with `-` or `_` for spaces (`focus=voyager-1`).
+ *   as `sb:<number or designation>`, comets, the interstellar objects and the dwarf
+ *   planets as `sbc:<SPK-ID>` (#99), and `L1`. On reading, a name works too, ignoring
+ *   case, with `-` or `_` for spaces (`focus=voyager-1`, `focus=pluto`).
  * - `preset` is one of the View buttons. With a focus too, the camera is on the preset
  *   and the inspector is open on the focus (choosing a preset keeps the selection).
  * - `detail=1` opens the "Look closer" model view on the focus (#203). Without a focus,

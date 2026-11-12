@@ -217,6 +217,12 @@
   background: var(--data-space-emit);
 }
 
+/* Dwarf planets (#99 item 8). */
+.dot[data-tone='dwarf'] {
+  border-color: var(--data-dwarf);
+  background: var(--data-dwarf);
+}
+
 .terms {
   margin: var(--space-2) 0;
 }

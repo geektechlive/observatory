@@ -624,6 +624,10 @@
   color: var(--data-space-emit);
 }
 
+.dwarfLabel {
+  color: var(--data-dwarf);
+}
+
 /* The four impact terms (#92, spec Part 12): each yes or no, with what it means. */
 .terms {
   margin: 0;

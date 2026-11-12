@@ -39,6 +39,17 @@ describe('the guide reference sections (#159)', () => {
     expect(text).toContain('without knowing its name')
   })
 
+  it('explains the Dwarf planets switch, its coverage and its colour (#99 item 8)', () => {
+    const finding = SECTIONS.find((s) => s.id === 'finding')
+    const text = finding ? sectionText(finding) : ''
+    expect(text).toContain('Dwarf planets')
+    expect(text).toContain('1600 to 2500')
+    expect(text).toContain('barycentre')
+    const colours = SECTIONS.find((s) => s.id === 'colours')
+    const tones = colours?.blocks.flatMap((b) => (b.kind === 'marks' ? b.items : []))
+    expect(tones?.some((t) => t.tone === 'dwarf')).toBe(true)
+  })
+
   it('gives every data source a link, what it gives and how fresh it is', () => {
     const known = new Set(SOURCES.map((s) => s.id))
     expect(DATA_SOURCES.length).toBeGreaterThanOrEqual(8)

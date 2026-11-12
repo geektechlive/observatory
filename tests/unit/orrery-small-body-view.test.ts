@@ -196,6 +196,7 @@ describe('scene keys', () => {
       provider: 'jpl-horizons' as const,
       comets: [base],
       interstellar: [oumuamua],
+      dwarfs: [],
       missing: [],
     }
     expect(smallBodyEntries(data).map((e) => e.key)).toEqual(['sbc:1004119', 'sbc:50788063'])

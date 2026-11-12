@@ -45,6 +45,7 @@ import type { BodyName } from '@/lib/orrery/bodies'
 import { threeQuarterView } from '@/lib/orrery/craftModelFit'
 import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
+import type { OrreryEntry } from '@/lib/orrery/dwarfView'
 import {
   CAMERA_NEAR,
   cameraMinDistance,
@@ -56,7 +57,7 @@ import {
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
 import { ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
-import { lookupTwinKey, type SmallBodyEntry } from '@/lib/orrery/smallBodyView'
+import { lookupTwinKey } from '@/lib/orrery/smallBodyView'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
@@ -84,7 +85,7 @@ import { loadGltfScene } from './gltfLoad'
 import { type LookupData, LookupLayer } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
-import { clampRadius, craftModelPx, PX_CEILING, SMALL_BODY_MIN_PX } from './pxClamp'
+import { clampRadius, craftModelPx, DWARF_MIN_PX, PX_CEILING, SMALL_BODY_MIN_PX } from './pxClamp'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
 import { type SmallBodyGroups, SmallBodyLayer } from './smallBodyLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
@@ -115,8 +116,8 @@ export interface ProjectedBody {
    * 'ring': the heliopause marker's label anchor (#93), not a body. 'asteroid': a close
    * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92). 'satellite': the
    * chosen satellite (#98); the others have no labels. 'lookup': an object looked up at
-   * JPL and shown (#145). 'smallbody': a comet or interstellar object (#99), its group
-   * in `group`.
+   * JPL and shown (#145). 'smallbody': a comet, interstellar object or dwarf planet
+   * (#99), its group in `group`.
    */
   kind:
     | 'body'
@@ -489,8 +490,10 @@ export class OrreryRenderer {
     if (this.sats.marker.visible)
       this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX, PX_CEILING.satMarker)
     if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
-    for (const s of this.small.visible())
-      this.floorPx(s.mesh, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)
+    for (const s of this.small.visible()) {
+      if (s.group === 'dwarfs') this.floorPx(s.mesh, DWARF_MIN_PX, PX_CEILING.dwarf)
+      else this.floorPx(s.mesh, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)
+    }
     for (const ring of this.sats.flagRings())
       this.floorPx(ring, SAT_REENTRY_MIN_PX, PX_CEILING.satReentry)
     for (const c of this.craft.visible()) {
@@ -549,7 +552,18 @@ export class OrreryRenderer {
       asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
       satMarker: this.sats.marker.visible ? px(this.sats.marker) : null,
       satReentry: maxOf(this.sats.flagRings()),
-      smallBody: maxOf(this.small.visible().map((s) => s.mesh)),
+      smallBody: maxOf(
+        this.small
+          .visible()
+          .filter((s) => s.group !== 'dwarfs')
+          .map((s) => s.mesh),
+      ),
+      dwarf: maxOf(
+        this.small
+          .visible()
+          .filter((s) => s.group === 'dwarfs')
+          .map((s) => s.mesh),
+      ),
     })
   }
 
@@ -886,14 +900,14 @@ export class OrreryRenderer {
     this.markDirty()
   }
 
-  /** Comets and the interstellar objects from /api/orrery-smallbodies (#99). */
-  setSmallBodies(entries: readonly SmallBodyEntry[]): void {
+  /** Comets and the interstellar objects (/api/orrery-smallbodies) and the dwarf planets (/api/orrery-dwarfs), #99. */
+  setSmallBodies(entries: readonly OrreryEntry[]): void {
     const followed = this.focusBody !== null && this.small.has(this.focusBody)
     this.small.set(entries)
     this.afterSmallChange(followed)
   }
 
-  /** The "Comets & interstellar" switches (#99). */
+  /** The "Comets & interstellar" switches and the "Dwarf planets" switch (#99). */
   setSmallBodyGroups(groups: SmallBodyGroups): void {
     const followed = this.focusBody !== null && this.small.has(this.focusBody)
     this.small.setGroups(groups)

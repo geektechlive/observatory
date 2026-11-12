@@ -26,6 +26,7 @@ import {
   PLANETS,
   rangeRateKmS,
 } from '@/lib/orrery'
+import { dwarfNotice, type OrreryEntryGroup } from '@/lib/orrery/dwarfView'
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import { modelForKey } from '@/lib/orrery/modelDescriptor'
 import { moonBodies } from '@/lib/orrery/moonState'
@@ -42,6 +43,7 @@ import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DetailLoading } from './DetailLoading'
 import { DETAIL_VIEW_ID } from './detailViewId'
+import { DwarfControls } from './DwarfControls'
 import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
 import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
@@ -154,6 +156,12 @@ const NO_TRACKS: readonly OrreryTrack[] = []
 const NO_MOONS: readonly OrreryMoon[] = []
 const NO_GROUP_STATES: SatViewState['groups'] = {}
 const NO_NAMES: Readonly<Record<string, string>> = {}
+/** Each small-body group's label ink (#99): comets ice blue, visitors violet, dwarfs rose. */
+const LABEL_CLASS: Record<OrreryEntryGroup, string | undefined> = {
+  comets: styles.cometLabel,
+  interstellar: styles.interstellarLabel,
+  dwarfs: styles.dwarfLabel,
+}
 const VOICE_EMPTY: VoiceInput = {
   quakes: LOADING,
   kp: LOADING,
@@ -806,6 +814,8 @@ export function OrreryPage() {
   const outOfRange = heliocentric('Earth', jdNow)
   // Craft and moons outside their data spans hide; the stage says so (#114).
   const noData = bodies.status === 'success' ? noDataNotice(catalog) : null
+  // Dwarf planets outside their JPL span (#99 item 8): marker hidden, orbit still drawn.
+  const dwarfHidden = small.groups.dwarfs ? dwarfNotice(small.entries, jdNow) : null
   // Satellites past ±3 days of their orbit data are hidden (#98); said while they'd show.
   const satHidden =
     satState && satState.mode !== 'hidden'
@@ -868,11 +878,20 @@ export function OrreryPage() {
         craftStatus={craftStatus}
         dsnCount={craftTracks.filter((t) => dsnIds.has(t.naifId)).length}
         smallBodies={
-          <SmallBodyControls
-            groups={small.groups}
-            onGroups={small.setGroups}
-            status={small.status}
-          />
+          <>
+            <DwarfControls
+              on={small.groups.dwarfs}
+              onChange={(dwarfs) => {
+                small.setGroups({ ...small.groups, dwarfs })
+              }}
+              status={small.dwarfStatus}
+            />
+            <SmallBodyControls
+              groups={small.groups}
+              onGroups={small.setGroups}
+              status={small.status}
+            />
+          </>
         }
         nearEarth={
           <NeoControls
@@ -1066,7 +1085,7 @@ export function OrreryPage() {
                 if (el) labelNodes.current.set(e.key, el)
                 else labelNodes.current.delete(e.key)
               }}
-              className={`${styles.label ?? ''} ${(e.group === 'comets' ? styles.cometLabel : styles.interstellarLabel) ?? ''}`}
+              className={`${styles.label ?? ''} ${LABEL_CLASS[e.group] ?? ''}`}
               aria-pressed={selected === e.key}
               onClick={() => {
                 select(e.key)
@@ -1114,6 +1133,11 @@ export function OrreryPage() {
           {!failed && noData && (
             <p className={styles.notice ?? ''} role="status" data-orrery-nodata="">
               {noData}
+            </p>
+          )}
+          {!failed && dwarfHidden && (
+            <p className={styles.notice ?? ''} role="status" data-orrery-dwarf-notice="">
+              {dwarfHidden}
             </p>
           )}
           {!failed && satHidden && (

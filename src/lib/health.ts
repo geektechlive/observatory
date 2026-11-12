@@ -36,6 +36,7 @@ export type SourceName =
   | 'neo'
   | 'nws'
   | 'orrery-bodies'
+  | 'orrery-dwarfs'
   | 'orrery-neo'
   | 'orrery-sats'
   | 'orrery-smallbodies'
@@ -159,6 +160,15 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: true,
     maxAgeMs: 72 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'bodies'),
+  },
+  'orrery-dwarfs': {
+    // Not headline: fetched only when the Dwarf planets switch or a link asks (#99 item 8),
+    // so no view always shows it (ADR 0018). Pluto's span covers the whole clock and the
+    // job keeps a body's last span when JPL fails, so an empty list is a fault.
+    label: 'Orrery Dwarf Planets',
+    headline: false,
+    maxAgeMs: 72 * HOUR,
+    required: (data) => nonEmptyArrayField(data, 'dwarfs'),
   },
   'orrery-neo': {
     // Headline for the orrery view only (#92, #178). CAD finds dozens of objects inside

@@ -3,17 +3,21 @@ import { join } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
+import { DWARFS } from '@/lib/orrery/dwarfs'
+
 import {
   classifyFailure,
   describePayload,
   fetchWithRetry,
   isValidLaunchesPayload,
   KEY_ORRERY_BODIES,
+  KEY_ORRERY_DWARFS,
   KEY_ORRERY_NEO,
   KEY_ORRERY_SMALLBODIES,
   kvPutInit,
   parseTle,
   refreshOrreryBodies,
+  refreshOrreryDwarfs,
   refreshOrreryNeo,
   refreshOrrerySmallBodies,
   tleChecksumOk,
@@ -469,5 +473,80 @@ describe('refreshOrrerySmallBodies (#99)', () => {
     const b = await refreshOrrerySmallBodies(null, { ...failing, previousText: old })
     expect(b.entry.ok).toBe(false)
     expect(b.entry.detail).toMatch(/refresh:orrery-smallbodies/)
+  })
+})
+
+describe('refreshOrreryDwarfs (#99 item 8)', () => {
+  const NOW = Date.UTC(2026, 10, 12, 4)
+  const HEADER = readFileSync(
+    join(__dirname, '..', 'fixtures', 'smallbodies', 'horizons-3i.txt'),
+    'utf8',
+  ).split('$$SOE')[0]
+  const deps = (overrides: Record<string, unknown> = {}) => ({
+    now: NOW,
+    previousText: null,
+    pauseMs: 0,
+    fetchHorizonsText: (url: string) => {
+      const p = new URL(url).searchParams
+      const start = Number((p.get('START_TIME') ?? '').replace(/'|JD/g, ''))
+      const stop = Number((p.get('STOP_TIME') ?? '').replace(/'|JD/g, ''))
+      const step = Number.parseFloat((p.get('STEP_SIZE') ?? '').replace(/'/g, ''))
+      const n = Math.floor((stop - start) / step) + 1
+      const rows = Array.from(
+        { length: n },
+        (_, i) => `${String(start + i * step)}, A.D. x, 40, 1, 0, 0, 0, 0,`,
+      )
+      const target = DWARFS.find((d) => `'${d.command}'` === p.get('COMMAND'))?.target ?? '?'
+      const head = (HEADER ?? '').replace(
+        /^Target body name:.*$/m,
+        `Target body name: ${target}   {source: JPL#1}`,
+      )
+      return Promise.resolve(`${head}$$SOE\n${rows.join('\n')}\n$$EOE\n`)
+    },
+    ...overrides,
+  })
+
+  it('writes its own key, apart from the comets, with its counts as KV metadata', async () => {
+    const { entry, write } = await refreshOrreryDwarfs(null, deps())
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(false)
+    expect(entry.detail).toMatch(/refresh:orrery-dwarfs 5 dwarf planets, 5 JPL requests/)
+    expect(KEY_ORRERY_DWARFS).toBe('horizons:dwarfs:v1')
+    expect(KEY_ORRERY_DWARFS).not.toBe(KEY_ORRERY_SMALLBODIES)
+    expect(write.key).toBe(KEY_ORRERY_DWARFS)
+    expect(write.metadata).toEqual({
+      fetchedAt: new Date(NOW).toISOString(),
+      dwarfs: 5,
+      missing: 0,
+    })
+  })
+
+  it("reuses the last copy's spans for a day", async () => {
+    const first = await refreshOrreryDwarfs(null, deps())
+    let asked = 0
+    const counting = deps()
+    const second = await refreshOrreryDwarfs(null, {
+      ...counting,
+      now: NOW + 6 * HOUR,
+      previousText: first.write.value,
+      fetchHorizonsText: (url: string) => {
+        asked += 1
+        return counting.fetchHorizonsText(url)
+      },
+    })
+    expect(second.entry.ok).toBe(true)
+    expect(asked).toBe(0)
+  })
+
+  it('judges a total failure by the age of the copy it would replace (72 h)', async () => {
+    const failing = deps({ fetchHorizonsText: () => Promise.reject(new Error('HTTP 503')) })
+    const young = JSON.stringify({ generatedAt: new Date(NOW - 50 * HOUR).toISOString() })
+    const old = JSON.stringify({ generatedAt: new Date(NOW - 80 * HOUR).toISOString() })
+    const a = await refreshOrreryDwarfs(null, { ...failing, previousText: young })
+    expect(a.entry.ok).toBe(true)
+    expect(a.write).toBeUndefined()
+    const b = await refreshOrreryDwarfs(null, { ...failing, previousText: old })
+    expect(b.entry.ok).toBe(false)
+    expect(b.entry.detail).toMatch(/refresh:orrery-dwarfs/)
   })
 })

@@ -108,8 +108,11 @@ export async function fetchSpan(spec, startJd, stopJd, step, ask, now) {
   throw new Error(`still outside the ephemeris after ${String(MAX_ATTEMPTS)} attempts`)
 }
 
-/** Uniform samples as one flat array; the step comes from the data itself. */
-export function toSpan(samples, withVelocity) {
+/**
+ * Uniform samples as one flat array; the step comes from the data itself. Positions at
+ * `decimals` (8, 1.5 km, unless a caller needs less: the dwarf planets keep 6).
+ */
+export function toSpan(samples, withVelocity, decimals = POSITION_DECIMALS) {
   const first = samples[0]
   const second = samples[1]
   const step = second ? round(second.jd - first.jd, 9) : 1
@@ -120,7 +123,7 @@ export function toSpan(samples, withVelocity) {
   }
   const flat = []
   for (const s of samples) {
-    flat.push(round(s.x, POSITION_DECIMALS), round(s.y, POSITION_DECIMALS), round(s.z, POSITION_DECIMALS))
+    flat.push(round(s.x, decimals), round(s.y, decimals), round(s.z, decimals))
     if (withVelocity) {
       flat.push(round(s.vx, VELOCITY_DECIMALS), round(s.vy, VELOCITY_DECIMALS), round(s.vz, VELOCITY_DECIMALS))
     }

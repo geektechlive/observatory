@@ -7,8 +7,10 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { SmallBodyLayer } from '@/components/orrery/three/smallBodyLayer'
+import { dwarfEntries } from '@/lib/orrery/dwarfView'
 import { place3d } from '@/lib/orrery/scale'
 import { type SmallBodyEntry, smallBodyPath, smallBodyState } from '@/lib/orrery/smallBodyView'
+import type { OrreryDwarfs } from '@/schemas/orreryDwarfs'
 import type { OrrerySmallBody } from '@/schemas/orrerySmallBodies'
 
 const toScene = (p: { x: number; y: number; z: number }) => {
@@ -67,7 +69,7 @@ const entries: SmallBodyEntry[] = [
   { key: comet.id, label: comet.name, group: 'comets', body: comet },
   { key: visitor.id, label: visitor.name, group: 'interstellar', body: visitor },
 ]
-const BOTH = { comets: true, interstellar: true }
+const BOTH = { comets: true, interstellar: true, dwarfs: false }
 
 function layer() {
   const l = new SmallBodyLayer()
@@ -104,7 +106,7 @@ describe('SmallBodyLayer (#99)', () => {
 
   it('switches each group on and off', () => {
     const l = layer()
-    l.setGroups({ comets: false, interstellar: true })
+    l.setGroups({ comets: false, interstellar: true, dwarfs: false })
     l.place(START + 10, toScene, 'exaggerated')
     expect(l.position(comet.id)).toBeNull()
     expect(l.pathPoints(comet.id)).toBe(0)
@@ -138,6 +140,44 @@ describe('SmallBodyLayer (#99)', () => {
     l.placeNear((helio) => (helio.x > 1 ? new Vector3(9, 9, 9) : null))
     expect(l.position(comet.id)?.x).toBe(9)
     expect(l.helio(comet.id)?.x).toBeCloseTo(2.1, 6)
+  })
+
+  it('draws a dwarf planet as a third group: its marker on the span, its line always', () => {
+    // A span from 2000 to 2050, so 1000 AD is outside it.
+    const span = { start: 2451544.5, step: 1826, samples: [] as number[] }
+    for (let k = 0; k < 11; k += 1) span.samples.push(2.7, 0.1 * k, 0)
+    const ceres = dwarfEntries({
+      dwarfs: [
+        {
+          id: 'sb:20000001',
+          spkid: '20000001',
+          name: 'Ceres',
+          target: '1 Ceres (A801 AA)',
+          availableFrom: null,
+          availableTo: null,
+          coarse: span,
+        },
+      ],
+    } as unknown as OrreryDwarfs)
+    const l = new SmallBodyLayer()
+    l.set([...entries, ...ceres])
+    l.setGroups({ comets: false, interstellar: false, dwarfs: true })
+    l.place(2451544.5 + 100, toScene, 'exaggerated')
+    expect(l.drawn('sbc:20000001')).toBe(true)
+    expect(l.visible().map((v) => [v.key, v.group])).toEqual([['sbc:20000001', 'dwarfs']])
+    // The closed orbit from the elements: 360 points and back to the first.
+    expect(l.pathPoints('sbc:20000001')).toBe(361)
+    // 1000 AD: no marker, but the orbit line stays.
+    l.place(2086302.5, toScene, 'exaggerated')
+    expect(l.drawn('sbc:20000001')).toBe(false)
+    expect(l.position('sbc:20000001')).toBeNull()
+    expect(l.pathPoints('sbc:20000001')).toBe(361)
+    expect(l.counts()).toEqual({ drawn: 0, paths: 1 })
+    // Switched off: neither.
+    l.setGroups({ comets: false, interstellar: false, dwarfs: false })
+    l.place(2451544.5 + 100, toScene, 'exaggerated')
+    expect(l.counts()).toEqual({ drawn: 0, paths: 0 })
+    l.dispose()
   })
 
   it('disposes the lines it drops when new data replaces the old', () => {

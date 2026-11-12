@@ -6,7 +6,8 @@
 // here one request at a time, never on the request path; see orrery-bodies.mjs), and
 // /api/orrery-neo (#92: close approaches placed with Horizons, JPL Scout and ESA NEOCC;
 // see orrery-neo.mjs), and /api/orrery-smallbodies (#99: comets and the interstellar
-// objects; see orrery-smallbodies.mjs), and /api/spacetrack (#101: re-entries, the
+// objects; see orrery-smallbodies.mjs), and /api/orrery-dwarfs (#99 item 8: the dwarf
+// planets, a key of their own; see orrery-dwarfs.mjs), and /api/spacetrack (#101: re-entries, the
 // satellite catalogue, the Box Score and a few objects' element history from
 // Space-Track.org, with the owner's account; see spacetrack.mjs).
 //
@@ -30,6 +31,8 @@
 //                                            just the close-approach step (#92)
 //   ... --dry-run --only=orrery-smallbodies --smallbodies-out=/tmp/sb.json
 //                                            just the comets and interstellar objects (#99)
+//   ... --dry-run --only=orrery-dwarfs --dwarfs-out=/tmp/dwarfs.json
+//                                            just the dwarf planets (#99 item 8)
 //   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
 //   ... --dry-run --only=spacetrack --spacetrack-out=/tmp/st.json
 //                                            just Space-Track (#101); needs SPACETRACK_USER
@@ -56,6 +59,7 @@ import {
   buildOrrerySmallBodies,
   DEFAULT_BUDGET_MS as SMALLBODIES_BUDGET_MS,
 } from './orrery-smallbodies.mjs'
+import { buildOrreryDwarfs, DEFAULT_BUDGET_MS as DWARFS_BUDGET_MS } from './orrery-dwarfs.mjs'
 import { HISTORY_OBJECTS } from '../src/lib/spacetrack.ts'
 import { buildDiscos, discosToken } from './discos.mjs'
 import {
@@ -95,6 +99,11 @@ export const KEY_ORRERY_SMALLBODIES = 'horizons:smallbodies:v1'
 const SMALLBODIES_SIGNATURE = 'refresh:orrery-smallbodies'
 /** Spans run 30 days either side, so /api/orrery-smallbodies serves a copy up to 72 h old. */
 const SMALLBODIES_MAX_AGE_MS = 72 * 3_600_000
+/** The orrery's dwarf planets (#99 item 8): their own key, so the comets stay small. */
+export const KEY_ORRERY_DWARFS = 'horizons:dwarfs:v1'
+const DWARFS_SIGNATURE = 'refresh:orrery-dwarfs'
+/** Rewritten every run (spans reused for a day), so a copy past 72 h means refreshes failed. */
+const DWARFS_MAX_AGE_MS = 72 * 3_600_000
 /** Space-Track (#101): re-entries, recent decays, the Box Score; see spacetrack.mjs. */
 export const KEY_SPACETRACK_CATALOG = 'spacetrack:catalog:v1'
 /** GP_HISTORY element sets, each month asked once ever; rewritten only when it grows. */
@@ -821,6 +830,54 @@ export async function refreshOrrerySmallBodies(config, deps = {}) {
 }
 
 /**
+ * The orrery's dwarf planets (#99 item 8): one finished body plus metadata in one KV
+ * write, under a key of their own. The last copy is read back so the spans are reused
+ * for a day. A failure is judged by the copy's age.
+ */
+export async function refreshOrreryDwarfs(config, deps = {}) {
+  const now = deps.now ?? Date.now()
+  const previousText = deps.previousText ?? (await readKv(KEY_ORRERY_DWARFS, config))
+  const previous = parseJsonOrNull(previousText)
+  try {
+    const { payload, requests } = await buildOrreryDwarfs({
+      now,
+      fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
+      previous,
+      ...(deps.pauseMs === undefined ? {} : { pauseMs: deps.pauseMs }),
+      ...budgetDeps(deps),
+    })
+    const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    const detail =
+      `ok ${DWARFS_SIGNATURE} ${String(payload.dwarfs.length)} dwarf planets, ` +
+      `${String(requests)} JPL requests` +
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+    console.log(detail)
+    return {
+      entry: { signature: DWARFS_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      write: {
+        key: KEY_ORRERY_DWARFS,
+        value: JSON.stringify(payload),
+        metadata: {
+          fetchedAt: payload.generatedAt,
+          dwarfs: payload.dwarfs.length,
+          missing: payload.missing.length,
+        },
+      },
+    }
+  } catch (err) {
+    const verdict = classifyFailure({
+      err,
+      envelopeText: previous ? JSON.stringify({ fetchedAt: previous.generatedAt }) : previousText,
+      maxAgeMs: DWARFS_MAX_AGE_MS,
+      now,
+    })
+    const detail = `${DWARFS_SIGNATURE} ${verdict.detail}`
+    ;(verdict.ok ? console.warn : console.error)(detail)
+    return { entry: { ...verdict, signature: DWARFS_SIGNATURE, detail } }
+  }
+}
+
+/**
  * Space-Track (#101): the catalogue every run, the SATCAT shards once a day, and the
  * history when it gained months, each a finished body with its time in the metadata.
  * Skipped with a warning when the account isn't configured (a local run, or before the
@@ -996,6 +1053,7 @@ async function main(argv) {
   const smallOut = argv
     .find((a) => a.startsWith('--smallbodies-out='))
     ?.slice('--smallbodies-out='.length)
+  const dwarfsOut = argv.find((a) => a.startsWith('--dwarfs-out='))?.slice('--dwarfs-out='.length)
   const stOut = argv.find((a) => a.startsWith('--spacetrack-out='))?.slice('--spacetrack-out='.length)
   const discosOut = argv.find((a) => a.startsWith('--discos-out='))?.slice('--discos-out='.length)
   const config = dryRun ? null : readConfig()
@@ -1059,6 +1117,23 @@ async function main(argv) {
         console.log(
           `  saved ${KEY_ORRERY_SMALLBODIES} to ${smallOut} (${String(write.value.length)} bytes)`,
         )
+      }
+    }
+  }
+
+  // After the comet step, never beside it: JPL takes one request at a time.
+  if (!only || only === 'orrery-dwarfs') {
+    const began = Date.now()
+    const { entry, write } = await refreshOrreryDwarfs(config, {
+      budgetMs: stepBudget(DWARFS_BUDGET_MS, deadline),
+    })
+    console.log(`  ${DWARFS_SIGNATURE} took ${String(Math.round((Date.now() - began) / 1000))} s`)
+    report.push(entry)
+    if (write) {
+      writes.push({ ...write, entry })
+      if (dryRun && dwarfsOut) {
+        await writeFile(dwarfsOut, write.value)
+        console.log(`  saved ${KEY_ORRERY_DWARFS} to ${dwarfsOut} (${String(write.value.length)} bytes)`)
       }
     }
   }

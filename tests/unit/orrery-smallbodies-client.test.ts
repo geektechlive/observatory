@@ -4,6 +4,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { fetchOrreryDwarfsEnvelope } from '@/lib/api/orreryDwarfs'
 import { fetchOrrerySmallBodiesEnvelope } from '@/lib/api/orrerySmallBodies'
 
 function mockFetch(status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -88,11 +89,55 @@ describe('fetchOrrerySmallBodiesEnvelope', () => {
     expect((await fetchOrrerySmallBodiesEnvelope()).degraded).toBe(true)
   })
 
+  it('never carries the dwarf planets: they have their own endpoint (#99 item 8)', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { ...PAYLOAD, dwarfs: [{ id: 'sb:20134340' }] }))
+    expect('dwarfs' in (await fetchOrrerySmallBodiesEnvelope()).data).toBe(false)
+  })
+
   it('rejects a payload that breaks the schema', async () => {
     vi.stubGlobal(
       'fetch',
       mockFetch(200, { ...PAYLOAD, interstellar: [{ ...ATLAS, kind: 'moon' }] }),
     )
     await expect(fetchOrrerySmallBodiesEnvelope()).rejects.toBeTruthy()
+  })
+})
+
+describe('fetchOrreryDwarfsEnvelope (#99 item 8)', () => {
+  const pluto = {
+    id: 'sb:20134340',
+    spkid: '20134340',
+    name: 'Pluto',
+    target: 'Pluto Barycenter (9)',
+    availableFrom: null,
+    availableTo: null,
+    coarse: { start: 625307.5, step: 1826, samples: [1, 2, 3, 4, 5, 6] },
+  }
+  const DWARFS_PAYLOAD = {
+    generatedAt: '2026-11-12T04:00:00.000Z',
+    coarseFetchedAt: '2026-11-12T04:00:00.000Z',
+    frame: 'ecliptic-J2000',
+    center: 'Sun',
+    timeScale: 'TDB',
+    units: { position: 'au' },
+    sourceType: 'ephemeris',
+    provider: 'jpl-horizons',
+    dwarfs: [pluto],
+    missing: [],
+  }
+
+  it('asks its own endpoint and keeps positions only, with the target Horizons named', async () => {
+    const fetch = mockFetch(200, DWARFS_PAYLOAD)
+    vi.stubGlobal('fetch', fetch)
+    expect((await fetchOrreryDwarfsEnvelope()).data.dwarfs).toEqual([pluto])
+    expect(String(fetch.mock.calls[0]?.[0])).toContain('/api/orrery-dwarfs')
+  })
+
+  it('rejects a body without a span', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, { ...DWARFS_PAYLOAD, dwarfs: [{ ...pluto, coarse: null }] }),
+    )
+    await expect(fetchOrreryDwarfsEnvelope()).rejects.toBeTruthy()
   })
 })

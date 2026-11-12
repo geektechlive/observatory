@@ -52,7 +52,7 @@ interface ControlRailProps {
   nearEarth?: ReactNode
   /** The Earth orbit group (#98): the satellite switches. */
   earthOrbit?: ReactNode
-  /** The "Comets & interstellar" group (#99). */
+  /** The "Dwarf planets" and "Comets & interstellar" groups (#99). */
   smallBodies?: ReactNode
 }
 

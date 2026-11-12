@@ -64,6 +64,15 @@ describe('SOURCES', () => {
     ).toBe(true)
   })
 
+  it('grades orrery dwarf planets by a non-empty list, 72 h before degraded, never headline (#99)', () => {
+    // Fetched only when the Dwarf planets switch or a link asks, so never on a view's list (ADR 0018).
+    expect(SOURCES['orrery-dwarfs'].headline).toBe(false)
+    expect(SOURCES['orrery-dwarfs'].maxAgeMs).toBe(72 * 3_600_000)
+    expect(SOURCES['orrery-dwarfs'].required({ dwarfs: [] })).toBe(false)
+    expect(SOURCES['orrery-dwarfs'].required({ dwarfs: [{ id: 'sb:20134340' }] })).toBe(true)
+    expect(Object.values(VIEW_HEADLINES).flat()).not.toContain('orrery-dwarfs')
+  })
+
   it('grades Space-Track by a TIP list (empty is fine), 36 h before degraded (#101)', () => {
     expect(SOURCES.spacetrack.headline).toBe(false)
     expect(SOURCES.spacetrack.maxAgeMs).toBe(36 * 3_600_000)

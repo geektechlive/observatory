@@ -1,44 +1,52 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useOrreryDwarfs } from '@/hooks/useOrreryDwarfs'
 import { useOrrerySmallBodies } from '@/hooks/useOrrerySmallBodies'
-import { smallBodyEntries, type SmallBodyEntry, smallBodyStatus } from '@/lib/orrery/smallBodyView'
+import { isDwarfFocus } from '@/lib/orrery/dwarfs'
+import { dwarfEntries, dwarfStatus, type OrreryEntry } from '@/lib/orrery/dwarfView'
+import { smallBodyEntries, smallBodyStatus } from '@/lib/orrery/smallBodyView'
 
 import { type CatalogItem, smallBodyCatalog } from './catalog'
 import type { OrreryRenderer, SmallBodyGroups } from './three/OrreryRenderer'
 
-const OFF: SmallBodyGroups = { comets: false, interstellar: false }
-const NO_ENTRIES: SmallBodyEntry[] = []
+const OFF: SmallBodyGroups = { comets: false, interstellar: false, dwarfs: false }
+const NO_ENTRIES: OrreryEntry[] = []
 
 export interface SmallBodiesView {
   groups: SmallBodyGroups
   setGroups: (g: SmallBodyGroups) => void
-  entries: readonly SmallBodyEntry[]
+  entries: readonly OrreryEntry[]
   catalog: readonly CatalogItem[]
   status: string
-  /** A link asks for a focus the loaded catalog lacks: fetch them, if not already. */
-  request: () => void
-  /** Asked for, and answered or failed: a link focus still unknown now is unknown. */
+  /** The "Dwarf planets" switch's own status line (#99 item 8). */
+  dwarfStatus: string
+  /** A link asks for a focus the loaded catalog lacks: fetch what it needs, if not already. */
+  request: (focus: string) => void
+  /** Everything asked for has answered or failed: a link focus still unknown now is unknown. */
   settled: boolean
   /** The entry for a key, or undefined. */
-  find: (key: string | null) => SmallBodyEntry | undefined
+  find: (key: string | null) => OrreryEntry | undefined
   /** Choosing one switches its group on, so it is drawn. */
   showGroupOf: (key: string) => void
 }
 
 /**
- * Comets and the interstellar objects on the orrery page (#99): the switches (both off),
- * the data (fetched only once a switch or a link asks), the renderer's layer, and the
- * Find box's entries.
+ * Comets, the interstellar objects and the dwarf planets on the orrery page (#99): the
+ * switches (all off), the data (two endpoints, each fetched only once its switch or a link
+ * asks: a visitor who wants only Pluto never downloads the comets, and the reverse), the
+ * renderer's layer, and the Find box's entries.
  */
 export function useSmallBodies(renderer: OrreryRenderer | null, jd: number): SmallBodiesView {
   const [groups, setGroups] = useState<SmallBodyGroups>(OFF)
-  const [requested, setRequested] = useState(false)
-  const enabled = requested || groups.comets || groups.interstellar
-  const query = useOrrerySmallBodies({ enabled })
-  const entries = useMemo(
-    () => (query.data ? smallBodyEntries(query.data) : NO_ENTRIES),
-    [query.data],
-  )
+  const [asked, setAsked] = useState({ comets: false, dwarfs: false })
+  const cometsOn = asked.comets || groups.comets || groups.interstellar
+  const dwarfsOn = asked.dwarfs || groups.dwarfs
+  const comets = useOrrerySmallBodies({ enabled: cometsOn })
+  const dwarfs = useOrreryDwarfs({ enabled: dwarfsOn })
+  const entries = useMemo(() => {
+    if (!comets.data && !dwarfs.data) return NO_ENTRIES
+    return [...smallBodyEntries(comets.data), ...dwarfEntries(dwarfs.data)]
+  }, [comets.data, dwarfs.data])
 
   useEffect(() => {
     renderer?.setSmallBodies(entries)
@@ -50,13 +58,19 @@ export function useSmallBodies(renderer: OrreryRenderer | null, jd: number): Sma
 
   const catalog = useMemo(() => smallBodyCatalog(entries, jd), [entries, jd])
   const status = smallBodyStatus({
-    status: query.status,
-    enabled,
-    comets: query.data?.comets.length ?? 0,
-    interstellar: query.data?.interstellar.length ?? 0,
+    status: comets.status,
+    enabled: cometsOn,
+    comets: comets.data?.comets.length ?? 0,
+    interstellar: comets.data?.interstellar.length ?? 0,
   })
-  const request = useCallback(() => {
-    setRequested(true)
+  const dwarfLine = dwarfStatus({
+    status: dwarfs.status,
+    enabled: groups.dwarfs,
+    count: dwarfs.data?.dwarfs.length ?? 0,
+  })
+  const request = useCallback((focus: string) => {
+    const part = isDwarfFocus(focus) ? 'dwarfs' : 'comets'
+    setAsked((a) => (a[part] ? a : { ...a, [part]: true }))
   }, [])
   const find = useCallback(
     (key: string | null) => (key === null ? undefined : entries.find((e) => e.key === key)),
@@ -74,14 +88,19 @@ export function useSmallBodies(renderer: OrreryRenderer | null, jd: number): Sma
     },
     [entries, groups, renderer],
   )
+  const settledOf = (on: boolean, status: string) => !on || status !== 'pending'
   return {
     groups,
     setGroups,
     entries,
     catalog,
     status,
+    dwarfStatus: dwarfLine,
     request,
-    settled: enabled && query.status !== 'pending',
+    settled:
+      (cometsOn || dwarfsOn) &&
+      settledOf(cometsOn, comets.status) &&
+      settledOf(dwarfsOn, dwarfs.status),
     find,
     showGroupOf,
   }

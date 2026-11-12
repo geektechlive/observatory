@@ -392,6 +392,15 @@ describe('probed endpoints (#42, #61)', () => {
     expect(sb?.check({ comets: [], interstellar: [{ fine: null }] })).toBe(false)
   })
 
+  it('probes orrery dwarf planets: a non-empty list, each with its span (#99 item 8)', () => {
+    const d = byPath('/api/orrery-dwarfs')
+    expect(d).toBeDefined()
+    const pluto = { coarse: { start: 1, step: 1826, samples: [1, 2, 3] } }
+    expect(d?.check({ dwarfs: [pluto] })).toBe(true)
+    expect(d?.check({ dwarfs: [] })).toBe(false)
+    expect(d?.check({ dwarfs: [{ coarse: null }] })).toBe(false)
+  })
+
   it('probes on-demand lookup with a fixed past span, so it is cached, not a JPL call (#100)', () => {
     const traj = (CHECKS as (Check & { notConfiguredWarns?: boolean })[]).find((c) =>
       c.path.startsWith('/api/trajectory?'),

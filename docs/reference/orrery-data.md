@@ -82,8 +82,8 @@ They ride in the same job and payload, relative to their planets.
 
 - The catalogue is `src/lib/orrery/moons.ts`: 14 moons of Mars, Jupiter, Saturn, Uranus and
   Neptune. It has no imports, like `craft.ts`. Each id was checked live on 2026-11-07, and period
-  and semi-major axis come from Horizons' physical-data header. Charon is left out because the
-  orrery draws no Pluto.
+  and semi-major axis come from Horizons' physical-data header. Charon is left out (see
+  [Dwarf planets](#dwarf-planets-99-item-8)).
 - The job asks `CENTER='500@<planet>'` at the coarsest step that gives 14 samples per orbit
   (`moonStepDays`): Phobos every 30 min (`stepSize` writes minutes), Io every 3 h, Enceladus,
   Miranda and Deimos every 2 h, Titan daily. Hermite stays within 100 km of Horizons for Io.
@@ -289,6 +289,67 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
     1I has no magnitude law (only H) and is skipped.
   - On 2026-11-07 the brightest were C/2024 T5 (13.3) and C/2026 A2 (13.9), both 8-inch objects:
     a quiet month.
+
+## Dwarf planets (#99 item 8)
+
+Pluto, Ceres, Eris, Makemake and Haumea, in `horizons:dwarfs:v1` (`/api/orrery-dwarfs`), a key
+of their own. Owner's call, 2026-11-12: a "Dwarf planets" switch, off at first, and never in
+`/api/orrery-bodies`, which every orrery visit loads.
+
+- **Why a key of their own** ([ADR 0023](../decisions/0023-optional-orrery-data-has-its-own-key.md)):
+  the first build put them in the comets' `/api/orrery-smallbodies`, which the Tonight panel
+  also loads every 30 minutes once a location is shared. That would have taken every Tonight
+  visitor from 71.9 KB to 129.7 KB gzip. Measured in dry runs on 2026-11-12 after the split: the
+  comets' payload is 164,428 bytes (71,885 gzip) with no `dwarfs`, the dwarf planets' 131,265
+  (58,775 gzip). `tests/e2e/orrery-dwarfs.spec.ts` checks the Tonight panel never asks for them
+  and the switch never asks for the comets.
+- **Served** like the other orrery bodies: `functions/api/orrery-dwarfs.ts` streams the KV body
+  through `_kvBody.ts` unparsed, degraded (`X-Data-Source: kv-backup`, `X-Error-Kind`) past 72 h,
+  503 until the first write. Health contract `orrery-dwarfs` (a non-empty list, not a headline
+  source: no view always fetches it, ADR 0018) and a probe in `scripts/check-health.mjs`.
+- **Asking Horizons** (`src/lib/orrery/dwarfs.ts`, no imports, so the job uses it): `'9'` for
+  Pluto's system barycentre (DE441, "Pluto Barycenter (9)"), `'1;'`, `'136199;'`, `'136472;'` and
+  `'136108;'` for the others; never `DES=`. Every answer's target name is asserted exactly.
+  Positions only, at 6 decimals (`toSpan`'s `decimals`).
+- **Coverage, checked live 2026-11-12:** '9' covers 3000 BC to 3000 AD, so Pluto's span is asked
+  from 3005 BC to 3006 AD, past both ends of the clock. Ceres, Eris, Makemake and Haumea answer
+  "No ephemeris ... prior to A.D. 1599-DEC-11" and "after A.D. 2501-JAN-01", so they are asked
+  for 1600-01-01 to 2500-12-31. Outside that their marker hides, their orbit stays, and the stage
+  says so (`dwarfNotice`, with the years read from the span itself, rounded to decades: Ceres's
+  last sample is 2500-11-18, the others' 2499-11-23).
+- **Steps:** 1826 days; 120 for Ceres. Catmull-Rom against Horizons' own positions halfway
+  between samples, around each body's perihelion (`tests/unit/fixtures/dwarfs/`): worst
+  0.0046 au for Pluto, 0.0047 Ceres, 0.0037 Eris, 0.0037 Makemake, 0.0041 Haumea (limit 0.01).
+- **Measured** in a local dry run (`--only=orrery-dwarfs --dwarfs-out=…`), one
+  request at a time, 2026-11-12: 5 requests in 11 s; Pluto 1,203 rows, Ceres 2,743, the other
+  three 181 each; 131,315 bytes, 58,813 gzip.
+- **In the refresh job:** their own step (`scripts/orrery-dwarfs.mjs`, 60 s budget within the job's
+  deadline), after the comet step and never beside it. Spans are reused for a day (`coarseFetchedAt`), decided per
+  body, so the first run after this landed fetched them. A body that fails keeps its last span and
+  is listed in `missing`, and the next run asks for it again rather than a day later. Until that first production run the key is empty, the endpoint answers
+  503, and the switch says there is no dwarf-planet data yet.
+- **The line** is the closed two-body orbit from SBDB's osculating elements (`conicPath`,
+  `full-prec=1`, fetched 2026-11-12; Pluto's are orbit 1 at 2016-07-19, the rest 2026-06-09). It
+  holds the shape, not the position along it: measured on the real spans, the worst gap from a
+  sample to its line is 0.63 au for Pluto (2836 BC), 0.37 Eris, 0.22 Makemake, 0.21 Haumea, 0.07
+  Ceres, and even within a century of the epoch the outer four reach 0.16 to 0.24 au
+  (likely cause, not checked: heliocentric osculating elements of a distant body wobble with
+  Jupiter). The marker always comes from the span. The design's estimate of 0.16 au for Pluto did not hold.
+- **Drawing** (`dwarfView.ts`, `smallBodyLayer.ts` as a third group): 4 px floor,
+  `PX_CEILING.dwarf` 6 px, under the Sun's 10 px; pale rose `--dwarf` (`oklch(0.8 0.09 345)`,
+  `DWARF_HEX`), neither spacecraft cyan nor hazard red. Real-GPU shots at 1920x1080 with the
+  real spans: all five drawn at 4 px against a Sun of 10 px (whole system) to 16 px (Pluto
+  selected).
+- **Pluto is the barycentre**, 2,131 km from Pluto's centre on 2026-01-01 (Horizons, 999 from
+  500@9): far below a pixel. The inspector says so.
+- **Keys and links:** `sbc:<SBDB SPK-ID>` like the comets (Pluto 20134340, Ceres 20000001), so a
+  JPL lookup of one is drawn once. A link to one, or `focus=pluto` (any of the five names), asks
+  for `/api/orrery-dwarfs` alone (`isDwarfFocus`) and waits for it.
+- **Charon is left out** (see #99). Horizons covers it ("Charon (901)", plu060, 1800 to 2199, today
+  included), so coverage is not the obstacle. Wiring is: the moon layer types a parent as a
+  planet and places and sizes a moon from its parent's drawn planet radius (`moonLayer.ts`,
+  `moonState.ts` drops any other parent), while Pluto is a px-clamped small-body marker with no
+  radius; and moon spans ship in `/api/orrery-bodies`, which every visit loads.
 
 ## On-demand JPL (#100)
 

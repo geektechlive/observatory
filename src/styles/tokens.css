@@ -40,6 +40,7 @@
   --amber: oklch(0.84 0.16 80); /* status: watch. 12.5 / 12.1 / 11.3 */
   --mcrn: oklch(0.64 0.2 27); /* status: hazard. 5.6 / 5.4 / 5.1 */
   --mcrn-2: oklch(0.5 0.22 25); /* MARK-ONLY: 3.3 on void, rivets and hazard stripes */
+  --dwarf: oklch(0.8 0.09 345); /* orrery dwarf planets (#99): pale rose, not cyan, not red */
 
   /* Legacy aliases: kept for one release, removed by codemod in Phase 3 */
   --ink: var(--bone);

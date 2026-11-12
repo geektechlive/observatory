@@ -49,6 +49,7 @@ export const TOKEN_OKLCH = {
   copperGlow: 'oklch(0.78 0.14 55)',
   brass: 'oklch(0.82 0.14 80)',
   globeDeep: 'oklch(0.3 0.06 48)',
+  dwarf: 'oklch(0.8 0.09 345)',
 } as const
 
 const hexOf = (literal: string): string => {
@@ -64,6 +65,8 @@ export const STATUS_HEX: Readonly<Record<Status, string>> = {
 }
 
 export const ISS_HEX = hexOf(TOKEN_OKLCH.signal)
+/** The orrery's dwarf planets (#99 item 8): pale rose, apart from cyan craft and hazard red. */
+export const DWARF_HEX = hexOf(TOKEN_OKLCH.dwarf)
 /** Label ink for canvas-drawn nameplates on the globe (text wears ink, never the series colour). */
 export const BONE_HEX = hexOf(TOKEN_OKLCH.bone)
 /**
@@ -346,6 +349,12 @@ export function renderPaletteCss(): string {
   for (const [key, lane] of Object.entries(LANES)) {
     lines.push(`  --data-${key}: ${lane.chart};`, `  --data-${key}-emit: ${lane.emit};`)
   }
-  lines.push(`  --data-iss: ${ISS_HEX};`, `  --data-aurora: ${AURORA_HEX};`, '}', '')
+  lines.push(
+    `  --data-iss: ${ISS_HEX};`,
+    `  --data-aurora: ${AURORA_HEX};`,
+    `  --data-dwarf: ${DWARF_HEX};`,
+    '}',
+    '',
+  )
   return lines.join('\n')
 }

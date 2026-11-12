@@ -6,10 +6,10 @@ import type { DsnLink } from '@/lib/dsn'
 import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orrery'
 import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
+import type { OrreryEntry } from '@/lib/orrery/dwarfView'
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
-import type { SmallBodyEntry } from '@/lib/orrery/smallBodyView'
 import type { SatcatEntry } from '@/lib/spacetrack'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryNeo } from '@/schemas/orreryNeo'
@@ -17,6 +17,7 @@ import type { Discos, Reentry } from '@/schemas/spaceTrack'
 
 import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
+import { DwarfFacts } from './DwarfFacts'
 import { ImageryFacts } from './ImageryFacts'
 import { LookupFacts } from './LookupFacts'
 import { MoonFacts } from './MoonFacts'
@@ -134,8 +135,8 @@ interface InspectorProps {
   lookCloserRef?: Ref<HTMLButtonElement> | undefined
   /** Present while the detail view is open: the phone sheet folds and this opens it (#205). */
   facts?: FactsToggle | undefined
-  /** The selected comet or interstellar object (#99), when that is what `body` names. */
-  smallBody?: SmallBodyEntry | undefined
+  /** The selected comet, interstellar object or dwarf planet (#99), when that is what `body` names. */
+  smallBody?: OrreryEntry | undefined
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
@@ -193,7 +194,11 @@ export function Inspector({
           </button>
         </div>
         <div id={bodyId} className={styles.inspectorBody ?? ''}>
-          <SmallBodyFacts entry={smallBody} simMs={simMs} />
+          {smallBody.group === 'dwarfs' ? (
+            <DwarfFacts entry={smallBody} simMs={simMs} />
+          ) : (
+            <SmallBodyFacts entry={smallBody} simMs={simMs} />
+          )}
         </div>
       </aside>
     )

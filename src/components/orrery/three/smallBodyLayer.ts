@@ -3,7 +3,11 @@
  * (smallBodyView.ts: hidden where none cover the date, never extrapolated) and its line.
  * A comet's line is its orbit from the elements, a line only; 1I, 2I and 3I follow their
  * sampled paths. Lines are in heliocentric au through the scene's scale, rebuilt only when
- * the data or the scale mode changes, never per frame. Both groups start switched off.
+ * the data or the scale mode changes, never per frame. Every group starts switched off.
+ *
+ * The dwarf planets (#99 item 8) are a third group: a marker on their coarse span, and the
+ * closed orbit from their elements, drawn whenever the group is on, even where the
+ * marker is hidden outside the span.
  */
 import {
   BufferGeometry,
@@ -18,32 +22,33 @@ import {
   Vector3,
 } from 'three'
 
-import type { Vec3 } from '@/lib/orrery/scale'
 import {
-  type SmallBodyEntry,
-  type SmallBodyGroup,
-  smallBodyPath,
-  smallBodyState,
-} from '@/lib/orrery/smallBodyView'
-import { LANES } from '@/lib/palette'
+  entryPath,
+  entryState,
+  type OrreryEntry,
+  type OrreryEntryGroup,
+} from '@/lib/orrery/dwarfView'
+import type { Vec3 } from '@/lib/orrery/scale'
+import { DWARF_HEX, LANES } from '@/lib/palette'
 
 /**
  * Comets in the hydro lane's pale ice blue; the interstellar objects in the "Space
  * objects" lane, as a looked-up object is. Cyan is spacecraft, amber the close
- * approaches and red hazard only.
+ * approaches and red hazard only. The dwarf planets (#99 item 8) have their own token.
  */
-const HEX: Record<SmallBodyGroup, string> = {
+const HEX: Record<OrreryEntryGroup, string> = {
   comets: LANES.hydro.emit,
   interstellar: LANES.space.emit,
+  dwarfs: DWARF_HEX,
 }
 /** The marker's radius before the renderer's px clamp, scene units. */
 const MARKER_RADIUS = 0.02
 const LINE_OPACITY = 0.5
 
-export type SmallBodyGroups = Record<SmallBodyGroup, boolean>
+export type SmallBodyGroups = Record<OrreryEntryGroup, boolean>
 
 interface Item {
-  entry: SmallBodyEntry
+  entry: OrreryEntry
   mesh: Mesh<SphereGeometry, MeshBasicMaterial>
   line: Line<BufferGeometry, LineBasicMaterial>
   /** Heliocentric position now, au; null where no sample covers the date. */
@@ -54,24 +59,18 @@ export class SmallBodyLayer {
   readonly markers = new Group()
   readonly paths = new Group()
   private readonly sphere = new SphereGeometry(1, 16, 12)
-  private readonly markerMaterials: Record<SmallBodyGroup, MeshBasicMaterial> = {
-    comets: new MeshBasicMaterial({ color: new Color(HEX.comets) }),
-    interstellar: new MeshBasicMaterial({ color: new Color(HEX.interstellar) }),
+  private readonly markerMaterials: Record<OrreryEntryGroup, MeshBasicMaterial> = {
+    comets: markerMaterial('comets'),
+    interstellar: markerMaterial('interstellar'),
+    dwarfs: markerMaterial('dwarfs'),
   }
-  private readonly lineMaterials: Record<SmallBodyGroup, LineBasicMaterial> = {
-    comets: new LineBasicMaterial({
-      color: new Color(HEX.comets),
-      transparent: true,
-      opacity: LINE_OPACITY,
-    }),
-    interstellar: new LineBasicMaterial({
-      color: new Color(HEX.interstellar),
-      transparent: true,
-      opacity: LINE_OPACITY,
-    }),
+  private readonly lineMaterials: Record<OrreryEntryGroup, LineBasicMaterial> = {
+    comets: lineMaterial('comets'),
+    interstellar: lineMaterial('interstellar'),
+    dwarfs: lineMaterial('dwarfs'),
   }
   private items = new Map<string, Item>()
-  private groups: SmallBodyGroups = { comets: false, interstellar: false }
+  private groups: SmallBodyGroups = { comets: false, interstellar: false, dwarfs: false }
   /** The scale mode the lines were last built for; '' means rebuild. */
   private builtMode = ''
 
@@ -81,7 +80,7 @@ export class SmallBodyLayer {
   }
 
   /** New data: lines are rebuilt, and those no longer in it are freed. */
-  set(entries: readonly SmallBodyEntry[]): void {
+  set(entries: readonly OrreryEntry[]): void {
     this.clear()
     for (const entry of entries) {
       const mesh = new Mesh(this.sphere, this.markerMaterials[entry.group])
@@ -120,7 +119,7 @@ export class SmallBodyLayer {
     const rebuild = this.builtMode !== mode
     for (const item of this.items.values()) {
       const on = this.groups[item.entry.group]
-      const s = on ? smallBodyState(item.entry.body, jd) : null
+      const s = on ? entryState(item.entry, jd) : null
       item.helio = s ? s.position : null
       item.mesh.visible = s !== null
       if (s) {
@@ -128,7 +127,9 @@ export class SmallBodyLayer {
         item.mesh.scale.setScalar(MARKER_RADIUS)
       }
       if (rebuild) buildLine(item, toScene)
-      item.line.visible = item.mesh.visible && item.line.geometry.drawRange.count > 1
+      // A dwarf planet's orbit stays drawn where its span ends; a comet's line goes with it.
+      const lineOn = item.entry.group === 'dwarfs' ? on : item.mesh.visible
+      item.line.visible = lineOn && item.line.geometry.drawRange.count > 1
     }
     this.builtMode = mode
   }
@@ -154,8 +155,8 @@ export class SmallBodyLayer {
   }
 
   /** The drawn markers, for the px clamp, the labels and picking. */
-  visible(): { key: string; label: string; group: SmallBodyGroup; mesh: Mesh }[] {
-    const out: { key: string; label: string; group: SmallBodyGroup; mesh: Mesh }[] = []
+  visible(): { key: string; label: string; group: OrreryEntryGroup; mesh: Mesh }[] {
+    const out: { key: string; label: string; group: OrreryEntryGroup; mesh: Mesh }[] = []
     for (const item of this.items.values()) {
       if (!item.mesh.visible) continue
       out.push({
@@ -210,9 +211,21 @@ export class SmallBodyLayer {
   }
 }
 
+function markerMaterial(group: OrreryEntryGroup): MeshBasicMaterial {
+  return new MeshBasicMaterial({ color: new Color(HEX[group]) })
+}
+
+function lineMaterial(group: OrreryEntryGroup): LineBasicMaterial {
+  return new LineBasicMaterial({
+    color: new Color(HEX[group]),
+    transparent: true,
+    opacity: LINE_OPACITY,
+  })
+}
+
 /** An object's line in scene space: a buffer sized to its own points. */
 function buildLine(item: Item, toScene: (p: Vec3) => Vector3): void {
-  const path = smallBodyPath(item.entry.body)
+  const path = entryPath(item.entry)
   const points = path.closed && path.points[0] ? [...path.points, path.points[0]] : path.points
   const array = new Float32Array(points.length * 3)
   points.forEach((p, i) => {
