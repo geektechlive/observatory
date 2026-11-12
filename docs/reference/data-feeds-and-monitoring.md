@@ -54,6 +54,31 @@ mean day to day:
   and `solar-wind/{plasma,mag}-7-day.json` returned 404. Solar wind and Bz now come from
   `products/geospace/propagated-solar-wind-1-hour.json` via the shared `functions/api/_swpc.ts`.
   Its cells are numbers, not numeric strings.
+- **SWPC active regions and flare odds (#210), `/api/solar-regions`.** Worker-direct, Cache API
+  for 30 minutes, key `noaa:solar-regions:v1`. Parsers in `src/lib/swpcRegions.ts`.
+  - `solar_regions.json` is ~104 kB: about 180 rows, 30 days of daily region reports, newest
+    first. Only the newest `observed_date` is validated and kept, and only rows with an area
+    and spot class (the Solar Region Summary's "Regions with Sunspots"; plage-only and departed
+    regions have nulls). Parsing both files measured 0.12 ms warm and 1.7 ms cold in Node 26
+    on 2026-11-12, so it fits the 10 ms Worker limit without a refresh-job step.
+  - A row's position is SWPC's "Locations Valid at" time, the **end** of `observed_date` UTC:
+    the 2026-11-11 rows matched SRS 316, "Locations Valid at 11/2400Z", issued 12 Nov 00:30.
+    Longitude is degrees from the central meridian, **east positive** (S09E65 is 65).
+  - `solar_probabilities.json`: the newest `date` row's `*_1_day` odds are for the **next** UTC
+    day. The 2026-11-11 row (M 45, X 5, proton 5) matched the 3-day predictions issued
+    11 Nov 22:00 for 12 Nov.
+  - A half answer is a 200 marked degraded with `X-Error-Kind` and `X-Data-Source: swpc`. Both
+    halves down is a 503, or a 500 when both changed shape. Not a headline source (ADR 0018),
+    and not in `check-health.mjs`, like the other below-the-fold Sun feeds.
+  - The disc marks (`src/lib/sunDisc.ts`) turn each position forward by Snodgrass-Ulrich
+    differential rotation from the valid time to the SDO image's time, tilt by B0, and scale
+    by the limb radius per instrument (AIA 2.4"/px, HMI 2.016"/px in the 1024 px frames; SDO's
+    latest frames are north-up). More than 48 h apart, no mark is drawn. Checked against
+    HMI's 2026-11-12 05:00 magnetogram: region 4566 projects to (882, 587) px, on its spots.
+  - Terms: NOAA/NWS public domain (https://www.weather.gov/disclaimer). The panel credits
+    NOAA SWPC with a link, says the data is shown as published, and says the disc marks are
+    turned positions; nothing is called official. `www.swpc.noaa.gov` now 301s to
+    `www.spaceweather.gov`, so links go there.
 - **Upstream drift is silent by default.** A feed that changes shape yields an
   empty-but-HTTP-200 payload. `src/lib/health.ts` gives every source a content contract so this
   reads as an error, and `scripts/check-health.mjs` probes the headline endpoints on a schedule.

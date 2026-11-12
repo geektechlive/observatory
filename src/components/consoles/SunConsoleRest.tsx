@@ -1,6 +1,7 @@
 // Below the lens row, so it loads in its own chunk after first paint (#75).
 import { CmePanel } from '@/components/panels/CmePanel'
 import { SolarCyclePanel } from '@/components/panels/SolarCyclePanel'
+import { SolarRegionsPanel } from '@/components/panels/SolarRegionsPanel'
 import { SpaceWeatherStrip } from '@/components/panels/SpaceWeatherStrip'
 import { SunImageryPanel } from '@/components/panels/SunImageryPanel'
 import { SwpcAlertsPanel } from '@/components/panels/SwpcAlertsPanel'
@@ -23,6 +24,11 @@ export function SunConsoleRest() {
       <ErrorBoundary label="SWPC Alerts">
         <SwpcAlertsPanel />
       </ErrorBoundary>
+      <div className={styles.wide ?? ''}>
+        <ErrorBoundary label="Active Regions">
+          <SolarRegionsPanel />
+        </ErrorBoundary>
+      </div>
       <div className={styles.full ?? ''}>
         <ErrorBoundary label="Solar Cycle 25">
           <SolarCyclePanel />

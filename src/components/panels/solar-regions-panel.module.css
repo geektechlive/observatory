@@ -1,0 +1,108 @@
+/* Active Regions (#210): SWPC's flare odds as bars, then its region table. Odds are a
+   forecast, not a status, so the bars are copper rather than the status scale. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--panel-body-pad);
+}
+
+.odds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.oddsList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oddsRow {
+  display: grid;
+  grid-template-columns: 6.5ch 1fr 4.5ch;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.oddsLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
+}
+
+.bar {
+  height: 6px;
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--bone) 8%, transparent);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--copper-glow);
+}
+
+.oddsValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--bone);
+  text-align: right;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone);
+}
+
+.caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--space-2);
+  color: var(--bone-faint);
+  letter-spacing: var(--track-label);
+}
+
+.table th,
+.table td {
+  padding: 4px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--plate-seam);
+}
+
+.table thead th {
+  color: var(--bone-faint);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--track-label);
+}
+
+.table tbody th {
+  color: var(--copper-glow);
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--bone-dim);
+}
+
+.credit {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--bone-faint);
+}
+
+.credit a {
+  color: var(--bone-dim);
+}

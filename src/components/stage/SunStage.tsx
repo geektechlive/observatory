@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 
 import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
@@ -26,6 +26,11 @@ const WAVELENGTHS: Wavelength[] = [
 
 const REFRESH_MS = 10 * 60 * 1000
 
+// SWPC's active regions on the disc (#210), in their own chunk so the first load stays put.
+const SunRegionLayer = lazy(() =>
+  import('./SunRegionLayer').then((m) => ({ default: m.SunRegionLayer })),
+)
+
 /** The disc's share of the stage at its normal 460px, kept when expanded (#89). */
 const DISC_SHARE = 380 / 460
 
@@ -33,6 +38,7 @@ export function SunStage({ size = 460, expanded = false }: { size?: number; expa
   const [wl, setWl] = useState('0171')
   const bucket = useImageBucket(REFRESH_MS)
   const [errored, setErrored] = useState(false)
+  const [regions, setRegions] = useState(true)
   const { data: sa } = useSolarActivity()
   // The zoom crops SDO's burned-in stamp, so the time comes from SDO's times files (#73).
   const { data: sdo } = useSdoTimes()
@@ -73,6 +79,11 @@ export function SunStage({ size = 460, expanded = false }: { size?: number; expa
           />
         )}
         <div className={styles.limb ?? ''} aria-hidden="true" />
+        {regions && !errored && (
+          <Suspense fallback={null}>
+            <SunRegionLayer wavelength={wl} observed={observed} />
+          </Suspense>
+        )}
         {flaring && <div className={styles.flarePulse ?? ''} aria-hidden="true" />}
       </div>
 
@@ -91,21 +102,35 @@ export function SunStage({ size = 460, expanded = false }: { size?: number; expa
             Observed <time dateTime={observed}>{formatObserved(observed)}</time>
           </span>
         )}
-        <div className={styles.waves ?? ''} role="group" aria-label="Wavelength">
-          {WAVELENGTHS.map((w) => (
-            <button
-              key={w.key}
-              type="button"
-              aria-pressed={w.key === wl}
-              className={styles.wave ?? ''}
-              onClick={() => {
-                setWl(w.key)
-                setErrored(false)
-              }}
-            >
-              {w.label}
-            </button>
-          ))}
+        <div className={styles.waves ?? ''}>
+          <div className={styles.waveGroup ?? ''} role="group" aria-label="Wavelength">
+            {WAVELENGTHS.map((w) => (
+              <button
+                key={w.key}
+                type="button"
+                aria-pressed={w.key === wl}
+                className={styles.wave ?? ''}
+                onClick={() => {
+                  setWl(w.key)
+                  setErrored(false)
+                }}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+          {/* Not a wavelength: SWPC's numbered regions over whichever image is on (#210). */}
+          <button
+            type="button"
+            aria-pressed={regions}
+            title="NOAA SWPC's numbered active regions"
+            className={styles.wave ?? ''}
+            onClick={() => {
+              setRegions(!regions)
+            }}
+          >
+            Regions
+          </button>
         </div>
       </div>
     </div>

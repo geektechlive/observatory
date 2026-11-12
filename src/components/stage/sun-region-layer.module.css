@@ -1,0 +1,62 @@
+/* Active-region marks on the SDO disc (#210): a thin bone ring with a dark halo, so it
+   reads on AIA's bright loops and HMI's grey alike. Not cyan (telemetry) and not MCRN red
+   (hazard): a region is a place, not a status. */
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mark {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 1px solid var(--bone);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px var(--shade-edge),
+    inset 0 0 0 1px var(--shade-edge);
+}
+
+.label {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  padding: 0 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+  color: var(--bone);
+  background: var(--scrim);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+
+.west .label {
+  left: auto;
+  right: 12px;
+}
+
+/* A label that would overlap a close neighbour's goes under its mark instead. */
+.below .label {
+  bottom: auto;
+  top: 10px;
+}
+
+/* Said, not silent, when the marks are off because SWPC's positions are too old. */
+.stale {
+  position: absolute;
+  top: 16%;
+  left: 50%;
+  max-width: 70%;
+  margin: 0;
+  padding: 2px 8px;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
+  text-align: center;
+  background: var(--scrim);
+  border-radius: var(--radius);
+}

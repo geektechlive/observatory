@@ -49,6 +49,7 @@ export type SourceName =
   | 'sentry'
   | 'solar-activity'
   | 'solar-cycle'
+  | 'solar-regions'
   | 'solar-wind'
   | 'space-news'
   | 'spacetrack'
@@ -280,6 +281,21 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: false,
     maxAgeMs: 30 * DAY,
     required: hasContent,
+  },
+  // SWPC active regions and flare odds (#210). Either half is usable alone (the server
+  // marks a half answer degraded); a regions half must carry its list, which may be empty.
+  'solar-regions': {
+    label: 'Active Regions',
+    headline: false,
+    maxAgeMs: 12 * HOUR,
+    required: (data) => {
+      if (!isRecord(data)) return false
+      const regions = data['regions']
+      return (
+        fieldPresent(data, 'probabilities') ||
+        (isRecord(regions) && Array.isArray(regions['items']))
+      )
+    },
   },
   'solar-wind': {
     label: 'Solar Wind',
