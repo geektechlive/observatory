@@ -65,6 +65,37 @@ describe('tier-A satellite models (#194)', () => {
     expect(model?.sourceUrl).toMatch(/^https:\/\/science\.nasa\.gov\/3d-resources\/.+\/$/)
   })
 
+  // Third batch. CelesTrak active ids, 2026-11-10. SORCE, SDO and CYGNSS have no Source
+  // field on a NASA page, so their credit is NASA; SORCE and SDO have no page at all and link
+  // to their folder in NASA's repository.
+  it.each([
+    ['40059', 'oco2', 'own', 'NASA/Christopher R. Meaney'], // OCO 2
+    ['27651', 'sorce', 'own', 'NASA'], // SORCE
+    ['36395', 'sdo', 'own', 'NASA'], // SDO
+    ['25560', 'swas', 'own', 'NASA/Christopher R. Meaney'], // SWAS
+    ['25867', 'chandra', 'own', 'NASA/Brian E. Kumanchik'], // CXO
+    ['40482', 'mms', 'family', 'NASA/Walter K. Feimer'], // MMS 1
+    ['40485', 'mms', 'family', 'NASA/Walter K. Feimer'], // MMS 4
+    ['30580', 'themis', 'family', 'NASA/JPL/Eyes on the Solar System'], // THEMIS A
+    ['30798', 'themis', 'family', 'NASA/JPL/Eyes on the Solar System'], // THEMIS E
+    ['41887', 'cygnss', 'family', 'NASA'], // CYGFM01
+    ['41888', 'cygnss', 'family', 'NASA'], // CYGFM08
+    ['43476', 'grace', 'family', 'NASA/Christopher M. Garcia'], // GRACE-FO 1
+    ['43477', 'grace', 'family', 'NASA/Christopher M. Garcia'], // GRACE-FO 2
+    ['41240', 'jason2', 'family', 'NASA/Kevin K. Lane'], // JASON-3
+    ['46984', 'sentinel6', 'own', 'NASA/Matthew J. Garcia'], // SENTINEL-6A
+    ['66514', 'sentinel6', 'family', 'NASA/Matthew J. Garcia'], // SENTINEL-6B
+    ['39574', 'gpm', 'own', 'NASA/Christopher R. Meaney'], // GPM-CORE
+  ])('sat:%s resolves to %s (%s), credit %s', (id, name, scope, credit) => {
+    const model = modelForKey(`sat:${id}`, loaded(id))
+    expect(model?.file).toBe(`/models/craft/${name}.glb`)
+    expect(model?.scope).toBe(scope)
+    expect(model?.credit).toBe(credit)
+    expect(model?.sourceUrl).toMatch(
+      /^https:\/\/(science\.nasa\.gov\/3d-resources\/.+\/|github\.com\/nasa\/NASA-3D-Resources\/tree\/[0-9a-f]{40}\/3D%20Models\/.+)$/,
+    )
+  })
+
   it('gives a satellite with no entry no model', () => {
     expect(modelForKey('sat:1', loaded('1'))).toBeUndefined()
   })

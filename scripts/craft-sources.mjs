@@ -59,4 +59,17 @@ export const SOURCES = {
   aqua: { plain: { shiny_panel: [0.18, 0.18, 0.2, 1] } },
   aura: {},
   'suomi-npp': {},
+  // Third batch (#194).
+  oco2: {},
+  sorce: {},
+  sdo: { aim: 6_000 },
+  swas: {},
+  chandra: { blank: [{ texture: 'chandra_tex_01', x: 6, y: 638, w: 52, h: 96 }] },
+  mms: {},
+  themis: {},
+  cygnss: {},
+  grace: { plain: { 'underside.001': [0.83, 0.66, 0.35, 1] } },
+  jason2: {},
+  sentinel6: {},
+  gpm: { aim: 9_800, minPart: 0.005 },
 }

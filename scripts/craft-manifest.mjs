@@ -282,4 +282,137 @@ export const MANIFEST = {
     logos:
       'Five textures, each with a PNG fallback of the same picture: two 1024 px sheets of hardware photographs (array, cable-run panel, foil, radiators, instrument panels), a 1024 px ambient-occlusion map and two 256 px foil ramps. NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
   }),
+  // Third batch (#194).
+  oco2: nasaRepo({
+    folder: 'Orbiting Carbon Observatory (OCO) 2',
+    file: 'Orbiting Carbon Observatory (OCO) 2.glb',
+    sha256: '5aba302aaf91fe1a915f1121683aca6ef7ad65d7a82dad65f363361e5009b1ef',
+    family: 'oco',
+    triangles: 14000,
+    transforms: {},
+    outputSha256: '26acfb93c52190ecd0d8fb5e9f53b476ce3c5e35dfe273d7e43f30ed7b1fa450',
+    logos:
+      "No texture images in the file (23 plain materials). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  sorce: nasaRepo({
+    folder: 'Solar Radiation and Climate Experiment (SORCE)',
+    file: 'Solar Radiation and Climate Experiment (SORCE).glb',
+    sha256: '8ec505080199227d25897f5157f4cd87e60092d69b16079deb3ca32caa2ce10d',
+    family: 'sorce',
+    triangles: 14000,
+    transforms: {},
+    outputSha256: '60f2bcb37abedcb48547e7ab08f5a6c7f8391fc9f7122bb90967a91179b2c3a7',
+    logos:
+      'No texture images in the file (29 plain materials). NASA publishes no preview render or page for it. Three pink plates on an end face, rendered close, are connectors. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  sdo: nasaRepo({
+    folder: 'Solar Dynamics Observatory',
+    file: 'Solar Dynamics Observatory.glb',
+    sha256: '8ce4607bd65f098eee22f02717a182d6721610c940a961511dfbca832a3eda95',
+    family: 'sdo',
+    triangles: 14000,
+    transforms: { aim: 6_000 },
+    outputSha256: 'd9aa7e65c4c149c0201b60cbae1f85940ad62cbedd73ca73c778bbe237b35c97',
+    logos:
+      "No texture images in the file (31 plain materials). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  swas: nasaRepo({
+    folder: 'Submillimeter Wave Astronomy Satellite (SWAS)',
+    file: 'Submillimeter Wave Astronomy Satellite (SWAS).glb',
+    sha256: 'c1d58e66cb2f1185fc98b5941cbfeb3dbdb453b817a87f95e6bf8d176630f5a1',
+    family: 'swas',
+    triangles: 12908,
+    transforms: {},
+    outputSha256: 'b4376a1d27b2f9f08cfb096da79d45d5e7c5a4d4d06fef71b60b928bdc2df4a6',
+    logos:
+      'No texture images in the file (20 plain materials). NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  chandra: nasaRepo({
+    folder: 'Chandra X-ray Observatory',
+    file: 'Chandra X-ray Observatory.glb',
+    sha256: '9383f44fc4c6eba73c40b0c2cfe33c08c90f1fb5230274bfdaa98e0c9f116a34',
+    family: 'chandra',
+    triangles: 14000,
+    transforms: { blank: [{ texture: 'chandra_tex_01', x: 6, y: 638, w: 52, h: 96 }] },
+    outputSha256: '04412979c7569c0a270594cd939fd4e5bd7e450380bc454477ebb6e4b40885a6',
+    logos:
+      'Three textures, each with a PNG fallback of the same picture: two 256 px foil ramps and a 1024 px sheet (aperture, array cells, a cable-run panel, a mechanism photograph, a cylinder, panels). One small photographed part on the sheet carries a label with a blue band and blurred lines of text, enlarged 6x, unreadable and with no symbol that could be identified; the build paints it out (blank, in craft-sources.mjs). NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  mms: nasaRepo({
+    folder: 'Magnetospheric Multiscale (MMS) (A)',
+    file: 'Magnetospheric Multiscale (MMS) (A).glb',
+    sha256: 'e3688a8db82f1918c3b4525f4ceed08b614a3a2c5be09ade5711baba30262eef',
+    family: 'mms',
+    triangles: 14000,
+    transforms: {},
+    outputSha256: 'ea157869f01c79ee1876e838c164c45f2226f5b6195d760a90b27d74040471c8',
+    logos:
+      "No materials and no texture images in the file: it draws in the default grey. NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  themis: nasaRepo({
+    folder: 'Time History of Events and Macroscale Interactions During Substorms (THEMIS)',
+    file: 'Time History of Events and Macroscale Interactions During Substorms (THEMIS).glb',
+    sha256: '2dfe2a2e07de211f6686adbb612c09c5dfac62a397cb88343f119c2124d818e3',
+    family: 'themis',
+    triangles: 11424,
+    transforms: {},
+    outputSha256: 'feb10186e168f839f088f97eeee75881cb5553d3bc9b92cbca31b5d760c0ad60',
+    logos:
+      'Three textures, each with a PNG fallback of the same picture: two 256 px foil ramps and a 1024 px sheet (foil, array cells, panels). NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  cygnss: nasaRepo({
+    folder: 'Cyclone Global Navigation Satellite System (CYGNSS)',
+    file: 'Cyclone Global Navigation Satellite System (CYGNSS).glb',
+    sha256: '830321f2d30099b4355f835d7ae5a2ab1f9f91c292dd01dfc008b8d4bf64c962',
+    family: 'cygnss',
+    triangles: 7338,
+    transforms: {},
+    outputSha256: '56f2cb3575c2f46e1376653aada313a7f407d995b4704a1bc75bae7aabf06132',
+    logos:
+      'One 2048 px texture sheet (a WebP and a PNG of the same picture): array cells, antenna patches, radiators, panels, hardware. NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  grace: nasaRepo({
+    folder: 'Gravity Recovery and Climate Experiment (GRACE) (B)',
+    file: 'Gravity Recovery and Climate Experiment (GRACE) (B).glb',
+    sha256: '33382f0069d7e84de6d3747a723c2e0ded2cbaf83185d89bdf82c5ca58e1fef1',
+    family: 'grace',
+    triangles: 3961,
+    transforms: { plain: { 'underside.001': [0.83, 0.66, 0.35, 1] } },
+    outputSha256: '7dac8c419c24253a7c77401a099b3b713b0eaf8057e837f454de5638c09fd0a6',
+    logos:
+      "Two textures, each with a PNG fallback of the same picture: a 1024 px sheet (array cells and a ring) and a 720 x 480 px normal map, which the source also uses as the colour of one underside material ('underside.001'), drawing it magenta; the build draws that material in the gold of the other underside (plain, in craft-sources.mjs). A relief on the large end-face disc, rendered close, is a crossed-dipole antenna pattern. NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  jason2: nasaRepo({
+    folder: 'Ocean Surface Topography Mission (OSTM Jason-2)',
+    file: 'Ocean Surface Topography Mission (OSTM Jason-2).glb',
+    sha256: '61c58c2b1c9afce77186a781f699aad5b026573b2cb52e4476d7afd57eae2d04',
+    family: 'jason',
+    triangles: 14000,
+    transforms: {},
+    outputSha256: '9726518172d6404b908c202cb881d560e5c3df8832cd5b16380eeb0e64b5dd57',
+    logos:
+      'One 1024 px gold-foil photograph (a WebP and a JPEG of the same picture). NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  sentinel6: nasaRepo({
+    folder: 'Jason Continuity of Service (Sentinel-6)',
+    file: 'Jason Continuity of Service (Sentinel-6).glb',
+    sha256: 'cd257b8d63deef018d0227fa6c4bcb29974f257073c4d4f92abd557098b3d580',
+    family: 'sentinel-6',
+    triangles: 14000,
+    transforms: {},
+    outputSha256: '8fe5ccc8d7d561e0b6b026f3055f946eb65d495bfa45baa1ce7d963209f7d682',
+    logos:
+      'Eight textures, each with a fallback of the same picture: foil and corrugation normal maps, an ambient-occlusion atlas, a 2048 px normal map and a 1024 px occlusion map of the antenna deck (hexagon panels, a ring, a star-shaped plate), and a 110 x 62 px array. Normal maps were viewed for embossed lettering too: none. NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
+  gpm: nasaRepo({
+    folder: 'Global Precipitation Measurement',
+    file: 'Global Precipitation Measurement.glb',
+    sha256: '7068c880770bb2ac936e804a1af48e564c90b829ff884c405a4759e8da9e693e',
+    family: 'gpm',
+    triangles: 14000,
+    transforms: { aim: 9_800, minPart: 0.005 },
+    outputSha256: 'b87cccbc9aba54307cb9ecbe49a987255ed445607210e10774cb6cc97f8d4e07',
+    logos:
+      'No texture images in the file (48 plain materials). NASA publishes no preview render for it. Real-GPU renders of the shipped file along all six axes, and close-ups of anything label-like: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.',
+  }),
 }

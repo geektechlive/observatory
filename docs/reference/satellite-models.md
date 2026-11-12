@@ -108,8 +108,8 @@ One Starlink model would put a real shape behind two thirds of every satellite d
 ### NASA models
 
 From `https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/<name>`. Raw GLB sizes
-are from the repository tree (VERIFIED). Ten are built and shipped, in two batches of 2026-11-11
-(see "The trial batch" and "The second batch" below); the rest are not built, and no other mesh
+are from the repository tree (VERIFIED). Twenty-two are built and shipped, in three batches of 2026-11-11
+(see "The trial batch", "The second batch" and "The third batch" below); the rest are not built, and no other mesh
 has been checked for logos yet.
 
 | Model                              | Covers                                         | Raw GLB                                 | Notes                                                                                                            |
@@ -123,16 +123,16 @@ has been checked for logos yet.
 | Landsat 8                          | Landsat 8, 9                                   | 780 kB                                  | **Built**; shown for Landsat 9 as a stand-in                                                                     |
 | Suomi NPP                          | Suomi NPP; look-alike for NOAA 20, 21          | 2.28 MB                                 | **Built**; shown for NOAA 20 and 21 as a stand-in                                                                |
 | GOES                               | GOES 14–19 (6)                                 | 336 kB                                  | **Built**; its shape is the GOES-R series (16 to 19); a stand-in for all six                                     |
-| ICESat-2 (A)                       | ICESat-2                                       | 1.5 MB                                  |                                                                                                                  |
-| OCO-2                              | OCO-2                                          | 280 kB                                  |                                                                                                                  |
-| SORCE, SDO, Fermi, SWAS, Chandra   | 1 each                                         | 366 kB, 498 kB, 1.38 MB, 150 kB, 999 kB |                                                                                                                  |
-| MMS (A)                            | MMS 1–4                                        | 336 kB                                  |                                                                                                                  |
-| THEMIS                             | THEMIS A, D, E                                 | 683 kB                                  |                                                                                                                  |
-| CYGNSS                             | CYGNSS (7)                                     | 1.62 MB                                 |                                                                                                                  |
-| GRACE (A)                          | GRACE-FO 1, 2 (look-alike, predecessor design) | 22.6 kB                                 |                                                                                                                  |
-| Jason-1 / OSTM                     | Jason-3 (look-alike)                           | 593 kB / 925 kB                         |                                                                                                                  |
-| Jason CS                           | Sentinel-6A, 6B                                | 2.1 MB                                  | Same family                                                                                                      |
-| GPM                                | GPM Core                                       | 2.26 MB                                 |                                                                                                                  |
+| ICESat-2 (A)                       | ICESat-2                                       | 1.5 MB                                  | **Held**: the simplifier breaks its arrays (third batch, below)                                                  |
+| OCO-2                              | OCO-2                                          | 280 kB                                  | **Built**                                                                                                        |
+| SORCE, SDO, Fermi, SWAS, Chandra   | 1 each                                         | 366 kB, 498 kB, 1.38 MB, 150 kB, 999 kB | **Built** except Fermi (held, third batch); SORCE and SDO have no NASA page                                      |
+| MMS (A)                            | MMS 1–4                                        | 336 kB                                  | **Built**; shown for all four as a stand-in                                                                      |
+| THEMIS                             | THEMIS A, D, E                                 | 683 kB                                  | **Built**; shown for all three as a stand-in                                                                     |
+| CYGNSS                             | CYGNSS (7)                                     | 1.62 MB                                 | **Built**; shown for all seven as a stand-in; credit NASA (the page names no source)                             |
+| GRACE (A)                          | GRACE-FO 1, 2 (look-alike, predecessor design) | 22.6 kB                                 | **GRACE (B) built** instead (a textured wedge); shown for GRACE-FO 1, 2 as a stand-in                            |
+| Jason-1 / OSTM                     | Jason-3 (look-alike)                           | 593 kB / 925 kB                         | **OSTM (Jason-2) built**, Jason-3 being a near copy; shown for Jason-3 as a stand-in                             |
+| Jason CS                           | Sentinel-6A, 6B                                | 2.1 MB                                  | **Built**; Sentinel-6A own, 6B its twin as a stand-in                                                            |
+| GPM                                | GPM Core                                       | 2.26 MB                                 | **Built**                                                                                                        |
 | CubeSat 1RU, 2RU, ICECube, MiRaTa  | Generic stand-in for CubeSat fleets            | 149–445 kB                              | Flock and Lemur are 3U, so approximate                                                                           |
 | Satellite Kit (body, wings, radio) | Generic stand-in for any bus                   | 3–15 kB each                            | Assembled by us, as for New Horizons                                                                             |
 
@@ -298,6 +298,76 @@ orrery; that step must set these.
 **Where they fall short:** the simplifier left gaps in the GOES array's rows of cells. GOES and
 Suomi NPP have no preview render from NASA to compare with.
 
+### The third batch (#194, 2026-11-11)
+
+Twelve models through the same gate, from the same pinned commit, for 25 active satellites. Two
+more, Fermi and ICESat-2, were built and held back (below).
+
+| Model     | Source file (SHA-256 prefix)                                                                | Raw         | Built     | Triangles (source, built, budget) | Shown for (scope)                          | Credit                            |
+| --------- | ------------------------------------------------------------------------------------------- | ----------- | --------- | --------------------------------- | ------------------------------------------ | --------------------------------- |
+| oco2      | `Orbiting Carbon Observatory (OCO) 2.glb` 5aba302a                                          | 280,060 B   | 253,192 B | 41,004, 14,037, 14,000            | OCO 2 40059 (own)                          | NASA/Christopher R. Meaney        |
+| sorce     | `Solar Radiation and Climate Experiment (SORCE).glb` 8ec50508                               | 366,492 B   | 163,024 B | 115,513, 14,138, 14,000           | SORCE 27651 (own)                          | NASA                              |
+| sdo       | `Solar Dynamics Observatory.glb` 8ce4607b                                                   | 497,844 B   | 167,064 B | 272,770, 13,865, 14,000           | SDO 36395 (own)                            | NASA                              |
+| swas      | `Submillimeter Wave Astronomy Satellite (SWAS).glb` c1d58e66                                | 150,296 B   | 161,440 B | 12,908, 12,908, 12,908            | SWAS 25560 (own)                           | NASA/Christopher R. Meaney        |
+| chandra   | `Chandra X-ray Observatory.glb` 9383f44f                                                    | 998,500 B   | 233,064 B | 30,132, 13,966, 14,000            | CXO 25867 (own)                            | NASA/Brian E. Kumanchik           |
+| mms       | `Magnetospheric Multiscale (MMS) (A).glb` e3688a8d                                          | 335,808 B   | 166,972 B | 139,502, 13,998, 14,000           | MMS 1 to 4, 40482 to 40485 (family)        | NASA/Walter K. Feimer             |
+| themis    | `Time History of Events and Macroscale Interactions During Substorms (THEMIS).glb` 2dfe2a2e | 682,092 B   | 159,576 B | 11,424, 11,424, 11,424            | THEMIS A 30580, D 30797, E 30798 (family)  | NASA/JPL/Eyes on the Solar System |
+| cygnss    | `Cyclone Global Navigation Satellite System (CYGNSS).glb` 830321f2                          | 1,622,924 B | 107,016 B | 7,338, 7,338, 7,338               | CYGFM01 to 08 except 06 (family)           | NASA                              |
+| grace     | `Gravity Recovery and Climate Experiment (GRACE) (B).glb` 33382f00                          | 1,777,600 B | 95,408 B  | 3,961, 3,961, 3,961               | GRACE-FO 1 43476, 2 43477 (family)         | NASA/Christopher M. Garcia        |
+| jason2    | `Ocean Surface Topography Mission (OSTM Jason-2).glb` 61c58c2b                              | 924,688 B   | 229,388 B | 65,314, 14,617, 14,000            | JASON-3 41240 (family)                     | NASA/Kevin K. Lane                |
+| sentinel6 | `Jason Continuity of Service (Sentinel-6).glb` cd257b8d                                     | 2,108,496 B | 280,672 B | 22,866, 14,044, 14,000            | SENTINEL-6A 46984 (own), 6B 66514 (family) | NASA/Matthew J. Garcia            |
+| gpm       | `Global Precipitation Measurement.glb` 7068c880                                             | 2,257,008 B | 179,516 B | 282,774, 14,230, 14,000           | GPM-CORE 39574 (own)                       | NASA/Christopher R. Meaney        |
+
+The twelve add 2,196,332 B; the models total 6,050,964 B, under the 8,500,000 B
+`craftModelTotal`. CYGFM06 is not in CelesTrak's `active` group (FM01 41887, FM02 41886, FM03
+41891, FM04 41885, FM05 41884, FM07 41890, FM08 41888). SWAS is built slightly larger than its
+source (nothing to simplify): the build re-encodes the file uncompressed, without Draco.
+
+**Credits without a named source.** CYGNSS's page on science.nasa.gov carries the model but no
+"Source" field, and SORCE and SDO have no page there at all (searched by URL and with the site's
+search API, 2026-11-11), so the three are credited "NASA", as NASA's guidelines ask. SORCE and
+SDO link to their folder in NASA's repository instead of a page.
+
+**Choices of model.** GRACE (B), a textured wedge with its cells, over GRACE (A), a plain 22 kB
+box. OSTM (Jason-2) for Jason-3, which is close to a copy of Jason-2.
+
+**Build steps specific to these models:**
+
+- SDO and GPM: the simplifier overshoots, so SDO's `aim` is 6,000 (13,865 built). GPM would not
+  come under about 18k at any aim or error, being thousands of small closed parts, so its parts
+  under 0.5% of its size go first (`minPart`, as for Clipper) and `aim` is 9,800 (14,230 built).
+- Chandra, a change we made: one photographed part on its texture sheet carries a label with a blue
+  band and blurred, unreadable lines of text; nothing on it can be identified, so the build paints
+  it out (`blank`), as it does Hubble's plate.
+- GRACE, a change we made: the source draws one underside material (`underside.001`) with a normal
+  map as its colour picture, so it showed magenta; the build draws it in the gold of the other
+  underside (`plain`).
+
+**Held back: Fermi and ICESat-2.** Both build within budget, but the simplifier punches holes in
+their solar arrays: each panel is a substrate with a recess filled by separate cell quads, and
+simplifying removes cells and leaves the recess open (Fermi: large black triangles and rectangles
+in every panel; ICESat-2: one panel shredded). Tried and not enough: a 24k triangle budget for
+Fermi (holes stay), pruning small parts, and locking part borders (keeps the cells but lands at
+34k and 73k triangles, over the 500 kB file budget). They need a build step that merges each
+panel's cells first. Their downloads, hashes and logo check are done (no logos).
+
+**Logo check, 2026-11-11.** Every texture image extracted and viewed, label-like areas enlarged;
+NASA's preview renders viewed where NASA has one (OCO-2, SDO, MMS, GRACE A and B, ICESat-2); every
+shipped file rendered on a real GPU along all six axes, anything label-like rendered close. None
+shows an insignia, meatball, worm, patch, flag or company logo. Things that looked like marks and
+are not: SORCE's pink end-face plates (connectors), a relief on GRACE's end-face disc (a
+crossed-dipole antenna pattern). Sentinel-6's normal maps were viewed for embossed lettering:
+none. Details per model are in each manifest entry's `logosChecked.detail`.
+
+**Attitude axes.** All twelve are placeholders, none checked against the mesh: Earth-pointing for
+OCO-2, CYGNSS, GRACE, Jason-2, Sentinel-6 and GPM; Sun-pointing for SORCE and SDO
+(`PLACEHOLDER_SUN`); and for Chandra, SWAS, MMS and THEMIS, which point at neither, a placeholder
+whose note says the attitude is not modelled (`PLACEHOLDER_NONE`).
+
+**Where they fall short:** MMS has no materials and draws in plain grey. MMS and THEMIS are framed
+by their long wire booms, so the body is small in Look closer until zoomed. GPM's arrays keep
+small fragments where the simplifier merged cells.
+
 ### Other models under CC BY 4.0
 
 Licence labels read from the Sketchfab API (VERIFIED). CC BY needs the title, author, source
@@ -361,7 +431,8 @@ or stay a dot.
 ## Budget plan (#202)
 
 **`craftModelTotal` was raised on 2026-11-11 to 8,500,000 B** with the second batch, which took
-the shipped total from 2,671,904 B to 3,854,632 B, past the old 3,000,000 B. The per-model budget
+the shipped total from 2,671,904 B to 3,854,632 B, past the old 3,000,000 B. The third batch
+brought it to 6,050,964 B. The per-model budget
 stays **500 kB** on the uncompressed shipped file (`craftModelBytes`). Only the focused object's
 model is ever loaded, so the total is deploy size, not a visitor's download.
 
@@ -400,8 +471,10 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
 - [x] ISS (B), Hubble (A), Terra: built, gated and registered (trial batch).
 - [x] TDRS (two generations), GOES, Landsat 8 (and 9), Aqua, Aura, Suomi NPP (and NOAA 20, 21):
       built, gated and registered (second batch).
-- [ ] ICESat-2, OCO-2, SORCE, SDO, Fermi, SWAS, Chandra, MMS, THEMIS, CYGNSS, GRACE, Jason,
-      Jason CS, GPM, and the CubeSat and Satellite Kit stand-ins.
+- [x] OCO-2, SORCE, SDO, SWAS, Chandra, MMS, THEMIS, CYGNSS, GRACE (for GRACE-FO), OSTM (for
+      Jason-3), Sentinel-6, GPM: built, gated and registered (third batch).
+- [ ] Fermi and ICESat-2: held, their arrays need a cell-merging build step.
+- [ ] The CubeSat and Satellite Kit stand-ins (they need family lookup, not built yet).
 - [ ] Starlink (Malacodart): not downloaded or measured yet; it is the one model that could exceed
       the trial mean size.
 
@@ -411,7 +484,7 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
    budget, a look for logos and a visual check.
 2. NASA's guidelines don't mention modifying files; the README says "without copyright". This is
    the position we already took for the 10 craft.
-3. Only the ten craft shipped before the gate (as "unrecorded") and the ten satellite models of
-   the two batches are checked for logos. Every other model needs its textures viewed before it ships.
+3. Only the ten craft shipped before the gate (as "unrecorded"), the twenty-two satellite models of
+   the three batches, and the two held back (Fermi, ICESat-2), are checked for logos. Every other model needs its textures viewed before it ships.
 4. NASA's pages list a person or a company as "Source" (Hubble (A): DigitalSpace Corporation). The
    credit repeats it; the rights position is still the README's "free and without copyright".

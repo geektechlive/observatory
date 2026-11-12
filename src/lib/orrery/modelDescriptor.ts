@@ -171,6 +171,118 @@ const SUOMI_NPP: NasaSatelliteFields = {
   ...PLACEHOLDER_EARTH,
 }
 
+// Third batch (#194). The same placeholder rule as above: no axis here was checked against
+// the mesh. SDO and SORCE point at the Sun; the observatories and the spinning magnetosphere
+// missions point at neither Earth nor the Sun, and have no attitude model yet.
+const PLACEHOLDER_SUN = {
+  attitude: 'sun',
+  axis: [0, 0, 1],
+  attitudeNote: 'Sun-pointing (model axis not yet checked)',
+} as const
+const PLACEHOLDER_NONE = {
+  attitude: 'earth',
+  axis: [0, -1, 0],
+  attitudeNote: 'Attitude not modelled yet (model axis not yet checked)',
+} as const
+const NASA_REPO_TREE =
+  'https://github.com/nasa/NASA-3D-Resources/tree/11ebb4ee043715aefbba6aeec8a61746fad67fa7/3D%20Models'
+
+/** A third-batch model: file name, page, credit and attitude placeholder. */
+function batch3(
+  name: string,
+  sourceUrl: string,
+  credit: string,
+  attitude: typeof PLACEHOLDER_EARTH | typeof PLACEHOLDER_SUN | typeof PLACEHOLDER_NONE,
+): NasaSatelliteFields {
+  return { file: `/models/craft/${name}.glb`, sourceUrl, credit, ...attitude }
+}
+
+const MEANEY = 'NASA/Christopher R. Meaney'
+const MMS = batch3(
+  'mms',
+  `${RES}/magnetospheric-multiscale-mms-a/`,
+  'NASA/Walter K. Feimer',
+  PLACEHOLDER_NONE,
+)
+const THEMIS = batch3(
+  'themis',
+  `${RES}/time-history-of-events-and-macroscale-interactions-during-substorms-themis/`,
+  'NASA/JPL/Eyes on the Solar System',
+  PLACEHOLDER_NONE,
+)
+// The NASA page has the model but no Source field, so the credit is NASA's.
+const CYGNSS = batch3(
+  'cygnss',
+  `${RES}/cyclone-global-navigation-satellite-system-cygnss/`,
+  'NASA',
+  PLACEHOLDER_EARTH,
+)
+// GRACE (B): the predecessor mission, the same wedge-shaped design as GRACE-FO.
+const GRACE = batch3(
+  'grace',
+  `${RES}/gravity-recovery-and-climate-experiment-grace-b/`,
+  'NASA/Christopher M. Garcia',
+  PLACEHOLDER_EARTH,
+)
+const SENTINEL_6 = batch3(
+  'sentinel6',
+  `${RES}/jason-continuity-of-service-sentinel-6/`,
+  'NASA/Matthew J. Garcia',
+  PLACEHOLDER_EARTH,
+)
+
+const BATCH3_MODELS: SatelliteModelTable = {
+  '40059': nasaSatellite(
+    batch3('oco2', `${RES}/orbiting-carbon-observatory-oco-2/`, MEANEY, PLACEHOLDER_EARTH),
+  ),
+  // SORCE and SDO have no page on science.nasa.gov: credit NASA, source the repository folder.
+  '27651': nasaSatellite(
+    batch3(
+      'sorce',
+      `${NASA_REPO_TREE}/Solar%20Radiation%20and%20Climate%20Experiment%20(SORCE)`,
+      'NASA',
+      PLACEHOLDER_SUN,
+    ),
+  ),
+  '36395': nasaSatellite(
+    batch3('sdo', `${NASA_REPO_TREE}/Solar%20Dynamics%20Observatory`, 'NASA', PLACEHOLDER_SUN),
+  ),
+  '25560': nasaSatellite(
+    batch3('swas', `${RES}/submillimeter-wave-astronomy-satellite-swas/`, MEANEY, PLACEHOLDER_NONE),
+  ),
+  '25867': nasaSatellite(
+    batch3(
+      'chandra',
+      `${RES}/chandra-x-ray-observatory/`,
+      'NASA/Brian E. Kumanchik',
+      PLACEHOLDER_NONE,
+    ),
+  ), // CXO
+  '39574': nasaSatellite(
+    batch3('gpm', `${RES}/global-precipitation-measurement/`, MEANEY, PLACEHOLDER_EARTH),
+  ), // GPM-CORE
+  ...sharing(['40482', '40483', '40484', '40485'], nasaSatellite(MMS, 'family')), // MMS 1 to 4
+  ...sharing(['30580', '30797', '30798'], nasaSatellite(THEMIS, 'family')), // THEMIS A, D, E
+  // CYGFM01 to 08 (FM06 is not in the active group).
+  ...sharing(
+    ['41887', '41886', '41891', '41885', '41884', '41890', '41888'],
+    nasaSatellite(CYGNSS, 'family'),
+  ),
+  ...sharing(['43476', '43477'], nasaSatellite(GRACE, 'family')), // GRACE-FO 1, 2
+  // JASON-3 is a near copy of Jason-2 (OSTM), the model shown for it.
+  '41240': nasaSatellite(
+    batch3(
+      'jason2',
+      `${RES}/ocean-surface-topography-mission-ostm-jason-2/`,
+      'NASA/Kevin K. Lane',
+      PLACEHOLDER_EARTH,
+    ),
+    'family',
+  ),
+  '46984': nasaSatellite(SENTINEL_6), // SENTINEL-6A
+  '66514': nasaSatellite(SENTINEL_6, 'family'), // SENTINEL-6B, its twin
+}
+
 /**
  * By NORAD id, as a string: a model of that very object (`scope: 'own'`). The ISS is six
  * CelesTrak records (the station and five module records that carry its element set); they
@@ -226,6 +338,7 @@ export const SATELLITE_MODELS_BY_NORAD: SatelliteModelTable = {
   '37849': nasaSatellite(SUOMI_NPP), // SUOMI NPP
   // NOAA 20 and 21 (JPSS-1, JPSS-2) fly the same instruments on a bus of the same family.
   ...sharing(['43013', '54234'], nasaSatellite(SUOMI_NPP, 'family')),
+  ...BATCH3_MODELS,
 }
 
 /**
