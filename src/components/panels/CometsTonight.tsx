@@ -53,10 +53,7 @@ export function CometsTonight({ coords, dark, now }: Props) {
     <div className={styles.passes ?? ''}>
       <Label tone="dim">Comets tonight</Label>
       <CometsBody data={data !== undefined} error={error} dark={dark} result={result} />
-      <Label>
-        Brightness is JPL’s forecast. Comets often come in a magnitude or two off, and look fainter
-        than a star of the same magnitude because their light is spread out.
-      </Label>
+      <Label>Brightness is JPL’s forecast, and comets often miss it by a magnitude or two.</Label>
     </div>
   )
 }

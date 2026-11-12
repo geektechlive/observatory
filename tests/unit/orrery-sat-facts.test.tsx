@@ -115,6 +115,65 @@ describe('<SatFacts> (#98)', () => {
     expect(text).toMatch(/ESA DISCOS/)
   })
 
+  it('labels the owner as Space-Track catalogues it, and explains the ISS (#157)', () => {
+    render(
+      <SatFacts
+        info={{
+          key: 'sat:25544',
+          noradId: '25544',
+          name: 'ISS (ZARYA)',
+          group: 'stations',
+          epochMs: T0 - 3_600_000,
+          teme: [EARTH_RADIUS_KM + 418, 0, 0],
+        }}
+        simMs={T0}
+        // Space-Track's SATCAT row for 25544 as the site serves it (checked 2026-11-11).
+        catalog={{
+          noradId: '25544',
+          intlDes: '1998-067A',
+          objectType: 'PAYLOAD',
+          country: 'CIS',
+          launch: '1998-11-20',
+          site: 'TTMTR',
+          rcsSize: 'LARGE',
+        }}
+      />,
+    )
+    expect(screen.getByText('Catalogued owner')).toBeTruthy()
+    expect(screen.queryByText('Owner')).toBeNull()
+    const text = document.body.textContent
+    expect(text).toMatch(/Russia and the former USSR \(CIS\)/)
+    expect(text).toMatch(/first module, Zarya, which Russia launched in 1998/)
+    expect(text).toMatch(/NASA, Roscosmos, ESA, JAXA and CSA/)
+    expect(text).toMatch(/Space-Track\.org/)
+  })
+
+  it('adds no station note for an ordinary satellite (#157)', () => {
+    render(
+      <SatFacts
+        info={{
+          key: 'sat:45700',
+          noradId: '45700',
+          name: 'STARLINK-1400',
+          group: 'starlink',
+          epochMs: T0 - 3_600_000,
+          teme: [EARTH_RADIUS_KM + 210, 0, 0],
+        }}
+        simMs={T0}
+        catalog={{
+          noradId: '45700',
+          intlDes: '2020-035AV',
+          objectType: 'PAYLOAD',
+          country: 'US',
+          launch: '2020-06-04',
+          site: 'AFETR',
+          rcsSize: 'LARGE',
+        }}
+      />,
+    )
+    expect(document.body.textContent).not.toMatch(/Zarya/)
+  })
+
   it('says when it has no position at this date', () => {
     render(
       <SatFacts

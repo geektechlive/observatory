@@ -3,7 +3,7 @@ import { Readout } from '@/components/ui/Readout'
 import { EPOCH_WINDOW_MS } from '@/lib/orbit/satCatalog'
 import { KM_TO_MI } from '@/lib/orrery'
 import { epochAgeText, satAltitudeKm } from '@/lib/orrery/satView'
-import { objectTypeText, ownerText, rcsText } from '@/lib/satcatWords'
+import { objectTypeText, ownerNote, ownerText, rcsText } from '@/lib/satcatWords'
 import type { SatcatEntry } from '@/lib/spacetrack'
 import { reentryWhen } from '@/lib/spaceTrackText'
 import type { DiscosObject, Reentry } from '@/schemas/spaceTrack'
@@ -43,6 +43,7 @@ export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsPr
   // Without a pass for the loaded objects a null position says nothing about the date (#206).
   const computed = info.computed !== false
   const radar = catalog ? rcsText(catalog.rcsSize) : null
+  const note = ownerNote(info.noradId)
   return (
     <>
       <p className={styles.inspectorMeta ?? ''}>
@@ -96,8 +97,11 @@ export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsPr
           <>
             <dt>Kind</dt>
             <dd className={styles.inspectorText ?? ''}>{objectTypeText(catalog.objectType)}</dd>
-            <dt>Owner</dt>
-            <dd className={styles.inspectorText ?? ''}>{ownerText(catalog.country)}</dd>
+            <dt>Catalogued owner</dt>
+            <dd className={styles.inspectorText ?? ''}>
+              {ownerText(catalog.country)}
+              {note && ` · ${note}`}
+            </dd>
             {catalog.launch && (
               <>
                 <dt>Launched</dt>

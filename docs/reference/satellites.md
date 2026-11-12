@@ -244,9 +244,13 @@ They are read with the owner's accounts, in the refresh job only.
   be empty) and DISCOS (the craft).
 - **Showing it:** the ticker's RE-ENTRY lines for this week's predictions; in the orrery, the Box
   Score and re-entry count under the Earth orbit switches, an amber ring on each predicted object
-  that is loaded (`data-orrery-sat-reentries`), and the satellite inspector's kind, owner, launch,
-  radar size (Space-Track's bands: "Small (< 0.1m), Medium (0.1m – 1m), & Large (>1m)") and
-  DISCOS facts. Spacecraft get DISCOS's mass, size and operator.
+  that is loaded (`data-orrery-sat-reentries`), and the satellite inspector's kind, catalogued
+  owner, launch, radar size (Space-Track's bands: "Small (< 0.1m), Medium (0.1m – 1m), & Large
+  (>1m)") and DISCOS facts. Spacecraft get DISCOS's mass, size and operator.
+- **Catalogued owner (#157):** SATCAT's COUNTRY, "the nation or group that has responsibility for
+  an object" (Space-Track's glossary), shown as Space-Track gives it. It belongs to the catalogued
+  object, so the ISS (25544, 1998-067A, Zarya) is CIS. `ownerNote()` in `satcatWords.ts` adds a
+  note by NORAD id where that misleads; never remap the code.
 - **The ticker costs the first load 0.9 kB gzip** (150.1 to 151.0 kB, still 4 chunks):
   `useSpaceTrack`, its schema and `spaceTrackText.ts`. A lazy import of the fetcher saved nothing
   and added a chunk.

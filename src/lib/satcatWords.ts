@@ -47,6 +47,23 @@ export function ownerText(code: string): string {
   return name ? `${name} (${code})` : code
 }
 
+/**
+ * A note beside the catalogued owner where it misleads (#157). SATCAT's COUNTRY is "the
+ * nation or group that has responsibility for an object" (Space-Track's glossary), and it
+ * belongs to the catalogued object: for the ISS that is Zarya (1998-067A), so Space-Track
+ * lists it as CIS. Keyed by NORAD id, not owner code, and the code itself is shown as is.
+ */
+const OWNER_NOTES: Readonly<Record<string, string>> = {
+  '25544':
+    'Space-Track catalogues the station under its first module, Zarya, which Russia launched ' +
+    'in 1998. The station is run by NASA, Roscosmos, ESA, JAXA and CSA.',
+}
+
+/** A note on an object's catalogued owner, or null when none is needed. */
+export function ownerNote(noradId: string): string | null {
+  return OWNER_NOTES[noradId] ?? null
+}
+
 /** SATCAT's OBJECT_TYPE in plain words. */
 export function objectTypeText(type: string): string {
   return TYPES[type.toUpperCase()] ?? type

@@ -5,7 +5,7 @@
  * window, when it is highest, and how bright JPL's total-magnitude law makes it then.
  *
  * Comet magnitudes are forecasts from a two-number law fitted to past observations,
- * and comets often come in a magnitude or two off; the panel says so.
+ * and comets often miss it by a magnitude or two; the panel says so.
  */
 import { compassPoint } from '@/lib/compass'
 

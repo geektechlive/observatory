@@ -57,7 +57,17 @@ describe('CometsTonight', () => {
     expect(item.textContent).toMatch(/\d+° up/)
     expect(item.textContent).toMatch(/mag 13\.\d/)
     expect(item.textContent).toMatch(/8-inch telescope/)
-    expect(document.body.textContent).toMatch(/a magnitude or two off/i)
+  })
+
+  it('warns in one short sentence that comet brightness is a forecast (#134)', () => {
+    query.result = payload([t5])
+    render(<CometsTonight coords={KITT_PEAK} dark={DARK} now={NOW} />)
+    expect(
+      screen.getByText(
+        'Brightness is JPL’s forecast, and comets often miss it by a magnitude or two.',
+      ),
+    ).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/light is spread out/i)
   })
 
   it('says plainly when nothing is bright enough, and names the brightest one up', () => {
