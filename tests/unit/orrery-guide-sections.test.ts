@@ -43,8 +43,8 @@ describe('the guide reference sections (#159)', () => {
     const known = new Set(SOURCES.map((s) => s.id))
     expect(DATA_SOURCES.length).toBeGreaterThanOrEqual(8)
     for (const d of DATA_SOURCES) {
-      // A registry id where the registry has one, so the guide and the Data sources list agree.
-      expect(d.sourceId === undefined || known.has(d.sourceId), d.name).toBe(true)
+      // Every guide entry is in the Data sources list (#207), so the two agree.
+      expect(d.sourceId !== undefined && known.has(d.sourceId), d.name).toBe(true)
       expect(d.url, d.name).toMatch(/^https:\/\//)
       expect(d.fresh.length, d.name).toBeGreaterThan(10)
       expect(d.gives.length, d.name).toBeGreaterThan(10)
@@ -61,5 +61,16 @@ describe('the guide reference sections (#159)', () => {
     ]) {
       expect(DATA_SOURCES.map((d) => d.name)).toContain(name)
     }
+  })
+
+  it('explains every source in the Data sources list, at the same link (#207)', () => {
+    for (const s of SOURCES) {
+      const d = DATA_SOURCES.find((x) => x.sourceId === s.id)
+      expect(d?.url, s.id).toBe(s.docs)
+    }
+  })
+
+  it('links to the final address, not one that redirects (#207)', () => {
+    for (const d of DATA_SOURCES) expect(d.url, d.name).not.toContain('www.swpc.noaa.gov')
   })
 })

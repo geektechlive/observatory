@@ -237,10 +237,8 @@ export function ControlRail({
               <a href={s.docs} target="_blank" rel="noreferrer">
                 {s.name}
               </a>
-              <span className={styles.status ?? ''} data-status={s.status}>
-                {s.status}
-              </span>
-              {s.note && <span className={styles.sourceNote ?? ''}>{s.note}</span>}
+              <span className={styles.sourceNote ?? ''}>{s.gives}</span>
+              {s.credit && <span className={styles.sourceCredit ?? ''}>{s.credit}</span>}
             </li>
           ))}
         </ul>

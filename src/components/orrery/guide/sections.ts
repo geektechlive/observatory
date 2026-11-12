@@ -199,6 +199,10 @@ export const SECTIONS: readonly Section[] = [
         kind: 'p',
         text: 'Most of it is fetched ahead of time by a refresh job and served from a cache, so the orrery rarely waits on an agency’s server. When a copy gets old, the page says so.',
       },
+      {
+        kind: 'p',
+        text: 'Data sources, at the foot of the controls, names each provider the orrery uses, what it gives and any credit its terms ask for. The list below adds how fresh each one is.',
+      },
     ],
   },
 ]
@@ -221,6 +225,14 @@ export const DATA_SOURCES: readonly DataSource[] = [
     gives: 'Where the spacecraft, Earth, the Moon and the other moons are.',
     fresh:
       'Sampled every 6 hours and shown as current for up to 72 hours. The planets do not come from here: they use JPL’s approximate orbital elements, computed in your browser.',
+  },
+  {
+    name: 'JPL Small-Body Database',
+    sourceId: 'sbdb',
+    url: 'https://ssd-api.jpl.nasa.gov/doc/sbdb.html',
+    gives: 'The asteroid or comet you look up, and which comets are bright enough to show.',
+    fresh:
+      'A lookup is kept for a day. The comets are picked again every 6 hours by the refresh job.',
   },
   {
     name: 'JPL Close Approach Data',
@@ -268,18 +280,28 @@ export const DATA_SOURCES: readonly DataSource[] = [
   },
   {
     name: 'NOAA GOES SUVI',
-    url: 'https://www.swpc.noaa.gov/products/goes-solar-ultraviolet-imager-suvi',
+    sourceId: 'suvi',
+    url: 'https://www.spaceweather.gov/products/goes-solar-ultraviolet-imager-suvi',
     gives: 'The live picture of the Sun.',
     fresh: 'The newest frame, checked every 10 minutes while the orrery is open.',
   },
   {
     name: 'NOAA solar wind',
-    url: 'https://www.swpc.noaa.gov/products/real-time-solar-wind',
+    sourceId: 'solar-wind',
+    url: 'https://www.spaceweather.gov/products/solar-wind',
     gives: 'The speed of the solar wind at L1.',
     fresh: 'Cached for 5 minutes and refetched every 5 minutes.',
   },
   {
+    name: 'NOAA WSA-ENLIL',
+    sourceId: 'enlil',
+    url: 'https://www.spaceweather.gov/products/wsa-enlil-solar-wind-prediction',
+    gives: 'Whether a cloud thrown off by the Sun (a CME) is forecast to reach Earth, and when.',
+    fresh: 'Cached for 3 hours and refetched every 3 hours.',
+  },
+  {
     name: 'NASA Deep Space Network',
+    sourceId: 'dsn',
     url: 'https://eyes.nasa.gov/apps/dsn-now/dsn.html',
     gives: 'Which craft the big dishes are talking to.',
     fresh: 'Checked every 15 seconds.',
