@@ -1,4 +1,4 @@
-import { upstreamError } from './_cache'
+import { fetchUpstream, upstreamError } from './_cache'
 
 // The way to JPL for on-demand requests (#100): every one goes through the jpl-queue
 // Worker's Durable Object, which runs them one at a time (JPL Fair Use: "only one API
@@ -59,4 +59,24 @@ export async function askJpl(ns: JplQueueNamespace, url: string): Promise<JplRep
     }
   }
   return { ok: true, status: Number(res.headers.get('X-Jpl-Status')), text: await res.text() }
+}
+
+/**
+ * Ask JPL for a cached feed (#146: planets, Sentry, Fireball): through the queue when it is
+ * bound, so these never overlap a lookup; without it, straight to JPL as before, so the
+ * feed keeps working where the queue isn't deployed (local dev, a preview without it).
+ * A network failure or timeout on the direct path throws, as `fetchUpstream` does.
+ */
+export async function askJplFeed(
+  ns: JplQueueNamespace | undefined,
+  url: string,
+  direct?: { init?: RequestInit; timeoutMs?: number },
+): Promise<JplReply> {
+  if (ns) return askJpl(ns, url)
+  const res = await fetchUpstream(
+    url,
+    direct?.init,
+    direct?.timeoutMs === undefined ? undefined : { timeoutMs: direct.timeoutMs },
+  )
+  return { ok: true, status: res.status, text: await res.text() }
 }

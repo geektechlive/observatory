@@ -10,55 +10,10 @@ import halley from '../fixtures/jpl-lookup/sbdb-halley.json'
 import none from '../fixtures/jpl-lookup/sbdb-none.json'
 import eros from '../fixtures/jpl-lookup/sbdb-spk433.json'
 import { installFakeCache } from './_fakeCache'
+import { fakeQueue, run } from './_fakeJplQueue'
 
 // /api/lookup and /api/trajectory (#100) with the real cachedJson over a fake Cache API
 // and a fake jpl-queue Durable Object that answers from real JPL fixtures.
-
-interface Reply {
-  status?: number
-  jplStatus: number
-  body: unknown
-  headers?: Record<string, string>
-}
-
-function fakeQueue(replies: (url: string) => Reply) {
-  const asked: string[] = []
-  const stub = {
-    fetch: vi.fn(async (_url: string, init: RequestInit) => {
-      const { url } = JSON.parse(init.body as string) as { url: string }
-      asked.push(url)
-      const r = replies(url)
-      return new Response(typeof r.body === 'string' ? r.body : JSON.stringify(r.body), {
-        status: r.status ?? 200,
-        headers: { 'X-Jpl-Status': String(r.jplStatus), ...r.headers },
-      })
-    }),
-  }
-  const ns = {
-    idFromName: vi.fn(() => 'the-one-id'),
-    get: vi.fn(() => stub),
-  }
-  return { ns, asked }
-}
-
-function run(
-  handler: typeof lookup,
-  path: string,
-  env: Record<string, unknown>,
-): Promise<{ res: Response; settle: () => Promise<void> }> {
-  const pending: Promise<unknown>[] = []
-  const ctx = {
-    request: new Request(`https://observatory.test${path}`),
-    env,
-    waitUntil: (p: Promise<unknown>) => pending.push(p),
-  }
-  return Promise.resolve(handler(ctx as unknown as Parameters<typeof lookup>[0])).then((res) => ({
-    res,
-    settle: async () => {
-      await Promise.all(pending)
-    },
-  }))
-}
 
 beforeEach(() => {
   installFakeCache()

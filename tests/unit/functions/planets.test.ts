@@ -39,7 +39,9 @@ function serveHorizons(down: string[] = []) {
 }
 
 type Handler = (ctx: unknown) => Promise<Response>
-const call = () => (onRequest as unknown as Handler)(makeCtx('https://o.test/api/planets').ctx)
+// No JPL_QUEUE binding: the direct path (#146; the queued path is jpl-queued-feeds.test.ts).
+const call = () =>
+  (onRequest as unknown as Handler)({ ...makeCtx('https://o.test/api/planets').ctx, env: {} })
 
 interface Body {
   bodies: { name: string }[]

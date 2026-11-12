@@ -45,6 +45,7 @@ mean day to day:
 - **JPL Horizons answers 503 to overlapping requests from one address (#88, measured
   2026-11-06).** Nine parallel calls got two answers; the same nine one at a time all answered in
   ~140 ms each. `/api/planets` asks one body at a time, and any new Horizons caller must too.
+  With the `JPL_QUEUE` binding it asks through the jpl-queue, as Sentry and Fireball do (#146).
 - **NOAA SWPC feed drift (2026-09):** `noaa-planetary-k-index.json` became an array of objects,
   and `solar-wind/{plasma,mag}-7-day.json` returned 404. Solar wind and Bz now come from
   `products/geospace/propagated-solar-wind-1-hour.json` via the shared `functions/api/_swpc.ts`.

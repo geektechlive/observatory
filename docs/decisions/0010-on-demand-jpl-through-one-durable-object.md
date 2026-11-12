@@ -33,3 +33,11 @@ answers for a day with the Cache API.
 - #100, #145; commit d64212a.
 - `workers/jpl-queue/`, `wrangler.toml` (`JPL_QUEUE`).
 - [reference/orrery-data.md](../reference/orrery-data.md#on-demand-jpl-100).
+
+## Addendum, 2026-11-11 (#146)
+
+The cached Functions `/api/planets`, `/api/sentry` and `/api/fireball` now ask JPL through the
+queue too, on their Cache API misses only, and fetch directly only when the binding is missing.
+The fourth consequence above no longer holds. They spend the daily budget that searches use:
+about 244 requests a day for each colo that sees steady traffic, so the "budget regularly reached"
+trigger for revisiting this decision is now more likely to fire.

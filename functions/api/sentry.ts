@@ -1,18 +1,21 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { SentryResponseSchema } from '../../src/schemas/sentry'
-import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, upstreamError } from './_cache'
+import { askJplFeed, type JplEnv } from './_jpl'
 
 const SENTRY_API = 'https://ssd-api.jpl.nasa.gov/sentry.api'
 const CACHE_TTL_SECONDS = 21600 // 6 h
 
-export const onRequest: PagesFunction = (ctx) =>
+export const onRequest: PagesFunction<JplEnv> = (ctx) =>
   cachedJson(ctx, 'nasa:sentry:top50', CACHE_TTL_SECONDS, async () => {
     // JPL Sentry is not gated by the NASA_API_KEY — no quota header to surface here.
-    const upstream = await fetchUpstream(SENTRY_API)
-    if (!upstream.ok) return upstreamError(upstream.status, 'JPL Sentry upstream error')
+    // Only a cache miss reaches JPL, through the jpl-queue when it is bound (#146).
+    const reply = await askJplFeed(ctx.env.JPL_QUEUE, SENTRY_API)
+    if (!reply.ok) return reply.response
+    if (reply.status !== 200) return upstreamError(reply.status, 'JPL Sentry upstream error')
 
-    const raw: unknown = await upstream.json()
+    const raw: unknown = JSON.parse(reply.text)
     const parsed = SentryResponseSchema.safeParse(raw)
     if (!parsed.success) {
       console.warn('[sentry] invalid upstream response', parsed.error.issues)

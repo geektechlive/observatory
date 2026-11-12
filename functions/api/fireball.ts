@@ -2,7 +2,8 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 import { z } from 'zod'
 
 import { type Fireball, FireballResponseSchema } from '../../src/schemas/fireball'
-import { cachedJson, contractError, fetchUpstream, upstreamError } from './_cache'
+import { cachedJson, contractError, upstreamError } from './_cache'
+import { askJplFeed, type JplEnv } from './_jpl'
 
 const FIREBALL_API = 'https://ssd-api.jpl.nasa.gov/fireball.api'
 const CACHE_TTL_SECONDS = 3600 // 1 h
@@ -30,12 +31,14 @@ function parseFireballData(fields: string[], rows: (string | null)[][]): Firebal
   }))
 }
 
-export const onRequest: PagesFunction = (ctx) =>
+export const onRequest: PagesFunction<JplEnv> = (ctx) =>
   cachedJson(ctx, 'nasa:fireball:recent30', CACHE_TTL_SECONDS, async () => {
-    const upstream = await fetchUpstream(`${FIREBALL_API}?limit=30`)
-    if (!upstream.ok) return upstreamError(upstream.status, 'JPL Fireball upstream error')
+    // Only a cache miss reaches JPL, through the jpl-queue when it is bound (#146).
+    const reply = await askJplFeed(ctx.env.JPL_QUEUE, `${FIREBALL_API}?limit=30`)
+    if (!reply.ok) return reply.response
+    if (reply.status !== 200) return upstreamError(reply.status, 'JPL Fireball upstream error')
 
-    const rawParsed = FireballRawSchema.safeParse(await upstream.json())
+    const rawParsed = FireballRawSchema.safeParse(JSON.parse(reply.text))
     if (!rawParsed.success) {
       console.warn('[fireball] invalid upstream response', rawParsed.error.issues)
       return contractError('Invalid JPL Fireball response')

@@ -295,8 +295,13 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
 A visitor's search goes through one Durable Object, `JplQueue`, in its own Worker
 (`workers/jpl-queue/`, deployed as `observatory-jpl-queue`). It reaches JPL only through it, one
 request at a time, as JPL's Fair Use asks ("only one API request at a time"). `/api/planets`,
-`/api/sentry` and `/api/fireball` still call JPL from their own Functions (cached, outside the
-queue).
+`/api/sentry` and `/api/fireball` use it too (#146): only their Cache API misses reach it,
+through `askJplFeed` in `functions/api/_jpl.ts`, and without the binding they fetch JPL directly
+as before. Planets asks its nine bodies one after another, within 20 s through the queue (1 s
+between starts, inside `waitUntil`'s 30 s). Each colo's misses spend the daily budget: about
+9 × 24 (planets, hourly) + 24 (Fireball) + 4 (Sentry) = 244 requests a colo a day, so eight colos
+busy all day would use the 2,000 that lookups share. The GitHub Actions refresh job still calls
+JPL from its own address, outside the queue.
 
 - **Why a separate Worker:** Pages can't host one. "You cannot create and deploy a Durable Object
   within a Pages project", and a Pages binding "require[s] the `script_name` key"
