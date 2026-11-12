@@ -137,6 +137,8 @@ describe('the lessons (#159)', () => {
     const text = l?.paragraphs.join(' ') ?? ''
     // 0.0021 au is 0.0021 * 149,597,870.7 / 384,400 = 0.82 lunar distances.
     expect(text).toContain('0.8 lunar distances')
+    // Under a million km it reads in km, not "0.31 million km" (#217).
+    expect(text).toContain('(314,156 km)')
     expect(text.toLowerCase()).toContain('potentially hazardous')
   })
 

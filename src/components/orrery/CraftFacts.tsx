@@ -3,22 +3,15 @@ import { Readout } from '@/components/ui/Readout'
 import type { DsnLink } from '@/lib/dsn'
 import { craftModelFor } from '@/lib/orrery/craftModels'
 import { describeCraft } from '@/lib/orrery/craftState'
-import { AU_KM, formatLightTime, KM_TO_MI } from '@/lib/orrery/units'
+import { formatLightTime } from '@/lib/orrery/units'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { DiscosObject } from '@/schemas/spaceTrack'
 
 import { DiscosFacts } from './DiscosFacts'
+import { Distance } from './Distance'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
 import { Term } from './Term'
-
-const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
-const fmtKm = (km: number) =>
-  km >= 1e9
-    ? `${(km / 1e9).toFixed(2)} billion`
-    : km >= 1e6
-      ? `${(km / 1e6).toFixed(1)} million`
-      : Math.round(km).toLocaleString('en-US')
 
 const CATEGORY: Record<OrreryTrack['category'], string> = {
   spacecraft: 'Spacecraft',
@@ -82,16 +75,11 @@ export function CraftFacts({ track, earth, jd, simMs, link, physical }: CraftFac
           <dl className={styles.facts ?? ''}>
             <dt>From the Sun</dt>
             <dd>
-              <Readout value={fmtAu(d.sunDistanceAu)} unit="au" />{' '}
-              <Label>{fmtKm(d.sunDistanceAu * AU_KM)} km</Label>
+              <Distance au={d.sunDistanceAu} />
             </dd>
             <dt>From Earth</dt>
             <dd>
-              <Readout value={fmtAu(d.earthDistanceAu)} unit="au" />{' '}
-              <Label>
-                {fmtKm(d.earthDistanceAu * AU_KM)} km ·{' '}
-                {fmtKm(d.earthDistanceAu * AU_KM * KM_TO_MI)} mi
-              </Label>
+              <Distance au={d.earthDistanceAu} miles />
             </dd>
             <dt>
               <Term id="light-time">Light time</Term>

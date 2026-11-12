@@ -1,14 +1,10 @@
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import { type SmallBodyEntry, smallBodyFacts } from '@/lib/orrery/smallBodyView'
-import { AU_KM } from '@/lib/orrery/units'
 
+import { Distance } from './Distance'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
-
-const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
-const fmtKm = (km: number) =>
-  km >= 1e9 ? `${(km / 1e9).toFixed(2)} billion` : `${(km / 1e6).toFixed(1)} million`
 
 const SPAN_TEXT = {
   fine: 'JPL Horizons, daily samples with velocity',
@@ -41,8 +37,7 @@ export function SmallBodyFacts({ entry, simMs }: { entry: SmallBodyEntry; simMs:
           <>
             <dt>From the Sun</dt>
             <dd>
-              <Readout value={fmtAu(f.sunAu)} unit="au" />{' '}
-              <Label>{fmtKm(f.sunAu * AU_KM)} km</Label>
+              <Distance au={f.sunAu} />
             </dd>
           </>
         )}

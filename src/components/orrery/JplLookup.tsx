@@ -5,6 +5,7 @@ import { type LookupState, trajectoryFacts, type Unavailable } from '@/lib/api/j
 import { lookupSpan } from '@/lib/orrery/lookupTrack'
 import type { LookupObject } from '@/schemas/jplLookup'
 
+import { distanceText } from './distanceText'
 import styles from './jpl-lookup.module.css'
 import { useLookupStore } from './lookupStore'
 import { useSimTime } from './useSimTime'
@@ -112,8 +113,8 @@ function Position({ object }: { object: LookupObject }) {
   const day = new Date((facts.sampleJd - UNIX_EPOCH_JD) * DAY_MS).toISOString().slice(0, 10)
   return (
     <p className={styles.facts ?? ''}>
-      On {day}: {fmt(facts.sunAu, 3)} au from the Sun, about {fmt(facts.earthAu, 3)} au from Earth,
-      moving at {fmt(facts.speedKmS, 1)} km/s.
+      On {day}: {distanceText(facts.sunAu)} from the Sun, about {distanceText(facts.earthAu)} from
+      Earth, moving at {fmt(facts.speedKmS, 1)} km/s.
     </p>
   )
 }

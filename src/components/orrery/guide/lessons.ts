@@ -14,6 +14,7 @@
 import { AU_KM, LD_KM } from '@/lib/orrery/units'
 
 import { L1_KEY } from '../catalog'
+import { distanceText } from '../distanceText'
 import type { OrreryLink } from '../orreryLink'
 import type { PlaybackRate } from '../rateLabels'
 
@@ -117,7 +118,8 @@ function asteroidLesson(ctx: LessonContext): Lesson {
   const ms = Date.parse(pick.closeApproach.date)
   const km = pick.closeApproach.distAu * AU_KM
   const ld = km / LD_KM
-  const ldText = ld >= 10 ? String(Math.round(ld)) : ld.toFixed(1)
+  // Below 0.1 LD, two significant figures, never "0.0" (#217).
+  const ldText = ld >= 10 ? String(Math.round(ld)) : ld >= 0.1 ? ld.toFixed(1) : ld.toPrecision(2)
   const hazard = pick.pha
     ? ' JPL lists it as a potentially hazardous asteroid, which describes its orbit and size, not a forecast of an impact.'
     : ''
@@ -125,7 +127,7 @@ function asteroidLesson(ctx: LessonContext): Lesson {
     ...base,
     title: `The closest asteroid pass this month: ${pick.name.replace(/^\((.*)\)$/, '$1')}`,
     paragraphs: [
-      `Among the objects the orrery places, ${pick.name} makes the closest pass within 30 days of today: about ${ldText} lunar distances (${(km / 1e6).toFixed(2)} million km) from Earth, at ${utcWhen(ms)}.${hazard}`,
+      `Among the objects the orrery places, ${pick.name} makes the closest pass within 30 days of today: about ${ldText} lunar distances (${distanceText(pick.closeApproach.distAu)}) from Earth, at ${utcWhen(ms)}.${hazard}`,
       'Show me jumps the clock to that moment, frames Earth and selects the asteroid. Amber marks an asteroid, and red marks one on the hazardous list.',
     ],
     tryIt:

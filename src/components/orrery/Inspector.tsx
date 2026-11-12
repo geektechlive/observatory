@@ -3,7 +3,7 @@ import { type Ref, useId } from 'react'
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import type { DsnLink } from '@/lib/dsn'
-import { AU_KM, formatLightTime, jdFromDate, KM_TO_MI, PLANETS } from '@/lib/orrery'
+import { formatLightTime, jdFromDate, PLANETS } from '@/lib/orrery'
 import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
 import type { OrreryEntry } from '@/lib/orrery/dwarfView'
@@ -17,6 +17,7 @@ import type { Discos, Reentry } from '@/schemas/spaceTrack'
 
 import { L1_KEY } from './catalog'
 import { CraftFacts } from './CraftFacts'
+import { Distance } from './Distance'
 import { DwarfFacts } from './DwarfFacts'
 import { ImageryFacts } from './ImageryFacts'
 import { LookupFacts } from './LookupFacts'
@@ -141,10 +142,6 @@ interface InspectorProps {
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
 const isBodyName = (key: string): key is BodyName => BODY_NAMES.has(key)
-
-const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
-const fmtKm = (km: number) =>
-  km >= 1e9 ? `${(km / 1e9).toFixed(2)} billion` : `${(km / 1e6).toFixed(1)} million`
 
 /**
  * What the orrery knows about the selected body (#91; spec Parts 10 and 16). Concise
@@ -397,24 +394,19 @@ function PlanetFacts({
 }) {
   const d = describePlanet(body, jd)
   const { state } = d
-  const earthKm = d.earthDistanceAu === null ? null : d.earthDistanceAu * AU_KM
 
   return (
     <>
       <dl className={styles.facts ?? ''}>
         <dt>From the Sun</dt>
         <dd>
-          <Readout value={fmtAu(d.sunDistanceAu)} unit="au" />{' '}
-          <Label>{fmtKm(d.sunDistanceAu * AU_KM)} km</Label>
+          <Distance au={d.sunDistanceAu} />
         </dd>
-        {earthKm !== null && d.earthDistanceAu !== null && (
+        {d.earthDistanceAu !== null && (
           <>
             <dt>From Earth</dt>
             <dd>
-              <Readout value={fmtAu(d.earthDistanceAu)} unit="au" />{' '}
-              <Label>
-                {fmtKm(earthKm)} km · {fmtKm(earthKm * KM_TO_MI)} mi
-              </Label>
+              <Distance au={d.earthDistanceAu} miles />
             </dd>
             <dt>
               <Term id="light-time">Light time</Term>

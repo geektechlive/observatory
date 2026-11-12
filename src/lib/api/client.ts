@@ -10,6 +10,8 @@ const HEADER_AGE = 'X-Data-Age'
 const HEADER_QUOTA = 'X-Quota-Remaining'
 /** `REVALIDATING`: an expired entry, answered at once while the server refreshes it (#83). */
 const HEADER_CACHE = 'X-Cache'
+/** `contract` or `upstream`: why a Function answered an error (functions/api/_cache.ts). */
+const HEADER_ERROR_KIND = 'X-Error-Kind'
 
 let revalidatingListener: (() => void) | null = null
 
@@ -28,14 +30,34 @@ export async function apiFetch(url: string, init?: RequestInit): Promise<Respons
   return res
 }
 
-/** A non-2xx response. Carries the status so retry policy can branch on it. */
+/**
+ * Retry-After as delta-seconds, or null. Only seconds: our middleware sends `60`, the zone
+ * rule sends none, and an HTTP date falls back to the retry's 61 s floor.
+ */
+function parseRetryAfter(raw: string | null): number | null {
+  const s = raw === null || raw.trim() === '' ? NaN : Number(raw)
+  return s >= 0 ? s : null
+}
+
+/**
+ * A non-2xx response. Carries what retry policy branches on (#218): the status, a 429's
+ * `Retry-After`, and whether the answer is the server's 60 s negative entry
+ * (`X-Cache: NEG`), which a quick retry would only replay.
+ */
 export class HttpError extends Error {
   status: number
+  retryAfterS: number | null
+  negCached: boolean
+  /** `X-Error-Kind: contract`: the upstream's payload broke our schema, so a retry can't help. */
+  contract: boolean
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, res?: Response) {
     super(message)
     this.name = 'HttpError'
     this.status = status
+    this.retryAfterS = parseRetryAfter(res?.headers.get('Retry-After') ?? null)
+    this.negCached = res?.headers.get(HEADER_CACHE) === 'NEG'
+    this.contract = res?.headers.get(HEADER_ERROR_KIND) === 'contract'
   }
 }
 
@@ -63,7 +85,7 @@ export async function getJsonMeta<T>(
   init?: RequestInit,
 ): Promise<SourceEnvelope<T>> {
   const res = await apiFetch(url, init)
-  if (!res.ok) throw new HttpError(res.status, `Request failed (${res.status}): ${url}`)
+  if (!res.ok) throw new HttpError(res.status, `Request failed (${res.status}): ${url}`, res)
 
   if (res.headers.get(HEADER_QUOTA) !== null) trackQuota(res)
 

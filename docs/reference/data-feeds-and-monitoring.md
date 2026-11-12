@@ -171,6 +171,13 @@ mean day to day:
 - The client's `apiFetch` (every `src/lib/api` fetcher uses it) notices a REVALIDATING answer, and
   `main.tsx` refetches the active queries 10 s later, once the fresh copy has landed. A new
   fetcher must use `apiFetch` or `getJson`, never bare `fetch`.
+- **The client's retries wait out what answered them (#218).** `main.tsx`'s default
+  `retryDelay` is `defaultRetryDelay` (`src/hooks/useSourceQuery.ts`): 1, 2 and 4 s for a
+  dropped connection or a 5xx, but 61 s (or a longer `Retry-After`, up to 2 minutes) after a
+  429 or an answer marked `X-Cache: NEG`, which a quick retry would only replay. `HttpError`
+  carries `retryAfterS`, `negCached` and `contract` from the response; `defaultRetry` caps every
+  query at three retries and never retries a contract: a client-side schema failure, a 400, a
+  500 (`contractError()`) or any answer marked `X-Error-Kind: contract`.
 - When the background refresh fails, it writes the neg entry, and the next request gets the last
   good body as a 200 with `X-Cache: STALE`, `X-Data-Age`, `X-Stale-Status` and `X-Error-Kind`.
 - The health check re-asks 12 s after a REVALIDATING answer and judges the second one. Judged as
@@ -267,9 +274,10 @@ Both data-refresh jobs write `incident-report.json`, and `scripts/report-inciden
   `_middleware.ts` (60 a minute per isolate, JSON `{"error":"Rate limit exceeded"}` with
   `Retry-After: 60`, seen only by requests that reach a Function). A cold orrery load sends
   about 17 `/api/` requests, so five tabs at once from one address can trip either. Which one
-  sent #141's 429s wasn't captured. The client waits out both: the orrery bodies query retries
-  a 429 after 61 s (`bodiesRetryDelay`; a 5xx keeps the 2/4/8 s backoff, since its KV
-  pass-through keeps no negative entry), and a JPL lookup reads a 429 as busy and comes back
+  sent #141's 429s wasn't captured. The client waits out both: every query, the orrery bodies
+  included, retries a 429 after 61 s (`defaultRetryDelay`, #218, which replaced #141's
+  `bodiesRetryDelay`; a 5xx keeps the 1/2/4 s backoff unless it is a negative-cache replay),
+  and a JPL lookup reads a 429 as busy and comes back
   after its `Retry-After` (61 s at least for a replayed negative entry, `X-Cache: NEG`).
 - When a fix doesn't show on the plain URL of an `/api/` endpoint but does with `?x=1`, the zone's
   cache rule is holding the old answer: purge that URL (#61, #72).

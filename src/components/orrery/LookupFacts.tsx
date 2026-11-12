@@ -1,19 +1,17 @@
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import { describeLookup, lookupOrbit } from '@/lib/orrery/lookupTrack'
-import { AU_KM, formatLightTime, KM_TO_MI } from '@/lib/orrery/units'
+import { formatLightTime } from '@/lib/orrery/units'
 import type { LookupObject, TrajectoryResponse } from '@/schemas/jplLookup'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
+import { Distance } from './Distance'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
 import { Term } from './Term'
 
 const JD_UNIX_EPOCH = 2440587.5
 const DAY_MS = 86_400_000
-const fmtAu = (au: number) => (au < 10 ? au.toFixed(3) : au.toFixed(2))
-const fmtKm = (km: number) =>
-  km >= 1e9 ? `${(km / 1e9).toFixed(2)} billion` : `${(km / 1e6).toFixed(1)} million`
 
 interface LookupFactsProps {
   object: LookupObject | null
@@ -48,7 +46,6 @@ export function LookupFacts({
   const fine = trajectory?.fine ?? null
   const d = fine ? describeLookup(fine, earth, jd) : null
   const orbitKind = fine && d ? lookupOrbit(fine, jd)?.kind : undefined
-  const earthKm = d ? d.earthDistanceAu * AU_KM : 0
   const request = trajectory?.request
 
   return (
@@ -90,15 +87,11 @@ export function LookupFacts({
         <dl className={styles.facts ?? ''}>
           <dt>From the Sun</dt>
           <dd>
-            <Readout value={fmtAu(d.sunDistanceAu)} unit="au" />{' '}
-            <Label>{fmtKm(d.sunDistanceAu * AU_KM)} km</Label>
+            <Distance au={d.sunDistanceAu} />
           </dd>
           <dt>From Earth</dt>
           <dd>
-            <Readout value={fmtAu(d.earthDistanceAu)} unit="au" />{' '}
-            <Label>
-              {fmtKm(earthKm)} km · {fmtKm(earthKm * KM_TO_MI)} mi
-            </Label>
+            <Distance au={d.earthDistanceAu} miles />
           </dd>
           <dt>
             <Term id="light-time">Light time</Term>

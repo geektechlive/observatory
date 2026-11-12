@@ -17,7 +17,8 @@ export interface OrrerySatsBody {
 export async function fetchOrrerySatsBody(group: SatGroupId): Promise<OrrerySatsBody> {
   const url = `/api/orrery-sats?group=${group}`
   const res = await apiFetch(url, undefined)
-  if (!res.ok) throw new HttpError(res.status, `Request failed (${String(res.status)}): ${url}`)
+  if (!res.ok)
+    throw new HttpError(res.status, `Request failed (${String(res.status)}): ${url}`, res)
   const age = Number.parseInt(res.headers.get('X-Data-Age') ?? '', 10)
   return {
     body: await res.arrayBuffer(),

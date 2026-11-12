@@ -8,26 +8,25 @@ import { describe, expect, it } from 'vitest'
 import { ZodError } from 'zod'
 
 import { LOOKUP_MAX_RETRIES, lookupRetryMs } from '@/hooks/useJplLookup'
-import { bodiesRetryDelay, RATE_LIMIT_RETRY_MS } from '@/hooks/useOrreryBodies'
-import { defaultRetry } from '@/hooks/useSourceQuery'
+import { defaultRetry, defaultRetryDelay, RATE_LIMIT_RETRY_MS } from '@/hooks/useSourceQuery'
 import { HttpError } from '@/lib/api/client'
 
 describe('the bodies fetch after a 429 (#141)', () => {
   it('asks again after 61 s, past both rate limits', () => {
     expect(RATE_LIMIT_RETRY_MS).toBe(61_000)
     for (const attempt of [0, 1, 2]) {
-      expect(bodiesRetryDelay(attempt, new HttpError(429, 'x'))).toBe(61_000)
+      expect(defaultRetryDelay(attempt, new HttpError(429, 'x'))).toBe(61_000)
     }
   })
 
   it('keeps the quick backoff for a 5xx (KV, no negative cache) or a dropped connection', () => {
-    expect(bodiesRetryDelay(0, new HttpError(503, 'x'))).toBe(1000)
-    expect(bodiesRetryDelay(2, new HttpError(500, 'x'))).toBe(4000)
-    expect(bodiesRetryDelay(0, new TypeError('Failed to fetch'))).toBe(1000)
+    expect(defaultRetryDelay(0, new HttpError(503, 'x'))).toBe(1000)
+    expect(defaultRetryDelay(2, new HttpError(500, 'x'))).toBe(4000)
+    expect(defaultRetryDelay(0, new TypeError('Failed to fetch'))).toBe(1000)
   })
 
   it('retries a 429 three times, as any infrastructure error, and never a contract', () => {
-    // The app's rule (main.tsx's default), which the bodies query keeps.
+    // The app's rule (main.tsx's default), which the bodies query uses.
     expect(defaultRetry(0, new HttpError(429, 'x'))).toBe(true)
     expect(defaultRetry(2, new HttpError(429, 'x'))).toBe(true)
     expect(defaultRetry(3, new HttpError(429, 'x'))).toBe(false)
