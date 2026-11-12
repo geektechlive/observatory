@@ -65,6 +65,7 @@ import {
   buildOrrerySmallBodies,
   DEFAULT_BUDGET_MS as SMALLBODIES_BUDGET_MS,
 } from './orrery-smallbodies.mjs'
+import { buildCometsTonight } from './comets-tonight.mjs'
 import { buildOrreryDwarfs, DEFAULT_BUDGET_MS as DWARFS_BUDGET_MS } from './orrery-dwarfs.mjs'
 import { HISTORY_OBJECTS } from '../src/lib/spacetrack.ts'
 import { buildDiscos, discosToken } from './discos.mjs'
@@ -105,6 +106,8 @@ export const KEY_ORRERY_SMALLBODIES = 'horizons:smallbodies:v1'
 const SMALLBODIES_SIGNATURE = 'refresh:orrery-smallbodies'
 /** Spans run 30 days either side, so /api/orrery-smallbodies serves a copy up to 72 h old. */
 const SMALLBODIES_MAX_AGE_MS = 72 * 3_600_000
+/** The Tonight panel's comets (#135): a week of spans cut from the comet body, its own key. */
+export const KEY_COMETS_TONIGHT = 'horizons:comets-tonight:v1'
 /** The orrery's dwarf planets (#99 item 8): their own key, so the comets stay small. */
 export const KEY_ORRERY_DWARFS = 'horizons:dwarfs:v1'
 const DWARFS_SIGNATURE = 'refresh:orrery-dwarfs'
@@ -820,6 +823,9 @@ export async function refreshOrreryNeo(config, deps = {}) {
  * The orrery's comets and interstellar objects (#99): one finished body plus metadata
  * in one KV write, like the craft. The last copy is read back so the interstellar
  * objects' long spans are reused for a day. A failure is judged by the copy's age.
+ * `tonightWrite` is the Tonight panel's slice of the same body (#135), a second KV write,
+ * so the panel downloads a few kB instead of the whole payload; it is written only with
+ * the body it was cut from, so the two never disagree.
  */
 export async function refreshOrrerySmallBodies(config, deps = {}) {
   const now = deps.now ?? Date.now()
@@ -843,8 +849,14 @@ export async function refreshOrrerySmallBodies(config, deps = {}) {
       `${String(requests)} JPL requests` +
       (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
     console.log(detail)
+    const tonight = buildCometsTonight(payload)
     return {
       entry: { signature: SMALLBODIES_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      tonightWrite: {
+        key: KEY_COMETS_TONIGHT,
+        value: JSON.stringify(tonight),
+        metadata: { fetchedAt: payload.generatedAt, comets: tonight.comets.length },
+      },
       write: {
         key: KEY_ORRERY_SMALLBODIES,
         value: JSON.stringify(payload),
@@ -1147,7 +1159,7 @@ async function main(argv) {
   // After the close-approach step, never beside it: JPL takes one request at a time.
   if (!only || only === 'orrery-smallbodies') {
     const began = Date.now()
-    const { entry, write } = await refreshOrrerySmallBodies(config, {
+    const { entry, write, tonightWrite } = await refreshOrrerySmallBodies(config, {
       budgetMs: stepBudget(SMALLBODIES_BUDGET_MS, deadline),
     })
     console.log(
@@ -1156,6 +1168,10 @@ async function main(argv) {
     report.push(entry)
     if (write) {
       writes.push({ ...write, entry })
+      if (tonightWrite) {
+        writes.push({ ...tonightWrite, entry })
+        console.log(`  ${KEY_COMETS_TONIGHT}: ${String(tonightWrite.value.length)} bytes`)
+      }
       if (dryRun && smallOut) {
         await writeFile(smallOut, write.value)
         console.log(

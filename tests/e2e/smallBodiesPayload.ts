@@ -105,6 +105,40 @@ export const smallBodies = () => ({
   missing: [],
 })
 
+/**
+ * A mocked /api/comets-tonight (#135), the Tonight panel's slice: the same comet with a
+ * magnitude law, a week of its fine span kept. Returns the request paths seen.
+ */
+export async function serveCometsTonight(page: Page): Promise<string[]> {
+  const asked: string[] = []
+  await page.route('**/api/comets-tonight', (route) => {
+    asked.push(new URL(route.request().url()).pathname)
+    const { generatedAt, frame, center, timeScale, provider, comets } = smallBodies()
+    const span = fine(cometAt, [0.004, 0.006, 0])
+    const week = { start: span.start + 29, step: 1, samples: span.samples.slice(29 * 6, 38 * 6) }
+    return route.fulfill({
+      json: {
+        generatedAt,
+        frame,
+        center,
+        timeScale,
+        provider,
+        window: { fromJd: week.start, toJd: week.start + 8 },
+        comets: comets.map((c) => ({
+          id: c.id,
+          name: c.name,
+          interstellar: c.interstellar,
+          m1: 9,
+          k1: 10,
+          fine: week,
+          coarse: null,
+        })),
+      },
+    })
+  })
+  return asked
+}
+
 export const OUMUAMUA_ID = 'sbc:50788063'
 /** JD of 2017-01-01 00:00 UTC. */
 const JD_2017 = 2457754.5

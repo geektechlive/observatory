@@ -113,7 +113,8 @@ lives in `src/components/orrery/orreryLink.ts` (no three.js), and the hook in
 ## The guide (#159)
 
 It teaches by doing: a lazy drawer of lessons, a glossary, and "what's this?" terms in the
-inspector. A Guide button (in the rail, beside Controls on a phone) and a first-visit "New
+inspector. A Guide button (in the rail, beside Controls on a phone, and out of the way while the
+phone sheet is open, since the sheet has its own, #208) and a first-visit "New
 here?" chip open `guide/OrreryGuide.tsx`. Decision:
 [ADR 0014](../decisions/0014-the-guide-teaches-through-links.md).
 

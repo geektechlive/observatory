@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
-import { useOrrerySmallBodies } from '@/hooks/useOrrerySmallBodies'
+import { useCometsTonight } from '@/hooks/useCometsTonight'
+import { jdFromDate } from '@/lib/orrery/kepler'
 import {
   cometsTonight,
   FAINTEST_LISTED,
@@ -35,24 +36,34 @@ interface Props {
 /**
  * Comets up in the dark tonight (#99), our stand-in for JPL's missing sb_obs: the
  * refresh job's comets (and interstellar objects) placed from the user's location,
- * computed in the browser. Its data comes from our own API, so the location goes
- * nowhere new.
+ * computed in the browser. Its data comes from our own API (a week of each comet's
+ * spans, #135), so the location goes nowhere new.
  */
 export function CometsTonight({ coords, dark, now }: Props) {
-  const { data, error } = useOrrerySmallBodies()
+  const { data, error } = useCometsTonight()
   const minute = Math.floor(now.getTime() / 60_000)
 
+  // A copy left stale by a long refresh outage ends before tonight does: say so, rather
+  // than "nothing is up", since nothing is extrapolated past the slice's spans (#135).
+  const outdated = data !== undefined && dark !== null && jdFromDate(dark.end) > data.window.toJd
+
   const result = useMemo(() => {
-    if (!data || !dark) return null
+    if (!data || !dark || outdated) return null
     const start = new Date(Math.max(dark.start.getTime(), minute * 60_000))
     if (start >= dark.end) return null
-    return cometsTonight([...data.comets, ...data.interstellar], coords, { start, end: dark.end })
-  }, [data, dark, coords, minute])
+    return cometsTonight(data.comets, coords, { start, end: dark.end })
+  }, [data, dark, coords, minute, outdated])
 
   return (
     <div className={styles.passes ?? ''}>
       <Label tone="dim">Comets tonight</Label>
-      <CometsBody data={data !== undefined} error={error} dark={dark} result={result} />
+      <CometsBody
+        data={data !== undefined}
+        error={error}
+        dark={dark}
+        outdated={outdated}
+        result={result}
+      />
       <Label>Brightness is JPL’s forecast, and comets often miss it by a magnitude or two.</Label>
     </div>
   )
@@ -62,15 +73,18 @@ function CometsBody({
   data,
   error,
   dark,
+  outdated,
   result,
 }: {
   data: boolean
   error: Error | null
   dark: Props['dark']
+  outdated: boolean
   result: ReturnType<typeof cometsTonight> | null
 }) {
   if (!dark) return <Label>It doesn’t get fully dark here tonight, so no comets are listed.</Label>
   if (!data) return <Label>{error ? 'The comet data is unavailable.' : 'Loading comets…'}</Label>
+  if (outdated) return <Label>The comet data is out of date, so no comets are listed.</Label>
   if (!result || result.visible.length === 0) {
     const faint = result?.brightestFaint
     return (

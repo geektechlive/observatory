@@ -6,27 +6,24 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CometsTonight } from '@/components/panels/CometsTonight'
-import type { OrrerySmallBody } from '@/schemas/orrerySmallBodies'
+import type { TonightComet } from '@/schemas/cometsTonight'
 
 import fixture from './fixtures/tonight/c2024t5-kittpeak.json'
 
 const t5 = {
   id: 'sb:1004035',
-  spkid: '1004035',
-  des: fixture.comet.des,
   name: fixture.comet.name,
-  kind: 'comet',
   interstellar: false,
   m1: fixture.comet.m1,
   k1: fixture.comet.k1,
   fine: fixture.comet.fine,
   coarse: null,
-} as unknown as OrrerySmallBody
+} satisfies TonightComet
 
 const query = vi.hoisted((): { result: { data: unknown; error: Error | null } } => ({
   result: { data: undefined, error: null },
 }))
-vi.mock('@/hooks/useOrrerySmallBodies', () => ({ useOrrerySmallBodies: () => query.result }))
+vi.mock('@/hooks/useCometsTonight', () => ({ useCometsTonight: () => query.result }))
 
 const [lonText, latText] = fixture.siteGeodetic.split(',')
 const KITT_PEAK = { lat: Number(latText), lon: Number(lonText) - 360 }
@@ -37,8 +34,13 @@ const DARK = { start: new Date('2026-11-07T02:00:00Z'), end: new Date('2026-11-0
 const hhmm = (d: Date) =>
   d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 
-const payload = (comets: unknown[], interstellar: unknown[] = []) => ({
-  data: { comets, interstellar },
+/** /api/comets-tonight's answer (#135): comets and interstellar objects in one list. */
+const JD_UNIX = 2440587.5
+const jd = (d: Date) => d.getTime() / 86_400_000 + JD_UNIX
+/** The slice's spans run from a day before the refresh to a week after (#135). */
+const WINDOW = { fromJd: jd(NOW) - 1, toJd: jd(NOW) + 7 }
+const payload = (comets: unknown[], interstellar: unknown[] = [], window = WINDOW) => ({
+  data: { comets: [...comets, ...interstellar], window },
   error: null,
 })
 
@@ -97,6 +99,15 @@ describe('CometsTonight', () => {
     query.result = payload([], [{ ...t5, id: 'sb:x', name: '3I/ATLAS', interstellar: true, m1: 5 }])
     render(<CometsTonight coords={KITT_PEAK} dark={DARK} now={NOW} />)
     expect(screen.getByRole('listitem').textContent).toMatch(/interstellar/i)
+  })
+
+  it('says the data is out of date, not that nothing is up, once the night outruns the slice (#135)', () => {
+    // A copy left stale by a long refresh outage: its spans end before tonight's dark does.
+    query.result = payload([t5], [], { fromJd: jd(NOW) - 8, toJd: jd(DARK.start) + 0.1 })
+    render(<CometsTonight coords={KITT_PEAK} dark={DARK} now={NOW} />)
+    expect(screen.queryByRole('listitem')).toBeNull()
+    expect(document.body.textContent).toMatch(/comet data is out of date/i)
+    expect(document.body.textContent).not.toMatch(/No comet bright enough/i)
   })
 
   it('says when the comet data is unavailable', () => {

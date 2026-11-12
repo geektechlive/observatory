@@ -10,7 +10,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { CERES_ID, PLUTO_ID, serveDwarfs } from './dwarfsPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
-import { serveSmallBodies } from './smallBodiesPayload'
+import { serveCometsTonight, serveSmallBodies } from './smallBodiesPayload'
 import { offlineSun } from './swpc'
 
 test.use({ viewport: { width: 1440, height: 900 } })
@@ -114,13 +114,24 @@ test.describe('Dwarf planets (#99 item 8)', () => {
 test.describe('The Tonight panel (#99 item 8)', () => {
   test.use({ geolocation: { latitude: 31.96, longitude: -111.6 }, permissions: ['geolocation'] })
 
-  test("fetches the comets for tonight's list, never the dwarf planets", async ({ page }) => {
+  test("fetches only its slice of tonight's comets: not the orrery's comets, nor the dwarf planets (#135)", async ({
+    page,
+  }) => {
+    const tonight = await serveCometsTonight(page)
     const comets = await serveSmallBodies(page)
     const dwarfsAsked = await serveDwarfs(page)
     await page.goto('/#sky')
     await page.getByRole('button', { name: 'Use my location' }).first().click()
-    await expect.poll(() => comets.length, { timeout: 20_000 }).toBeGreaterThan(0)
+    await expect.poll(() => tonight.length, { timeout: 20_000 }).toBeGreaterThan(0)
+    // The slice parsed: the list is no longer loading and did not fail.
+    const list = page
+      .locator('div')
+      .filter({ has: page.getByText('Comets tonight') })
+      .last()
+    await expect(list).not.toContainText('Loading comets', { timeout: 10_000 })
+    await expect(list).not.toContainText('unavailable')
     await page.waitForTimeout(1000)
+    expect(comets).toEqual([])
     expect(dwarfsAsked).toEqual([])
   })
 })

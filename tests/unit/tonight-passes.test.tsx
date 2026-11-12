@@ -25,8 +25,8 @@ vi.mock('@/hooks/useSunMoon', () => ({ useSunMoon: () => ({ data: undefined }) }
 vi.mock('@/hooks/useClouds', () => ({ useClouds: () => ({ data: undefined }) }))
 vi.mock('@/hooks/useAurora', () => ({ useAurora: () => ({ data: undefined }) }))
 vi.mock('@/hooks/useSolarCycle', () => ({ useSolarCycle: () => ({ data: undefined }) }))
-vi.mock('@/hooks/useOrrerySmallBodies', () => ({
-  useOrrerySmallBodies: () => ({ data: undefined, error: null }),
+vi.mock('@/hooks/useCometsTonight', () => ({
+  useCometsTonight: () => ({ data: undefined, error: null }),
 }))
 
 afterEach(() => {

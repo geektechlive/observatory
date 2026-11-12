@@ -32,3 +32,4 @@ that makes the decision.
 | [0022](0022-visitors-see-only-the-sources-the-orrery-uses.md) | Visitors see only the sources the orrery uses; the full registry lives in docs            | #207           |
 | [0023](0023-optional-orrery-data-has-its-own-key.md)          | Optional orrery data gets its own key, so only the visitors who ask for it pay            | #99            |
 | [0024](0024-starlink-elements-from-supgp.md)                  | Starlink's elements come from CelesTrak SupGP, fetched once a run on the strictest terms  | #209           |
+| [0025](0025-tonight-comets-are-a-slice.md)                    | The Tonight panel's comets are a slice the refresh job cuts, under a key of their own     | #135           |

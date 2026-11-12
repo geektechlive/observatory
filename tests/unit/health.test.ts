@@ -73,6 +73,15 @@ describe('SOURCES', () => {
     expect(Object.values(VIEW_HEADLINES).flat()).not.toContain('orrery-dwarfs')
   })
 
+  it("grades tonight's comets by a non-empty list, 72 h before degraded, never headline (#135)", () => {
+    // Fetched only once a visitor shares a location on the Sky view, so no view always shows it.
+    expect(SOURCES['comets-tonight'].headline).toBe(false)
+    expect(SOURCES['comets-tonight'].maxAgeMs).toBe(72 * 3_600_000)
+    expect(SOURCES['comets-tonight'].required({ comets: [] })).toBe(false)
+    expect(SOURCES['comets-tonight'].required({ comets: [{ id: 'sb:1003639' }] })).toBe(true)
+    expect(Object.values(VIEW_HEADLINES).flat()).not.toContain('comets-tonight')
+  })
+
   it('grades Space-Track by a TIP list (empty is fine), 36 h before degraded (#101)', () => {
     expect(SOURCES.spacetrack.headline).toBe(false)
     expect(SOURCES.spacetrack.maxAgeMs).toBe(36 * 3_600_000)

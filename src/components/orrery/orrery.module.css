@@ -856,6 +856,12 @@
     z-index: 3;
   }
 
+  /* The open sheet's "Close controls" is wider than "Controls" and would cover this button
+     (#208); the sheet has its own Learn > Guide, so the stage's steps aside meanwhile. */
+  .sheetToggle[aria-expanded='true'] ~ .guideToggle {
+    display: none;
+  }
+
   .guideChip {
     bottom: 132px;
     left: var(--space-3);

@@ -401,6 +401,18 @@ describe('probed endpoints (#42, #61)', () => {
     expect(d?.check({ dwarfs: [{ coarse: null }] })).toBe(false)
   })
 
+  it("probes tonight's comets: a non-empty list, each with a magnitude law and a span (#135)", () => {
+    const c = byPath('/api/comets-tonight')
+    expect(c).toBeDefined()
+    const span = { start: 1, step: 1, samples: [1, 2, 3, 4, 5, 6] }
+    const borisov = { m1: 13.8, k1: 4.5, fine: span, coarse: null }
+    expect(c?.check({ comets: [borisov] })).toBe(true)
+    expect(c?.check({ comets: [{ ...borisov, fine: null, coarse: span }] })).toBe(true)
+    expect(c?.check({ comets: [] })).toBe(false)
+    expect(c?.check({ comets: [{ ...borisov, fine: null }] })).toBe(false)
+    expect(c?.check({ comets: [{ ...borisov, m1: null }] })).toBe(false)
+  })
+
   it('probes on-demand lookup with a fixed past span, so it is cached, not a JPL call (#100)', () => {
     const traj = (CHECKS as (Check & { notConfiguredWarns?: boolean })[]).find((c) =>
       c.path.startsWith('/api/trajectory?'),

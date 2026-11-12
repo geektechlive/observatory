@@ -36,6 +36,12 @@ visitors load.
 - Revisit if the Tonight panel ever shows dwarf planets, or if a single payload becomes cheaper
   than two for the visitors who load both.
 
+## Note, 2026-11-12
+
+The Tonight panel no longer loads `/api/orrery-smallbodies`: it reads its own slice,
+`/api/comets-tonight` (#135, [ADR 0025](0025-tonight-comets-are-a-slice.md)). The reasoning above
+stands; the comets' payload is now loaded only by the orrery.
+
 ## Evidence
 
 - #99; `functions/api/orrery-dwarfs.ts`, `scripts/orrery-dwarfs.mjs`,

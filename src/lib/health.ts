@@ -20,6 +20,7 @@ export type SourceName =
   | 'aurora'
   | 'buoys'
   | 'cme'
+  | 'comets-tonight'
   | 'discos'
   | 'co2'
   | 'donki'
@@ -240,6 +241,15 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: false,
     maxAgeMs: 72 * HOUR,
     required: (data) => nonEmptyArrayField(data, 'interstellar'),
+  },
+  'comets-tonight': {
+    // Not headline: the Sky view fetches it only once a visitor shares a location (#135).
+    // Cut from the comet payload, where 2I and 3I always carry a magnitude law, so an
+    // empty list is a fault.
+    label: 'Comets Tonight',
+    headline: false,
+    maxAgeMs: 72 * HOUR,
+    required: (data) => nonEmptyArrayField(data, 'comets'),
   },
   'orrery-sats': {
     // Not headline: only the orrery page asks for it (#98). One CelesTrak group per

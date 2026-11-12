@@ -251,8 +251,9 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
 - Measured in a live dry run on 2026-11-07: 19 JPL requests in 26 s, all 15 placed, 164 KB (72
   KB gzip). One KV write a run.
 - `/api/orrery-smallbodies` streams it through `_kvBody.ts`, degraded past 72 h. Health requires
-  a non-empty `interstellar` list, since comets can be few. `useOrrerySmallBodies` fetches it,
-  for the Tonight panel and the orrery (below).
+  a non-empty `interstellar` list, since comets can be few. `useOrrerySmallBodies` fetches it
+  for the orrery (below); the Tonight panel reads its own slice, `/api/comets-tonight` (below).
+  Two KV writes a run since #135: the body and that slice.
 - **In the orrery (#99, drawing half):**
   - **Switches:** "Comets & interstellar" in the controls (`SmallBodyControls.tsx`), Comets and
     Interstellar objects, both off at first. The payload (72 KB gzip) is fetched only once a
@@ -282,6 +283,20 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
 - **"Comets tonight" in the Tonight panel (#99)** is our stand-in for JPL's missing sb_obs
   (`CometsTonight.tsx`, `src/lib/sky/`). It is fetched only once the user shares a location,
   from our own API, so the location goes nowhere new.
+  - **Its own slice (#135, [ADR 0025](../decisions/0025-tonight-comets-are-a-slice.md)):**
+    `scripts/comets-tonight.mjs` cuts it from the comet body in the same refresh step, so it costs
+    no JPL request: only the bodies with a magnitude law, each span cut to a day before the refresh
+    through a week after (bracketing samples kept; coarse samples only where the fine span does not
+    cover the week). KV `horizons:comets-tonight:v1`, written only with the body it came from;
+    `functions/api/comets-tonight.ts` streams it through `_kvBody.ts`, degraded past 72 h. Health
+    contract `comets-tonight` (a non-empty list, not a headline source) and a probe in
+    `scripts/check-health.mjs`. Measured on the production payload of 2026-11-12: 12,690 bytes
+    (5,083 gzip) against the full body's 164,424 (71,878 gzip), 14 bodies with 10 daily samples
+    each. A unit test checks the panel's answers from the slice equal those from the full body
+    for every night from the refresh to four days on; `tests/e2e/orrery-dwarfs.spec.ts` checks the
+    panel never asks for `/api/orrery-smallbodies`. If refreshes fail for days and tonight's dark
+    ends past the slice's `window.toJd`, the panel says the comet data is out of date instead of
+    "no comet is up".
   - `topocentric.ts`: the Hermite span minus JPL Table 1's Earth–Moon barycentre, corrected for
     light time, turned to the equator of J2000, precessed to the date (IAU 1976), turned with
     Earth by mean sidereal time, then seen from the observer on WGS84 through east-north-up, so
@@ -306,7 +321,8 @@ of their own. Owner's call, 2026-11-12: a "Dwarf planets" switch, off at first, 
 
 - **Why a key of their own** ([ADR 0023](../decisions/0023-optional-orrery-data-has-its-own-key.md)):
   the first build put them in the comets' `/api/orrery-smallbodies`, which the Tonight panel
-  also loads every 30 minutes once a location is shared. That would have taken every Tonight
+  then also loaded every 30 minutes once a location was shared (it reads its own slice since
+  #135). That would have taken every Tonight
   visitor from 71.9 KB to 129.7 KB gzip. Measured in dry runs on 2026-11-12 after the split: the
   comets' payload is 164,428 bytes (71,885 gzip) with no `dwarfs`, the dwarf planets' 131,265
   (58,775 gzip). `tests/e2e/orrery-dwarfs.spec.ts` checks the Tonight panel never asks for them

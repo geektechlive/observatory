@@ -128,6 +128,20 @@ export const CHECKS = [
       b.dwarfs.length > 0 &&
       b.dwarfs.every((x) => Array.isArray(x?.coarse?.samples)),
   },
+  // The Tonight panel's comets (#135): KV-only, cut from the comet payload by the refresh job.
+  {
+    path: '/api/comets-tonight',
+    requires: 'a non-empty comets array, each with a magnitude law and a sampled span',
+    check: (b) =>
+      Array.isArray(b?.comets) &&
+      b.comets.length > 0 &&
+      b.comets.every(
+        (x) =>
+          typeof x?.m1 === 'number' &&
+          typeof x?.k1 === 'number' &&
+          (Array.isArray(x?.fine?.samples) || Array.isArray(x?.coarse?.samples)),
+      ),
+  },
   // On-demand lookup (#100): JPL through the jpl-queue Durable Object. A fixed past span
   // is cached for a day, so most runs never reach JPL. Until the Worker is deployed and
   // bound, the endpoint says "not set up" (X-Not-Configured), which only warns.

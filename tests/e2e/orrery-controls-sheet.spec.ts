@@ -45,6 +45,50 @@ for (const viewport of [
       await expect(rail).not.toHaveAttribute('data-open', 'true')
     })
 
+    // #208: "Close controls" is wider than "Controls", and the stage's Guide button sat at a
+    // fixed offset beside it, so the open sheet's toggle covered it ("…uide").
+    for (const sheet of ['closed', 'open'] as const) {
+      test(`no two stage toolbar items overlap with the sheet ${sheet} (#208)`, async ({
+        page,
+      }) => {
+        await openOrrery(page)
+        if (sheet === 'open') {
+          await page.getByRole('button', { name: 'Controls', exact: true }).click()
+          await expect(page.locator('#orrery-controls')).toHaveAttribute('data-open', 'true')
+        }
+        const items = await page.evaluate(() => {
+          const stage = document.querySelector('section[aria-label="Orrery"]')
+          if (!stage) return null
+          // The stage's own buttons (Controls, Guide) and its scale badge, as laid out.
+          return [
+            ...stage.querySelectorAll<HTMLElement>(
+              ':scope > button, :scope > p[data-label-obstacle]',
+            ),
+          ]
+            .map((el) => {
+              const r = el.getBoundingClientRect()
+              return { name: el.textContent.trim(), l: r.left, r: r.right, t: r.top, b: r.bottom }
+            })
+            .filter((b) => b.r > b.l && b.b > b.t)
+        })
+        expect(items).not.toBeNull()
+        const names = (items ?? []).map((i) => i.name)
+        expect(names).toContain(sheet === 'open' ? 'Close controls' : 'Controls')
+        // The stage's Guide button is hidden while the sheet (with its own Guide) is open,
+        // and back when it closes; the check above would pass trivially without this.
+        if (sheet === 'open') expect(names).not.toContain('Guide')
+        else expect(names).toContain('Guide')
+        const overlaps: string[] = []
+        for (const [i, a] of (items ?? []).entries()) {
+          for (const b of (items ?? []).slice(i + 1)) {
+            if (a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b)
+              overlaps.push(`${a.name} × ${b.name}`)
+          }
+        }
+        expect(overlaps).toEqual([])
+      })
+    }
+
     test('the open sheet stays inside the stage and above the dial bar', async ({ page }) => {
       await openOrrery(page)
       await page.getByRole('button', { name: 'Controls', exact: true }).click()

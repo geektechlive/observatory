@@ -10,6 +10,7 @@ import {
   describePayload,
   fetchWithRetry,
   isValidLaunchesPayload,
+  KEY_COMETS_TONIGHT,
   KEY_ORRERY_BODIES,
   KEY_ORRERY_DWARFS,
   KEY_ORRERY_NEO,
@@ -444,6 +445,34 @@ describe('refreshOrrerySmallBodies (#99)', () => {
       placed: 3,
       missing: 1,
     })
+  })
+
+  it("also writes the Tonight panel's slice, cut from the same body under its own key (#135)", async () => {
+    const { write, tonightWrite } = await refreshOrrerySmallBodies(null, deps())
+    expect(tonightWrite.key).toBe(KEY_COMETS_TONIGHT)
+    expect(KEY_COMETS_TONIGHT).toBe('horizons:comets-tonight:v1')
+    const tonight = JSON.parse(tonightWrite.value)
+    const full = JSON.parse(write.value)
+    expect(tonight.generatedAt).toBe(full.generatedAt)
+    // Every body with a magnitude law (this stub gives all three 3I's header), in order.
+    type Row = { id: string; m1: number | null; k1: number | null }
+    const lawful = [...full.comets, ...full.interstellar]
+      .filter((b: Row) => b.m1 !== null && b.k1 !== null)
+      .map((b: Row) => b.id)
+    expect(lawful.length).toBeGreaterThan(0)
+    expect(tonight.comets.map((c: Row) => c.id)).toEqual(lawful)
+    expect(tonightWrite.value.length).toBeLessThan(write.value.length / 4)
+    expect(tonightWrite.metadata).toEqual({
+      fetchedAt: new Date(NOW).toISOString(),
+      comets: lawful.length,
+    })
+  })
+
+  it('writes no slice when the step fails, so the last one ages with its source', async () => {
+    const failing = deps({ fetchHorizonsText: () => Promise.reject(new Error('HTTP 503')) })
+    const young = JSON.stringify({ generatedAt: new Date(NOW - 50 * HOUR).toISOString() })
+    const res = await refreshOrrerySmallBodies(null, { ...failing, previousText: young })
+    expect(res.tonightWrite).toBeUndefined()
   })
 
   it("reuses the last copy's long spans for a day", async () => {
