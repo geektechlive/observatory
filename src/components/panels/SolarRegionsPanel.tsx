@@ -1,8 +1,10 @@
+import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
 import { useSolarRegions } from '@/hooks/useSolarRegions'
 import { magClassWords } from '@/lib/magClass'
+import { panelView } from '@/lib/panelView'
 import { regionsOutOfDate } from '@/lib/sunDisc'
 import type { ActiveRegion, FlareOdds } from '@/schemas/solarRegions'
 
@@ -135,9 +137,10 @@ function RegionTable({
 }
 
 export function SolarRegionsPanel() {
-  const { data, isLoading, error } = useSolarRegions()
+  const query = useSolarRegions()
+  const view = panelView(query, 'solar-regions')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Active Regions">
         <PanelState kind="loading" />
@@ -145,7 +148,7 @@ export function SolarRegionsPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Active Regions">
         <PanelState kind="unavailable" detail="The NOAA SWPC region feed did not answer" />
@@ -153,8 +156,11 @@ export function SolarRegionsPanel() {
     )
   }
 
+  const { data, refreshFailed, age } = view
+
   return (
     <GlassPanel variant="tile" label="Active Regions">
+      {refreshFailed && <DataAge {...age} />}
       <div className={styles.panel ?? ''}>
         {data.probabilities ? (
           <Odds odds={data.probabilities} />

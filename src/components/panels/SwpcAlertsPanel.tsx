@@ -1,10 +1,9 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useSwpcAlerts } from '@/hooks/useSwpcAlerts'
 import { formatRelativeTime } from '@/lib/format'
+import { panelView } from '@/lib/panelView'
 import { statusVar } from '@/lib/severity'
 
 import styles from './swpc-alerts-panel.module.css'
@@ -19,10 +18,10 @@ function codeColor(productId: string): string {
 }
 
 export function SwpcAlertsPanel() {
-  const { data, isLoading, error } = useSwpcAlerts()
-  const updatedAt = useQueryClient().getQueryState(['swpc-alerts'])?.dataUpdatedAt ?? 0
+  const query = useSwpcAlerts()
+  const view = panelView(query, 'swpc-alerts')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="SWPC Alerts">
         <PanelState kind="loading" />
@@ -30,7 +29,7 @@ export function SwpcAlertsPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="SWPC Alerts">
         <PanelState kind="unavailable" detail="The NOAA SWPC alerts feed did not answer" />
@@ -38,9 +37,12 @@ export function SwpcAlertsPanel() {
     )
   }
 
+  const { data, refreshFailed, age } = view
+
   if (data.alerts.length === 0) {
     return (
       <GlassPanel variant="tile" label="SWPC Alerts">
+        {refreshFailed && <DataAge {...age} />}
         <PanelState kind="empty" detail="No active SWPC alerts" />
       </GlassPanel>
     )
@@ -48,7 +50,7 @@ export function SwpcAlertsPanel() {
 
   return (
     <GlassPanel variant="tile" label="SWPC Alerts">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <ol className={styles.list ?? ''}>
         {data.alerts.slice(0, 6).map((a, i) => (
           <li key={`${a.productId}-${i}`} className={styles.item ?? ''}>

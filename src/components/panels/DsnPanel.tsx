@@ -1,3 +1,4 @@
+import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
@@ -6,6 +7,7 @@ import { Swatch } from '@/components/ui/Swatch'
 import { useDsn } from '@/hooks/useDsn'
 import type { DsnContact, DsnStation } from '@/lib/dsn'
 import { ISS_HEX, LANES, STATUS_HEX } from '@/lib/palette'
+import { panelView } from '@/lib/panelView'
 
 import styles from './dsn-panel.module.css'
 
@@ -72,9 +74,10 @@ function StationBlock({ station }: { station: DsnStation }) {
 }
 
 export function DsnPanel() {
-  const { data, isLoading, error } = useDsn()
+  const query = useDsn()
+  const view = panelView(query)
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Deep Space Network" className={styles.reserve ?? ''}>
         <PanelState kind="loading" detail="Acquiring signal" />
@@ -82,7 +85,7 @@ export function DsnPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Deep Space Network" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="NASA's DSN Now feed did not answer" />
@@ -90,8 +93,11 @@ export function DsnPanel() {
     )
   }
 
+  const { data, refreshFailed, age } = view
+
   return (
     <GlassPanel variant="tile" label="Deep Space Network" className={styles.reserve ?? ''}>
+      {refreshFailed && <DataAge {...age} />}
       <div className={styles.panel ?? ''}>
         {data.stations.map((s) => (
           <StationBlock key={s.name} station={s} />

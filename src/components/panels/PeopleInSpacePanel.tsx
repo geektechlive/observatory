@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { StencilLabel } from '@/components/ui/StencilLabel'
 import { usePeopleInSpace } from '@/hooks/usePeopleInSpace'
+import { panelView } from '@/lib/panelView'
 import type { Astronaut } from '@/schemas/peopleInSpace'
 
 import styles from './people-in-space-panel.module.css'
@@ -28,10 +27,10 @@ function groupByCraft(people: Astronaut[]): [string, Astronaut[]][] {
 }
 
 export function PeopleInSpacePanel() {
-  const { data, isLoading, error } = usePeopleInSpace()
-  const updatedAt = useQueryClient().getQueryState(['people-in-space'])?.dataUpdatedAt ?? 0
+  const query = usePeopleInSpace()
+  const view = panelView(query, 'people-in-space')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Humans in Orbit" className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -39,7 +38,7 @@ export function PeopleInSpacePanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Humans in Orbit" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The crew roster feed did not answer" />
@@ -47,11 +46,13 @@ export function PeopleInSpacePanel() {
     )
   }
 
+  const { data, age } = view
+
   const groups = groupByCraft(data.people)
 
   return (
     <GlassPanel variant="tile" label="Humans in Orbit" className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.headline ?? ''}>
           <Readout value={String(data.number)} tone="signal" className={styles.count ?? ''} />

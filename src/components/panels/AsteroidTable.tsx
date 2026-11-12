@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
@@ -7,6 +6,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { useNeo } from '@/hooks/useNeo'
 import { formatDiameter, formatKm, formatLunarDistance, formatVelocity } from '@/lib/format'
 import { STATUS_HEX } from '@/lib/palette'
+import { panelView } from '@/lib/panelView'
 import type { NeoObject } from '@/schemas/neo'
 
 import styles from './asteroid-table.module.css'
@@ -157,8 +157,7 @@ function SortableTh({ label, sortKey, current, dir, align = 'left', onSort }: So
 }
 
 export function AsteroidTable() {
-  const { data, isLoading, error } = useNeo()
-  const updatedAt = useQueryClient().getQueryState(['neo'])?.dataUpdatedAt ?? 0
+  const view = panelView(useNeo(), 'neo')
   const [sortKey, setSortKey] = useState<SortKey>('missKm')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -172,15 +171,15 @@ export function AsteroidTable() {
   }
 
   const renderContent = () => {
-    if (isLoading && !data) {
+    if (view.kind === 'loading') {
       return <PanelState kind="loading" />
     }
 
-    if (error || !data) {
+    if (view.kind === 'unavailable') {
       return <PanelState kind="unavailable" detail="NASA NeoWs is not answering" />
     }
 
-    const raw = flattenNeos(data.near_earth_objects)
+    const raw = flattenNeos(view.data.near_earth_objects)
     const neos = sortNeos(raw, sortKey, sortDir).slice(0, 12)
 
     if (neos.length === 0) {
@@ -274,7 +273,7 @@ export function AsteroidTable() {
 
   return (
     <GlassPanel variant="panel" label="Close Approaches · 7 days" breathe>
-      <DataAge updatedAt={updatedAt} />
+      {view.kind === 'ready' && <DataAge {...view.age} />}
       <div className={styles.asteroidTable ?? ''}>{renderContent()}</div>
     </GlassPanel>
   )

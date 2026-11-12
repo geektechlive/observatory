@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -9,6 +7,7 @@ import { StencilLabel } from '@/components/ui/StencilLabel'
 import { useSunMoon } from '@/hooks/useSunMoon'
 import { isWaxing, moonLitPath } from '@/lib/moon'
 import { MOON_DISC_HEX } from '@/lib/palette'
+import { panelView } from '@/lib/panelView'
 
 import styles from './sun-moon-panel.module.css'
 
@@ -49,10 +48,11 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 export function SunMoonPanel() {
-  const { data, isLoading, error, isFallbackLocation, geoStatus, requestLocation } = useSunMoon()
-  const updatedAt = useQueryClient().getQueryState(['sun-moon'])?.dataUpdatedAt ?? 0
+  const query = useSunMoon()
+  const { isFallbackLocation, geoStatus, requestLocation } = query
+  const view = panelView(query, 'sun-moon')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Sun & Moon" breathe className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -60,7 +60,7 @@ export function SunMoonPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Sun & Moon" breathe className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The USNO rise and set service is not answering" />
@@ -68,12 +68,13 @@ export function SunMoonPanel() {
     )
   }
 
+  const { data, age } = view
   const next = data.closestPhase
   const days = next ? daysUntil(next.date) : null
 
   return (
     <GlassPanel variant="tile" label="Sun & Moon" breathe className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.moonRow ?? ''}>
           <MoonDisc phase={data.curPhase} illum={data.fracIllum} />

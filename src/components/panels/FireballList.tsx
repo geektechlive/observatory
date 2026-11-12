@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,14 +5,15 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useFireball } from '@/hooks/useFireball'
 import { formatDateUtc, formatKt, formatRelativeTime } from '@/lib/format'
+import { panelView } from '@/lib/panelView'
 
 import styles from './fireball-list.module.css'
 
 export function FireballList() {
-  const { data, isLoading, error } = useFireball()
-  const updatedAt = useQueryClient().getQueryState(['fireball'])?.dataUpdatedAt ?? 0
+  const query = useFireball()
+  const view = panelView(query, 'fireball')
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Fireballs">
         <PanelState kind="loading" />
@@ -22,13 +21,15 @@ export function FireballList() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Fireballs">
         <PanelState kind="unavailable" detail="JPL's fireball feed is not answering" />
       </GlassPanel>
     )
   }
+
+  const { data, refreshFailed, age } = view
 
   const recent = data.data.slice(0, 8)
 
@@ -39,6 +40,7 @@ export function FireballList() {
   if (recent.length === 0) {
     return (
       <GlassPanel variant="tile" label="Fireballs">
+        {refreshFailed && <DataAge {...age} />}
         <PanelState kind="empty" detail="No fireballs reported recently" />
       </GlassPanel>
     )
@@ -46,7 +48,7 @@ export function FireballList() {
 
   return (
     <GlassPanel variant="tile" label="Fireballs">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.fireballList ?? ''}>
         <ol className={styles.list ?? ''}>
           {recent.map((fb, idx) => {

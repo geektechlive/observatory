@@ -2,6 +2,7 @@ import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useNwsAlerts } from '@/hooks/useNwsAlerts'
+import { panelView } from '@/lib/panelView'
 import { nwsStatus, type NwsTier, type Status, statusVar } from '@/lib/severity'
 import type { NwsFeature } from '@/schemas/nws'
 
@@ -39,9 +40,10 @@ function rank(
 }
 
 export function NwsAlertsPanel() {
-  const { data, isLoading, error } = useNwsAlerts(true)
+  const query = useNwsAlerts(true)
+  const view = panelView(query, 'nws')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -49,7 +51,7 @@ export function NwsAlertsPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The National Weather Service feed did not answer" />
@@ -57,9 +59,12 @@ export function NwsAlertsPanel() {
     )
   }
 
+  const { data, refreshFailed, age } = view
+
   if (data.features.length === 0) {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
+        {refreshFailed && <DataAge {...age} />}
         <PanelState kind="empty" detail="No active US weather alerts" />
       </GlassPanel>
     )
@@ -67,7 +72,7 @@ export function NwsAlertsPanel() {
 
   return (
     <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
-      <DataAge updatedAt={Date.parse(data.updatedAt)} />
+      <DataAge {...age} />
       <ul className={styles.list ?? ''}>
         {rank(data.features).map(({ alert, tier, status }, i) => (
           <li key={`${alert.event}-${String(i)}`} className={styles.row ?? ''} data-tier={tier}>

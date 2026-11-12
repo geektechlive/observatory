@@ -1,11 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useSentry } from '@/hooks/useSentry'
 import { formatImpactProbability, formatPalermo } from '@/lib/format'
+import { panelView } from '@/lib/panelView'
 import { palermoStatus, type Status, statusVar } from '@/lib/severity'
 
 import styles from './sentry-panel.module.css'
@@ -43,8 +42,9 @@ function PalermoGauge({ value }: { value: string | null | undefined }) {
 }
 
 export function SentryPanel() {
-  const { data, isLoading, error } = useSentry()
-  const updatedAt = useQueryClient().getQueryState(['sentry'])?.dataUpdatedAt ?? 0
+  const query = useSentry()
+  const { data } = query
+  const view = panelView(query, 'sentry')
 
   const sorted = [...(data?.data ?? [])]
     .sort((a, b) => {
@@ -55,11 +55,11 @@ export function SentryPanel() {
     .slice(0, 8)
 
   const renderContent = () => {
-    if (isLoading && !data) {
+    if (view.kind === 'loading') {
       return <PanelState kind="loading" />
     }
 
-    if (error || !data) {
+    if (view.kind === 'unavailable') {
       return <PanelState kind="unavailable" detail="JPL Sentry is not answering" />
     }
 
@@ -115,7 +115,7 @@ export function SentryPanel() {
 
   return (
     <GlassPanel variant="tile" label="Sentry" className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      {view.kind === 'ready' && <DataAge {...view.age} />}
       <div className={styles.sentryPanel ?? ''}>{renderContent()}</div>
     </GlassPanel>
   )

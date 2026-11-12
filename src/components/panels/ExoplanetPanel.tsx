@@ -1,15 +1,18 @@
+import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useCountUp } from '@/hooks/useCountUp'
 import { useExoplanets } from '@/hooks/useExoplanets'
+import { panelView } from '@/lib/panelView'
 
 import styles from './counter-panel.module.css'
 
 export function ExoplanetPanel() {
-  const { data, isLoading, error } = useExoplanets()
-  const animated = useCountUp(data?.count ?? 0)
+  const query = useExoplanets()
+  const animated = useCountUp(query.data?.count ?? 0)
+  const view = panelView(query, 'exoplanets')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Exoplanets">
         <PanelState kind="loading" />
@@ -17,7 +20,7 @@ export function ExoplanetPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Exoplanets">
         <PanelState kind="unavailable" detail="The NASA Exoplanet Archive is not answering" />
@@ -27,6 +30,7 @@ export function ExoplanetPanel() {
 
   return (
     <GlassPanel variant="tile" label="Exoplanets">
+      {view.refreshFailed && <DataAge {...view.age} />}
       <div className={styles.panel ?? ''}>
         <span className={styles.value ?? ''} style={{ color: 'var(--signal)' }}>
           {animated.toLocaleString()}

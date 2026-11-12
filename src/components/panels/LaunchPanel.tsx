@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
@@ -8,6 +7,7 @@ import { Readout } from '@/components/ui/Readout'
 import { RocketLaunchCredit } from '@/components/ui/RocketLaunchCredit'
 import { useLaunches } from '@/hooks/useLaunches'
 import { useNow } from '@/hooks/useNow'
+import { panelView } from '@/lib/panelView'
 import { type Status, statusVar } from '@/lib/severity'
 import type { RLLLaunch } from '@/schemas/launches'
 
@@ -105,12 +105,12 @@ function weatherSummary(launch: RLLLaunch): string | null {
 }
 
 export function LaunchPanel() {
-  const { data, isLoading, error } = useLaunches()
-  const updatedAt = useQueryClient().getQueryState(['launches'])?.dataUpdatedAt ?? 0
+  const query = useLaunches()
+  const view = panelView(query, 'launches')
   const now = useNow()
   const [expandedId, setExpandedId] = useState<number | null | 'unset'>('unset')
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Launches">
         <PanelState kind="loading" />
@@ -118,13 +118,16 @@ export function LaunchPanel() {
     )
   }
 
-  if (error || !data || data.result.length === 0) {
+  // An empty schedule keeps reading as unavailable, as before #222.
+  if (view.kind === 'unavailable' || view.data.result.length === 0) {
     return (
       <GlassPanel variant="tile" label="Launches">
         <PanelState kind="unavailable" detail="The RocketLaunch.live schedule did not answer" />
       </GlassPanel>
     )
   }
+
+  const { data, age } = view
 
   const launches = data.result
   const firstId = launches[0]?.id ?? null
@@ -139,7 +142,7 @@ export function LaunchPanel() {
 
   return (
     <GlassPanel variant="tile" label="Launches">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.accordion ?? ''}>
         {launches.map((launch, idx) => {
           const isOpen = effectiveId === launch.id

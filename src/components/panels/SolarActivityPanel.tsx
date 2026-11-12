@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarActivity } from '@/hooks/useSolarActivity'
+import { panelView } from '@/lib/panelView'
 import { flareStatus, noaaScaleStatus, statusVar } from '@/lib/severity'
 
 import styles from './solar-activity-panel.module.css'
@@ -33,10 +32,10 @@ function colHeader(offset: number): string {
 }
 
 export function SolarActivityPanel() {
-  const { data, isLoading, error } = useSolarActivity()
-  const updatedAt = useQueryClient().getQueryState(['solar-activity'])?.dataUpdatedAt ?? 0
+  const query = useSolarActivity()
+  const view = panelView(query, 'solar-activity')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Solar Activity" breathe className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -44,7 +43,7 @@ export function SolarActivityPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Solar Activity" breathe className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA GOES X-ray feed did not answer" />
@@ -52,12 +51,14 @@ export function SolarActivityPanel() {
     )
   }
 
+  const { data, age } = view
+
   const { xray, scales } = data
   const cls = xray.currentClass
 
   return (
     <GlassPanel variant="tile" label="Solar Activity" breathe className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.xrayRow ?? ''}>
           <div className={styles.xrayReadout ?? ''}>

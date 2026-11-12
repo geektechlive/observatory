@@ -1,8 +1,10 @@
+import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useCme } from '@/hooks/useCme'
+import { panelView } from '@/lib/panelView'
 
 import styles from './cme-panel.module.css'
 
@@ -18,9 +20,10 @@ function formatArrival(iso: string | null): string {
 }
 
 export function CmePanel() {
-  const { data, isLoading, error } = useCme()
+  const query = useCme()
+  const view = panelView(query, 'cme')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="CME Watch">
         <PanelState kind="loading" />
@@ -28,7 +31,7 @@ export function CmePanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="CME Watch">
         <PanelState kind="unavailable" detail="The NOAA WSA-ENLIL model feed did not answer" />
@@ -36,8 +39,11 @@ export function CmePanel() {
     )
   }
 
+  const { data, refreshFailed, age } = view
+
   return (
     <GlassPanel variant="tile" label="CME Watch">
+      {refreshFailed && <DataAge {...age} />}
       <div className={styles.panel ?? ''}>
         <div className={`${styles.status ?? ''} ${data.inbound ? (styles.alert ?? '') : ''}`}>
           <span className={styles.statusDot ?? ''} aria-hidden="true" />

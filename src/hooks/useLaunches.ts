@@ -8,8 +8,9 @@ export function useLaunches(enabled = true): {
   data: LaunchesResponse | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useSourceQuery('launches', {
+  const { data, isLoading, error, dataUpdatedAt } = useSourceQuery('launches', {
     queryKey: ['launches'],
     queryFn: fetchLaunchesEnvelope,
     staleTime: 30 * 60 * 1000,
@@ -22,5 +23,6 @@ export function useLaunches(enabled = true): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

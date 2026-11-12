@@ -8,6 +8,7 @@ import { useAftershocks } from '@/hooks/useAftershocks'
 import { useNow } from '@/hooks/useNow'
 import { useQuakes } from '@/hooks/useQuakes'
 import { LANES } from '@/lib/palette'
+import { panelView } from '@/lib/panelView'
 import { aftershockStatus, quakeStatus } from '@/lib/severity'
 import type { Quake } from '@/schemas/quakes'
 
@@ -69,10 +70,11 @@ function AftershockOdds() {
 }
 
 export function SeismicPanel() {
-  const { data, isLoading, error } = useQuakes()
+  const query = useQuakes()
+  const view = panelView(query, 'quakes')
   const now = useNow(CLOCK_TICK_MS).getTime()
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -80,7 +82,7 @@ export function SeismicPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The USGS earthquake feed did not answer" />
@@ -88,10 +90,13 @@ export function SeismicPanel() {
     )
   }
 
+  const { data, refreshFailed, age } = view
+
   const rows = strongestRecent(data.quakes, now)
   if (rows.length === 0) {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
+        {refreshFailed && <DataAge {...age} />}
         <PanelState kind="empty" detail="No quakes in the last 24 hours" />
         <AftershockOdds />
       </GlassPanel>
@@ -100,7 +105,7 @@ export function SeismicPanel() {
 
   return (
     <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
-      <DataAge updatedAt={Date.parse(data.updatedAt)} />
+      <DataAge {...age} />
       <ul className={styles.list ?? ''}>
         {rows.map((q) => (
           <li key={q.id} className={styles.row ?? ''}>

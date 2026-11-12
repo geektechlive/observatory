@@ -1,11 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
 import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useMarsWeather } from '@/hooks/useMarsWeather'
+import { panelView } from '@/lib/panelView'
 
 import styles from './mars-weather-panel.module.css'
 
@@ -19,10 +18,10 @@ function Stat({ label, value, unit }: { label: string; value: string; unit?: str
 }
 
 export function MarsWeatherPanel() {
-  const { data, isLoading, error } = useMarsWeather()
-  const updatedAt = useQueryClient().getQueryState(['mars-weather'])?.dataUpdatedAt ?? 0
+  const query = useMarsWeather()
+  const view = panelView(query, 'mars-weather')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Mars Weather">
         <PanelState kind="loading" />
@@ -30,7 +29,7 @@ export function MarsWeatherPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Mars Weather">
         <PanelState kind="unavailable" detail="The Curiosity REMS feed is not answering" />
@@ -38,9 +37,11 @@ export function MarsWeatherPanel() {
     )
   }
 
+  const { data, age } = view
+
   return (
     <GlassPanel variant="tile" label="Mars Weather">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.head ?? ''}>
           <div className={styles.sol ?? ''}>

@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarWind } from '@/hooks/useSolarWind'
+import { panelView } from '@/lib/panelView'
 import { bzStatus, kpStatus, statusVar } from '@/lib/severity'
 
 import { KpSparkline } from './KpSparkline'
@@ -29,10 +28,10 @@ function auroraLabel(kp: number): string {
 const bzColor = (bz: number): string => statusVar(bzStatus(bz))
 
 export function SolarWindPanel() {
-  const { data, isLoading, error } = useSolarWind()
-  const updatedAt = useQueryClient().getQueryState(['solarWind'])?.dataUpdatedAt ?? 0
+  const query = useSolarWind()
+  const view = panelView(query, 'solar-wind')
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Solar Wind" breathe className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -40,7 +39,7 @@ export function SolarWindPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Solar Wind" breathe className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA solar wind feed did not answer" />
@@ -48,12 +47,14 @@ export function SolarWindPanel() {
     )
   }
 
+  const { data, age } = view
+
   const kp = data.currentKp
   const sparklineReadings = data.kpReadings.map((r) => ({ observedTime: r.time, kpIndex: r.kp }))
 
   return (
     <GlassPanel variant="tile" label="Solar Wind" breathe className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.solarWindPanel ?? ''}>
         <div className={styles.kpRow ?? ''}>
           <Readout

@@ -171,6 +171,15 @@ mean day to day:
 - The client's `apiFetch` (every `src/lib/api` fetcher uses it) notices a REVALIDATING answer, and
   `main.tsx` refetches the active queries 10 s later, once the fresh copy has landed. A new
   fetcher must use `apiFetch` or `getJson`, never bare `fetch`.
+- **A panel keeps its last good answer when a refetch fails (#222).** Every data panel decides
+  through `panelView` (`src/lib/panelView.ts`): data wins whenever there is some, marked
+  `refreshFailed` when the latest refetch failed; "Data unavailable" is only for no data at all.
+  The mark is the nameplate's age stamp (`DataAge`) reading "couldn't refresh" ("stale" at
+  380 px and below), so it never changes a panel's height. Never check `error` before `data`;
+  `tests/unit/panel-view-scan.test.ts` fails on it. The stamp dates data by its own `updatedAt`
+  (else when it arrived), and once a failed panel's data is older than its source's `maxAgeMs`
+  (`src/lib/health.ts`) the age itself is the visible text ("3d ago · stale"). The panel keeps
+  the data rather than going unavailable: it is still the last known answer, and now dated.
 - **The client's retries wait out what answered them (#218).** `main.tsx`'s default
   `retryDelay` is `defaultRetryDelay` (`src/hooks/useSourceQuery.ts`): 1, 2 and 4 s for a
   dropped connection or a 5xx, but 61 s (or a longer `Retry-After`, up to 2 minutes) after a

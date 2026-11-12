@@ -10,8 +10,9 @@ export function useDonki(): {
   data: DonkiResponse | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['donki'],
     queryFn: fetchDonki,
     staleTime: 15 * 60 * 1000,
@@ -27,5 +28,6 @@ export function useDonki(): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

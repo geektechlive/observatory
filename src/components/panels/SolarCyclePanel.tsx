@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useSolarCycle } from '@/hooks/useSolarCycle'
+import { panelView } from '@/lib/panelView'
 import { kpStatus, statusVar } from '@/lib/severity'
 
 import styles from './solar-cycle-panel.module.css'
@@ -14,10 +13,10 @@ import styles from './solar-cycle-panel.module.css'
 const kpColor = (kp: number): string => statusVar(kpStatus(kp))
 
 export function SolarCyclePanel() {
-  const { data, isLoading, error } = useSolarCycle()
-  const updatedAt = useQueryClient().getQueryState(['solar-cycle'])?.dataUpdatedAt ?? 0
+  const query = useSolarCycle()
+  const view = panelView(query, 'solar-cycle')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Solar Cycle 25">
         <PanelState kind="loading" />
@@ -25,7 +24,7 @@ export function SolarCyclePanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Solar Cycle 25">
         <PanelState kind="unavailable" detail="The NOAA solar cycle feed did not answer" />
@@ -33,13 +32,15 @@ export function SolarCyclePanel() {
     )
   }
 
+  const { data, age } = view
+
   const ssn = data.cycle.map((c) => c.ssn)
   const kpValues = data.kpForecast.map((k) => k.kp)
   const peak = ssn.length > 0 ? Math.max(...ssn) : 0
 
   return (
     <GlassPanel variant="tile" label="Solar Cycle 25">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.cycle ?? ''}>
           <div className={styles.cycleHead ?? ''}>

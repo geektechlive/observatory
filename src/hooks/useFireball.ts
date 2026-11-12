@@ -8,8 +8,9 @@ export function useFireball(enabled = true): {
   data: FireballResponse | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['fireball'],
     queryFn: fetchFireball,
     staleTime: 60 * 60 * 1000,
@@ -22,5 +23,6 @@ export function useFireball(enabled = true): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

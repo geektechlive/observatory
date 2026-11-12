@@ -8,8 +8,9 @@ export function useSentry(): {
   data: SentryResponse | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['sentry'],
     queryFn: fetchSentry,
     staleTime: 6 * 60 * 60 * 1000,
@@ -21,5 +22,6 @@ export function useSentry(): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

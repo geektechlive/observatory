@@ -1,18 +1,17 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useSpaceNews } from '@/hooks/useSpaceNews'
 import { formatRelativeTime } from '@/lib/format'
+import { panelView } from '@/lib/panelView'
 
 import styles from './space-news-panel.module.css'
 
 export function SpaceNewsPanel() {
-  const { data, isLoading, error } = useSpaceNews()
-  const updatedAt = useQueryClient().getQueryState(['space-news'])?.dataUpdatedAt ?? 0
+  const query = useSpaceNews()
+  const view = panelView(query, 'space-news')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Mission Intel">
         <PanelState kind="loading" />
@@ -20,7 +19,7 @@ export function SpaceNewsPanel() {
     )
   }
 
-  if (error || !data || data.articles.length === 0) {
+  if (view.kind === 'unavailable' || view.data.articles.length === 0) {
     return (
       <GlassPanel variant="tile" label="Mission Intel">
         <PanelState kind="unavailable" detail="The space news feed did not answer" />
@@ -28,9 +27,11 @@ export function SpaceNewsPanel() {
     )
   }
 
+  const { data, age } = view
+
   return (
     <GlassPanel variant="tile" label="Mission Intel">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <ol className={styles.list ?? ''}>
         {data.articles.slice(0, 7).map((a, i) => (
           <li key={`${a.url}-${i}`} className={styles.item ?? ''}>

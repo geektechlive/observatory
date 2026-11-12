@@ -7,8 +7,9 @@ export function useNeo(): {
   data: NeoResponse | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useSourceQuery('neo', {
+  const { data, isLoading, error, dataUpdatedAt } = useSourceQuery('neo', {
     queryKey: ['neo'],
     queryFn: fetchNeoEnvelope,
     staleTime: 15 * 60 * 1000,
@@ -20,5 +21,6 @@ export function useNeo(): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

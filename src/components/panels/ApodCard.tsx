@@ -1,18 +1,21 @@
 import { useState } from 'react'
 
+import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useApod } from '@/hooks/useApod'
+import { panelView } from '@/lib/panelView'
 
 import styles from './apod-card.module.css'
 import { ApodLightbox } from './ApodLightbox'
 
 export function ApodCard() {
-  const { data, isLoading, error } = useApod()
+  const query = useApod()
+  const view = panelView(query, 'apod')
   const [expanded, setExpanded] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="hero" label="APOD">
         <PanelState kind="loading" />
@@ -20,7 +23,7 @@ export function ApodCard() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="hero" label="APOD">
         <PanelState kind="unavailable" detail="NASA's APOD service is not answering" />
@@ -28,11 +31,13 @@ export function ApodCard() {
     )
   }
 
+  const { data, refreshFailed, age } = view
   const lightboxSrc = data.hdurl ?? data.url
   const canLightbox = data.media_type === 'image'
 
   return (
     <GlassPanel variant="hero" label="APOD">
+      {refreshFailed && <DataAge {...age} />}
       <div className={styles.apodCard ?? ''}>
         {data.media_type === 'image' ? (
           <div className={styles.imageWrap ?? ''}>

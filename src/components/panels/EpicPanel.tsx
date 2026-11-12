@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { DataAge } from '@/components/ui/DataAge'
@@ -6,6 +5,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useEpic } from '@/hooks/useEpic'
 import { epicImageUrl } from '@/lib/epicUrl'
+import { panelView } from '@/lib/panelView'
 
 import styles from './epic-panel.module.css'
 
@@ -39,20 +39,20 @@ function formatCoord(value: number, posLabel: string, negLabel: string): string 
 }
 
 export function EpicPanel() {
-  const { data, isLoading, error } = useEpic()
-  const updatedAt = useQueryClient().getQueryState(['epic'])?.dataUpdatedAt ?? 0
+  const query = useEpic()
+  const view = panelView(query, 'epic')
   const [imgFailed, setImgFailed] = useState(false)
-  const [lastImage, setLastImage] = useState(data?.image)
+  const [lastImage, setLastImage] = useState(query.data?.image)
 
   // Reset the failure flag when a new EPIC image comes in, so it gets a
   // fresh attempt. Adjusted during render (not an effect) per React's
   // guidance for state that depends on a changed prop.
-  if (data?.image !== lastImage) {
-    setLastImage(data?.image)
+  if (query.data?.image !== lastImage) {
+    setLastImage(query.data?.image)
     setImgFailed(false)
   }
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="panel" label="Earth Now">
         <PanelState kind="loading" />
@@ -60,13 +60,15 @@ export function EpicPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="panel" label="Earth Now">
         <PanelState kind="unavailable" detail="NASA's EPIC camera feed did not answer" />
       </GlassPanel>
     )
   }
+
+  const { data, age } = view
 
   const imgSrc = epicImageUrl(data, 'jpg')
   const fullResSrc = epicImageUrl(data, 'png')
@@ -85,7 +87,7 @@ export function EpicPanel() {
   return (
     <GlassPanel variant="panel" label="Earth Now">
       <div className={styles.epicPanel ?? ''}>
-        <DataAge updatedAt={updatedAt} />
+        <DataAge {...age} />
         <div className={styles.imageWrap ?? ''}>
           <img
             src={imgSrc}

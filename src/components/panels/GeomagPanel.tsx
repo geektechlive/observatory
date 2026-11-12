@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useGeomag } from '@/hooks/useGeomag'
+import { panelView } from '@/lib/panelView'
 import { bzStatus, dstStatus, statusVar } from '@/lib/severity'
 
 import styles from './geomag-panel.module.css'
@@ -17,10 +16,10 @@ const DST_LABEL = { hazard: 'SEVERE STORM', watch: 'MODERATE STORM', nominal: 'Q
 const dstLabel = (dst: number): string => DST_LABEL[dstStatus(dst)]
 
 export function GeomagPanel() {
-  const { data, isLoading, error } = useGeomag()
-  const updatedAt = useQueryClient().getQueryState(['geomag'])?.dataUpdatedAt ?? 0
+  const query = useGeomag()
+  const view = panelView(query, 'geomag')
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Geomagnetic" className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -28,7 +27,7 @@ export function GeomagPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Geomagnetic" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA geomagnetic feed did not answer" />
@@ -36,12 +35,14 @@ export function GeomagPanel() {
     )
   }
 
+  const { data, age } = view
+
   const dst = data.currentDst
   const bz = data.currentBz
 
   return (
     <GlassPanel variant="tile" label="Geomagnetic" className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.metric ?? ''}>
           <div className={styles.head ?? ''}>

@@ -10,8 +10,9 @@ export function useEpic(): {
   data: EpicResponse | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['epic'],
     queryFn: fetchEpic,
     staleTime: 60 * 60 * 1000,
@@ -27,5 +28,6 @@ export function useEpic(): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

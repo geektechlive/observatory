@@ -14,10 +14,11 @@ export function useApod(): {
   data: Apod | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
   const utcDate = new Date().toISOString().slice(0, 10)
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['apod', utcDate],
     queryFn: fetchApod,
     staleTime: msUntilUtcMidnight(),
@@ -29,5 +30,6 @@ export function useApod(): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Readout } from '@/components/ui/Readout'
 import { useDonki } from '@/hooks/useDonki'
 import { formatRelativeTime } from '@/lib/format'
+import { panelView } from '@/lib/panelView'
 
 import { KpSparkline } from './KpSparkline'
 import styles from './space-weather-strip.module.css'
@@ -19,10 +18,10 @@ interface RecentEvent {
 }
 
 export function SpaceWeatherStrip() {
-  const { data, isLoading, error } = useDonki()
-  const updatedAt = useQueryClient().getQueryState(['donki'])?.dataUpdatedAt ?? 0
+  const query = useDonki()
+  const view = panelView(query, 'donki')
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Space Weather">
         <PanelState kind="loading" />
@@ -30,13 +29,15 @@ export function SpaceWeatherStrip() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Space Weather">
         <PanelState kind="unavailable" detail="NASA DONKI did not answer" />
       </GlassPanel>
     )
   }
+
+  const { data, age } = view
 
   // Collect all Kp readings across all storms for sparkline
   const kpReadings: { observedTime: string; kpIndex: number }[] = []
@@ -100,7 +101,7 @@ export function SpaceWeatherStrip() {
 
   return (
     <GlassPanel variant="tile" label="Space Weather">
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.strip ?? ''}>
         <div className={styles.countRow ?? ''}>
           {counts.map(([label, n]) => (

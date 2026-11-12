@@ -7,8 +7,9 @@ export function useSolarWind(): {
   data: SolarWind | undefined
   isLoading: boolean
   error: Error | null
+  dataUpdatedAt: number
 } {
-  const { data, isLoading, error } = useSourceQuery('solar-wind', {
+  const { data, isLoading, error, dataUpdatedAt } = useSourceQuery('solar-wind', {
     queryKey: ['solarWind'],
     queryFn: fetchSolarWindEnvelope,
     staleTime: 5 * 60 * 1000,
@@ -20,5 +21,6 @@ export function useSolarWind(): {
     data,
     isLoading,
     error: error == null ? null : toError(error),
+    dataUpdatedAt,
   }
 }

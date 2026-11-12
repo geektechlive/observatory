@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-
 import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Label } from '@/components/ui/Label'
@@ -7,6 +5,7 @@ import { PanelState } from '@/components/ui/PanelState'
 import { Swatch } from '@/components/ui/Swatch'
 import { usePlanets } from '@/hooks/usePlanets'
 import { BODY_HEX } from '@/lib/palette'
+import { panelView } from '@/lib/panelView'
 import type { Planet } from '@/schemas/planets'
 
 import styles from './planets-panel.module.css'
@@ -27,10 +26,10 @@ function raX(raHours: number): number {
 }
 
 export function PlanetsPanel() {
-  const { data, isLoading, error } = usePlanets()
-  const updatedAt = useQueryClient().getQueryState(['planets'])?.dataUpdatedAt ?? 0
+  const query = usePlanets()
+  const view = panelView(query, 'planets')
 
-  if (isLoading) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
         <PanelState kind="loading" detail="Plotting ephemerides" />
@@ -38,7 +37,7 @@ export function PlanetsPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="JPL Horizons is not answering" />
@@ -46,13 +45,15 @@ export function PlanetsPanel() {
     )
   }
 
+  const { data, age } = view
+
   const sun = data.bodies.find((b) => b.name === 'Sun')
   const planets = data.bodies.filter((b) => b.name !== 'Sun')
   const sorted = [...planets].sort((a, b) => b.elongation - a.elongation)
 
   return (
     <GlassPanel variant="tile" label="Planets Tonight" className={styles.reserve ?? ''}>
-      <DataAge updatedAt={updatedAt} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <svg
           className={styles.strip ?? ''}

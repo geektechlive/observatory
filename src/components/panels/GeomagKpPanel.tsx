@@ -7,6 +7,7 @@ import { Readout } from '@/components/ui/Readout'
 import { useAurora } from '@/hooks/useAurora'
 import { useSolarWind } from '@/hooks/useSolarWind'
 import { HORIZON_REACH_DEG, reachExtreme, type ReachPoint } from '@/lib/auroraReach'
+import { panelView } from '@/lib/panelView'
 import { kpStatus, type Status, statusVar } from '@/lib/severity'
 
 import styles from './geomag-kp-panel.module.css'
@@ -66,9 +67,10 @@ function AuroraReach() {
 }
 
 export function GeomagKpPanel() {
-  const { data, isLoading, error } = useSolarWind()
+  const query = useSolarWind()
+  const view = panelView(query, 'solar-wind')
 
-  if (isLoading && !data) {
+  if (view.kind === 'loading') {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="loading" />
@@ -76,7 +78,7 @@ export function GeomagKpPanel() {
     )
   }
 
-  if (error || !data) {
+  if (view.kind === 'unavailable') {
     return (
       <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
         <PanelState kind="unavailable" detail="The NOAA Kp feed did not answer" />
@@ -84,12 +86,14 @@ export function GeomagKpPanel() {
     )
   }
 
+  const { data, age } = view
+
   const kp = data.currentKp
   const readings = data.kpReadings.map((r) => ({ observedTime: r.time, kpIndex: r.kp }))
 
   return (
     <GlassPanel variant="tile" label={TITLE} className={styles.reserve ?? ''}>
-      <DataAge updatedAt={Date.parse(data.updatedAt)} />
+      <DataAge {...age} />
       <div className={styles.panel ?? ''}>
         <div className={styles.head ?? ''}>
           <span data-testid="kp-now">
