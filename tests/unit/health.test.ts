@@ -107,6 +107,37 @@ describe('SOURCES', () => {
     expect(ok({ rows, supgpCount: '2' })).toBe(false)
   })
 
+  it('grades a JPL lookup by its answer: an object, a non-empty list, or "not found" (#148)', () => {
+    const required = SOURCES['jpl-lookup'].required
+    expect(SOURCES['jpl-lookup'].headline).toBe(false)
+    const answer = (result: unknown) => ({ query: 'eros', provider: 'jpl-sbdb', result })
+    expect(required(answer({ type: 'none' }))).toBe(true)
+    expect(required(answer({ type: 'object', object: { spkid: '20000433' } }))).toBe(true)
+    expect(required(answer({ type: 'list', count: 1, matches: [{ designation: '1P' }] }))).toBe(
+      true,
+    )
+    expect(required(answer({ type: 'object', object: { spkid: '' } }))).toBe(false)
+    expect(required(answer({ type: 'list', count: 0, matches: [] }))).toBe(false)
+    expect(required(answer({ type: 'surprise' }))).toBe(false)
+    expect(required({ query: 'eros' })).toBe(false)
+  })
+
+  it('grades a JPL trajectory by whole samples, or where the ephemeris ends (#148)', () => {
+    const required = SOURCES['jpl-trajectory'].required
+    expect(SOURCES['jpl-trajectory'].headline).toBe(false)
+    const object = { spkid: '20000433' }
+    const span = (samples: number[]) => ({ start: 2461345.5, step: 1, samples })
+    const none = { availableFrom: null, availableTo: null }
+    expect(required({ object, fine: span([1, 2, 3, 4, 5, 6]), ...none })).toBe(true)
+    expect(required({ object, fine: null, availableFrom: null, availableTo: '2100-01-01' })).toBe(
+      true,
+    )
+    expect(required({ object, fine: span([]), ...none })).toBe(false)
+    expect(required({ object, fine: span([1, 2, 3, 4, 5]), ...none })).toBe(false)
+    expect(required({ object, fine: null, ...none })).toBe(false)
+    expect(required({ object: {}, fine: span([1, 2, 3, 4, 5, 6]), ...none })).toBe(false)
+  })
+
   it('gives every source a label and a positive max age', () => {
     for (const name of SOURCE_NAMES) {
       const contract = SOURCES[name]
