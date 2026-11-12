@@ -1,6 +1,7 @@
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { refetchOnceAfter, REVALIDATE_REFETCH_MS } from '@/lib/api/revalidate'
+import { refetchOnceAfter, REVALIDATE_REFETCH_MS, revalidateFeeds } from '@/lib/api/revalidate'
 
 describe('refetchOnceAfter (#83)', () => {
   beforeEach(() => {
@@ -43,5 +44,38 @@ describe('refetchOnceAfter (#83)', () => {
 
   it('gives the server longer than its 8 s upstream deadline', () => {
     expect(REVALIDATE_REFETCH_MS).toBeGreaterThan(8_000)
+  })
+})
+
+describe('revalidateFeeds (#215)', () => {
+  it('refetches the active feeds but never an on-demand JPL lookup', async () => {
+    const client = new QueryClient()
+    const feed = vi.fn(async () => 1)
+    const jpl = vi.fn(async () => 2)
+    const keys = [
+      ['jpl-lookup', 'q'],
+      ['jpl-lookup-track', '1', 'a', 'b'],
+      ['jpl-lookup-closest', '1'],
+    ]
+    const observers = [
+      new QueryObserver(client, { queryKey: ['neo'], queryFn: feed, staleTime: Infinity }),
+      ...keys.map(
+        (queryKey) => new QueryObserver(client, { queryKey, queryFn: jpl, staleTime: Infinity }),
+      ),
+    ]
+    const stop = observers.map((o) => o.subscribe(() => undefined))
+    await vi.waitFor(() => {
+      expect(jpl).toHaveBeenCalledTimes(3)
+    })
+    expect(feed).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(client.isFetching()).toBe(0)
+    })
+    await revalidateFeeds(client)
+    expect(client.getQueryState(['neo'])?.dataUpdateCount).toBe(2)
+    expect(feed).toHaveBeenCalledTimes(2)
+    // Each lookup spends the JPL queue's daily budget: asked once, never re-asked here.
+    expect(jpl).toHaveBeenCalledTimes(3)
+    for (const s of stop) s()
   })
 })

@@ -80,6 +80,30 @@ describe('LookupFacts (#145)', () => {
     expect(text).toMatch(/whole orbit.*osculating/i)
   })
 
+  it('says when a close pass is drawn from its 10-minute samples (#215)', () => {
+    const t = trajectory()
+    const fine = t.fine ?? { start: 0, step: 1, samples: [] }
+    // Four days of the 2-day samples, every 10 minutes; its end is a float JD.
+    const startJd = Date.parse('2026-11-06T00:00:00Z') / DAY_MS + 2440587.5
+    const samples = Array.from({ length: 577 * 6 }, (_, i) => fine.samples[i % 6] ?? 0)
+    const closest = { start: startJd, step: 0.006944444, samples }
+    render(
+      <LookupFacts
+        object={apophis}
+        trajectory={t}
+        closest={closest}
+        earth={null}
+        simMs={simMs}
+        problem={null}
+        loading={false}
+        onRemove={vi.fn()}
+      />,
+    )
+    expect(document.body.textContent).toContain(
+      'Around its pass near Earth, 2026-11-06 00:00 UTC to 2026-11-10 00:00 UTC, samples every 10 minutes.',
+    )
+  })
+
   it('never shows a position past its samples, and says so', () => {
     render(
       <LookupFacts

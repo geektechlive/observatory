@@ -3,7 +3,7 @@ import { Readout } from '@/components/ui/Readout'
 import { describeLookup, lookupOrbit } from '@/lib/orrery/lookupTrack'
 import { formatLightTime } from '@/lib/orrery/units'
 import type { LookupObject, TrajectoryResponse } from '@/schemas/jplLookup'
-import type { OrreryTrack } from '@/schemas/orreryBodies'
+import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
 import { Distance } from './Distance'
 import styles from './orrery.module.css'
@@ -16,6 +16,8 @@ const DAY_MS = 86_400_000
 interface LookupFactsProps {
   object: LookupObject | null
   trajectory: TrajectoryResponse | null
+  /** A close pass's 10-minute samples (#215), drawn there in place of the 2-day ones. */
+  closest?: SampledSpan | null | undefined
   /** Horizons' Earth from /api/orrery-bodies, where it covers the date. */
   earth: OrreryTrack | null
   simMs: number
@@ -35,6 +37,7 @@ interface LookupFactsProps {
 export function LookupFacts({
   object,
   trajectory,
+  closest = null,
   earth,
   simMs,
   problem,
@@ -44,9 +47,16 @@ export function LookupFacts({
 }: LookupFactsProps) {
   const jd = simMs / DAY_MS + JD_UNIX_EPOCH
   const fine = trajectory?.fine ?? null
-  const d = fine ? describeLookup(fine, earth, jd) : null
+  const d = fine ? describeLookup(fine, earth, jd, closest) : null
   const orbitKind = fine && d ? lookupOrbit(fine, jd)?.kind : undefined
   const request = trajectory?.request
+  // To the minute: a Julian date's float would print 2026-11-14 00:00 as 23:59.
+  const utcOf = (jd: number) =>
+    formatSimUtc(Math.round(((jd - JD_UNIX_EPOCH) * DAY_MS) / 60_000) * 60_000)
+  const closestFrom = closest ? utcOf(closest.start) : ''
+  const closestTo = closest
+    ? utcOf(closest.start + (closest.samples.length / 6 - 1) * closest.step)
+    : ''
 
   return (
     <>
@@ -115,6 +125,8 @@ export function LookupFacts({
           Asked on demand from JPL Horizons: samples from {request.start} to {request.end}, every{' '}
           {String(Math.round(request.stepMinutes / 1440))} days, interpolated between them (cubic
           Hermite).
+          {closest &&
+            ` Around its pass near Earth, ${closestFrom} to ${closestTo}, samples every 10 minutes.`}
           {orbitKind === 'osculating' &&
             ' Its line is the whole orbit: the osculating ellipse through its position and velocity now, so it drifts from the true path over years.'}
           {orbitKind === 'sampled' &&

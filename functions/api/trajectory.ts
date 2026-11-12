@@ -19,7 +19,8 @@ import { askJpl, badRequest, type JplEnv, type JplQueueNamespace, notConfigured 
 // GET /api/trajectory?id=sb:<SPK-ID>&start=&end=&step= (#100): Horizons vectors for any
 // small body over a span, on demand, through the jpl-queue Durable Object. The object is
 // looked up in SBDB first (cached for a week) to name it the way Horizons needs and to
-// check Horizons answered for it. Spans are capped at 600 samples.
+// check Horizons answered for it. Spans are capped at 600 samples; steps go down to 10
+// minutes, for a close pass's dense span (#215).
 
 const OBJECT_TTL_SECONDS = 7 * 86_400
 const TRAJECTORY_TTL_SECONDS = 86_400

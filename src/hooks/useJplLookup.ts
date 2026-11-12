@@ -113,6 +113,25 @@ export function lookupGaveUp(a: LookupState<unknown> | undefined, answers: numbe
 }
 
 /**
+ * A close pass's dense span (#215, lookupTrack.ts's `lookupClosestSpan`), idle while either
+ * is null. Asked once: never retried, never refetched, nothing kept from another span or
+ * object, and no health report, so a busy or failed answer changes nothing on screen (the
+ * 2-day samples keep drawing). It still goes through the JPL queue and its daily budget.
+ */
+export function useLookupClosest(spkid: string | null, span: LookupSpan | null) {
+  return useQuery({
+    queryKey: ['jpl-lookup-closest', spkid, span?.start, span?.end, span?.step],
+    queryFn: () =>
+      fetchTrajectorySpan(`sb:${spkid ?? ''}`, span ?? { start: '', end: '', step: '' }),
+    enabled: spkid !== null && span !== null,
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+}
+
+/**
  * Horizons samples for a looked-up object over a span (lookupTrack.ts's `lookupSpan`),
  * idle while either is null. The search card and the orrery ask for the same span through
  * this one query, so a lookup shown in the orrery is one JPL request, not two (#152).

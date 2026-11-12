@@ -23,7 +23,7 @@ import {
 
 import { earthFrameDistance, earthFrameRadii, sceneDirection } from '@/lib/orrery/earthFrame'
 import { stateAt } from '@/lib/orrery/ephemeris'
-import { lookupNearTimes, type LookupOrbit } from '@/lib/orrery/lookupTrack'
+import { lookupNearTimes, type LookupOrbit, lookupState } from '@/lib/orrery/lookupTrack'
 import type { Vec3 } from '@/lib/orrery/scale'
 import { AU_KM } from '@/lib/orrery/units'
 import { LANES } from '@/lib/palette'
@@ -62,6 +62,11 @@ export interface LookupData {
   designation: string | null
   /** Horizons samples, position and velocity (/api/trajectory). */
   fine: SampledSpan
+  /**
+   * A close pass's 10-minute samples (#215), drawn in place of `fine` where they cover the
+   * date; absent or null otherwise.
+   */
+  closest?: SampledSpan | null | undefined
   orbit: LookupOrbit | null
 }
 
@@ -117,6 +122,9 @@ function longestKept(keep: Uint8Array, n: number, loop: boolean): Run {
   return best
 }
 
+/** The 2-day samples and a close pass's dense ones (#215). */
+const samplesOf = (data: LookupData) => ({ fine: data.fine, closest: data.closest ?? null })
+
 /** Per date of the pass: scene direction from Earth (3), frame radii, true offset. */
 const PART = 5
 
@@ -126,7 +134,7 @@ const PART = 5
  * dates within reach of Earth, with Earth sampled, are kept.
  */
 function nearParts(
-  fine: SampledSpan,
+  data: LookupData,
   earth: SampledSpan,
   times: readonly number[],
   maxAu: number,
@@ -135,7 +143,7 @@ function nearParts(
   const kept: number[] = []
   const parts: number[] = []
   for (const jd of times) {
-    const s = stateAt({ fine, coarse: null }, jd)
+    const s = lookupState(samplesOf(data), jd)
     const e = s ? stateAt({ fine: earth, coarse: null }, jd) : null
     if (!s || !e) continue
     const p = s.position
@@ -243,7 +251,7 @@ export class LookupLayer {
     this.jd = jd
     this.toScene = toScene
     this.mode = mode
-    const s = this.data ? stateAt({ fine: this.data.fine, coarse: null }, jd) : null
+    const s = this.data ? lookupState(samplesOf(this.data), jd) : null
     this.helio = s ? s.position : null
     this.marker.visible = s !== null && !hidden
     if (s) {
@@ -340,12 +348,18 @@ export class LookupLayer {
       const toScene = this.toScene
       if (!toScene) return 0
       const earthAt = (jd: number) => stateAt({ fine: earth, coarse: null }, jd)?.position ?? null
-      const times = lookupNearTimes(data.fine, earthAt, near.maxAu, NEAR_TIMES)
+      const times = lookupNearTimes(
+        data.fine,
+        earthAt,
+        near.maxAu,
+        NEAR_TIMES,
+        data.closest ?? null,
+      )
       this.near = {
         data,
         earth: near.earthTrack,
         mode: this.mode,
-        ...nearParts(data.fine, earth, times, near.maxAu, toScene),
+        ...nearParts(data, earth, times, near.maxAu, toScene),
       }
       this.nearKey = []
     }

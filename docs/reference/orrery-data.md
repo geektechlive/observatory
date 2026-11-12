@@ -464,7 +464,8 @@ queue).
   The DO answers 200 with JPL's status in `X-Jpl-Status`.
 - **`/api/lookup?q=`** reads SBDB (`sstr=`): one object, a list (HTTP 300), or "not found".
   `parseLookupQuery` normalises the text (it is the cache key) and allows one trailing `*` after
-  three characters. **`/api/trajectory?id=sb:<SPK-ID>&start=&end=&step=`** looks the SPK-ID up
+  three characters. **`/api/trajectory?id=sb:<SPK-ID>&start=&end=&step=`** (`step` is `<n>m`,
+  `<n>h` or `<n>d`, at least `10m` since #215) looks the SPK-ID up
   in SBDB (cached a week), asks Horizons for vectors (`DES=<SPK-ID>;` for an asteroid,
   `DES=<SPK-ID>;CAP;NOFRAG` for a comet, checked live 2026-11-07 on Eros, Apophis and 3I), checks
   the target name and the sample count, and caps a span at 600 samples between 1900 and 2100.
@@ -480,7 +481,8 @@ queue).
   the distance from the Sun and Earth (Earth from the planet tables) and the speed at the sim
   date, Hermite on the same two-year span the orrery draws (`useLookupSpan`, one query key for
   both, #152). "Show in orrery" then asks JPL for nothing more: one queue request per lookup,
-  not two (the card used to ask for three daily samples of its own). The card waits for the
+  not two (the card used to ask for three daily samples of its own), or two for a span that
+  passes within 0.001 au of Earth (the dense span below, #215). The card waits for the
   clock to settle in a new span as the orrery does (`useSettledSpan`, `LOOKUP_SETTLE_MS`), so a
   scrub with the card open asks once, not once per 120-day step.
 - **"Show in orrery" (#145) draws the object.** The card puts it in `lookupStore.ts`;
@@ -518,9 +520,28 @@ queue).
     line through the frame. Earth's samples cover only ±30 days of the refresh, so for a date
     outside them (Apophis on 13 April 2029, seen today) the frame stays closed and the object
     and its loop stay at their true places. `data-orrery-lookup-near-path` counts the pass's
-    points. The lookup's samples are 2 days apart, too coarse for a pass of a few hours:
-    2026 VQ11 (31,453 km, CAD) is drawn at 19,241 km at its closest (−39%, measured on the
-    recorded 2026-11-12 answer), where its close-approach copy's 3 h span gives 31,474 km.
+    points.
+  - **A close pass gets a dense span (#215).** The 2-day samples are too coarse for a pass of
+    hours: 2026 VQ11 (31,453 km, CAD; 31,453.4 km from Horizons' 1-minute vectors) drew at
+    19,241 km at its closest (−39%). When the 2-day samples come within 0.001 au of Earth
+    (`lookupClosestSpan`, against JPL's approximate Earth, which is enough to decide), the
+    orrery asks `/api/trajectory` once more, through the same queue and its daily budget:
+    10-minute samples over the two 2-day steps either side of the sample nearest the pass
+    (4 days, 577 samples), cached a day like the main span. Not #142's ±6 h: the 2-day
+    Hermite is still 8,600 km off 6 h from VQ11's closest approach (12,000 km at 15 h), so
+    the line would jump at the dense span's edges; these edges are lookup samples, so the
+    hand-over is at a shared Horizons state. Measured on VQ11 (`orrery-lookup-closest.test.ts`,
+    fixture `jpl-lookup/vq11-pass.json`): drawn closest 31,453.2 km, and within 6.5 km of the
+    1-minute vectors from −2 to +2 days. `lookupState` uses the dense span where it covers
+    the date, else the 2-day one, never past either. The query is asked once (no retry, no
+    refetch, no `placeholderData`), reports no health and shows nothing while loading or
+    failed: the 2-day line stays. It is not asked when a close approach of the same object
+    (`sb:<designation>`) has samples at that pass, since the approach layer draws it from
+    its own (#216); if the filters then hide that approach, the lookup draws its 2-day copy.
+    Nothing is asked until the approaches have answered or failed (`approachesSettled`): a
+    link's lookup may answer first, and a request once sent can't be taken back.
+    The inspector says when the dense samples are in use. The search card still reads the
+    2-day span.
   - **Drawn once (#216):** while a close approach of the same object is drawn, the lookup hides
     its marker, line and label, as it does for a comet twin (#99). The approaches are keyed
     `sb:<des>`, CAD's designation, so the match is SBDB's primary designation (the number once

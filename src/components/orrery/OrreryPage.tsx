@@ -768,7 +768,13 @@ export function OrreryPage() {
 
   // An object looked up at JPL and shown (#145): drawn, searchable and linkable. Removing
   // it, from the search card or the inspector, closes its inspector.
-  const lookup = useLookupTrack({ renderer, simMs: sim, select })
+  const lookup = useLookupTrack({
+    renderer,
+    simMs: sim,
+    select,
+    approaches: near.approaches,
+    approachesSettled: near.approachesSettled,
+  })
   const smallCatalog = small.catalog
   const items = useMemo(() => {
     const listed = [...catalog, ...smallCatalog]

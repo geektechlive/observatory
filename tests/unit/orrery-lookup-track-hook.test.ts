@@ -13,6 +13,10 @@ import { useLookupTrack } from '@/components/orrery/useLookupTrack'
 import { fetchTrajectorySpan } from '@/lib/api/jplLookup'
 import { lookupSpan } from '@/lib/orrery/lookupTrack'
 import type { LookupObject, TrajectoryResponse } from '@/schemas/jplLookup'
+import type { SampledSpan } from '@/schemas/orreryBodies'
+import type { OrreryApproach } from '@/schemas/orreryNeo'
+
+import vq11Pass from './fixtures/jpl-lookup/vq11-pass.json'
 
 const fetchSpan = vi.mocked(fetchTrajectorySpan)
 
@@ -60,7 +64,7 @@ function answer(span: { start: string; end: string }): TrajectoryResponse {
   }
 }
 
-function setup(simMs = NOW) {
+function setup(simMs = NOW, approaches: readonly OrreryApproach[] = []) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: qc }, children)
@@ -72,6 +76,7 @@ function setup(simMs = NOW) {
         renderer,
         simMs: sim,
         select,
+        approaches,
       }),
     { wrapper, initialProps: { sim: simMs } },
   )
@@ -268,5 +273,146 @@ describe('useLookupTrack (#145)', () => {
       expect(select).toHaveBeenCalledTimes(2)
     })
     expect(select).toHaveBeenLastCalledWith('lookup:20099942')
+  })
+})
+
+describe('useLookupTrack: a close pass gets a dense span (#215)', () => {
+  const vq11: LookupObject = {
+    id: 'sb:54670410',
+    spkid: '54670410',
+    name: '(2026 VQ11)',
+    designation: '2026 VQ11',
+    prefix: null,
+    kind: 'asteroid',
+    orbitClass: { code: 'APO', name: 'Apollo' },
+    neo: true,
+    pha: false,
+  }
+  const SIM = Date.parse('2026-11-11T15:00:00Z')
+  const coarse = vq11Pass.coarse
+  const dense = vq11Pass.dense
+  const DENSE = { start: '2026-11-10', end: '2026-11-14', step: '10m' }
+  const reply = (span: { start: string; end: string; step: string }, fine: SampledSpan) => ({
+    state: 'ok' as const,
+    data: {
+      ...answer(span),
+      object: vq11,
+      target: '(2026 VQ11)',
+      request: { start: span.start, end: span.end, stepMinutes: span.step === '10m' ? 10 : 2880 },
+      fine,
+    },
+  })
+  type Drawn = { closest: SampledSpan | null } | null
+  const lastDrawn = (r: { setLookup: ReturnType<typeof vi.fn> }) =>
+    r.setLookup.mock.lastCall?.[0] as Drawn
+  const denseCalls = () => fetchSpan.mock.calls.filter(([, s]) => s.step === '10m')
+
+  it('asks once for four days at 10 minutes around the pass, and draws from them', async () => {
+    fetchSpan.mockImplementation(async (_id, span) =>
+      reply(span, span.step === '10m' ? dense : coarse),
+    )
+    const { renderer, result, rerender } = setup(SIM)
+    act(() => {
+      useLookupStore.getState().show(vq11)
+    })
+    await waitFor(() => {
+      expect(lastDrawn(renderer)?.closest).toEqual(dense)
+    })
+    expect(denseCalls()).toEqual([['sb:54670410', DENSE]])
+    // A later date inside the same span asks for nothing more.
+    rerender({ sim: SIM + 3_600_000 })
+    expect(denseCalls()).toHaveLength(1)
+    expect(result.current.problem).toBeNull()
+  })
+
+  it('shows nothing extra while it loads or when it fails: the 2-day line stays', async () => {
+    fetchSpan.mockImplementation(async (_id, span) =>
+      span.step === '10m'
+        ? { state: 'unavailable', reason: 'busy', retryAfterS: 20 }
+        : reply(span, coarse),
+    )
+    const { renderer, result } = setup(SIM)
+    act(() => {
+      useLookupStore.getState().show(vq11)
+    })
+    await waitFor(() => {
+      expect(denseCalls()).toHaveLength(1)
+    })
+    const drawn = lastDrawn(renderer)
+    expect(drawn).not.toBeNull()
+    expect(drawn?.closest).toBeNull()
+    expect(result.current.problem).toBeNull()
+    expect(result.current.loading).toBe(false)
+    expect(result.current.gaveUp).toBe(false)
+  })
+
+  it('asks nothing when the close approaches already draw this pass (#216)', async () => {
+    fetchSpan.mockImplementation(async (_id, span) => reply(span, coarse))
+    const twin = {
+      id: 'sb:2026 VQ11',
+      des: '2026 VQ11',
+      closeApproach: { jd: vq11Pass.cadJd },
+      fine: coarse,
+      close: null,
+      closest: null,
+    } as unknown as OrreryApproach
+    const { renderer } = setup(SIM, [twin])
+    act(() => {
+      useLookupStore.getState().show(vq11)
+    })
+    await waitFor(() => {
+      expect(lastDrawn(renderer)).not.toBeNull()
+    })
+    expect(denseCalls()).toHaveLength(0)
+  })
+
+  it('waits for the close approaches before asking, so a twin found late costs nothing', async () => {
+    fetchSpan.mockImplementation(async (_id, span) => reply(span, coarse))
+    const twin = {
+      id: 'sb:2026 VQ11',
+      des: '2026 VQ11',
+      closeApproach: { jd: vq11Pass.cadJd },
+      fine: coarse,
+      close: null,
+      closest: null,
+    } as unknown as OrreryApproach
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: qc }, children)
+    const renderer = { setLookup: vi.fn(), focusOn: vi.fn() }
+    const hook = renderHook(
+      ({ approaches, settled }: { approaches: OrreryApproach[]; settled: boolean }) =>
+        useLookupTrack({
+          renderer,
+          simMs: SIM,
+          select: vi.fn(),
+          approaches,
+          approachesSettled: settled,
+        }),
+      { wrapper, initialProps: { approaches: [] as OrreryApproach[], settled: false } },
+    )
+    act(() => {
+      useLookupStore.getState().show(vq11)
+    })
+    await waitFor(() => {
+      expect(lastDrawn(renderer)).not.toBeNull()
+    })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(denseCalls()).toHaveLength(0)
+    hook.rerender({ approaches: [twin], settled: true })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(denseCalls()).toHaveLength(0)
+  })
+
+  it('asks nothing for an object that never comes near Earth', async () => {
+    fetchSpan.mockImplementation(async (_id, span) => ({ state: 'ok', data: answer(span) }))
+    const { renderer } = setup(SIM)
+    act(() => {
+      useLookupStore.getState().show(apophis)
+    })
+    await waitFor(() => {
+      expect(lastDrawn(renderer)).not.toBeNull()
+    })
+    expect(denseCalls()).toHaveLength(0)
   })
 })

@@ -157,7 +157,8 @@ export const MAX_TRAJECTORY_SAMPLES = 600
 /** Horizons covers most small bodies across this range; outside it, refuse. */
 const MIN_DATE = '1900-01-01'
 const MAX_DATE = '2100-12-31'
-const MIN_STEP_MINUTES = 60
+/** 10 minutes: a close pass's dense span (#215), as the refresh job's for #142. */
+const MIN_STEP_MINUTES = 10
 
 export interface TrajectoryRequest {
   spkid: string
@@ -178,13 +179,13 @@ function dateMs(s: string | null): number {
 }
 
 function stepMinutesOf(s: string | null): number {
-  const m = /^(\d{1,4})([hd])$/.exec(s ?? '')
+  const m = /^(\d{1,4})([mhd])$/.exec(s ?? '')
   if (!m) return Number.NaN
   const n = Number(m[1])
-  return m[2] === 'd' ? n * 1440 : n * 60
+  return m[2] === 'd' ? n * 1440 : m[2] === 'h' ? n * 60 : n
 }
 
-/** `id=sb:<SPK-ID>&start=YYYY-MM-DD&end=YYYY-MM-DD&step=<n>h|<n>d`, checked and capped. */
+/** `id=sb:<SPK-ID>&start=YYYY-MM-DD&end=YYYY-MM-DD&step=<n>m|<n>h|<n>d`, checked and capped. */
 export function parseTrajectoryParams(p: URLSearchParams): TrajectoryParams {
   const id = /^sb:(\d{1,10})$/.exec(p.get('id') ?? '')
   if (!id?.[1]) return { ok: false, reason: 'id must be sb:<SPK-ID>' }
@@ -201,7 +202,7 @@ export function parseTrajectoryParams(p: URLSearchParams): TrajectoryParams {
   }
   const stepMinutes = stepMinutesOf(p.get('step'))
   if (!Number.isFinite(stepMinutes) || stepMinutes < MIN_STEP_MINUTES) {
-    return { ok: false, reason: 'step must be <n>h or <n>d, at least 1h' }
+    return { ok: false, reason: 'step must be <n>m, <n>h or <n>d, at least 10m' }
   }
   const value = { spkid: id[1], start, end, stepMinutes }
   if (trajectorySampleCount(value) > MAX_TRAJECTORY_SAMPLES) {
@@ -210,9 +211,10 @@ export function parseTrajectoryParams(p: URLSearchParams): TrajectoryParams {
   return { ok: true, value }
 }
 
-/** Horizons' STEP_SIZE, as the refresh job writes it: whole days, else hours. */
+/** Horizons' STEP_SIZE, as the refresh job writes it: whole days, else whole hours, else minutes. */
 function stepSize(minutes: number): string {
-  return minutes % 1440 === 0 ? `${String(minutes / 1440)} d` : `${String(minutes / 60)} h`
+  if (minutes % 1440 === 0) return `${String(minutes / 1440)} d`
+  return minutes % 60 === 0 ? `${String(minutes / 60)} h` : `${String(minutes)} m`
 }
 
 /** A VECTORS request matching the refresh job's: Sun-centred ecliptic J2000, au and au/day. */

@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
+import { useLookupClosest, useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
 import type { LookupState, Unavailable } from '@/lib/api/jplLookup'
-import { shortName } from '@/lib/orrery/asteroids'
-import { lookupKey, lookupOrbit, lookupSpan, spanCovers } from '@/lib/orrery/lookupTrack'
+import { asteroidState, shortName } from '@/lib/orrery/asteroids'
+import { earthState } from '@/lib/orrery/craftState'
+import {
+  lookupClosestSpan,
+  lookupKey,
+  lookupOrbit,
+  lookupSpan,
+  spanCovers,
+} from '@/lib/orrery/lookupTrack'
 import type { LookupObject, TrajectoryResponse } from '@/schemas/jplLookup'
+import type { SampledSpan } from '@/schemas/orreryBodies'
+import type { OrreryApproach } from '@/schemas/orreryNeo'
 
 import type { CatalogItem } from './catalog'
 import { useLookupStore } from './lookupStore'
@@ -52,6 +61,8 @@ export interface LookupView {
   object: LookupObject | null
   /** Horizons' answer for the span drawn now, once it has arrived. */
   trajectory: TrajectoryResponse | null
+  /** A close pass's 10-minute samples (#215), once they have arrived, else null. */
+  closest: SampledSpan | null
   /** Its search entry, with whether its samples cover the date. */
   item: CatalogItem | null
   loading: boolean
@@ -69,9 +80,67 @@ interface Options {
   renderer: Pick<OrreryRenderer, 'setLookup' | 'focusOn'> | null
   simMs: number
   select: (key: SceneKey) => void
+  /** The close approaches (#92): one that draws the same pass needs no dense span (#215). */
+  approaches?: readonly OrreryApproach[]
+  /**
+   * The approaches have answered (or failed). Until then no dense span is asked: a link's
+   * lookup may answer first, and a request once sent can't be taken back.
+   */
+  approachesSettled?: boolean
 }
 
-export function useLookupTrack({ renderer, simMs, select }: Options): LookupView {
+const NO_APPROACHES: readonly OrreryApproach[] = []
+/** JPL's approximate Earth: enough to decide whether a pass is within 0.001 au. */
+const approxEarth = (jd: number) => earthState(null, jd).position
+
+/**
+ * A close pass's dense span (#215), once JPL has answered for it; null while it loads, if
+ * it failed, or when none is needed. None is asked when the close approaches already draw
+ * the pass from their own 10-minute samples (#216 draws that object once, from them).
+ */
+function useClosestSpan(
+  spkid: string | null,
+  fine: SampledSpan | null,
+  designation: string | null,
+  approaches: readonly OrreryApproach[],
+  approachesSettled: boolean,
+): SampledSpan | null {
+  const wanted = useMemo(
+    () => (fine && approachesSettled ? lookupClosestSpan(fine, approxEarth) : null),
+    [fine, approachesSettled],
+  )
+  const twinDraws = useMemo(() => {
+    if (!wanted || !designation) return false
+    const twin = approaches.find((a) => a.id === `sb:${designation}`)
+    if (!twin) return false
+    const from = jdOfDay(wanted.start)
+    const to = jdOfDay(wanted.end)
+    const ca = twin.closeApproach.jd
+    return ca > from && ca < to && asteroidState(twin, ca) !== null
+  }, [wanted, designation, approaches])
+  const span = wanted && !twinDraws ? wanted : null
+  const query = useLookupClosest(span ? spkid : null, span)
+  const data = query.data?.state === 'ok' ? query.data.data : null
+  // Only this object's answer for this span, inside the 2-day samples.
+  if (!span || !data?.fine || !fine || data.object.spkid !== spkid) return null
+  if (data.request.start !== span.start || data.request.end !== span.end) return null
+  const dense = data.fine
+  const denseEnd = dense.start + (dense.samples.length / 6 - 1) * dense.step
+  const fineEnd = fine.start + (fine.samples.length / 6 - 1) * fine.step
+  const EPS = 1e-6
+  if (dense.start < fine.start - EPS || denseEnd > fineEnd + EPS) return null
+  return dense
+}
+
+const jdOfDay = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / DAY_MS + JD_UNIX_EPOCH
+
+export function useLookupTrack({
+  renderer,
+  simMs,
+  select,
+  approaches = NO_APPROACHES,
+  approachesSettled = true,
+}: Options): LookupView {
   const shown = useLookupStore((s) => s.shown)
   const spkid = shown?.spkid ?? null
   const span = useSettledSpan(spkid ? lookupSpan(simMs) : null, spkid)
@@ -93,9 +162,10 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
 
   // The close approaches are keyed by designation (#216): the renderer draws a twin once.
   const designation = object?.designation ?? null
+  const closest = useClosestSpan(spkid, fine, designation, approaches, approachesSettled)
   useEffect(() => {
-    renderer?.setLookup(key && fine ? { key, label, designation, fine, orbit } : null)
-  }, [renderer, key, label, designation, fine, orbit])
+    renderer?.setLookup(key && fine ? { key, label, designation, fine, closest, orbit } : null)
+  }, [renderer, key, label, designation, fine, closest, orbit])
 
   // "Show in orrery": once drawn where the clock is, fly there and open the inspector.
   const jd = simMs / DAY_MS + JD_UNIX_EPOCH
@@ -152,6 +222,7 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
     label,
     object,
     trajectory,
+    closest,
     item,
     loading: spkid !== null && (span === null || query.isFetching),
     problem,

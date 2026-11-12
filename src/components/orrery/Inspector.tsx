@@ -224,6 +224,7 @@ export function Inspector({
           <LookupFacts
             object={lookup?.object ?? null}
             trajectory={lookup?.trajectory ?? null}
+            closest={lookup?.closest ?? null}
             earth={tracks?.find((t) => t.naifId === '399') ?? null}
             simMs={simMs}
             problem={lookup?.problem ?? null}

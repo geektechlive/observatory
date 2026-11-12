@@ -10,6 +10,7 @@ import {
   parseTrajectoryParams,
   sbdbLookupUrl,
   sbdbSpkUrl,
+  trajectorySampleCount,
 } from '@/lib/orrery/jplLookup'
 
 import oneP from './fixtures/jpl-lookup/sbdb-1P.json'
@@ -154,6 +155,21 @@ describe('parseTrajectoryParams (#100)', () => {
     expect(
       parseTrajectoryParams(params('id=sb:1004083&start=2026-11-01&end=2026-11-02&step=6h')),
     ).toMatchObject({ ok: true, value: { stepMinutes: 360 } })
+    // A close pass's dense span (#215): four days at 10 minutes, 577 samples.
+    expect(
+      parseTrajectoryParams(params('id=sb:54670410&start=2026-11-10&end=2026-11-14&step=10m')),
+    ).toEqual({
+      ok: true,
+      value: { spkid: '54670410', start: '2026-11-10', end: '2026-11-14', stepMinutes: 10 },
+    })
+    expect(
+      trajectorySampleCount({
+        spkid: '1',
+        start: '2026-11-10',
+        end: '2026-11-14',
+        stepMinutes: 10,
+      }),
+    ).toBe(577)
   })
 
   it('refuses a bad id, date or step', () => {
@@ -164,7 +180,8 @@ describe('parseTrajectoryParams (#100)', () => {
       'id=sb:1&start=2026-02-30&end=2026-11-03&step=1d',
       'id=sb:1&start=2026-11-03&end=2026-11-01&step=1d',
       'id=sb:1&start=2026-11-01&end=2026-11-01&step=1d',
-      'id=sb:1&start=2026-11-01&end=2026-11-03&step=30m',
+      'id=sb:1&start=2026-11-01&end=2026-11-03&step=5m',
+      'id=sb:1&start=2026-11-01&end=2026-11-03&step=10s',
       'id=sb:1&start=2026-11-01&end=2026-11-03&step=0h',
       'id=sb:1&start=2026-11-01&end=2026-11-03',
       'id=sb:1&start=1850-01-01&end=1850-02-01&step=1d',
@@ -214,5 +231,15 @@ describe('horizonsTrajectoryUrl (#100)', () => {
       }),
     )
     expect(hourly.searchParams.get('STEP_SIZE')).toBe("'6 h'")
+    // Minutes as the refresh job writes them ("10 m"), not "0.1666… h" (#215).
+    const dense = new URL(
+      horizonsTrajectoryUrl('DES=54670410;', {
+        spkid: '54670410',
+        start: '2026-11-10',
+        end: '2026-11-14',
+        stepMinutes: 10,
+      }),
+    )
+    expect(dense.searchParams.get('STEP_SIZE')).toBe("'10 m'")
   })
 })

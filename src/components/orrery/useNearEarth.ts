@@ -63,6 +63,8 @@ export function useNearEarth(renderer: OrreryRenderer | null, jd: number) {
   return {
     neo,
     approaches,
+    /** The approaches have answered, or failed: an empty list now means none (#215). */
+    approachesSettled: !query.isPending,
     scout,
     filter,
     setFilter,

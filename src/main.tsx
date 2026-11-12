@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client'
 
 import { defaultRetry, defaultRetryDelay } from '@/hooks/useSourceQuery'
 import { onRevalidating } from '@/lib/api/client'
-import { refetchOnceAfter } from '@/lib/api/revalidate'
+import { refetchOnceAfter, revalidateFeeds } from '@/lib/api/revalidate'
 import { isOrreryHash, prefetchOrrery, scheduleOrreryIdlePrefetch } from '@/lib/orreryPrefetch'
 import { preloadTexturesAtBoot } from '@/lib/texturePreload'
 
@@ -28,10 +28,11 @@ const queryClient = new QueryClient({
 })
 
 // An old answer the server is refreshing (#83): ask again once the fresh copy has landed.
-// Every active query refetches; the ones already fresh come back as cache HITs.
+// Every active feed refetches; the ones already fresh come back as cache HITs. The JPL
+// lookups are left alone (revalidateFeeds, #215).
 onRevalidating(
   refetchOnceAfter(() => {
-    void queryClient.invalidateQueries({ refetchType: 'active' })
+    void revalidateFeeds(queryClient)
   }),
 )
 
