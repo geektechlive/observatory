@@ -98,6 +98,19 @@ mean day to day:
   the Tonight panel says so. Its free API is for non-commercial use only, and the limits are per
   IP (10,000/day), so don't proxy it through a Function: that would put every visitor on
   Cloudflare's shared egress limit.
+- **NASA GIBS map tiles are fetched straight from the browser (#211)**, like CARTO's: no
+  Function, no KV, no health contract (a raster source has no payload to judge). The host is in
+  both `img-src` and `connect-src` (`tests/unit/gibs-layers.test.ts` checks it); tiles answer
+  `access-control-allow-origin: *`. A day GIBS lacks answers 404 and the tile stays blank.
+  - **IMERG lags two days.** At 05:35Z on 2026-11-12 the capabilities' newest
+    `IMERG_Precipitation_Rate` day was 2026-11-10 and a 2026-11-11 tile answered 404. No
+    latency is published for the daily image (Worldview's layer notes say only that Early IMERG
+    arrives "within hours"), so `imergDate()` asks for two days back from noon UTC and three
+    before it. The time domain has gap days (2026-02-03 answered 404), which show as no rain.
+    If the layer goes blank every morning, the lag has grown: re-read the domain with
+    `.../1.0.0/IMERG_Precipitation_Rate/default/GoogleMapsCompatible_Level6/all/<start>--<end>.xml`.
+  - **Black Marble is fixed at 2016**, the newest of its two annual composites. If GIBS adds a
+    newer year, update `NIGHT_LIGHTS` in `src/lib/gibs.ts`.
 
 ## The response cache (`functions/api/_cache.ts`)
 

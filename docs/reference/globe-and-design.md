@@ -76,12 +76,47 @@ share of the stage, and the map takes the screen height. The globe keeps its one
   `AttributionControl({ compact: false })`: a compact one, or an unset one on a narrow map,
   folds behind a button after the first drag. Sources whose terms ask for credit carry it as
   the source's `attribution` (OpenAQ, adsb.lol), and MapLibre lists it while one of that
-  source's layers is visible. `tests/e2e/map-credits.spec.ts` checks all of it. Elsewhere on the
+  source's layers is visible. `tests/e2e/map-credits.spec.ts` checks all of it. From 900px the
+  control's `max-width` stops it short of the ISS plate, so a long credit wraps instead of
+  running under the plate (`src/styles/global.css`). Elsewhere on the
   site, the Launches panel says "Data by RocketLaunch.Live" and the Tonight panel "Weather data
   by Open-Meteo.com" beside the cloud cover, as those services ask.
 - **CARTO dark-matter's `background` layer is the land; water is a fill on top of it.**
   `src/lib/basemap.ts` repaints those vector layers on `style.load`. Never grade the map with a
   CSS `filter`: it recolours every data layer. `tests/e2e/map-renders.spec.ts` guards this.
+- **NASA GIBS layers (#211): Imagery, Night lights, Precipitation, all off by default.** Tiles
+  come straight from `gibs.earthdata.nasa.gov` in the browser (no Function). Config lives in
+  `src/lib/gibs.ts`; values are from GIBS's EPSG:3857 WMTS capabilities
+  (`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml`, read
+  2026-11-12):
+  - **Imagery:** `MODIS_Terra_CorrectedReflectance_TrueColor`, `GoogleMapsCompatible_Level9`,
+    yesterday (UTC).
+  - **Night lights:** `VIIRS_Black_Marble`, `GoogleMapsCompatible_Level8`, PNG. It is an annual
+    composite with only `2012-01-01` and `2016-01-01`, so it shows 2016, and the credit says so.
+    The image is opaque (`raster-opacity: 0.9`) and hides the basemap's borders. It is not
+    graded: ROCI v2 calls the city lights emissive, and emissive matter is never graded, so its
+    dark navy sea stays as GIBS draws it (as MODIS's ocean does).
+  - **Precipitation:** `IMERG_Precipitation_Rate` (the daily image; `_30min` has a sparse,
+    gappy time domain), `GoogleMapsCompatible_Level6`, PNG, `raster-opacity: 0.7`. Dry areas are
+    transparent in GIBS's colormap. It is a data scale, so it is never graded, and the credit
+    states the day shown. GIBS's own colours put snow in cyan-blue and the heaviest rain in red,
+    which overlaps the ROCI reservations (cyan for spacecraft, red for hazard); recolouring
+    would break the scale's meaning, so it is left as GIBS draws it. There is no colour legend.
+    The day is two days back from noon UTC and three before (`imergDate()`), a lag observed once
+    (2026-11-12); GIBS publishes none. If that day is missing (a gap day, or NASA publishing
+    late), its tiles 404 and the layer shows blank under a credit naming the day. Accepted,
+    as the layer is off by default; nothing retries.
+  - Each source's `maxzoom` matches its matrix set's deepest level, so deeper zooms overzoom
+    rather than asking for tiles that 404.
+  - All three sit above CARTO's layers and under every marker.
+- **GIBS's acknowledgment is a licence term and shows once.** GIBS asks for "We acknowledge the
+  use of imagery provided by services from NASA's Global Imagery Browse Services (GIBS), part of
+  NASA's Earth Science Data and Information System (ESDIS)." (nasa-gibs.github.io/gibs-api-docs/,
+  read 2026-11-12). MapLibre lists every distinct source credit, so the sentence is not repeated on
+  each tile source: an empty GeoJSON source `gibs-credit` carries it, and its invisible
+  `gibs-credit-anchor` layer is shown while any GIBS layer is on. Tile sources carry only the
+  product and date. `tests/e2e/map-gibs.spec.ts` checks it shows once and stays clear of the
+  plates.
 
 ## Fonts
 

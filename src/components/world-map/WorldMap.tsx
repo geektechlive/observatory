@@ -20,6 +20,7 @@ import { useIss } from '@/hooks/useIss'
 import { useNwsAlerts } from '@/hooks/useNwsAlerts'
 import { useQuakes } from '@/hooks/useQuakes'
 import { warmBasemapPaint } from '@/lib/basemap'
+import { gibsCreditSource, modisSource, nightLightsSource, precipitationSource } from '@/lib/gibs'
 import {
   altitudeColor,
   aqiColor,
@@ -255,21 +256,43 @@ export function WorldMap() {
       }
 
       // NASA GIBS MODIS true-color imagery (bottom layer, hidden until toggled).
-      map.addSource('gibs-truecolor', {
-        type: 'raster',
-        tiles: [
-          `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
-        ],
-        tileSize: 256,
-        maxzoom: 9,
-        attribution: 'Imagery © NASA GIBS / EOSDIS',
-      })
+      map.addSource('gibs-truecolor', modisSource(gibsDate()))
       map.addLayer({
         id: 'gibs-layer',
         type: 'raster',
         source: 'gibs-truecolor',
         layout: { visibility: 'none' },
         paint: { 'raster-opacity': 0.85 },
+      })
+
+      // GIBS night lights and precipitation (#211), above the imagery and under every marker.
+      // Neither is graded: ROCI v2 never grades emissive matter (city lights) or data (IMERG's
+      // colour scale), so both keep GIBS's colours. Black Marble is opaque, IMERG's dry areas
+      // are transparent; opacity is the only paint applied.
+      map.addSource('gibs-night-lights', nightLightsSource())
+      map.addLayer({
+        id: 'gibs-night-lights-layer',
+        type: 'raster',
+        source: 'gibs-night-lights',
+        layout: { visibility: 'none' },
+        paint: { 'raster-opacity': 0.9 },
+      })
+      map.addSource('gibs-precipitation', precipitationSource())
+      map.addLayer({
+        id: 'gibs-precipitation-layer',
+        type: 'raster',
+        source: 'gibs-precipitation',
+        layout: { visibility: 'none' },
+        paint: { 'raster-opacity': 0.7 },
+      })
+      // GIBS's acknowledgment, shown once while any GIBS layer is on: MapLibre lists a
+      // source's credit while one of its layers is visible, and this layer draws nothing.
+      map.addSource('gibs-credit', gibsCreditSource())
+      map.addLayer({
+        id: 'gibs-credit-anchor',
+        type: 'circle',
+        source: 'gibs-credit',
+        layout: { visibility: 'none' },
       })
 
       map.addSource('iss-trail', {
@@ -690,6 +713,9 @@ export function WorldMap() {
     if (!mapLoaded || !map) return
     const vis: [string, boolean][] = [
       ['gibs-layer', layers.gibs],
+      ['gibs-night-lights-layer', layers.nightLights],
+      ['gibs-precipitation-layer', layers.precipitation],
+      ['gibs-credit-anchor', layers.gibs || layers.nightLights || layers.precipitation],
       ['air-dots', layers.air],
       ['nws-fill', layers.nws],
       ['nws-outline', layers.nws],

@@ -26,6 +26,8 @@ const GLOBE_LAYERS: LayerDef[] = [
 
 const MAP_LAYERS: LayerDef[] = [
   { key: 'gibs', label: 'Imagery' },
+  { key: 'nightLights', label: 'Night lights' },
+  { key: 'precipitation', label: 'Precipitation' },
   { key: 'air', label: 'Air PM2.5' },
   { key: 'nws', label: 'US Alerts' },
   { key: 'aircraft', label: 'Aircraft' },

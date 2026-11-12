@@ -186,3 +186,12 @@ body::after {
 .maplibregl-ctrl-attrib a {
   color: var(--bone-dim) !important;
 }
+
+/* From 900px the ISS plate sits in the lens's bottom-right corner (min-width 19rem). A long
+   credit, such as GIBS's acknowledgment (#211), wraps short of it instead of running under
+   it (#94). Below 900px the plates sit under the lens. */
+@media (width >= 900px) {
+  .maplibregl-ctrl-bottom-left {
+    max-width: calc(100% - 19rem - 2 * var(--space-5));
+  }
+}

@@ -42,6 +42,8 @@ export type LayerKey =
   | 'fireballs'
   | 'launches'
   | 'gibs'
+  | 'nightLights'
+  | 'precipitation'
   | 'air'
   | 'nws'
   | 'aircraft'
@@ -60,6 +62,8 @@ export const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   fireballs: false,
   launches: false,
   gibs: false,
+  nightLights: false,
+  precipitation: false,
   air: false,
   nws: false,
   aircraft: false,

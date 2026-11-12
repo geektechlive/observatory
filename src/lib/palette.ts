@@ -146,6 +146,8 @@ export const LAYER_SWATCH: Readonly<Record<LayerKey, Swatch>> = {
   fireballs: { kind: 'lane', lane: 'space' },
   launches: { kind: 'lane', lane: 'orbital' },
   gibs: { kind: 'neutral' },
+  nightLights: { kind: 'neutral' },
+  precipitation: { kind: 'lane', lane: 'hydro' },
   air: { kind: 'status' },
   nws: { kind: 'status' },
   aircraft: { kind: 'neutral' },
