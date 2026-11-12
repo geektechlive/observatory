@@ -55,15 +55,19 @@ describe('layoutLabels (#91)', () => {
       y: 100 + dy,
       visible: true,
     }))
-    const ordinary = layoutLabels([
-      ...crowd,
-      { key: 'Mercury', text: 'Mercury', x: 100, y: 100, visible: true },
-    ])
+    // The left side is taken too (#127 added the left slots for a crowd on the right).
+    const leftTaken = [{ l: 0, r: 100, t: 0, b: 300 }]
+    const ordinary = layoutLabels(
+      [...crowd, { key: 'Mercury', text: 'Mercury', x: 100, y: 100, visible: true }],
+      [],
+      leftTaken,
+    )
     expect(ordinary.has('Mercury')).toBe(false)
-    const subject = layoutLabels([
-      ...crowd,
-      { key: 'Venus', text: 'Venus', x: 100, y: 100, visible: true, mustShow: true },
-    ])
+    const subject = layoutLabels(
+      [...crowd, { key: 'Venus', text: 'Venus', x: 100, y: 100, visible: true, mustShow: true }],
+      [],
+      leftTaken,
+    )
     expect(subject.has('Venus')).toBe(true)
   })
 

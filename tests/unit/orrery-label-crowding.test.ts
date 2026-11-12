@@ -55,9 +55,13 @@ describe('label crowding (#92)', () => {
       r: 5,
     }))
     const earth = { key: 'Earth', text: 'Earth', x: 110, y: 200, visible: true }
-    expect(layoutLabels([earth], dots).has('Earth')).toBe(false)
+    // The left side is taken too (#127 added the left slots for a crowd on the right).
+    const leftTaken = [{ l: 0, r: 110, t: 0, b: 400 }]
+    expect(layoutLabels([earth], dots, leftTaken).has('Earth')).toBe(false)
     // A free rung farther out first; over a dot only if none.
-    expect(layoutLabels([{ ...earth, priority: true }], dots).get('Earth')?.dy).toBe(-54)
+    expect(layoutLabels([{ ...earth, priority: true }], dots, leftTaken).get('Earth')?.dy).toBe(-54)
+    // With the left free, it sits there, beside its body, before a farther rung (#127).
+    expect(layoutLabels([{ ...earth, priority: true }], dots).get('Earth')?.side).toBe('left')
   })
 
   it('never treats a body’s own disc as in the way', () => {

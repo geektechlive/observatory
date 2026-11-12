@@ -45,11 +45,72 @@ the orrery writes its own voice line inside its chunk, from the planet math.
     label keeps off other bodies' dots but never its own ("Sun" sat on Saturn's), and a label
     that would run off the stage's right edge goes to the left of its body (`side: 'left'`, the
     leader moves too).
+  - Since #127 the left slots are tried whenever every slot on the right is taken, by the edge
+    or by a crowd. In the Jupiter view on a phone, Callisto sits left of Jupiter's disc and lost
+    every right-hand slot to the disc and the other moons' labels. A home label also takes the
+    left before a farther rung.
+  - Since #131 the planets, and the focused planet's moons, try the farther rungs too
+    (`farRungs`: right, then left), but never sit over a dot. In the Heliosphere view at
+    1280 x 720 on 2026-11-11, four planet labels hid before (Mercury, Mars, Jupiter, Uranus)
+    and one after (Saturn, real-GPU). In the Jupiter view on a phone with the sheet open, over
+    five days (2026-11-12 to -20), 11 moon labels hid before #127 and #131, and 2 after
+    (Callisto on two days): the band between the badge row and the sheet is about 165 px.
+    The deep-space craft have them too: at 390 px in Heliosphere, Voyager 2's near slots all
+    meet the guide chip, and its one free slot lay over the time bar until the bar became
+    furniture (#130; `orrery-craft.spec.ts` caught it).
   - Earth, the Sun and the selected body are home labels (`priority`): they try farther rungs
     (±54, ±72 px), then sit over a dot, rather than hide. The dot rule alone hid Earth's label in
     the default Heliosphere view.
   - Layout uses a shown label's measured width (`widthPx`); the 7 px a character estimate ran
     about 8% short.
+- **The label pass runs every drawn frame, so it stays cheap (#132 review).**
+  - Every read (sizes, rects, `offsetWidth`) comes before every write. The far-craft suffix
+    (#126) is sized from last frame's width plus its change in characters and written in the
+    final loop. Before, it was written between reads, which forced a second layout each
+    frame: in Parker's view at 1440 x 900 under a 4x CPU throttle, layouts went from 2.2 to 1.2
+    a frame and the pass's median from 1.1 to 0.8 ms (real GPU, 2026-11-12).
+  - The slot orders are built once at module level, disc boxes once a frame, and
+    `layoutStage` grows one list of taken boxes.
+  - A label holds last frame's slot while it is still free (`previous`), so it does not flip
+    between slots as the camera moves.
+  - Opening the Controls sheet or the guide chip changing calls `invalidate()`, so a paused
+    scene's labels see the new furniture.
+- **Close-approach labels are capped on a small stage (#130).** Below `SMALL_STAGE_PX` (600 px)
+  only `ASTEROID_LABELS_SMALL_STAGE` (6) of the approaches in view keep a label
+  (`asteroidLabelKeys`): the hazardous first, then the smallest nominal miss distance (CAD's,
+  so the ranking holds still while the clock runs), and always the selected one. Every dot
+  stays. On a 390 px phone the Earth–Moon view had 10 of its 25 labelled on 2026-11-11, piled
+  round Earth; after the cap, 3 (real-GPU: the rest of the six had no free slot). The guide's
+  amber entry says so. The time bar is furniture too: "2026 VW7", stacked below its dot, ran
+  under it.
+- **A craft far beyond the focus says how far it is (#126).** In a close-up a craft drawn in
+  view may lie much farther away, so it read as nearby (Voyager 2 beside Venus in Parker's
+  view). When its camera distance (`ProjectedBody.depth`) is at least `FAR_DEPTH_RATIO` (3)
+  times the focus's (`farBeyondFocus`), its label gets the rim marker's ` · 144 au` (distance
+  from the Sun), written before the layout so the measured width includes it, and
+  `data-far="true"`. Measured 2026-11-11 at 1440 x 900: Parker's view, focus 4.0 scene units,
+  Venus 3.05, Voyager 2 20.4; Jupiter's, the moons within 1.1 times the focus. The guide's
+  "Marker on the edge" entry says so.
+- **Rim markers** (a deep-space craft beyond the view, with its distance) are placed first,
+  by `spreadRim`, then the labels.
+  - Since #160 they keep off the stage furniture (every `[data-label-obstacle]`: the NOT TO
+    SCALE badge, the guide chip) as well as each other: each takes the nearest free spot along
+    its rim, either way, inside the rim's span (`RIM_TRIES` steps each way). Before, Voyager 1's
+    marker sat under the badge in the Earth–Moon view at 1440 and 390 px.
+  - Since #132, `layoutStage` places both in one pass: the rim markers around the furniture,
+    then the labels around the furniture and the markers' boxes ("2026 VP1" sat against New
+    Horizons' marker on a phone). The furniture now also takes in the Controls and Guide
+    buttons (`data-label-obstacle`) and the open inspector. The inspector takes the right of
+    the stage, or its bottom on a phone (`panelInset`, the same reading `setViewInset` uses):
+    the rim runs inside what it leaves, and a body under it counts as out of view, so a
+    Voyager there becomes a rim marker. When a rim is full (a phone's top row is Controls,
+    Guide and the badge), a marker steps in from it, up to `RIM_STEPS_IN` rows, but only after
+    the labels are placed: a label beside its body wins over a marker that had to leave its
+    rim, and a marker with no room left is not shown. In the Jupiter view on a phone, with the
+    sheet open, stepped-in markers placed first had pushed every moon label out.
+  - `rimBox` is the box the page draws: a left-rim marker is anchored at its left end, a
+    right-rim one at its right end, top and bottom ones centred. It uses the marker's measured
+    width when that is wider than the estimate.
 - **The inspector's footprint** is passed to `setViewInset`, which shifts the projection window
   so the focused body sits in the free part of the stage.
 - **Bundle rules:** `entry-has-no-orrery` (markers `data-orrery-page`, `orreryWebgl`) and

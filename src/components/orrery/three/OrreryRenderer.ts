@@ -138,6 +138,8 @@ export interface ProjectedBody {
   behind: boolean
   /** The body's drawn radius on screen, px, so a label can sit beside its disc. */
   radiusPx: number
+  /** Its distance from the camera, scene units (#126: a craft far beyond the focus). */
+  depth: number
   /** Craft: distance from the Sun now, au (for a rim marker's label). */
   sunAu?: number
   /** Craft: its group and NAIF id. */
@@ -1362,7 +1364,7 @@ export class OrreryRenderer {
 
   private projectOne(
     mesh: Object3D,
-  ): Pick<ProjectedBody, 'x' | 'y' | 'visible' | 'behind' | 'radiusPx'> {
+  ): Pick<ProjectedBody, 'x' | 'y' | 'visible' | 'behind' | 'radiusPx' | 'depth'> {
     const depth = mesh.position.distanceTo(this.camera.position)
     this.scratch.copy(mesh.position).project(this.camera)
     const x = ((this.scratch.x + 1) / 2) * this.width
@@ -1372,7 +1374,7 @@ export class OrreryRenderer {
     // A sphere's scale is its radius; a sprite's is its full width (#115).
     const radius = mesh instanceof Sprite ? mesh.scale.x / 2 : mesh.scale.x
     const radiusPx = depth > 0 ? radius / this.unitsPerPx(depth) : 0
-    return { x, y, visible, behind, radiusPx }
+    return { x, y, visible, behind, radiusPx, depth }
   }
 
   private project(): ProjectedBody[] {
@@ -1413,6 +1415,7 @@ export class OrreryRenderer {
         visible: true,
         behind: false,
         radiusPx: 0,
+        depth: 0,
       })
     }
     return out

@@ -136,7 +136,7 @@ export const SECTIONS: readonly Section[] = [
           {
             tone: 'amber',
             name: 'Amber',
-            text: 'An asteroid on a close pass, and also a notice or warning. On a satellite, an amber ring means Space-Track predicts it will re-enter the atmosphere soon.',
+            text: 'An asteroid on a close pass, and also a notice or warning. On a small screen only the hazardous passes and the closest ones are named; every pass keeps its dot. On a satellite, an amber ring means Space-Track predicts it will re-enter the atmosphere soon.',
           },
           {
             tone: 'red',
@@ -166,7 +166,7 @@ export const SECTIONS: readonly Section[] = [
           {
             tone: 'faint',
             name: 'Marker on the edge',
-            text: 'A deep-space craft that is off the edge of the view is shown on the rim of the stage, pointing toward it.',
+            text: 'A deep-space craft that is off the edge of the view is shown on the rim of the stage, pointing toward it, with its distance from the Sun. A craft in a close-up that lies far beyond what you are looking at carries its distance too, so it does not read as nearby.',
           },
           {
             tone: 'faint',

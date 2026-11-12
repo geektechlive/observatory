@@ -46,7 +46,17 @@ import { DETAIL_VIEW_ID } from './detailViewId'
 import { DwarfControls } from './DwarfControls'
 import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
-import { bodyLabelReach, labelOrder, layoutLabels, rimPoint, spreadRim } from './labelLayout'
+import {
+  asteroidLabelKeys,
+  bodyLabelReach,
+  farBeyondFocus,
+  LABEL_CHAR_PX,
+  labelOrder,
+  type LabelPlacement,
+  layoutStage,
+  panelInset,
+  rimPoint,
+} from './labelLayout'
 import { useLookupStore } from './lookupStore'
 import { NeoControls } from './NeoControls'
 import styles from './orrery.module.css'
@@ -302,12 +312,26 @@ export function OrreryPage() {
   // The label pass runs per drawn frame, outside React: it reads these through refs.
   const selectedRef = useRef<SceneKey | null>(null)
   const subjectRef = useRef<SceneKey | null>(null)
+  // Each close approach's hazard flag and miss distance, to rank its label (#130): built
+  // when the approaches change, not every frame.
+  const approachRank = useMemo(
+    () =>
+      new Map(
+        near.approaches.map((a) => [
+          a.id,
+          { key: a.id, pha: a.pha, distAu: a.closeApproach.distAu },
+        ]),
+      ),
+    [near.approaches],
+  )
+  const approachRankRef = useRef(approachRank)
   useEffect(() => {
     selectedRef.current = selected
     subjectRef.current = subject
     dsnRef.current = dsnIds
+    approachRankRef.current = approachRank
     renderer?.invalidate()
-  }, [selected, subject, dsnIds, renderer])
+  }, [selected, subject, dsnIds, approachRank, renderer])
   const inspectorRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -479,19 +503,12 @@ export function OrreryPage() {
   // Labels: positioned from the renderer's own projection each drawn frame, through refs.
   useEffect(() => {
     if (!renderer) return
+    // Last frame's placements: a label holds its slot while it is free (#132 review).
+    let previous: ReadonlyMap<string, LabelPlacement> | undefined
     renderer.setOnFrame((projected: readonly ProjectedBody[]) => {
-      // The heliopause ring's label is furniture, placed on its own; the rest are bodies.
+      // Every read (sizes, rects, widths) comes before every write, so a frame costs one
+      // layout at most: a write between reads forced a synchronous reflow each frame.
       const ring = projected.find((i) => i.kind === 'ring')
-      const ringNode = ringLabel.current
-      if (ringNode) {
-        // On a phone-width stage the label would run across the planets: the ring stays,
-        // its label goes.
-        ringNode.hidden = !ring || (host.current?.clientWidth ?? 0) < RING_LABEL_MIN_WIDTH
-        if (ring) {
-          ringNode.style.left = `${String(ring.x)}px`
-          ringNode.style.top = `${String(ring.y)}px`
-        }
-      }
       const items = projected.filter((i) => i.kind !== 'ring')
       const subjectNow = subjectRef.current
       const box = host.current
@@ -500,30 +517,56 @@ export function OrreryPage() {
       // Rim markers keep clear of the time bar along the stage's bottom edge.
       const bar = stage.current?.querySelector<HTMLElement>('[aria-label="Simulation time"]')
       const bottomInset = bar ? height - bar.offsetTop + RIM_INSET : RIM_INSET
-      // What sits under the time bar is out of view too, even inside the canvas.
-      const inView = (i: ProjectedBody) => i.visible && i.y < height - bottomInset + RIM_INSET
+      // Stage furniture (the badge, the guide chip, the Controls and Guide buttons) and the
+      // inspector, in the label layer's coordinates: rim markers and labels both move
+      // around them (#118, #160, #132).
+      const origin = box?.getBoundingClientRect()
+      const local = (el: Element) => {
+        const r = el.getBoundingClientRect()
+        const ox = origin?.left ?? 0
+        const oy = origin?.top ?? 0
+        return { l: r.left - ox, r: r.right - ox, t: r.top - oy, b: r.bottom - oy }
+      }
+      const panel = selectedRef.current && inspectorRef.current ? local(inspectorRef.current) : null
+      const furniture = [
+        ...(stage.current?.querySelectorAll<HTMLElement>('[data-label-obstacle]') ?? []),
+      ]
+        .map(local)
+        // A hidden button (Controls on a wide screen) has an empty box.
+        .filter((b) => b.r > b.l && b.b > b.t)
+      if (panel) furniture.push(panel)
+      // A label stacked below a body near the time bar ran under it (#130, 390 px).
+      if (bar) furniture.push(local(bar))
+      // The inspector takes the right or the bottom of the stage: the rim runs inside what
+      // it leaves, and what lies under it is out of view, like what lies under the time bar.
+      const inset = panelInset({ width, height }, panel)
+      const rimBottom = Math.max(bottomInset, inset.bottom + RIM_INSET)
+      const freeRight = width - inset.right
+      const inView = (i: ProjectedBody) =>
+        i.visible && i.x < freeRight && i.y < height - rimBottom + RIM_INSET
       // Deep-space craft beyond the view become rim markers with their true distance,
-      // slid apart along the rim when two would overlap.
+      // slid apart along the rim when two would overlap, and off the furniture.
       const rim = items.filter((i) => i.kind === 'craft' && !inView(i) && i.group === 'deep-space')
       const rimEdges = new Map(
         rim.map((i) => [
           i.name,
-          rimPoint(i.x, i.y, i.behind, width, height, RIM_INSET, bottomInset),
+          rimPoint(i.x, i.y, i.behind, freeRight, height, RIM_INSET, rimBottom),
         ]),
       )
-      const rimPlaces = spreadRim(
-        rim.map((i) => {
-          const p = rimEdges.get(i.name) ?? { x: 0, y: 0, edge: 'top' as const }
-          return {
-            key: i.name,
-            text: `${i.label} · ${(i.sunAu ?? 0).toFixed(0)} au`,
-            x: p.x,
-            y: p.y,
-            alongX: p.edge === 'top' || p.edge === 'bottom',
-          }
-        }),
-        { left: RIM_INSET, right: width - RIM_INSET },
-      )
+      const rimMarkers = rim.map((i) => {
+        const p = rimEdges.get(i.name) ?? { x: 0, y: 0, edge: 'top' as const }
+        const node = labelNodes.current.get(i.name)
+        return {
+          key: i.name,
+          text: `${i.label} · ${(i.sunAu ?? 0).toFixed(0)} au`,
+          x: p.x,
+          y: p.y,
+          alongX: p.edge === 'top' || p.edge === 'bottom',
+          edge: p.edge,
+          // Measured when it was a rim marker last frame (the estimate runs short).
+          widthPx: node?.dataset['rim'] ? node.offsetWidth : undefined,
+        }
+      })
       // Craft DSN is talking to, and the deep-space ones, win label room after the voice
       // subject: on a phone Voyager 1's label used to lose to Juno's.
       // So does an object the visitor looked up at JPL and asked to see (#145).
@@ -539,40 +582,96 @@ export function OrreryPage() {
           .map((i) => i.name),
       )
       const ordered = labelOrder(items, selectedRef.current, subjectNow, boosted)
+      // A craft in a close-up but far beyond the focus says how far it is, as a rim marker
+      // does (#126: Voyager 2 beside Venus in Parker's view read as nearby). The layout
+      // sizes it from last frame's width plus the suffix's change; the write comes last.
+      const focusDepth = items.find((i) => i.name === selectedRef.current)?.depth
+      const farText = (i: ProjectedBody) =>
+        i.kind === 'craft' &&
+        !rimEdges.has(i.name) &&
+        inView(i) &&
+        i.name !== selectedRef.current &&
+        farBeyondFocus(i.depth, focusDepth)
+          ? ` · ${(i.sunAu ?? 0).toFixed(0)} au`
+          : ''
+      const suffixes = new Map(items.map((i) => [i.name, farText(i)]))
+      // On a small stage only the hazardous and closest close approaches in view keep a
+      // label; the rest keep their dots (#130).
+      const rankOf = approachRankRef.current
+      const labelledAsteroids = asteroidLabelKeys(
+        items
+          .filter((i) => i.kind === 'asteroid' && inView(i))
+          .map((i) => rankOf.get(i.name) ?? { key: i.name, pha: i.pha ?? false, distAu: Infinity }),
+        selectedRef.current,
+        width,
+      )
       // Planets' drawn discs (Saturn's with its rings, #119): craft and moon labels keep
       // off them (#107: Juno on Jupiter).
       const discs = items
         .filter((i) => i.kind === 'body' && i.visible)
         .map((i) => ({ key: i.name, x: i.x, y: i.y, r: bodyLabelReach(i.name, i.radiusPx) }))
-      // Stage furniture labels move around, in the label layer's coordinates (#118).
-      const origin = box?.getBoundingClientRect()
-      const obstacles = [
-        ...(stage.current?.querySelectorAll<HTMLElement>('[data-label-obstacle]') ?? []),
-      ].map((el) => {
-        const r = el.getBoundingClientRect()
-        const ox = origin?.left ?? 0
-        const oy = origin?.top ?? 0
-        return { l: r.left - ox, r: r.right - ox, t: r.top - oy, b: r.bottom - oy }
-      })
-      const shown = layoutLabels(
-        ordered.map((i) => ({
-          key: i.name,
-          // The button's own text: L1's carries the wind speed (#92).
-          text: labelNodes.current.get(i.name)?.textContent ?? i.label,
-          // Measured when shown last frame; the box estimate runs ~8% short in this font.
-          widthPx: labelNodes.current.get(i.name)?.offsetWidth,
-          x: i.x + bodyLabelReach(i.name, i.radiusPx),
-          y: i.y,
-          visible: inView(i),
-          mustShow: i.name === subjectNow,
-          priority: i.name === 'Earth' || i.name === 'Sun' || i.name === selectedRef.current,
-          avoidDiscs: i.kind !== 'body',
-          reach: bodyLabelReach(i.name, i.radiusPx),
-        })),
+      const placed = layoutStage({
+        rim: rimMarkers,
+        rimSpan: {
+          left: RIM_INSET,
+          right: freeRight - RIM_INSET,
+          top: RIM_INSET,
+          bottom: height - rimBottom,
+        },
+        labels: ordered.map((i) => {
+          const node = labelNodes.current.get(i.name)
+          // The button's own text (L1's carries the wind speed, #92), with this frame's
+          // distance suffix in place of last frame's.
+          const shownSuffix = node?.querySelector('[data-rim-distance]')?.textContent ?? ''
+          const suffix = suffixes.get(i.name) ?? ''
+          const full = node?.textContent ?? i.label
+          const text = full.slice(0, full.length - shownSuffix.length) + suffix
+          // Measured when shown last frame (the estimate runs ~8% short in this font),
+          // adjusted by the suffix's change in characters.
+          const measured = node?.offsetWidth ?? 0
+          const widthPx =
+            measured > 0
+              ? measured + (suffix.length - shownSuffix.length) * LABEL_CHAR_PX
+              : undefined
+          return {
+            key: i.name,
+            text,
+            widthPx,
+            x: i.x + bodyLabelReach(i.name, i.radiusPx),
+            y: i.y,
+            visible: inView(i) && (i.kind !== 'asteroid' || labelledAsteroids.has(i.name)),
+            mustShow: i.name === subjectNow,
+            priority: i.name === 'Earth' || i.name === 'Sun' || i.name === selectedRef.current,
+            // Planets, the focused planet's moons and the deep-space craft try farther rungs
+            // before hiding (#131). Voyager 2's label at 390 px had only a slot over the time
+            // bar until the bar became furniture (#130); its near slots meet the guide chip.
+            farRungs:
+              i.kind === 'body' ||
+              (i.kind === 'moon' && i.parent === selectedRef.current) ||
+              (i.kind === 'craft' && i.group === 'deep-space'),
+            avoidDiscs: i.kind !== 'body',
+            reach: bodyLabelReach(i.name, i.radiusPx),
+          }
+        }),
         discs,
-        obstacles,
-        { width, height },
-      )
+        furniture,
+        bounds: { width, height },
+        previous,
+      })
+      const rimPlaces = placed.rim
+      const shown = placed.labels
+      previous = shown
+      // Writes from here on.
+      const ringNode = ringLabel.current
+      if (ringNode) {
+        // On a phone-width stage the label would run across the planets: the ring stays,
+        // its label goes.
+        ringNode.hidden = !ring || width < RING_LABEL_MIN_WIDTH
+        if (ring) {
+          ringNode.style.left = `${String(ring.x)}px`
+          ringNode.style.top = `${String(ring.y)}px`
+        }
+      }
       const seen = new Set<SceneKey>()
       for (const item of items) {
         seen.add(item.name)
@@ -598,7 +697,10 @@ export function OrreryPage() {
           continue
         }
         node.dataset['rim'] = ''
-        if (distance) distance.textContent = ''
+        // A far craft carries its distance (#126); every other label none.
+        const suffix = suffixes.get(item.name) ?? ''
+        if (distance && distance.textContent !== suffix) distance.textContent = suffix
+        if (item.kind === 'craft') node.dataset['far'] = suffix ? 'true' : ''
         const place = shown.get(item.name)
         node.style.left = `${String(item.x + bodyLabelReach(item.name, item.radiusPx) + (place?.dx ?? 0))}px`
         node.style.top = `${String(item.y + (place?.dy ?? 0))}px`
@@ -636,7 +738,6 @@ export function OrreryPage() {
   useEffect(() => {
     renderer?.setScaleMode(scale)
   }, [renderer, scale])
-
   const select = useCallback(
     (key: SceneKey) => {
       setSelected(key)
@@ -768,6 +869,13 @@ export function OrreryPage() {
   const stageGuideButton = useRef<HTMLButtonElement>(null)
   const guideFocus = useMemo(() => [railGuideButton, stageGuideButton], [])
   const guide = useGuide(applyLink, guideFocus)
+
+  // The labels move round the stage furniture, read each drawn frame: when it changes
+  // with nothing else moving (the Controls sheet or the guide chip, paused), ask for a
+  // frame so the obstacles are not stale. invalidate() goes through schedule().
+  useEffect(() => {
+    renderer?.invalidate()
+  }, [renderer, sheetOpen, guide.chipVisible, guide.mode])
   // The guide's collapsed bar grows with its tip; the inspector starts below it.
   const [barHeight, setBarHeight] = useState(0)
   const noticesRef = useRef<HTMLDivElement>(null)
@@ -789,14 +897,13 @@ export function OrreryPage() {
     if (!box) return
     const measure = () => {
       const s = box.getBoundingClientRect()
-      let right = 0
-      let bottom = 0
-      if (panel) {
-        const p = panel.getBoundingClientRect()
-        const sheet = p.width > s.width * 0.6
-        right = sheet ? 0 : s.right - p.left
-        bottom = sheet ? s.bottom - p.top : 0
-      }
+      const p = panel?.getBoundingClientRect()
+      const { right, bottom } = panelInset(
+        { width: s.width, height: s.height },
+        p
+          ? { l: p.left - s.left, r: p.right - s.left, t: p.top - s.top, b: p.bottom - s.top }
+          : null,
+      )
       const bar = box.querySelector<HTMLElement>('[data-guide-bar]')
       const b = bar?.getBoundingClientRect()
       let top = 0
@@ -1165,6 +1272,7 @@ export function OrreryPage() {
         <button
           type="button"
           className={`${styles.chipBtn ?? ''} ${styles.sheetToggle ?? ''}`}
+          data-label-obstacle=""
           aria-expanded={sheetOpen}
           aria-controls="orrery-controls"
           onClick={() => {
@@ -1177,6 +1285,7 @@ export function OrreryPage() {
           ref={stageGuideButton}
           type="button"
           className={`${styles.chipBtn ?? ''} ${styles.guideToggle ?? ''}`}
+          data-label-obstacle=""
           aria-expanded={guide.mode !== 'closed'}
           aria-controls="orrery-guide"
           onClick={guide.open}
