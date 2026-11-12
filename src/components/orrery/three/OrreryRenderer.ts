@@ -49,6 +49,7 @@ import type { OrreryEntry } from '@/lib/orrery/dwarfView'
 import {
   CAMERA_NEAR,
   cameraMinDistance,
+  EARTH_FRAME_OPEN_CAMERA,
   EARTH_FRAME_UNIT,
   earthFrameBlend,
   earthFrameRadius,
@@ -79,6 +80,7 @@ import {
   FOV,
   frameView,
   lookupFocusView,
+  nearFocusView,
   sunlitFocusDirection,
 } from './framing'
 import { loadGltfScene } from './gltfLoad'
@@ -186,8 +188,13 @@ const NEAR_LABEL_OPEN = 0.5
 const EARTH_PRESET_RADII = 13.5
 /** Geostationary orbit's radius, km: the Earth orbit preset's extent in the proportional mode. */
 const GEO_KM = 42_164
-/** A close approach, L1 or an L1/L2 craft is focused from this many frame units, inside the open frame. */
+/**
+ * A close approach, L1 or an L1/L2 craft is focused from at least this many frame units,
+ * inside the open frame, and farther when Earth needs it (#133).
+ */
 const NEAR_FOCUS_UNITS = 40
+/** A near-Earth focus's camera stays within this share of the frame's open distance from Earth (#133). */
+const NEAR_OPEN_MARGIN = 0.95
 /** Craft within this distance of Earth, au, are drawn in the Earth frame (#92). */
 const NEAR_FRAME_AU = 0.1
 const HELIOPAUSE_SAMPLES = 180
@@ -625,9 +632,13 @@ export class OrreryRenderer {
   private placeEarthFrame(forceOpen = false): void {
     const earth = this.bodies.get('Earth')
     if (!earth || Number.isNaN(this.lastJd)) return
-    // Forced open: where things will be once a focus flight arrives (it ends inside it).
-    const t = forceOpen && this.near.coversEarth(this.lastJd) ? 1 : this.earthOpenness()
-    const radius = this.earthFrameRadius(earth, t)
+    // Forced open: where things will be once a focus flight arrives (it ends inside it), so
+    // at the open frame's radius. The px floor is for the camera as it is now, and from
+    // far off it scaled the whole frame up (#133: a close approach was fitted about 60
+    // times too far from Earth).
+    const open = forceOpen && this.near.coversEarth(this.lastJd)
+    const t = open ? 1 : this.earthOpenness()
+    const radius = open ? this.drawnRadius('Earth', 1) : this.earthFrameRadius(earth, t)
     const frame = this.near.view(this.lastJd, earth.position, radius, t, (p) => this.toScene(p))
     // Any craft near Earth (the L1/L2 ones; Europa Clipper on its Earth flyby) goes into
     // the frame with the Moon and the close approaches, so they share one scale.
@@ -1091,18 +1102,17 @@ export class OrreryRenderer {
     this.applyInset()
     // The picture moved by the sheet: a preset is fitted for where it now sits.
     if (changed) this.refitPreset()
-    // The inspector opens after a looked-up object is focused: refit it to the room left.
-    // Not while it is hidden (past its samples): bodyPosition would answer the Sun's origin
-    // and the camera would swing there; it holds instead, as followFocus does (#186).
+    // The inspector opens after a looked-up object, a close approach, L1 or an L1/L2 craft
+    // is focused: refit it to the room left (#133), keeping its side unless that fails. Not while it is hidden (past its samples): bodyPosition would
+    // answer the Sun's origin and the camera would swing there; it holds instead, as
+    // followFocus does (#186).
     const focus = this.focusBody
-    if (
-      changed &&
-      this.lookupFramed &&
-      focus &&
-      (this.lookup.has(focus) || this.small.has(focus)) &&
-      this.drawnPosition(focus) !== null
-    ) {
-      this.focusLookup(focus, this.reducedMotion)
+    if (changed && this.focusFramed && focus && this.drawnPosition(focus) !== null) {
+      if (this.lookup.has(focus) || this.small.has(focus)) {
+        this.focusLookup(focus, this.reducedMotion)
+      } else if (this.mode !== 'proportional' && this.isNearEarthFocus(focus)) {
+        this.focusNear(focus, this.reducedMotion, undefined, true)
+      }
     }
     this.markDirty()
   }
@@ -1256,10 +1266,7 @@ export class OrreryRenderer {
     }
     this.updateBodies(true)
     // Near Earth, aim where the object sits once the flight is in, with the frame open.
-    const nearEarth =
-      this.near.asteroids.has(name) ||
-      name === L1_KEY ||
-      this.craft.visible().some((c) => c.key === name && c.group === 'l1')
+    const nearEarth = this.isNearEarthFocus(name)
     if (nearEarth && this.mode !== 'proportional') this.placeEarthFrame(true)
     // A craft or close approach with no data at this date is hidden: nowhere to fly to.
     if (
@@ -1281,6 +1288,13 @@ export class OrreryRenderer {
       this.focusLookup(name, instant)
       return
     }
+    // A craft with a model is seen three-quarter on, so its shape reads (#115).
+    const facing = craftNaif ? this.craftFacing(name) : null
+    if (nearEarth && this.mode !== 'proportional') {
+      const v = facing ? threeQuarterView(facing) : null
+      this.focusNear(name, instant, v ? new Vector3(v.x, v.y, v.z) : undefined)
+      return
+    }
     const target = this.bodyPosition(name)
     const r = this.radiusOf(name)
     // A craft is a marker, not a body: stand back far enough that it stays a few px and
@@ -1292,14 +1306,10 @@ export class OrreryRenderer {
         ? this.earthView().position.distanceTo(target)
         : isBody(name)
           ? Math.max(r * FOCUS_RADII, FOCUS_MIN_DISTANCE)
-          : nearEarth && this.mode !== 'proportional'
-            ? EARTH_FRAME_UNIT * NEAR_FOCUS_UNITS
-            : CRAFT_FOCUS_DISTANCE[this.mode]
+          : CRAFT_FOCUS_DISTANCE[this.mode]
 
     let dir = this.camera.position.clone().sub(this.controls.target).normalize()
     if (dir.lengthSq() === 0) dir.set(0, 0.5, 1).normalize()
-    // A craft with a model is seen three-quarter on, so its shape reads (#115).
-    const facing = craftNaif ? this.craftFacing(name) : null
     if (facing) {
       const v = threeQuarterView(facing)
       dir.set(v.x, v.y, v.z)
@@ -1335,24 +1345,66 @@ export class OrreryRenderer {
     const aspect = this.width / Math.max(1, this.height)
     const view = lookupFocusView(this.bodyPosition(name), others, aspect, this.focusRoom())
     this.flyTo(view.position, view.target, instant)
-    this.lookupFramed = true
+    this.focusFramed = true
+  }
+
+  /** A close approach, L1 or an L1/L2 craft: drawn in the Earth frame (#92). */
+  private isNearEarthFocus(name: SceneKey): boolean {
+    return (
+      this.near.asteroids.has(name) ||
+      name === L1_KEY ||
+      this.craft.visible().some((c) => c.key === name && c.group === 'l1')
+    )
+  }
+
+  /**
+   * A close approach, L1 or an L1/L2 craft (#133) is seen with Earth's disc, both in the
+   * part of the stage the inspector and time bar leave free, from the camera's own side
+   * (a modelled craft's three-quarter view, `prefer`) where that works. At a fixed 40 frame
+   * units, Earth (15.6 units from a 0.04 au pass, 12.8 from L2) fell under the inspector
+   * or off the stage. It fits the frame as it will be on arrival, forced open. Without
+   * `prefer` it is a refit or a fresh focus from where the camera is (or is flying to).
+   */
+  private focusNear(name: SceneKey, instant: boolean, prefer?: Vector3, refit = false): void {
+    // A refit can come mid-flight, with the frame half open: fit where things will be.
+    this.placeEarthFrame(true)
+    const target = this.bodyPosition(name)
+    const from = this.flight ? this.flight.toPos : this.camera.position
+    const view = nearFocusView({
+      target,
+      earth: this.bodyPosition('Earth'),
+      earthRadius: EARTH_FRAME_UNIT,
+      current:
+        prefer ?? from.clone().sub(this.flight ? this.flight.toTarget : this.controls.target),
+      refit,
+      aspect: this.width / Math.max(1, this.height),
+      room: this.focusRoom(),
+      minDistance: EARTH_FRAME_UNIT * NEAR_FOCUS_UNITS,
+      // A little inside the fully open distance, so the frame stays open on arrival.
+      maxEarthDistance: EARTH_FRAME_UNIT * EARTH_FRAME_OPEN_CAMERA.open * NEAR_OPEN_MARGIN,
+    })
+    this.flyTo(view.position, view.target, instant)
+    this.focusFramed = true
   }
 
   /** The focus view was fitted for the inspector as it was: refit when it changes. */
-  private lookupFramed = false
+  private focusFramed = false
 
   /** How far the free part of the stage reaches from a focus centred in it, NDC (#145). */
   private focusRoom(): FocusRoom {
     const w = Math.max(1, this.width)
     const h = Math.max(1, this.height)
-    const { right, bottom } = this.inset
+    const { right, bottom, top } = this.inset
     // The time bar, or the phone's sheet over it, whichever reaches higher.
     const blocked = Math.max(bottom, this.reserveBottomPx)
+    // applyInset centres the focus in the band between the top and bottom insets (#133:
+    // the top one, a phone's guide bar, was left out, so the room above was overstated).
+    const band = h - bottom - top
     const floor = 0.2
     return {
       x: Math.max(floor, (w - right) / w),
-      up: Math.max(floor, (h - bottom) / h),
-      down: Math.max(floor, ((h - bottom) / 2 - (blocked - bottom)) / (h / 2)),
+      up: Math.max(floor, band / h),
+      down: Math.max(floor, (band / 2 - (blocked - bottom)) / (h / 2)),
     }
   }
 
@@ -1389,7 +1441,7 @@ export class OrreryRenderer {
   private readonly onUserCamera = () => {
     this.flight = null
     this.presetPristine = false
-    this.lookupFramed = false
+    this.focusFramed = false
   }
 
   /** Nearest body or craft to a canvas point within `radius` px, or null. */
@@ -1614,6 +1666,24 @@ export class OrreryRenderer {
     this.controls.target.copy(target)
   }
 
+  /**
+   * Where the focus and Earth were drawn, "x,y,radiusPx" in canvas px, for the e2e check
+   * that a close approach's framing keeps both clear of the inspector and time bar (#133).
+   */
+  private reportFramed(projected: readonly ProjectedBody[]): void {
+    const at = (name: SceneKey | null) => {
+      const p = name ? projected.find((q) => q.name === name) : undefined
+      return p && !p.behind
+        ? `${p.x.toFixed(0)},${p.y.toFixed(0)},${p.radiusPx.toFixed(1)}`
+        : 'none'
+    }
+    const data = this.canvas.dataset
+    const focus = at(this.focusBody)
+    const earth = at('Earth')
+    if (data['orreryFocusPx'] !== focus) data['orreryFocusPx'] = focus
+    if (data['orreryEarthPx'] !== earth) data['orreryEarthPx'] = earth
+  }
+
   private readonly frame = (now: number) => {
     this.frameId = 0
     if (!this.attached || this.disposed) return
@@ -1646,6 +1716,7 @@ export class OrreryRenderer {
           .filter((p) => p.visible)
           .map((p) => p.name)
           .join(',')
+        this.reportFramed(projected)
         if (this.onFrame) this.onFrame(this.visibility.labels ? projected : [])
       }
     }

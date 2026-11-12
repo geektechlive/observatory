@@ -95,9 +95,13 @@ export function neoPayload() {
   }
 }
 
-/** Answer /api/orrery-neo with the mocked approaches. */
-export async function serveNeo(page: Page) {
-  const body = JSON.stringify(neoPayload())
+/** A mocked approach, for a spec that needs one of its own geometry (#133). */
+export const mockApproach = approach
+
+/** Answer /api/orrery-neo with the mocked approaches, plus any `extra` ones. */
+export async function serveNeo(page: Page, extra: readonly ReturnType<typeof approach>[] = []) {
+  const payload = neoPayload()
+  const body = JSON.stringify({ ...payload, approaches: [...payload.approaches, ...extra] })
   await page.route('**/api/orrery-neo', (route) =>
     route.fulfill({
       status: 200,

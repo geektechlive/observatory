@@ -365,6 +365,179 @@ export function lookupFocusView(
   )
 }
 
+export interface NearFocusInput {
+  /** The focus (a close approach, L1, an L1/L2 craft), where it is drawn in the open Earth frame. */
+  target: Vector3
+  earth: Vector3
+  /** Earth's drawn radius, scene units: its whole disc is kept in the free room. */
+  earthRadius: number
+  /** The camera's direction from the target before the focus (any length). */
+  current: Vector3
+  aspect: number
+  room: FocusRoom
+  /** The camera stands at least this far from the target (the old fixed distance). */
+  minDistance: number
+  /** And no farther than this from Earth, or the Earth frame starts to close. */
+  maxEarthDistance: number
+  /** A refit of a view already flown to (the inspector's inset changed): turn less readily. */
+  refit?: boolean
+}
+
+/** One camera direction for a near-Earth focus, fitted. */
+export interface NearFocusCandidate {
+  dir: Vector3
+  distance: number
+  /** False when even NEAR_FIT_MAX_FACTOR times minDistance cannot hold both. */
+  fits: boolean
+  earthDistance: number
+  /** Focus-to-Earth distance on screen, NDC height units (x scaled by the aspect). */
+  gap: number
+  /** Earth's drawn radius on screen, in the same units. */
+  earthNdc: number
+}
+
+export interface NearFocusView extends FrameView {
+  /** Both fit the free room (false: the farthest fit tried, clamped). */
+  fits: boolean
+  /** The camera left its own side for one of the 24 azimuths. */
+  turned: boolean
+}
+
+/** The fit's distance is searched up to this many times minDistance, then clamped. */
+export const NEAR_FIT_MAX_FACTOR = 1000
+/** A first focus keeps its side while the focus is this many Earth radii from Earth on screen. */
+const NEAR_GAP_FIRST = 2
+/** A refit keeps it down to this many (#133 review: no flip on a marginal refit). */
+const NEAR_GAP_REFIT = 1
+/** Below that, it turns only to a side with at least this much more gap. */
+const NEAR_TURN_GAIN = 1.25
+
+/** The largest share of the free room a disc takes (NDC); Infinity behind the camera. */
+function discRoomExtent(
+  camera: PerspectiveCamera,
+  p: Vector3,
+  radius: number,
+  aspect: number,
+  room: FocusRoom,
+): number {
+  const v = p.clone().project(camera)
+  if (v.z > 1) return Infinity
+  const ry = radius / (p.distanceTo(camera.position) * Math.tan((FOV * Math.PI) / 360))
+  const rx = ry / aspect
+  // The disc's right or left, top and bottom edges against the room on each side.
+  return Math.max((Math.abs(v.x) + rx) / room.x, (v.y + ry) / room.up, (ry - v.y) / room.down)
+}
+
+/** The 24 directions a near-Earth focus may turn to: 25° up, 15° apart in azimuth. */
+export function nearFocusAzimuths(): Vector3[] {
+  const el = (LOOKUP_FOCUS_ELEVATION_DEG * Math.PI) / 180
+  return Array.from({ length: AZIMUTH_STEPS }, (_, k) => {
+    const az = (k / AZIMUTH_STEPS) * Math.PI * 2
+    return new Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az))
+  })
+}
+
+/** Fit one direction (any length; zero means the default): its distance, gap and limits. */
+export function nearFocusCandidate(input: NearFocusInput, direction: Vector3): NearFocusCandidate {
+  const { target, earth, earthRadius, aspect, room, minDistance } = input
+  const dir = direction.clone()
+  if (dir.lengthSq() === 0) dir.set(0, 0.5, 1)
+  dir.normalize()
+  const camera = new PerspectiveCamera(FOV, Math.max(0.1, aspect), 0.0001, 1e7)
+  camera.updateProjectionMatrix()
+  const place = (distance: number) => {
+    camera.position.copy(target).addScaledVector(dir, distance)
+    camera.lookAt(target)
+    camera.updateMatrixWorld()
+  }
+  const extent = () =>
+    Math.max(
+      discRoomExtent(camera, target, 0, aspect, room),
+      discRoomExtent(camera, earth, earthRadius, aspect, room),
+    )
+  // The nearest distance (at least minDistance) that holds both, searched up to a bound:
+  // beyond it the candidate is clamped there and marked as not fitting.
+  let distance = minDistance
+  let fits = true
+  place(minDistance)
+  if (extent() > FILL) {
+    const bound = minDistance * NEAR_FIT_MAX_FACTOR
+    place(bound)
+    if (extent() > FILL) {
+      distance = bound
+      fits = false
+    } else {
+      let near = minDistance
+      let far = bound
+      for (let i = 0; i < 50; i += 1) {
+        const mid = Math.sqrt(near * far)
+        place(mid)
+        if (extent() > FILL) near = mid
+        else far = mid
+      }
+      distance = far
+    }
+  }
+  place(distance)
+  const a = target.clone().project(camera)
+  const b = earth.clone().project(camera)
+  const earthDistance = camera.position.distanceTo(earth)
+  return {
+    dir,
+    distance,
+    fits,
+    earthDistance,
+    gap: Math.hypot((b.x - a.x) * aspect, b.y - a.y),
+    earthNdc: earthRadius / (earthDistance * Math.tan((FOV * Math.PI) / 360)),
+  }
+}
+
+/**
+ * The view for a near-Earth focus (#133): a close approach, L1 or an L1/L2 craft, aimed at
+ * it, holding it and Earth's disc in the free part of the stage, no nearer than
+ * `minDistance`. The camera keeps its side while that fits within `maxEarthDistance` of
+ * Earth (so the Earth frame stays open) and Earth's disc stays clear of the focus on
+ * screen; else it takes the direction (of 24, from 25° up) that sets the two farthest
+ * apart. A refit (the inspector opened) keeps the side down to a smaller gap, and below
+ * that turns only for 25% more gap, so the camera does not swing on its own. Before, it
+ * stood a fixed 40 frame units off: Earth, 15.6 units from a 0.04 au pass, fell under the
+ * inspector or off the stage depending on where the camera had come from.
+ */
+export function nearFocusView(input: NearFocusInput): NearFocusView {
+  const open = (c: NearFocusCandidate) => c.fits && c.earthDistance <= input.maxEarthDistance
+  const view = (c: NearFocusCandidate, turned: boolean): NearFocusView => ({
+    position: input.target.clone().addScaledVector(c.dir, c.distance),
+    target: input.target.clone(),
+    fits: c.fits,
+    turned,
+  })
+  const kept = nearFocusCandidate(input, input.current)
+  const clear = (input.refit ? NEAR_GAP_REFIT : NEAR_GAP_FIRST) * kept.earthNdc
+  if (open(kept) && kept.gap > clear) return view(kept, false)
+
+  // Best alternative: open with the widest gap; else fitting nearest Earth; else nearest.
+  const rank = (c: NearFocusCandidate) => (open(c) ? 2 : c.fits ? 1 : 0)
+  let best: NearFocusCandidate | null = null
+  for (const dir of nearFocusAzimuths()) {
+    const c = nearFocusCandidate(input, dir)
+    if (!best || rank(c) > rank(best)) best = c
+    else if (rank(c) === rank(best)) {
+      if (rank(c) === 2 ? c.gap > best.gap : c.earthDistance < best.earthDistance) best = c
+    }
+  }
+  if (!best) return view(kept, false)
+  if (open(kept)) {
+    // Only the gap is short: turn only to a side clearly better.
+    return open(best) && best.gap >= NEAR_TURN_GAIN * kept.gap
+      ? view(best, true)
+      : view(kept, false)
+  }
+  return rank(best) > rank(kept) ||
+    (rank(best) === rank(kept) && best.earthDistance < kept.earthDistance)
+    ? view(best, true)
+    : view(kept, false)
+}
+
 /**
  * A focused planet is seen at no more than this phase angle (Sun-planet-camera), so it
  * shows its lit face. Jupiter from Earth never passes about 12°; 35° leaves the

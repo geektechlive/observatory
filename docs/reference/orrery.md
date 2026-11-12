@@ -113,6 +113,26 @@ the orrery writes its own voice line inside its chunk, from the planet math.
     width when that is wider than the estimate.
 - **The inspector's footprint** is passed to `setViewInset`, which shifts the projection window
   so the focused body sits in the free part of the stage.
+  - **A close approach, L1 or an L1/L2 craft is framed with Earth (#133, `nearFocusView` in
+    `framing.ts`).** L1/L2 had the same fault: at 1440 x 900 from the Earth–Moon view,
+    DSCOVR and JWST left Earth under the inspector (e2e, before the review fix). A modelled
+    craft's three-quarter view is its starting side. A refit (the inspector opening) keeps
+    the side while the focus is over one Earth radius from Earth on screen (two for a first
+    focus), and below that turns only for 25% more gap, so the camera does not swing on its
+    own. The distance search stops at 1000 times the minimum and says it did not fit. The
+    camera used to stand a fixed 40 frame units off in its old direction, and Earth, 15.6
+    units from a 0.04 au pass, fell under the inspector or off the stage (2001 KF54 from the
+    Earth–Moon view at 1440 x 900, real GPU, 2026-11-12). Now the approach and Earth's whole
+    disc both fit the free room (`focusRoom`), no nearer than those 40 units, from the
+    camera's own side unless that would take it past 95% of the frame's fully open distance
+    from Earth; then the azimuth that sets the two farthest apart. It refits when the
+    inspector's inset changes, as a looked-up object does. The fit uses the frame forced
+    open at its open radius: `placeEarthFrame(true)` had kept the px floor for the camera as
+    it was, so from far off the fit saw the approach about 60 times too far from Earth
+    (942 frame units against 15.2, in the phone e2e).
+  - `focusRoom` counts the top inset (a phone's guide bar) as well as the bottom.
+  - e2e: `orrery-near-focus-framing.spec.ts` reads the canvas's `data-orrery-focus-px` and
+    `data-orrery-earth-px` ("x,y,radiusPx").
 - **Bundle rules:** `entry-has-no-orrery` (markers `data-orrery-page`, `orreryWebgl`) and
   `orrery-gzip` (each orrery chunk, 34 kB since #98, 40 kB since #158, 38 kB since #162, when
   the satellite browser left OrreryPage: 34.7 and 24.4 kB measured).
