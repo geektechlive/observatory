@@ -1,11 +1,12 @@
 import { expect, type Page, test } from '@playwright/test'
 
-import { coveredPoints } from './mapCredit'
+import { coveredPoints, serveCartoStyle } from './mapCredit'
 
 // The CARTO / OpenStreetMap credit is a licence requirement. #94: MapLibre added its
 // default credits control on top of ours, and the ISS plate covered both.
 
 async function openMap(page: Page) {
+  await serveCartoStyle(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Map', exact: true }).click()
   await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 15_000 })

@@ -76,7 +76,12 @@ share of the stage, and the map takes the screen height. The globe keeps its one
   `AttributionControl({ compact: false })`: a compact one, or an unset one on a narrow map,
   folds behind a button after the first drag. Sources whose terms ask for credit carry it as
   the source's `attribution` (OpenAQ, adsb.lol), and MapLibre lists it while one of that
-  source's layers is visible. `tests/e2e/map-credits.spec.ts` checks all of it. From 900px the
+  source's layers is visible. `tests/e2e/map-credits.spec.ts` checks all of it. It serves
+  a dated copy of CARTO's style (`tests/e2e/mapCredit.ts`) and refuses CARTO's network (#143):
+  CARTO's own credit is in the style, so the line stays empty until the style arrives, and
+  in one gate run it hadn't within 15 s. That was not a gap for visitors, because a map whose
+  style is still pending draws nothing of CARTO's. The copy won't notice if CARTO changes its
+  credit. From 900px the
   control's `max-width` stops it short of the ISS plate, so a long credit wraps instead of
   running under the plate (`src/styles/global.css`). Elsewhere on the
   site, the Launches panel says "Data by RocketLaunch.Live" and the Tonight panel "Weather data

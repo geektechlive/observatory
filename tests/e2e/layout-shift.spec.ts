@@ -3,12 +3,13 @@
  * CLS p75 of 0.244. Measured on a cold 1440x900 and 1920x1080 load, the shifts were the
  * console column growing as its feeds arrived (the voice line from one line to two, each
  * lead panel from its "Loading" box to its data), the ISS plate widening with its first
- * position, and the globe's lens growing after first paint. Fonts were not a source: the
- * layout does not reflow when they swap. This test replays the load with delayed feeds
- * and sums the layout-shift entries the way the CLS metric does (ignoring shifts that
- * follow input), at 1440, 1920 and 390 px wide. It also holds the ticker at zero (#175):
- * Space-Track's re-entries landing after the storms used to push the storms a screen
- * width along (0.0095 at 1920 px here). The re-entries must still lead (#101).
+ * position, and the globe's lens growing after first paint. Fonts were not a source on
+ * desktop: the layout does not reflow when they swap (on a phone one was, #174, below).
+ * This test replays the load with delayed feeds and sums the layout-shift entries the way
+ * the CLS metric does (ignoring shifts that follow input), at 1440, 1920 and 390 px wide.
+ * It also holds the ticker at zero (#175): Space-Track's re-entries landing after the
+ * storms used to push the storms a screen width along (0.0095 at 1920 px here). The
+ * re-entries must still lead (#101).
  */
 import { expect, type Page, test } from '@playwright/test'
 
@@ -150,3 +151,64 @@ for (const viewport of [
     expect(cls.total, `cumulative layout shift ${cls.total.toFixed(4)}`).toBeLessThan(CLS_BUDGET)
   })
 }
+
+/**
+ * A cold phone #orrery load must not jump when the display font arrives (#174). On a
+ * throttled phone, Fraunces italic landed at about 3.8 s; the voice sentence, three lines in
+ * the Georgia fallback at 390 px, became two, and the stage and the "Solar system in 3D"
+ * line moved up 31 px (CLS 0.0258 of 0.0334 on production). Locally the font arrives before
+ * first paint, so the test holds it back. It counts only shifts of the voice strip and the
+ * stage box itself: the renderer's planet labels settling inside the stage are not layout.
+ * It can only fail where Georgia is installed (macOS), as the wrap difference is Georgia's.
+ */
+test('a cold 390px #orrery load does not move the stage when the display font arrives (#174)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.clock.setFixedTime(new Date(NOW))
+  await page.addInitScript(() => {
+    const shifts: { value: number; nodes: string[] }[] = []
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) {
+        const entry = e as PerformanceEntry & {
+          value: number
+          hadRecentInput: boolean
+          sources: { node: Node | null }[]
+        }
+        if (entry.hadRecentInput) continue
+        const nodes = entry.sources
+          .map((s) => (s.node instanceof Element ? s.node : (s.node?.parentElement ?? null)))
+          .filter(
+            (el): el is Element =>
+              el?.matches('[data-orrery-page] > :first-child *, section[aria-label="Orrery"]') ===
+              true,
+          )
+          .map((el) => `${el.tagName.toLowerCase()} "${el.textContent.slice(0, 30)}"`)
+        if (nodes.length > 0) shifts.push({ value: entry.value, nodes })
+      }
+    }).observe({ type: 'layout-shift', buffered: true })
+    ;(window as unknown as { headerShifts: typeof shifts }).headerShifts = shifts
+  })
+  let fontServed = false
+  await page.route('**/fonts/fraunces-italic-latin.woff2', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    fontServed = true
+    await route.continue()
+  })
+  await page.goto('/#orrery')
+  const voice = page.locator('[data-orrery-page] > :first-child > p').first()
+  await expect(voice).toContainText('nearest planet')
+  await expect.poll(() => fontServed, { timeout: 10_000 }).toBe(true)
+  await expect
+    .poll(() => page.evaluate(() => document.fonts.check('italic 300 16px Fraunces')))
+    .toBe(true)
+  // Two frames for the swap's relayout to be reported.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  )
+  const shifts = await page.evaluate(
+    () =>
+      (window as unknown as { headerShifts: { value: number; nodes: string[] }[] }).headerShifts,
+  )
+  expect(shifts, 'the voice line or the stage moved').toEqual([])
+})

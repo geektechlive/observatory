@@ -150,12 +150,23 @@ desktop p75 0.244). Sources:
 - the ISS plate widening with its first position;
 - the ticker track shrinking from the empty state to its items.
 
-**Fonts were not a source**: Special Elite, Fraunces and Plex 500 swap late, but nothing reflows
-when they do, so they are deliberately not preloaded. A new lead panel needs a `reserve` class
-too. `tests/e2e/layout-shift.spec.ts` replays `/` with staggered feed answers
-(`feedFixtures.ts`, trimmed production data) and holds the sum under 0.01 (the shipped code
-scored 0.044 and 0.019 there). Known leftover: the phone `#orrery` header moves 30 px at about
-3 s (0.025). Real-visitor CLS is re-checked under #177.
+**Fonts were not a source on desktop**: Special Elite, Fraunces and Plex 500 swap late, but
+nothing reflows there when they do, so they are deliberately not preloaded. **On a phone, one font
+was a source (#174):** under 430 px the orrery's voice sentence is three lines in the Georgia
+fallback (and in Fraunces too for the longer sentences), so Fraunces landing at about 3.8 s on
+throttled Slow 4G took it to two and pulled the stage up 31 px (CLS 0.0258; 0.0334 for the whole
+production load). `orrery.module.css` reserves three lines under 430 px. The same throttled
+load against a local build went from 0.0260 to 0.0002 (measured 2026-11-12). The cost: where
+Fraunces fits in two lines (most sentences at 390 to 429 px, for visitors whose font is already
+cached), the voice line has a blank third line, and at 390x844 the stage's last 6 px start
+under the fixed dial bar until the page scrolls (it had 25 px clear; the open controls sheet
+still ends above the bar). Taking the 30 px out of `--stage-h` instead shrank Look closer's
+phone model band under its 280 px floor and put the inspector over the credit (#205). A new lead panel
+needs a `reserve` class too. `tests/e2e/layout-shift.spec.ts` replays `/` with staggered feed
+answers (`feedFixtures.ts`, trimmed production data) and holds the sum under 0.01 (the shipped
+code scored 0.044 and 0.019 there); it also loads `#orrery` at 390 px with Fraunces held back
+2 s and holds the voice strip and stage at zero shift. Real-visitor CLS is re-checked under
+#177.
 
 The ticker's first fill waits for Space-Track (up to 3 s; with reduced motion, whose still
 strip shows 8 items, until it answers or fails) so its re-entries lead the strip
