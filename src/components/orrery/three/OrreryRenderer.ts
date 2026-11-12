@@ -491,6 +491,8 @@ export class OrreryRenderer {
     if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX, PX_CEILING.l1)
     if (this.sats.marker.visible)
       this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX, PX_CEILING.satMarker)
+    if (this.sats.selectRing.visible)
+      this.floorPx(this.sats.selectRing, PX_CEILING.satSelect, PX_CEILING.satSelect)
     if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
     for (const s of this.small.visible()) {
       if (s.group === 'dwarfs') this.floorPx(s.mesh, DWARF_MIN_PX, PX_CEILING.dwarf)
@@ -553,6 +555,7 @@ export class OrreryRenderer {
       l1: this.near.l1.visible ? px(this.near.l1) : null,
       asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
       satMarker: this.sats.marker.visible ? px(this.sats.marker) : null,
+      satSelect: this.sats.selectRing.visible ? px(this.sats.selectRing) : null,
       satReentry: maxOf(this.sats.flagRings()),
       smallBody: maxOf(
         this.small
@@ -642,6 +645,7 @@ export class OrreryRenderer {
       camera: this.camera.position,
       pixelRatio: this.renderer.getPixelRatio(),
       aspect: this.width / Math.max(1, this.height),
+      stagePx: Math.min(this.width, this.height),
     })
     const state = this.satState()
     const key = `${JSON.stringify(state.groups)}|${String(state.total)}|${String(state.drawn)}|${String(state.outOfWindow)}|${state.mode}`

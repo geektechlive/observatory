@@ -200,6 +200,42 @@ describe('SatLayer (#98)', () => {
     expect(ring?.renderOrder).toBeGreaterThan(0)
   })
 
+  describe('rings for a satellite behind Earth are dimmed, not drawn as if in front', () => {
+    // The fake puts every satellite on Earth's +x side; Earth is at (1, 0, 0), 0.01 across.
+    const facing = new Vector3(1.2, 0, 0)
+    const behind = new Vector3(0.8, 0, 0)
+    const bandOpacity = (layer: SatLayer) => {
+      const [halo, band] = layer.selectRing.children as unknown as {
+        visible: boolean
+        material: { opacity: number }
+      }[]
+      return { band: band?.material.opacity ?? -1, halo: halo?.visible ?? true }
+    }
+
+    it('draws the chosen ring at full strength in front, dim and without its backplate behind (#140)', async () => {
+      const { layer, at } = await loadedLayer(['stations'])
+      layer.setSelected(satKey('25544'))
+      layer.place({ ...at(20), camera: facing })
+      expect(layer.selectRing.visible).toBe(true)
+      expect(bandOpacity(layer)).toEqual({ band: 1, halo: true })
+      layer.place({ ...at(20), camera: behind })
+      expect(layer.selectRing.visible).toBe(true)
+      expect(bandOpacity(layer).band).toBeLessThan(0.4)
+      expect(bandOpacity(layer).halo).toBe(false)
+    })
+
+    it('dims a re-entry ring behind Earth the same way (#101)', async () => {
+      const { layer, at } = await loadedLayer(['stations', 'starlink'])
+      layer.setFlagged(['44713'])
+      layer.place({ ...at(20), camera: facing })
+      const front = layer.flagRings()[0]?.material.opacity ?? 0
+      layer.place({ ...at(20), camera: behind })
+      const back = layer.flagRings()[0]?.material.opacity ?? 1
+      expect(front).toBeGreaterThan(0.8)
+      expect(back).toBeLessThan(0.4)
+    })
+  })
+
   it('fades the points when Earth is small on screen (#198)', async () => {
     const { layer, at } = await loadedLayer(['stations'])
     const alpha = (earthPx?: number) => {

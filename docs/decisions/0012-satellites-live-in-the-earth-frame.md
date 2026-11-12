@@ -21,7 +21,7 @@ propagated in a worker.
 - Starlink and the debris clouds start switched off because of their size (Starlink alone is
   about 520 kB gzip).
 - Earth's map has no fitted prime meridian, so a satellite is in the right place in space but not
-  over the right spot on the map.
+  over the right spot on the map. (Superseded 2026-11-12, see the addendum.)
 - Revisit the cut-off distances if the camera's field of view or the Earth frame's scale changes.
 
 ## Evidence
@@ -30,3 +30,11 @@ propagated in a worker.
 - `scripts/celestrak-groups.mjs`, `src/lib/orrery/satView.ts`, `three/satLayer.ts`.
 - [reference/satellites.md](../reference/satellites.md),
   [reference/orrery-data.md](../reference/orrery-data.md#the-earth-frame-92-renderer-half).
+
+## Addendum 2026-11-12: Earth's map now turns with Greenwich (#138)
+
+Earth's skin is oriented by `earthSkinToScene` (`satView.ts`): Greenwich turned by sidereal time
+inside TEME, then the same `temeToScene` the satellites use. A satellite is now drawn over the
+place it is above: the ISS's drawn point lands within 0.05° of satellite.js's sub-satellite point
+(`tests/unit/orrery-earth-meridian.test.ts`). The other planets still have a real spin rate and
+no fitted phase.

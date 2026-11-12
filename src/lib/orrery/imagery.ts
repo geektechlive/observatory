@@ -157,6 +157,7 @@ export function poleEcliptic(planet: PlanetName): Vec3 {
 /**
  * Spin about the IAU north pole since J2000, radians in [0, 2π); decreasing for a
  * retrograde rotator. The rate is real; the phase is not (no prime meridian is fitted).
+ * Earth's skin does not use this: it turns with Greenwich (`earthSkinToScene`, #138).
  */
 export function spinAngle(body: BodyName, jd: number): number {
   const period = BODY_IMAGERY[body].rotationHours

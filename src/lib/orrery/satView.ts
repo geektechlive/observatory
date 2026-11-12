@@ -130,6 +130,37 @@ export function temeToScene(jd: number): Mat3 {
   return [ex[0], ex[1], ex[2], ez[0], ez[1], ez[2], -ey[0], -ey[1], -ey[2]]
 }
 
+/** Greenwich mean sidereal time at a UTC Julian date, radians (IAU 1982, linear term). */
+function gmstRad(jd: number): number {
+  return (280.46061837 + 360.98564736629 * (jd - 2_451_545)) * RAD
+}
+
+/**
+ * Earth's mapped skin to the scene (#138), row-major. The skin's own axes are the
+ * texture's as SphereGeometry lays it out: +x at longitude 0, +y the north pole, −z at
+ * 90° E. Greenwich turns with sidereal time inside TEME, and TEME goes to the scene by
+ * temeToScene, so the map and the satellites share one frame and a satellite is drawn
+ * over the place it is above.
+ */
+export function earthSkinToScene(jd: number): Mat3 {
+  const g = gmstRad(jd)
+  const c = Math.cos(g)
+  const s = Math.sin(g)
+  const [a, b, d, e, f, h, k, l, n] = temeToScene(jd)
+  // The skin's axes in TEME: Greenwich (c, s, 0), the pole (0, 0, 1), −(90° E) (s, −c, 0).
+  return [
+    a * c + b * s,
+    d,
+    a * s - b * c,
+    e * c + f * s,
+    h,
+    e * s - f * c,
+    k * c + l * s,
+    n,
+    k * s - l * c,
+  ]
+}
+
 /**
  * Where a satellite at TEME position `teme` (km) is drawn: around Earth's scene position
  * at the Earth frame's scale, Earth drawn `radius` scene units. The shader in
@@ -152,6 +183,28 @@ export function satScenePosition(
   return { x: earth.x + px * k, y: earth.y + py * k, z: earth.z + pz * k }
 }
 
+/**
+ * Whether Earth (a sphere of `radius` at `earth`) hides `point` from `camera` (#140): the
+ * sight line meets the sphere before it reaches the point. A camera inside Earth sees
+ * everything; markers that skip the depth test use this to dim what is on the far side.
+ */
+export function behindEarth(point: Vec3, earth: Vec3, radius: number, camera: Vec3): boolean {
+  const dx = point.x - camera.x
+  const dy = point.y - camera.y
+  const dz = point.z - camera.z
+  const fx = camera.x - earth.x
+  const fy = camera.y - earth.y
+  const fz = camera.z - earth.z
+  const a = dx * dx + dy * dy + dz * dz
+  const c = fx * fx + fy * fy + fz * fz - radius * radius
+  if (!(a > 0) || c <= 0) return false
+  const b = 2 * (fx * dx + fy * dy + fz * dz)
+  const disc = b * b - 4 * a * c
+  if (disc < 0) return false
+  const t = (-b - Math.sqrt(disc)) / (2 * a)
+  return t > 0 && t < 1
+}
+
 /** Height above Earth's mean radius, km. */
 export function satAltitudeKm(teme: readonly [number, number, number]): number {
   return Math.hypot(teme[0], teme[1], teme[2]) - EARTH_RADIUS_KM
@@ -165,6 +218,22 @@ export function epochAgeText(epochMs: number, simMs: number): string {
   return h < 48
     ? `${String(Math.round(h))} h ${side} this date`
     : `${(h / 24).toFixed(1)} days ${side} this date`
+}
+
+/** The haze's point size, CSS px, on a stage at least `HAZE_FULL_STAGE_PX` across its narrow side. */
+export const HAZE_PX = 7
+const HAZE_FULL_STAGE_PX = 700
+const HAZE_MIN_PX = 2
+
+/**
+ * The haze's point size for a stage `stagePx` CSS px across its narrow side (#139). The
+ * shell shrinks with the stage but a fixed 7 px grain does not, so on a 390 px phone at
+ * the Earth–Moon preset the haze drew a fat band through the asteroid labels. The grain
+ * shrinks in step with the stage below 700 px, to no less than 2 px.
+ */
+export function satHazePx(stagePx: number): number {
+  if (!(stagePx < HAZE_FULL_STAGE_PX)) return HAZE_PX
+  return Math.max(HAZE_MIN_PX, (HAZE_PX * Math.max(0, stagePx)) / HAZE_FULL_STAGE_PX)
 }
 
 /** Earth's drawn radius, CSS px, at and above which the points are at full strength (#198). */

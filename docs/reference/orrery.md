@@ -253,7 +253,9 @@ Real maps on the planets, the live Sun from GOES SUVI.
   the mapped bodies.
   - The poles are tested against the fact-sheet obliquities. Mars uses the IAU 2009 mean pole,
     because the 2015 constant needs its periodic terms (1.3° off without them).
-  - The spin rate is real; the phase is not, since no prime meridian is fitted.
+  - The spin rate is real; the phase is not, since no prime meridian is fitted. Earth is the
+    exception: its map turns with Greenwich, so satellites sit over the right place (#138,
+    [satellites.md](satellites.md)).
   - **Focusing a planet approaches its lit side (#116, `sunlitFocusDirection` in
     `framing.ts`).** Focus used to keep the camera's old direction, so Jupiter drew from its
     night side at half its map's brightness (disc luminance 73 against the map's 152; now 140).

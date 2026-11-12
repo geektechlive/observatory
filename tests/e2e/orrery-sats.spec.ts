@@ -98,6 +98,31 @@ test.describe('satellites (#98)', () => {
     await expect(page.locator('button[data-kind="satellite"]')).toBeVisible()
   })
 
+  test('the chosen satellite is ringed in screen px with every group on (#140)', async ({
+    page,
+  }) => {
+    await openOrrery(page)
+    await canvas(page).evaluate((c) => {
+      c.setAttribute('data-orrery-px', '')
+    })
+    await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()
+    await expect.poll(async () => Number(await attr(page, 'data-orrery-sat-drawn'))).toBe(55)
+    await page.getByRole('switch', { name: 'Starlink' }).click()
+    await page.getByRole('switch', { name: 'Debris' }).click()
+    await expect
+      .poll(async () => Number(await attr(page, 'data-orrery-sat-drawn')))
+      .toBeGreaterThan(55)
+    await page.getByRole('combobox', { name: /find/i }).fill('ISS')
+    await page.getByRole('option', { name: /^ISS/ }).first().click()
+    const px = async () =>
+      JSON.parse((await attr(page, 'data-orrery-px')) || '{}') as Record<string, number | null>
+    await expect.poll(async () => (await px())['satSelect'] ?? 0).toBeGreaterThan(0)
+    const drawn = await px()
+    // Outside the marker, never as big as the Sun.
+    expect(drawn['satSelect']).toBeGreaterThan(drawn['satMarker'] ?? 0)
+    expect(drawn['satSelect']).toBeLessThan(drawn['sun'] ?? 0)
+  })
+
   test('Space-Track and DISCOS add to the inspector, the controls and the stage (#101)', async ({
     page,
   }) => {

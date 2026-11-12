@@ -12,6 +12,7 @@ import {
   CustomBlending,
   DoubleSide,
   Float32BufferAttribute,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
@@ -30,6 +31,7 @@ import {
 import { type BodyName } from '@/lib/orrery/bodies'
 import { type PlanetName, PLANETS } from '@/lib/orrery/elements'
 import { BODY_IMAGERY, poleEcliptic, SATURN_RINGS, spinAngle } from '@/lib/orrery/imagery'
+import { earthSkinToScene } from '@/lib/orrery/satView'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 
@@ -79,6 +81,7 @@ export class BodySkins {
   private readonly geometry = new SphereGeometry(1, 48, 32)
   private readonly textures: Texture[] = []
   private readonly spin = new Quaternion()
+  private readonly basis = new Matrix4()
   private readonly toCamera = new Vector3()
   private sun: Sprite | null = null
   private sunMaterial: SpriteMaterial | null = null
@@ -145,9 +148,18 @@ export class BodySkins {
     return rings
   }
 
-  /** Tilt and spin every skin for a date. Only a moving clock changes it. */
+  /**
+   * Tilt and spin every skin for a date. Only a moving clock changes it. Earth turns with
+   * Greenwich in the satellites' frame (#138), so they are drawn over the right place.
+   */
   orient(jd: number): void {
     for (const [planet, skin] of this.skins) {
+      if (planet === 'Earth') {
+        const [a, b, c, d, e, f, g, h, i] = earthSkinToScene(jd)
+        this.basis.set(a, b, c, 0, d, e, f, 0, g, h, i, 0, 0, 0, 0, 1)
+        skin.mesh.quaternion.setFromRotationMatrix(this.basis)
+        continue
+      }
       this.spin.setFromAxisAngle(UP, spinAngle(planet, jd))
       skin.mesh.quaternion.copy(skin.tilt).multiply(this.spin)
     }

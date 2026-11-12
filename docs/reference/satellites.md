@@ -98,8 +98,10 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
   - A new pass only swaps the attribute's array. The geometry is rebuilt only when the field
     changes, and it carries fixed bounds: three's transparent sort otherwise computed them from
     raw TEME, NaN included.
-  - Earth's map has no fitted prime meridian (#105), so a satellite is in the right place in
-    space but not over the right spot on the map.
+  - Earth's map turns with Greenwich (#138): `earthSkinToScene` turns the skin by sidereal
+    time inside TEME, then by `temeToScene`, so the map and the satellites share one frame. The
+    ISS's drawn point lands within 0.05° of satellite.js's sub-satellite point
+    (`orrery-earth-meridian.test.ts`). Before, the map was about 75° of longitude off.
   - Colours by category from `SAT_CATEGORY_HEX`: stations bone, Starlink a quiet slate, debris
     dim. Cyan stays spacecraft-only and red hazard-only.
 - **How they show** (`satDisplay` in `src/lib/orrery/satView.ts`) depends on the camera's
@@ -113,6 +115,12 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
     about 31 R⊕ to hold the geostationary ring.
   - The haze blends normally, not additively: 19,000 additive points over Earth's disc made it
     white.
+  - The haze's grain scales with the stage (`satHazePx`, #139): 7 px on a stage at least 700 px
+    across its narrow side, shrinking in step below that, never under 2 px. At the Earth–Moon
+    preset a 390 px phone's stage (356 px narrow side) sits at 62.8 R⊕, in the haze band, where
+    the desktop (858 px) sits at 40.8 with no haze; 7 px grains drew a fat band through the
+    asteroid labels. Now 3.6 px: the band's mean luminance over the arc above Earth fell from
+    20.5 to 13.5 (p95 72 to 52), real GPU, 2026-11-12.
 - **The controller** (`src/lib/orrery/satController.ts`, no three.js): fetches a group only when
   it is switched on and the frame is open, and unloads it when switched off.
   - Passes follow the cadence and never run while the clock stands still. A pass held back by the
@@ -137,7 +145,14 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
     out even today (105 of 5,669 on 2026-11-07). The stage notice waits until a quarter are
     hidden, once the clock has moved days away.
 - **Picking, search and the inspector:** a tap picks the nearest point within 12 px, and only a
-  satellite nearer than any body wins. The chosen one gets a marker and a label. `SatFacts` shows
+  satellite nearer than any body wins. The chosen one gets a marker, a label and a ring (#140):
+  a bone band on a void backplate, held at `PX_CEILING.satSelect` (8 px) on screen, outside the
+  marker's 4 to 6 px and inside the Sun's 10. Like the re-entry rings it skips the depth test,
+  so on the far side of Earth it would draw over the near side as if the satellite were there
+  (the ISS at 12.7N 64.7E drew over the Arctic in the 12:00 UTC Earth orbit view). Behind Earth
+  (`behindEarth`), it and the re-entry rings draw at 0.25 opacity, the selection ring without its
+  backplate. Before, the 4 px marker
+  vanished among 19,000 points with every group on. `SatFacts` shows
   its group, height, how old its orbit data is and the source.
   - Search lists only the space stations: 19,000 entries would bury the rest. The ISS is listed
     before its group loads, and choosing it opens the Earth orbit view and switches the stations

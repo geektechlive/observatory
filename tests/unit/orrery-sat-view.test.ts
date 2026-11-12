@@ -7,11 +7,13 @@ import { describe, expect, it } from 'vitest'
 
 import { EARTH_FRAME_UNIT, EARTH_RADIUS_KM, GEO_RADII } from '@/lib/orrery/earthFrame'
 import {
+  behindEarth,
   epochAgeText,
   HAZE_ONLY_RATE,
   SAT_DISTANCE,
   satAltitudeKm,
   satDisplay,
+  satHazePx,
   satPointStrength,
   satScenePosition,
   temeToScene,
@@ -165,5 +167,46 @@ describe('satPointStrength (#198)', () => {
     expect(satPointStrength(57)).toBeLessThan(0.4)
     expect(satPointStrength(30)).toBeLessThan(0.3)
     expect(satPointStrength(0)).toBeCloseTo(0.2, 6)
+  })
+})
+
+describe('behindEarth (#140): Earth hides a point from the camera', () => {
+  const earth = { x: 0, y: 0, z: 0 }
+  it('is false for a point on the camera’s side or beside Earth, true on the far side', () => {
+    const cam = { x: 0, y: 0, z: 10 }
+    expect(behindEarth({ x: 0, y: 0, z: 1.1 }, earth, 1, cam)).toBe(false)
+    expect(behindEarth({ x: 1.1, y: 0, z: 0 }, earth, 1, cam)).toBe(false)
+    expect(behindEarth({ x: 0, y: 0, z: -1.1 }, earth, 1, cam)).toBe(true)
+    expect(behindEarth({ x: 0.3, y: 0.3, z: -1.05 }, earth, 1, cam)).toBe(true)
+  })
+
+  it('is false with the camera inside Earth or on the point', () => {
+    expect(behindEarth({ x: 0, y: 0, z: -1.1 }, earth, 1, { x: 0, y: 0, z: 0.5 })).toBe(false)
+    expect(behindEarth({ x: 0, y: 0, z: 2 }, earth, 1, { x: 0, y: 0, z: 2 })).toBe(false)
+  })
+})
+
+describe('satHazePx (#139): the haze grain scales with the stage', () => {
+  // Measured on the real GPU, Earth–Moon preset: the desktop stage's narrow side was 858
+  // px (no haze there), the 390 px phone's 356 px, where 7 px haze points drew a fat band.
+  it('is the full 7 px on a desktop stage', () => {
+    expect(satHazePx(858)).toBe(7)
+    expect(satHazePx(2000)).toBe(7)
+  })
+
+  it('is about half that on a phone, so the band is about a quarter the area', () => {
+    expect(satHazePx(356)).toBeLessThan(4)
+    expect(satHazePx(356)).toBeGreaterThanOrEqual(2)
+  })
+
+  it('never shrinks below 2 px or grows as the stage shrinks; unknown stages get the full size', () => {
+    let last = 7
+    for (let px = 1000; px >= 0; px -= 25) {
+      const s = satHazePx(px)
+      expect(s).toBeLessThanOrEqual(last)
+      expect(s).toBeGreaterThanOrEqual(2)
+      last = s
+    }
+    expect(satHazePx(Number.NaN)).toBe(7)
   })
 })

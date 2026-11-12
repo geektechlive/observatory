@@ -6,9 +6,8 @@
  * swaps the attribute's array. Two draws share one geometry: crisp points up close, a
  * soft haze when pulled back (satView.ts says which, and how strongly).
  *
- * The positions are TEME from SGP4. Earth's map in the orrery has a real spin rate but
- * no fitted prime meridian (#105), so a satellite is in the right place in space but
- * not over the right spot on the drawn map.
+ * The positions are TEME from SGP4. Earth's map turns with Greenwich in the same frame
+ * (earthSkinToScene, #138), so a satellite is drawn over the place it is above.
  */
 import {
   BufferAttribute,
@@ -34,25 +33,26 @@ import { SAT_GROUPS, type SatCategory, type SatGroupId } from '@/lib/orbit/satCa
 import { EARTH_FRAME_SPREAD, EARTH_RADIUS_KM, GEO_RADII } from '@/lib/orrery/earthFrame'
 import { SatController, type SatSnapshot, type SatSource } from '@/lib/orrery/satController'
 import {
+  behindEarth,
   isSatKey,
   type Mat3,
   SAT_KEY_PREFIX,
   type SatDisplay,
   satDisplay,
+  satHazePx,
   satKey,
   satPointStrength,
   satScenePosition,
   satViewDistance,
   temeToScene,
 } from '@/lib/orrery/satView'
-import { BONE_HEX, SAT_CATEGORY_HEX, STATUS_HEX } from '@/lib/palette'
+import { BONE_HEX, SAT_CATEGORY_HEX, STATUS_HEX, VOID_HEX } from '@/lib/palette'
 
 export { isSatKey, satKey } from '@/lib/orrery/satView'
-/** Point sizes, CSS px: up close, and in the haze. */
+/** Point size up close, CSS px; the haze's grain is satHazePx, by the stage's size. */
 const POINT_PX = 2
 /** The points never quite opaque, so Earth still shows through the low-orbit shell. */
 const POINT_ALPHA = 0.9
-const HAZE_PX = 7
 /** The haze is many faint points adding up; this is one point's strength at full haze. */
 const HAZE_GAIN = 0.12
 /** The chosen satellite's marker, as a share of Earth's drawn radius (the renderer floors it). */
@@ -63,6 +63,19 @@ const RING_SHARE = MARKER_SHARE * 2
 const MAX_RINGS = 32
 /** After Earth and the points: a ring that skips the depth test must not be painted under them. */
 const RING_RENDER_ORDER = 10
+/**
+ * The chosen satellite's ring (#140): a bone band on a void backplate (every marker
+ * carries a void halo, roci-retrofit-v2), so it reads over the low-orbit shell. Inner
+ * edges as shares of the ring's radius; the renderer holds it at a fixed px size.
+ */
+const SELECT_BAND_INNER = 0.8
+const SELECT_HALO_INNER = 0.68
+const SELECT_HALO_OUTER = 1.12
+/**
+ * The rings skip the depth test, so one on the far side of Earth would draw over the
+ * near side as if the satellite were there (#140 review). Behind Earth they draw at this.
+ */
+const BEHIND_EARTH_OPACITY = 0.25
 
 const CATEGORIES: readonly SatCategory[] = [
   'station',
@@ -181,11 +194,16 @@ export interface SatPlace {
   aspect?: number
   /** Earth's drawn radius on screen, CSS px (#198); full-strength points when unknown. */
   earthPx?: number
+  /** The stage's narrow side, CSS px (#139); the full haze grain when unknown. */
+  stagePx?: number
 }
 
 export class SatLayer {
   readonly group = new Group()
   readonly marker: Mesh<SphereGeometry, MeshBasicMaterial>
+  /** The ring around the chosen satellite (#140), facing the camera; the renderer sizes it in px. */
+  readonly selectRing = new Group()
+  private readonly selectBands: Mesh<RingGeometry, MeshBasicMaterial>[] = []
   private readonly ctl: SatController
   private geometry = new BufferGeometry()
   private readonly pointsMaterial = material(false)
@@ -213,6 +231,12 @@ export class SatLayer {
     // arcs (#199). It is a marker, always drawn whole; renderOrder keeps it after Earth.
     depthTest: false,
   })
+  /** A re-entry ring on an object behind Earth (#140): the same, but faint. */
+  private readonly ringMaterialBehind = (() => {
+    const m = this.ringMaterial.clone()
+    m.opacity = BEHIND_EARTH_OPACITY
+    return m
+  })()
   /** The camera's distance from Earth this frame, Earth radii across the narrow side. */
   private re = Number.POSITIVE_INFINITY
 
@@ -235,7 +259,34 @@ export class SatLayer {
     )
     this.marker.name = 'satellite-marker'
     this.marker.visible = false
-    this.group.add(this.haze, this.points, this.marker)
+    this.buildSelectRing()
+    this.group.add(this.haze, this.points, this.marker, this.selectRing)
+  }
+
+  private buildSelectRing(): void {
+    const ring = (inner: number, outer: number, hex: string, opacity: number, order: number) => {
+      const mesh = new Mesh(
+        new RingGeometry(inner, outer, 40),
+        new MeshBasicMaterial({
+          color: new Color(hex),
+          side: DoubleSide,
+          transparent: true,
+          opacity,
+          depthWrite: false,
+          // Like the re-entry rings: always whole, painted after Earth and the points.
+          depthTest: false,
+        }),
+      )
+      mesh.renderOrder = order
+      return mesh
+    }
+    this.selectBands.push(
+      ring(SELECT_HALO_INNER, SELECT_HALO_OUTER, VOID_HEX, 0.75, RING_RENDER_ORDER + 1),
+      ring(SELECT_BAND_INNER, 1, BONE_HEX, 1, RING_RENDER_ORDER + 2),
+    )
+    this.selectRing.add(...this.selectBands)
+    this.selectRing.name = 'satellite-selection'
+    this.selectRing.visible = false
   }
 
   setEnabled(groups: ReadonlySet<SatGroupId>): void {
@@ -288,7 +339,11 @@ export class SatLayer {
       this.display.pointsAlpha * POINT_ALPHA * satPointStrength(p.earthPx ?? Infinity),
       POINT_PX * p.pixelRatio,
     )
-    this.setStrength(this.hazeMaterial, this.display.hazeAlpha * HAZE_GAIN, HAZE_PX * p.pixelRatio)
+    this.setStrength(
+      this.hazeMaterial,
+      this.display.hazeAlpha * HAZE_GAIN,
+      satHazePx(p.stagePx ?? Number.NaN) * p.pixelRatio,
+    )
     this.points.visible = drawn && this.display.pointsAlpha > 0
     this.haze.visible = drawn && this.display.hazeAlpha > 0
     const at = this.selectedPosition()
@@ -296,7 +351,17 @@ export class SatLayer {
     if (at) {
       this.marker.position.copy(at)
       this.marker.scale.setScalar(p.radius * MARKER_SHARE)
+      this.selectRing.position.copy(at)
+      this.selectRing.lookAt(p.camera)
+      this.selectRing.scale.setScalar(p.radius * RING_SHARE)
+      // Behind Earth the ring still says where it is, but faintly and without its
+      // backplate, so it never reads as a satellite over the near side.
+      const hidden = behindEarth(at, p.earth, p.radius, p.camera)
+      const [halo, band] = this.selectBands
+      if (halo) halo.visible = !hidden
+      if (band) band.material.opacity = hidden ? BEHIND_EARTH_OPACITY : 1
     }
+    this.selectRing.visible = this.marker.visible
     this.placeRings(p)
   }
 
@@ -311,6 +376,9 @@ export class SatLayer {
         ring.position.copy(at)
         ring.lookAt(p.camera)
         ring.scale.setScalar(p.radius * RING_SHARE)
+        ring.material = behindEarth(at, p.earth, p.radius, p.camera)
+          ? this.ringMaterialBehind
+          : this.ringMaterial
         ring.visible = true
         used += 1
       }
@@ -509,5 +577,10 @@ export class SatLayer {
     this.marker.material.dispose()
     this.ringGeometry.dispose()
     this.ringMaterial.dispose()
+    this.ringMaterialBehind.dispose()
+    for (const band of this.selectBands) {
+      band.geometry.dispose()
+      band.material.dispose()
+    }
   }
 }

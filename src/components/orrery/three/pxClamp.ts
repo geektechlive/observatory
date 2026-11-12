@@ -30,6 +30,8 @@ export const PX_CEILING = {
   l1: 7,
   asteroid: 6,
   satMarker: 6,
+  /** The chosen satellite's ring (#140): one fixed size, outside its marker. */
+  satSelect: 8,
   satReentry: 9,
   /** A comet or an interstellar object (#99): a point, never a disc. */
   smallBody: 5,
