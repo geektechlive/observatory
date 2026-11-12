@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { type BudgetStore, DailyBudget } from '../../../workers/jpl-queue/src/budget'
+import {
+  type BudgetStore,
+  DailyBudget,
+  LOOKUP_DAILY_LIMIT,
+  TOTAL_DAILY_LIMIT,
+  TRAJECTORY_DAILY_LIMIT,
+} from '../../../workers/jpl-queue/src/budget'
 import { handleQueueRequest, type QueueDeps } from '../../../workers/jpl-queue/src/handler'
 import { fetchJpl, isJplUrl, JplFetchError } from '../../../workers/jpl-queue/src/jplFetch'
 import { QueueFullError, SerialQueue } from '../../../workers/jpl-queue/src/queue'
@@ -223,6 +229,19 @@ describe('DailyBudget', () => {
   })
 })
 
+function budgetsOf(
+  store: BudgetStore,
+  lookup: number,
+  trajectory: number,
+  at = '2026-11-07T12:00:00Z',
+) {
+  const now = () => Date.parse(at)
+  return {
+    lookup: new DailyBudget(store, lookup, now),
+    trajectory: new DailyBudget(store, trajectory, now, 'budget:trajectory'),
+  }
+}
+
 describe('handleQueueRequest', () => {
   const ask = (body: unknown, method = 'POST') =>
     new Request('https://jpl-queue/ask', {
@@ -234,7 +253,7 @@ describe('handleQueueRequest', () => {
   function deps(over: Partial<QueueDeps> = {}): QueueDeps {
     return {
       queue: new SerialQueue({ maxPending: 4, minGapMs: 0 }),
-      budget: new DailyBudget(memoryStore(), 100, () => Date.parse('2026-11-07T12:00:00Z')),
+      budgets: budgetsOf(memoryStore(), 100, 100),
       fetchJpl: vi.fn().mockResolvedValue({
         status: 300,
         body: '{"list":[]}',
@@ -269,7 +288,7 @@ describe('handleQueueRequest', () => {
     const store = memoryStore()
     const d = deps({
       queue: new SerialQueue({ maxPending: 1, minGapMs: 0, taskSeconds: 5 }),
-      budget: new DailyBudget(store, 100, () => Date.parse('2026-11-07T12:00:00Z')),
+      budgets: budgetsOf(store, 100, 100),
       fetchJpl: vi.fn().mockReturnValue(gate.promise),
     })
     const first = handleQueueRequest(ask({ url: jplUrl }), d)
@@ -285,12 +304,69 @@ describe('handleQueueRequest', () => {
 
   it('answers 503 until midnight once the day budget is spent', async () => {
     const d = deps({
-      budget: new DailyBudget(memoryStore(), 0, () => Date.parse('2026-11-07T22:00:00Z')),
+      budgets: budgetsOf(memoryStore(), 0, 0, '2026-11-07T22:00:00Z'),
     })
     const res = await handleQueueRequest(ask({ url: jplUrl }), d)
     expect(res.status).toBe(503)
     expect(res.headers.get('Retry-After')).toBe('7200')
     expect(res.headers.get('X-Queue')).toBe('budget')
+    expect(d.fetchJpl).not.toHaveBeenCalled()
+  })
+
+  it('counts a trajectory request against its own share, apart from lookups (#223)', async () => {
+    const store = memoryStore()
+    const d = deps({ budgets: budgetsOf(store, 5, 1) })
+    expect((await handleQueueRequest(ask({ url: jplUrl, share: 'trajectory' }), d)).status).toBe(
+      200,
+    )
+    expect(store.data.get('budget:trajectory:2026-11-07')).toBe(1)
+    expect(store.data.has('budget:2026-11-07')).toBe(false)
+    expect((await handleQueueRequest(ask({ url: jplUrl, share: 'lookup' }), d)).status).toBe(200)
+    expect(store.data.get('budget:2026-11-07')).toBe(1)
+  })
+
+  it('refuses a spent trajectory share the way a spent day is refused, and lookups go on', async () => {
+    const d = deps({ budgets: budgetsOf(memoryStore(), 5, 1, '2026-11-07T22:00:00Z') })
+    await handleQueueRequest(ask({ url: jplUrl, share: 'trajectory' }), d)
+    const spent = await handleQueueRequest(ask({ url: jplUrl, share: 'trajectory' }), d)
+    expect(spent.status).toBe(503)
+    expect(spent.headers.get('X-Queue')).toBe('budget')
+    expect(spent.headers.get('X-Queue-Share')).toBe('trajectory')
+    expect(spent.headers.get('Retry-After')).toBe('7200')
+    expect(d.fetchJpl).toHaveBeenCalledTimes(1)
+    const lookup = await handleQueueRequest(ask({ url: jplUrl, share: 'lookup' }), d)
+    expect(lookup.status).toBe(200)
+  })
+
+  it('counts a request with no share as a lookup, and refuses an unknown share', async () => {
+    const store = memoryStore()
+    const d = deps({ budgets: budgetsOf(store, 5, 5) })
+    expect((await handleQueueRequest(ask({ url: jplUrl }), d)).status).toBe(200)
+    expect(store.data.get('budget:2026-11-07')).toBe(1)
+    const odd = await handleQueueRequest(ask({ url: jplUrl, share: 'everything' }), d)
+    expect(odd.status).toBe(400)
+    expect(d.fetchJpl).toHaveBeenCalledTimes(1)
+  })
+
+  it("splits 2,000 a day so trajectories can never take the lookups' remainder", () => {
+    expect(TOTAL_DAILY_LIMIT).toBe(2000)
+    expect(LOOKUP_DAILY_LIMIT + TRAJECTORY_DAILY_LIMIT).toBe(TOTAL_DAILY_LIMIT)
+  })
+
+  it('refuses a spent lookup share, and trajectories go on', async () => {
+    const d = deps({ budgets: budgetsOf(memoryStore(), 1, 5) })
+    await handleQueueRequest(ask({ url: jplUrl, share: 'lookup' }), d)
+    const spent = await handleQueueRequest(ask({ url: jplUrl, share: 'lookup' }), d)
+    expect(spent.status).toBe(503)
+    expect(spent.headers.get('X-Queue-Share')).toBe('lookup')
+    const trajectory = await handleQueueRequest(ask({ url: jplUrl, share: 'trajectory' }), d)
+    expect(trajectory.status).toBe(200)
+  })
+
+  it.each([null, 1, true, ['trajectory']])('refuses a share of %j with 400', async (share) => {
+    const d = deps()
+    const res = await handleQueueRequest(ask({ url: jplUrl, share }), d)
+    expect(res.status).toBe(400)
     expect(d.fetchJpl).not.toHaveBeenCalled()
   })
 

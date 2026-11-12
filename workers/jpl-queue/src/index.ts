@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 
-import { DailyBudget } from './budget'
+import { DailyBudget, LOOKUP_DAILY_LIMIT, TRAJECTORY_DAILY_LIMIT } from './budget'
 import { handleQueueRequest, type QueueDeps } from './handler'
 import { fetchJpl } from './jplFetch'
 import { SerialQueue } from './queue'
@@ -17,8 +17,6 @@ import { SerialQueue } from './queue'
 const MAX_PENDING = 8
 /** At least this long between one JPL request's start and the next. */
 const MIN_GAP_MS = 1000
-/** JPL requests a UTC day may make through this queue. */
-const DAILY_LIMIT = 2000
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -31,16 +29,18 @@ export class JplQueue extends DurableObject {
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env as Cloudflare.Env)
     const storage = ctx.storage
+    const store = {
+      get: (key: string) => storage.get<number>(key),
+      put: (key: string, value: number) => storage.put(key, value),
+      delete: (key: string) => storage.delete(key),
+    }
     this.deps = {
       queue: new SerialQueue({ maxPending: MAX_PENDING, minGapMs: MIN_GAP_MS }),
-      budget: new DailyBudget(
-        {
-          get: (key) => storage.get<number>(key),
-          put: (key, value) => storage.put(key, value),
-          delete: (key) => storage.delete(key),
-        },
-        DAILY_LIMIT,
-      ),
+      // Two shares of the day's 2,000 (#223), each its own row per UTC day.
+      budgets: {
+        lookup: new DailyBudget(store, LOOKUP_DAILY_LIMIT),
+        trajectory: new DailyBudget(store, TRAJECTORY_DAILY_LIMIT, Date.now, 'budget:trajectory'),
+      },
       fetchJpl: (url) => fetchJpl(url, { fetch: (u, init) => fetch(u, init), sleep }),
     }
   }

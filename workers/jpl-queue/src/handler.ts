@@ -1,4 +1,4 @@
-import type { DailyBudget } from './budget'
+import { type DailyBudget, isJplShare, type JplShare } from './budget'
 import { isJplUrl, type JplAnswer, JplFetchError } from './jplFetch'
 import { QueueFullError, type SerialQueue } from './queue'
 
@@ -9,7 +9,8 @@ import { QueueFullError, type SerialQueue } from './queue'
 
 export interface QueueDeps {
   queue: SerialQueue
-  budget: DailyBudget
+  /** One budget per share (#223); the sum of their limits is the day's whole allowance. */
+  budgets: Record<JplShare, DailyBudget>
   fetchJpl: (url: string) => Promise<JplAnswer>
 }
 
@@ -27,7 +28,17 @@ const queueFull = (retryAfterSeconds: number) =>
     { 'Retry-After': String(retryAfterSeconds), 'X-Queue': 'full' },
   )
 
-async function readUrl(req: Request): Promise<string | null> {
+interface Ask {
+  url: string
+  share: JplShare
+}
+
+/**
+ * {"url": <JPL URL>, "share"?: "lookup" | "trajectory"}. Only a Pages Function reaches this
+ * through the binding, and it names the share; no share means a lookup, which is what the
+ * Functions deployed before #223 send. An unknown share is a bad request, never a free pass.
+ */
+async function readAsk(req: Request): Promise<Ask | null> {
   let body: unknown
   try {
     body = await req.json()
@@ -36,22 +47,33 @@ async function readUrl(req: Request): Promise<string | null> {
   }
   if (typeof body !== 'object' || body === null || !('url' in body)) return null
   const url = body.url
-  return typeof url === 'string' && isJplUrl(url) ? url : null
+  if (typeof url !== 'string' || !isJplUrl(url)) return null
+  const share = 'share' in body ? body.share : 'lookup'
+  return isJplShare(share) ? { url, share } : null
 }
 
 export async function handleQueueRequest(req: Request, deps: QueueDeps): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'POST only' })
-  const url = await readUrl(req)
-  if (!url) return json(400, { error: 'Body must be {"url": <a JPL API URL>}' })
+  const ask = await readAsk(req)
+  if (!ask) {
+    return json(400, {
+      error: 'Body must be {"url": <a JPL API URL>, "share"?: "lookup" | "trajectory"}',
+    })
+  }
+  const { url, share } = ask
 
   // A full queue refuses before spending budget, so refusals cost JPL nothing.
   if (deps.queue.isFull()) return queueFull(deps.queue.retryAfterSeconds())
-  const budget = await deps.budget.take()
+  const budget = await deps.budgets[share].take()
   if (!budget.ok) {
     return json(
       503,
       { error: "Today's JPL budget is spent" },
-      { 'Retry-After': String(budget.retryAfterSeconds), 'X-Queue': 'budget' },
+      {
+        'Retry-After': String(budget.retryAfterSeconds),
+        'X-Queue': 'budget',
+        'X-Queue-Share': share,
+      },
     )
   }
 

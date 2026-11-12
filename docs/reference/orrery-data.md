@@ -457,8 +457,10 @@ queue).
   (`idFromName('jpl')`) awake all day is 11,059 GB-s, so it can't run out of duration.
 - **The queue** (`queue.ts`): an explicit promise chain, because a Durable Object takes the next
   request while one awaits its fetch. 1 s between starts, 8 waiting at most (then 503 with
-  `Retry-After`, `X-Queue: full`), 2,000 JPL requests a UTC day (`budget.ts`, one storage row a
-  request; then 503 until midnight). `fetchJpl` allows only `ssd.jpl.nasa.gov` and
+  `Retry-After`, `X-Queue: full`), 2,000 JPL requests a UTC day in two shares, 1,400 for lookups
+  and 600 for trajectories (`budget.ts`, one storage row a UTC day per share, the lookup row
+  `budget:<day>` and the trajectory row `budget:trajectory:<day>`; a spent share is 503 until
+  midnight with `X-Queue: budget` and `X-Queue-Share`). `fetchJpl` allows only `ssd.jpl.nasa.gov` and
   `ssd-api.jpl.nasa.gov`, gives each attempt 15 s, and retries 503/429 twice (2 s, 5 s, or a
   `Retry-After` up to 10 s). `workers_dev` and preview URLs are off: only a binding reaches it.
   The DO answers 200 with JPL's status in `X-Jpl-Status`.
@@ -480,8 +482,18 @@ queue).
   open-ended SPK-IDs (and `/api/lookup`'s free text, a key per spelling by design) still allow
   more than 2,000 misses a day. The Function's in-isolate limit is 60 `/api/` requests a minute per IP
   (`functions/_middleware.ts`; the zone's Rate Limiting rule is the real boundary); against a queue that serves one a second, one IP at that limit
-  spends the 2,000 in about 33 minutes. A smaller daily share for trajectories is the next step if
-  the budget is ever reached.
+  spends the 2,000 in about 33 minutes, which is why trajectories have their own share (below).
+- **Shares of the day (#223, ADR 0010 addendum).** `askJpl(ns, url, share)` puts `share` in the
+  queue body: `lookup` from `/api/lookup`, `trajectory` from `/api/trajectory` for its Horizons
+  request and for the SBDB read it makes first. Only a Function reaches the queue, so a visitor
+  never picks. No `share` counts as a lookup (so the Worker may be deployed before Pages); an
+  unknown one is a 400. A spent share reaches the client as `upstreamError`: 503 with
+  `X-Upstream-Status`, `X-Error-Kind: upstream`. Trajectories can never use the 1,400. The 600 is
+  an estimate (about 40 requests for a heavy session, so some 15 of them with every cache cold),
+  not a measurement; if either share is reached on an ordinary day, move 100 or 200 across
+  (`LOOKUP_DAILY_LIMIT` is the total minus `TRAJECTORY_DAILY_LIMIT`) and redeploy the Worker (it is not part of the Pages deploy):
+  `pnpm exec wrangler deploy --config workers/jpl-queue/wrangler.toml`. Either order is safe (the old Worker ignores `share`);
+  the new one accepts the old Functions' bodies. Counts live in storage, so a deploy does not reset them.
 - **The binding** is in `wrangler.toml` (`[[durable_objects.bindings]] name = "JPL_QUEUE"`,
   `class_name = "JplQueue"`, `script_name = "observatory-jpl-queue"`; the Worker was deployed
   first, 2026-11-07). Top-level bindings apply to previews and production alike. Without it both

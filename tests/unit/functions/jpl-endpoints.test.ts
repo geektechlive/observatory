@@ -17,21 +17,27 @@ import { installFakeCache } from './_fakeCache'
 
 interface Reply {
   status?: number
-  jplStatus: number
+  /** Absent when the queue itself refused, as for a spent budget. */
+  jplStatus?: number
   body: unknown
   headers?: Record<string, string>
 }
 
 function fakeQueue(replies: (url: string) => Reply) {
   const asked: string[] = []
+  const shares: unknown[] = []
   const stub = {
     fetch: vi.fn(async (_url: string, init: RequestInit) => {
-      const { url } = JSON.parse(init.body as string) as { url: string }
+      const { url, share } = JSON.parse(init.body as string) as { url: string; share?: unknown }
       asked.push(url)
+      shares.push(share)
       const r = replies(url)
       return new Response(typeof r.body === 'string' ? r.body : JSON.stringify(r.body), {
         status: r.status ?? 200,
-        headers: { 'X-Jpl-Status': String(r.jplStatus), ...r.headers },
+        headers: {
+          ...(r.jplStatus === undefined ? {} : { 'X-Jpl-Status': String(r.jplStatus) }),
+          ...r.headers,
+        },
       })
     }),
   }
@@ -39,7 +45,7 @@ function fakeQueue(replies: (url: string) => Reply) {
     idFromName: vi.fn(() => 'the-one-id'),
     get: vi.fn(() => stub),
   }
-  return { ns, asked }
+  return { ns, asked, shares }
 }
 
 function run(
@@ -71,9 +77,10 @@ afterEach(() => {
 
 describe('/api/lookup (#100)', () => {
   it('answers an object from SBDB, through the queue, and caches it', async () => {
-    const { ns, asked } = fakeQueue(() => ({ jplStatus: 200, body: apophis }))
+    const { ns, asked, shares } = fakeQueue(() => ({ jplStatus: 200, body: apophis }))
     const first = await run(lookup, '/api/lookup?q=%20Apophis%20', { JPL_QUEUE: ns })
     expect(first.res.status).toBe(200)
+    expect(shares).toEqual(['lookup'])
     const body = readLookupResponse(await first.res.json())
     expect(body?.query).toBe('Apophis')
     expect(body?.result.type === 'object' && body.result.object.spkid).toBe('20099942')
@@ -250,6 +257,40 @@ describe('/api/trajectory (#100)', () => {
     const off = await run(trajectory, path, {})
     expect(off.res.status).toBe(503)
     expect(off.res.headers.get(NOT_CONFIGURED_HEADER)).toBe('jpl-queue')
+  })
+
+  it('asks the queue for the trajectory share, for the SBDB step and Horizons alike (#223)', async () => {
+    const { ns, shares } = queueFor()
+    await run(trajectory, path, { JPL_QUEUE: ns })
+    expect(shares).toEqual(['trajectory', 'trajectory'])
+  })
+
+  it('answers a spent trajectory share as a degraded 503, never 502 or 504 (#223)', async () => {
+    const spent = fakeQueue(() => ({
+      status: 503,
+      body: { error: "Today's JPL budget is spent" },
+      headers: { 'X-Queue': 'budget', 'X-Queue-Share': 'trajectory', 'Retry-After': '3600' },
+    }))
+    const { res } = await run(trajectory, path, { JPL_QUEUE: spent.ns })
+    expect(res.status).toBe(503)
+    expect(res.headers.get('X-Error-Kind')).toBe('upstream')
+    expect(res.headers.get('X-Upstream-Status')).toBe('503')
+  })
+
+  it('answers a share spent between the SBDB step and Horizons as a degraded 503 too (#223)', async () => {
+    const spentAtHorizons = fakeQueue((url) =>
+      url.includes('sbdb.api')
+        ? { jplStatus: 200, body: eros }
+        : {
+            status: 503,
+            body: { error: "Today's JPL budget is spent" },
+            headers: { 'X-Queue': 'budget', 'X-Queue-Share': 'trajectory', 'Retry-After': '3600' },
+          },
+    )
+    const { res } = await run(trajectory, path, { JPL_QUEUE: spentAtHorizons.ns })
+    expect(spentAtHorizons.asked).toHaveLength(2)
+    expect(res.status).toBe(503)
+    expect(res.headers.get('X-Error-Kind')).toBe('upstream')
   })
 
   it('caches by object and span, so a repeat asks JPL nothing', async () => {

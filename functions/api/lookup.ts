@@ -19,7 +19,7 @@ export const onRequest: PagesFunction<JplEnv> = (ctx) => {
   const { q } = parsed
 
   return cachedJson(ctx, `jpl:lookup:v1:${q}`, LOOKUP_TTL_SECONDS, async () => {
-    const reply = await askJpl(ns, sbdbLookupUrl(q))
+    const reply = await askJpl(ns, sbdbLookupUrl(q), 'lookup')
     if (!reply.ok) return reply.response
     // 300 is SBDB's "matched more than one object", with the list.
     if (reply.status !== 200 && reply.status !== 300) {

@@ -34,7 +34,7 @@ function objectAnswer(ctx: Ctx, ns: JplQueueNamespace, spkid: string): Promise<R
     `jpl:sbdb-spk:v1:${spkid}`,
     OBJECT_TTL_SECONDS,
     async () => {
-      const reply = await askJpl(ns, sbdbSpkUrl(spkid))
+      const reply = await askJpl(ns, sbdbSpkUrl(spkid), 'trajectory')
       if (!reply.ok) return reply.response
       if (reply.status !== 200) return upstreamError(reply.status, 'JPL SBDB unavailable')
       const result = parseSbdbLookup(JSON.parse(reply.text))
@@ -78,7 +78,7 @@ async function produceTrajectory(
   object: LookupObject,
   req: TrajectoryRequest,
 ) {
-  const reply = await askJpl(ns, horizonsTrajectoryUrl(lookupCommand(object), req))
+  const reply = await askJpl(ns, horizonsTrajectoryUrl(lookupCommand(object), req), 'trajectory')
   if (!reply.ok) return reply.response
   if (reply.status !== 200) return upstreamError(reply.status, 'JPL Horizons unavailable')
   const raw: unknown = JSON.parse(reply.text)

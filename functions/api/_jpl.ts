@@ -37,15 +37,26 @@ export function badRequest(message: string): Response {
 export type JplReply =
   { ok: true; status: number; text: string } | { ok: false; response: Response }
 
+/**
+ * Which part of the queue's daily allowance a request spends (#223). The Function names it,
+ * so a visitor cannot pick: /api/trajectory asks for `trajectory`, whose share is capped
+ * apart from `lookup`, so a script cannot spend what name lookups rely on.
+ */
+export type JplShare = 'lookup' | 'trajectory'
+
 /** Ask JPL through the queue. JPL's own status comes back as `status`. */
-export async function askJpl(ns: JplQueueNamespace, url: string): Promise<JplReply> {
+export async function askJpl(
+  ns: JplQueueNamespace,
+  url: string,
+  share: JplShare,
+): Promise<JplReply> {
   let res: Response
   try {
     const stub = ns.get(ns.idFromName(QUEUE_NAME))
     res = await stub.fetch('https://jpl-queue/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, share }),
     })
   } catch (err) {
     console.warn('[jpl] queue unreachable:', err)
