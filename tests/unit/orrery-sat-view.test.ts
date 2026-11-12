@@ -10,6 +10,7 @@ import {
   behindEarth,
   epochAgeText,
   HAZE_ONLY_RATE,
+  labelBehindEarth,
   SAT_DISTANCE,
   satAltitudeKm,
   satDisplay,
@@ -183,6 +184,22 @@ describe('behindEarth (#140): Earth hides a point from the camera', () => {
   it('is false with the camera inside Earth or on the point', () => {
     expect(behindEarth({ x: 0, y: 0, z: -1.1 }, earth, 1, { x: 0, y: 0, z: 0.5 })).toBe(false)
     expect(behindEarth({ x: 0, y: 0, z: 2 }, earth, 1, { x: 0, y: 0, z: 2 })).toBe(false)
+  })
+})
+
+describe('labelBehindEarth (#219): a label goes faint only for what Earth hides', () => {
+  const earth = { x: 0, y: 0, z: 0 }
+  const cam = { x: 0, y: 0, z: 10 }
+  it('is true on the far side and false on the near side', () => {
+    expect(labelBehindEarth({ x: 0, y: 0, z: -1.1 }, earth, 1, cam)).toBe(true)
+    expect(labelBehindEarth({ x: 0, y: 0, z: 1.1 }, earth, 1, cam)).toBe(false)
+  })
+
+  it('is false inside the drawn dot: the frame closed, an object at its true place', () => {
+    // The sight line enters the sphere before reaching a point inside it.
+    expect(behindEarth({ x: 0, y: 0, z: -0.2 }, earth, 1, cam)).toBe(true)
+    expect(labelBehindEarth({ x: 0, y: 0, z: -0.2 }, earth, 1, cam)).toBe(false)
+    expect(labelBehindEarth({ x: 0.5, y: 0, z: 0 }, earth, 1, cam)).toBe(false)
   })
 })
 

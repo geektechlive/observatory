@@ -628,6 +628,14 @@
   color: var(--data-dwarf);
 }
 
+/* Behind Earth (#219): the label sits over Earth where its object projects, so it swaps to
+   faint ink without its scrim, as the chosen satellite's ring dims (#140). Text never fades
+   through opacity (roci-retrofit-v2 §7). Hover and focus still answer in full. */
+.labels .label[data-occluded='true']:not(:hover, :focus-visible) {
+  color: var(--bone-faint);
+  background: transparent;
+}
+
 /* The four impact terms (#92, spec Part 12): each yes or no, with what it means. */
 .terms {
   margin: 0;

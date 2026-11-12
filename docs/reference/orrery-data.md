@@ -294,7 +294,8 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
     catalog lacks asks for the payload, waits for it, switches the object's group on and
     opens it (`useOrreryLink.ts`); no other key triggers that fetch.
   - **Drawn once:** a JPL lookup of the same object (`lookup:<SPK-ID>`, #145) hides its own
-    marker and line while the payload's copy is drawn, and its key follows that copy.
+    marker, line and label while the payload's copy is drawn, and its key follows that copy.
+    A close approach of the same object does the same (#216, below).
 - **"Comets tonight" in the Tonight panel (#99)** is our stand-in for JPL's missing sb_obs
   (`CometsTonight.tsx`, `src/lib/sky/`). It is fetched only once the user shares a location,
   from our own API, so the location goes nowhere new.
@@ -472,6 +473,16 @@ queue).
     points. The lookup's samples are 2 days apart, too coarse for a pass of a few hours:
     2026 VQ11 (31,453 km, CAD) is drawn at 19,241 km at its closest (−39%, measured on the
     recorded 2026-11-12 answer), where its close-approach copy's 3 h span gives 31,474 km.
+  - **Drawn once (#216):** while a close approach of the same object is drawn, the lookup hides
+    its marker, line and label, as it does for a comet twin (#99). The approaches are keyed
+    `sb:<des>`, CAD's designation, so the match is SBDB's primary designation (the number once
+    numbered, else the provisional one), not the SPK-ID. The approaches are placed after the
+    lookup, so the renderer asks `AsteroidLayer.drawsAt(key, jd)` (the filter, or chosen, and a
+    sample covering the date) rather than last frame's meshes. The lookup's key follows the
+    approach: the camera frames it, and choosing the lookup chooses the approach, which draws its
+    3 h pass and is labelled even with the frame closed. The page ranks that label as chosen
+    (`chosen` on the projected item, `labelRankKey`) at every width. When the filters leave the
+    approach out and nothing chooses it, the lookup draws its own copy again.
   - The inspector opens at once (`LookupFacts.tsx`: kind, orbit class, NEO/PHA, distances, light
     time, range rate, the samples' span and step, which line is drawn); the camera flies there
     once the samples cover the date. "Remove from orrery", on the card or in the inspector,

@@ -91,6 +91,24 @@ describe('AsteroidLayer (#92)', () => {
     ).toEqual(['sb:2026 UE2', 'sb:524522'])
   })
 
+  it('says whether it draws an object at a date before placing it (#216)', () => {
+    // A looked-up twin decides to hide its own copy before this layer is placed.
+    const l = layer()
+    const answers = neo.approaches.map((a) => l.drawsAt(a.id, jd))
+    l.place(jd, frame(1))
+    const drawn = new Set(l.visible().map((m) => m.key))
+    expect(answers).toEqual(neo.approaches.map((a) => drawn.has(a.id)))
+    expect(answers.some(Boolean)).toBe(true)
+    expect(l.drawsAt('sb:524522', jd + 30)).toBe(false)
+    expect(l.drawsAt('sb:no such object', jd)).toBe(false)
+    l.setFilter({ ...DEFAULT_NEO_FILTER, hazardousOnly: true })
+    expect(l.drawsAt('sb:2026 UE2', jd)).toBe(false)
+    l.setSelected('sb:2026 UE2')
+    expect(l.drawsAt('sb:2026 UE2', jd)).toBe(true)
+    l.setEarthTrack(null)
+    expect(l.drawsAt('sb:524522', jd)).toBe(false)
+  })
+
   it("draws the selected object's whole sampled pass", () => {
     const l = layer()
     expect(l.pathPoints()).toBe(0)

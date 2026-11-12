@@ -44,6 +44,7 @@ const fine = circle(START, 200)
 const data = {
   key: 'lookup:20099942',
   label: 'Apophis',
+  designation: '99942',
   fine,
   orbit: lookupOrbit(fine, START + 100),
 }
@@ -113,6 +114,19 @@ describe('LookupLayer (#145)', () => {
     expect(layer.marker.visible).toBe(true)
   })
 
+  it('names the close approach that is the same object, by designation (#216)', () => {
+    const layer = new LookupLayer()
+    expect(layer.approachKey()).toBeNull()
+    // The close approaches are keyed `sb:<des>`: the number once numbered, else the
+    // provisional designation, as SBDB's primary designation is.
+    layer.set({ ...data, designation: '2026 VQ11' })
+    expect(layer.approachKey()).toBe('sb:2026 VQ11')
+    layer.set({ ...data, designation: '524522' })
+    expect(layer.approachKey()).toBe('sb:524522')
+    layer.set({ ...data, designation: null })
+    expect(layer.approachKey()).toBeNull()
+  })
+
   describe('marker size on screen (#153)', () => {
     const SUN_FLOOR_PX = 10
     /** Scene units per px at a camera distance: 1440×900 at the orrery's 45° field. */
@@ -167,6 +181,7 @@ describe('LookupLayer (#145)', () => {
     const apophis = {
       key: 'lookup:20099942',
       label: 'Apophis',
+      designation: '99942',
       fine: flyby,
       orbit: lookupOrbit(flyby, flyby.start + 365),
     }

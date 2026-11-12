@@ -151,7 +151,14 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
   so on the far side of Earth it would draw over the near side as if the satellite were there
   (the ISS at 12.7N 64.7E drew over the Arctic in the 12:00 UTC Earth orbit view). Behind Earth
   (`behindEarth`), it and the re-entry rings draw at 0.25 opacity, the selection ring without its
-  backplate. Before, the 4 px marker
+  backplate. Its label goes faint the same way (#219): every projected label carries
+  `behindEarth` (the same test against Earth as drawn, in `OrreryRenderer.projectOne`), and the
+  page sets `data-occluded` on it, which swaps it to `--bone-faint` without its scrim (no
+  `opacity`: text swaps ink, roci-retrofit-v2 §7). That covers every label Earth can hide: the
+  close approaches, L1, a looked-up object, the Moon and the L1/L2 craft in the Earth frame,
+  and anything farther out lined up behind Earth. Something inside Earth's drawn dot (the frame
+  closed, an object at its true place in an exaggerated Earth) is on Earth, not behind it, and
+  stays at full strength. Before, the 4 px marker
   vanished among 19,000 points with every group on. `SatFacts` shows
   its group, height, how old its orbit data is and the source.
   - Search lists only the space stations: 19,000 entries would bury the rest. The ISS is listed

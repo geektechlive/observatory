@@ -205,6 +205,16 @@ export function behindEarth(point: Vec3, earth: Vec3, radius: number, camera: Ve
   return t > 0 && t < 1
 }
 
+/**
+ * Whether a label should go faint because Earth hides what it names (#219): behindEarth,
+ * except inside Earth's drawn sphere. There (the frame closed, a craft or approach at its
+ * true place in an exaggerated Earth) the object is on Earth, not behind it.
+ */
+export function labelBehindEarth(point: Vec3, earth: Vec3, radius: number, camera: Vec3): boolean {
+  const inside = Math.hypot(point.x - earth.x, point.y - earth.y, point.z - earth.z) <= radius
+  return !inside && behindEarth(point, earth, radius, camera)
+}
+
 /** Height above Earth's mean radius, km. */
 export function satAltitudeKm(teme: readonly [number, number, number]): number {
   return Math.hypot(teme[0], teme[1], teme[2]) - EARTH_RADIUS_KM

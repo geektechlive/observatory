@@ -55,6 +55,11 @@ export function lookupMarkerRadius(unitsPerPx: number): number {
 export interface LookupData {
   key: string
   label: string
+  /**
+   * SBDB's primary designation ("99942", "2026 VQ11"), null until JPL has answered: the
+   * close approaches are keyed by it (#216).
+   */
+  designation: string | null
   /** Horizons samples, position and velocity (/api/trajectory). */
   fine: SampledSpan
   orbit: LookupOrbit | null
@@ -213,6 +218,16 @@ export class LookupLayer {
     return this.data?.key ?? null
   }
 
+  /**
+   * The close approach that is the same object (#216), or null. The approaches are keyed
+   * `sb:<des>` (scripts/orrery-neo.mjs), CAD's designation: the number once numbered,
+   * else the provisional one, as SBDB's primary designation is.
+   */
+  approachKey(): string | null {
+    const des = this.data?.designation
+    return des ? `sb:${des}` : null
+  }
+
   /** Its heliocentric position now, au, or null where no sample covers the date. */
   helioNow(): Vec3 | null {
     return this.helio
@@ -220,8 +235,9 @@ export class LookupLayer {
 
   /**
    * Place the marker for a date and (re)build the line if the object or mode changed.
-   * `hidden`: the same object is drawn from the comet data (#99), so this copy hides its
-   * marker, line and label; it is still placed, so the camera can frame it.
+   * `hidden`: the same object is drawn from the comet data (#99) or the close approaches
+   * (#216), so this copy hides its marker, line and label; it is still placed, so the
+   * camera can frame it.
    */
   place(jd: number, toScene: (p: Vec3) => Vector3, mode: string, hidden = false): void {
     this.jd = jd

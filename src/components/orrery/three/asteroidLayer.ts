@@ -132,14 +132,26 @@ export class AsteroidLayer {
   /** Place every object for a date around Earth as drawn now. */
   place(jd: number, frame: EarthFrameView): void {
     for (const { approach, mesh } of this.entries.values()) {
-      const at =
-        approachPasses(approach, this.filter, jd) || approach.id === this.selected
-          ? this.placeAt(approach, jd, frame, mesh.position)
-          : false
+      const at = this.shown(approach, jd) && this.placeAt(approach, jd, frame, mesh.position)
       mesh.visible = at
       if (at) mesh.scale.setScalar(frame.radius * ASTEROID_SHARE)
     }
     this.placePath(frame)
+  }
+
+  /** Through the filter, or chosen. */
+  private shown(approach: OrreryApproach, jd: number): boolean {
+    return approachPasses(approach, this.filter, jd) || approach.id === this.selected
+  }
+
+  /**
+   * Whether place() draws this object at a date, asked before it runs: a looked-up object
+   * that is also this approach hides its own copy while this one is drawn (#216).
+   */
+  drawsAt(key: string, jd: number): boolean {
+    const entry = this.entries.get(key)
+    if (!entry || !this.shown(entry.approach, jd)) return false
+    return asteroidGeocentric(entry.approach, this.earthTrack, jd) !== null
   }
 
   /** Write an object's scene position for a date into `out`; false with no data. */

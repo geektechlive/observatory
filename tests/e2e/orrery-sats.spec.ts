@@ -123,6 +123,44 @@ test.describe('satellites (#98)', () => {
     expect(drawn['satSelect']).toBeLessThan(drawn['sun'] ?? 0)
   })
 
+  test('the chosen satellite’s label goes faint while Earth hides it, and back in front (#219)', async ({
+    page,
+  }) => {
+    await openOrrery(page)
+    await page.getByRole('combobox', { name: /find/i }).fill('ISS')
+    await page.getByRole('option', { name: /^ISS/ }).first().click()
+    const label = page.locator('button[data-kind="satellite"]')
+    await expect(label).toBeVisible()
+    // Step the date through one orbit (92 min), so the ISS goes behind Earth and comes back.
+    const start = Math.floor(Date.now() / 3_600_000) * 3_600_000
+    const states = new Map<string, string>()
+    for (let step = 0; step < 10 && states.size < 2; step += 1) {
+      const t = new Date(start + step * 10 * 60_000).toISOString().slice(0, 19)
+      await page.evaluate((h) => {
+        window.location.hash = h
+      }, `#orrery?t=${t}Z&focus=sat:25544`)
+      await page.waitForTimeout(1200)
+      if (await label.isHidden()) continue
+      const occluded = (await label.getAttribute('data-occluded')) ?? ''
+      const colour = await label.evaluate((el) => getComputedStyle(el).color)
+      states.set(occluded, colour)
+    }
+    // Both sides were seen. The ISS label in front keeps the chosen label's copper; behind
+    // Earth it is in the faint ink.
+    const ink = (token: string) =>
+      label.evaluate((el, t) => {
+        const probe = document.createElement('span')
+        probe.style.color = `var(${t})`
+        el.parentElement?.append(probe)
+        const c = getComputedStyle(probe).color
+        probe.remove()
+        return c
+      }, token)
+    expect([...states.keys()].sort()).toEqual(['', 'true'])
+    expect(states.get('true')).toBe(await ink('--bone-faint'))
+    expect(states.get('')).toBe(await ink('--copper-glow'))
+  })
+
   test('Space-Track and DISCOS add to the inspector, the controls and the stage (#101)', async ({
     page,
   }) => {

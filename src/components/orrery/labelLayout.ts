@@ -84,6 +84,18 @@ export function labelOrder<T extends { name: string }>(
   return [...items].sort((a, b) => rank(a.name) - rank(b.name))
 }
 
+/**
+ * The key the labels rank the chosen object by (#216): a looked-up object drawn by its
+ * close-approach twin is labelled as that approach (`chosen` on the projected item), so
+ * the approach ranks as chosen; otherwise the chosen key itself.
+ */
+export function labelRankKey(
+  items: readonly { name: string; chosen?: boolean | undefined }[],
+  selected: string | null,
+): string | null {
+  return items.find((i) => i.chosen === true)?.name ?? selected
+}
+
 /** Below this stage width, px, close-approach labels are capped (#130). */
 export const SMALL_STAGE_PX = 600
 /**

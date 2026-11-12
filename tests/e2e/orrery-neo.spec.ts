@@ -6,6 +6,7 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
+import { lookupTrajectory } from './lookupPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
 import { offlineSun } from './swpc'
@@ -91,5 +92,50 @@ test.describe('Earth’s neighbourhood (#92)', () => {
       .toBeGreaterThan(40)
     // Focused, it sits in the open frame.
     await expect.poll(() => attr(page, 'data-orrery-earth-frame')).toBe('1.00')
+  })
+
+  test('an object looked up at JPL that is also a close approach is drawn once (#216)', async ({
+    page,
+  }) => {
+    // SBDB's answer for the same object as the approach `sb:2026 TA1`, keyed by SPK-ID.
+    const twin = {
+      id: 'sb:54000001',
+      spkid: '54000001',
+      name: '(2026 TA1)',
+      designation: '2026 TA1',
+      prefix: null,
+      kind: 'asteroid',
+      orbitClass: null,
+      neo: true,
+      pha: true,
+    }
+    await page.route('**/api/trajectory?*', (route) => {
+      const url = new URL(route.request().url())
+      const q = (k: string) => url.searchParams.get(k) ?? ''
+      return route.fulfill({ json: lookupTrajectory(twin, q('start'), q('end'), q('step')) })
+    })
+    await serveMoons(page)
+    await serveNeo(page)
+    await page.goto('/#orrery?focus=lookup:54000001')
+    await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'lookup:54000001', {
+      timeout: 20_000,
+    })
+    await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('4')
+    // The close approach draws it: the lookup's marker, line and label hide, and the
+    // chosen key follows the approach, which draws its pass.
+    await expect.poll(() => attr(page, 'data-orrery-lookup')).toBe('')
+    await expect.poll(() => attr(page, 'data-orrery-lookup-path')).toBe('0')
+    await expect
+      .poll(async () => Number(await attr(page, 'data-orrery-asteroid-path')))
+      .toBeGreaterThan(40)
+    await expect(page.locator('[data-orrery-page] button[data-kind="lookup"]:visible')).toHaveCount(
+      0,
+    )
+    await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'lookup:54000001')
+    // Once the approaches' filter leaves it out and nothing chooses it, the lookup draws it.
+    await page.getByRole('switch', { name: /risk list only/i }).click()
+    await page.getByRole('complementary').getByRole('button', { name: 'Close' }).click()
+    await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
+    await expect.poll(() => attr(page, 'data-orrery-lookup')).toBe('lookup:54000001')
   })
 })

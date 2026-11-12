@@ -56,7 +56,7 @@ import {
 } from '@/lib/orrery/earthFrame'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
-import { ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
+import { labelBehindEarth, ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
 import { lookupTwinKey } from '@/lib/orrery/smallBodyView'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
@@ -136,6 +136,11 @@ export interface ProjectedBody {
   visible: boolean
   /** Behind the camera: its projected position is mirrored. */
   behind: boolean
+  /**
+   * Earth, as drawn, stands between the camera and it (#219): its label still sits where
+   * it projects, over Earth, so the page draws it faint. Never for Earth itself.
+   */
+  behindEarth?: boolean
   /** The body's drawn radius on screen, px, so a label can sit beside its disc. */
   radiusPx: number
   /** Its distance from the camera, scene units (#126: a craft far beyond the focus). */
@@ -149,6 +154,8 @@ export interface ProjectedBody {
   parent?: string
   /** Asteroid: on JPL's potentially hazardous list (#92). */
   pha?: boolean
+  /** Asteroid: chosen through a looked-up object it draws (#216). */
+  chosen?: boolean
 }
 
 export { L1_KEY } from '../catalog'
@@ -643,6 +650,8 @@ export class OrreryRenderer {
     if (!earth || Number.isNaN(this.lastJd)) return
     const clock = this.clock.motion()
     const radius = this.earthFrameRadius(earth, t)
+    // The labels test against the same Earth the satellite ring dims by (#219).
+    this.occluderRadius = radius
     this.sats.place({
       jd: this.lastJd,
       simMs: this.clock.simTime(),
@@ -839,26 +848,41 @@ export class OrreryRenderer {
     this.craft.place(jd)
     // The comets first: a looked-up object whose twin they draw hides its own copy (#99).
     this.small.place(jd, (p) => this.toScene(p), this.mode)
-    this.lookup.place(jd, (p) => this.toScene(p), this.mode, this.lookupTwin() !== null)
+    this.lookup.place(jd, (p) => this.toScene(p), this.mode, this.lookupTwin(jd) !== null)
   }
 
   /**
-   * A looked-up object (#145) that is also in the comet data (#99: 1I, 2I, 3I or a bright
-   * comet looked up by name), while that copy is drawn: its key there, else null. The
-   * object is then drawn once, from the comet data, and the lookup key follows it.
+   * A looked-up object (#145) that another layer draws at `jd`: its key there, else null.
+   * The comet data (#99: 1I, 2I, 3I or a bright comet looked up by name) matches it by
+   * SPK-ID; the close approaches (#216: 2026 VQ11) by designation. The object is then
+   * drawn once, by the other layer, and the lookup key follows it. The approaches are
+   * placed after this runs, so they are asked whether they will draw it (drawsAt).
    */
-  private lookupTwin(): SceneKey | null {
+  private lookupTwin(jd: number): SceneKey | null {
     const key = this.lookup.key()
-    const twin = key === null ? null : lookupTwinKey(key)
-    return twin !== null && this.small.drawn(twin) ? twin : null
+    const comet = key === null ? null : lookupTwinKey(key)
+    if (comet !== null && this.small.drawn(comet)) return comet
+    const approach = this.lookup.approachKey()
+    return approach !== null && this.near.asteroids.drawsAt(approach, jd) ? approach : null
   }
 
   /** Where a looked-up object is drawn: its own marker, or its twin's (lookupTwin). */
   private lookupPosition(name: SceneKey): Vector3 | null {
     const own = this.lookup.position(name)
     if (own || !this.lookup.has(name)) return own
-    const twin = this.lookupTwin()
-    return twin === null ? null : this.small.position(twin)
+    const twin = this.lookupTwin(this.lastJd)
+    if (twin === null) return null
+    return this.small.position(twin) ?? this.near.asteroids.position(twin)
+  }
+
+  /**
+   * The close approach the chosen key means (#216): a looked-up object that is also an
+   * approach chooses that approach, so its pass and label show as the approach's do.
+   */
+  private chosenApproach(): SceneKey | null {
+    const key = this.chosen
+    if (key === null || !this.lookup.has(key)) return key
+    return this.lookup.approachKey() ?? key
   }
 
   /** Where a body or craft is drawn now, scene space. */
@@ -890,6 +914,7 @@ export class OrreryRenderer {
   /** This fortnight's close approaches from /api/orrery-neo (#92). */
   setApproaches(list: readonly OrreryApproach[]): void {
     this.near.asteroids.setApproaches(list)
+    this.near.asteroids.setSelected(this.chosenApproach())
     this.updateBodies(true)
     this.markDirty()
   }
@@ -912,6 +937,8 @@ export class OrreryRenderer {
       this.models.show(null, null)
       delete this.canvas.dataset['orreryFocus']
     }
+    // Its designation arrives with JPL's answer, after it may have been chosen (#216).
+    this.near.asteroids.setSelected(this.chosenApproach())
     this.updateBodies(true)
     this.markDirty()
   }
@@ -986,11 +1013,12 @@ export class OrreryRenderer {
   /** Draw a craft's whole-mission path (spec Part 14), or none. */
   setTrajectory(key: SceneKey | null): void {
     this.craft.setTrajectory(key && this.craft.has(key) ? key : null)
-    // A chosen close approach draws its sampled pass (#92).
-    this.near.asteroids.setSelected(key)
     // A chosen satellite gets a marker and a label (#98).
     this.sats.setSelected(key)
     this.chosen = key
+    // A chosen close approach draws its sampled pass (#92), and so does a looked-up
+    // object that is one (#216).
+    this.near.asteroids.setSelected(this.chosenApproach())
     this.updateBodies(true)
     this.markDirty()
   }
@@ -1378,7 +1406,7 @@ export class OrreryRenderer {
 
   private projectOne(
     mesh: Object3D,
-  ): Pick<ProjectedBody, 'x' | 'y' | 'visible' | 'behind' | 'radiusPx' | 'depth'> {
+  ): Pick<ProjectedBody, 'x' | 'y' | 'visible' | 'behind' | 'behindEarth' | 'radiusPx' | 'depth'> {
     const depth = mesh.position.distanceTo(this.camera.position)
     this.scratch.copy(mesh.position).project(this.camera)
     const x = ((this.scratch.x + 1) / 2) * this.width
@@ -1388,8 +1416,23 @@ export class OrreryRenderer {
     // A sphere's scale is its radius; a sprite's is its full width (#115).
     const radius = mesh instanceof Sprite ? mesh.scale.x / 2 : mesh.scale.x
     const radiusPx = depth > 0 ? radius / this.unitsPerPx(depth) : 0
-    return { x, y, visible, behind, radiusPx, depth }
+    return { x, y, visible, behind, behindEarth: this.hiddenByEarth(mesh), radiusPx, depth }
   }
+
+  /**
+   * Whether Earth as drawn this frame hides a mesh from the camera (#219), by the test the
+   * chosen satellite's ring dims with (#140, behindEarth). Labels draw over the scene, so
+   * one on the far side would sit over Earth at full strength. Allocates nothing.
+   */
+  private hiddenByEarth(mesh: Object3D): boolean {
+    const earth = this.bodies.get('Earth')
+    if (!earth || mesh === earth || !this.visibility.planets) return false
+    const radius = Number.isNaN(this.occluderRadius) ? earth.scale.x : this.occluderRadius
+    return labelBehindEarth(mesh.position, earth.position, radius, this.camera.position)
+  }
+
+  /** Earth's radius this frame as the satellites were placed with it (earthFrameRadius). */
+  private occluderRadius = Number.NaN
 
   private project(): ProjectedBody[] {
     const out: ProjectedBody[] = []
@@ -1428,6 +1471,7 @@ export class OrreryRenderer {
         ...anchor,
         visible: true,
         behind: false,
+        behindEarth: false,
         radiusPx: 0,
         depth: 0,
       })
@@ -1444,13 +1488,16 @@ export class OrreryRenderer {
    */
   private projectNear(out: ProjectedBody[]): void {
     const open = this.near.openness() >= NEAR_LABEL_OPEN
+    const chosen = this.chosenApproach()
     for (const a of this.near.asteroids.visible()) {
-      if (!open && a.key !== this.chosen) continue
+      if (!open && a.key !== chosen) continue
       out.push({
         name: a.key,
         label: a.label,
         kind: 'asteroid',
         pha: a.pha,
+        // Chosen through its looked-up twin (#216): the page ranks this label as chosen.
+        chosen: a.key === chosen && chosen !== this.chosen,
         ...this.projectOne(a.mesh),
       })
     }

@@ -53,6 +53,7 @@ import {
   LABEL_CHAR_PX,
   labelOrder,
   type LabelPlacement,
+  labelRankKey,
   layoutStage,
   panelInset,
   rimPoint,
@@ -581,7 +582,9 @@ export function OrreryPage() {
           )
           .map((i) => i.name),
       )
-      const ordered = labelOrder(items, selectedRef.current, subjectNow, boosted)
+      // A looked-up object drawn by its close-approach twin ranks as that approach (#216).
+      const rankKey = labelRankKey(items, selectedRef.current)
+      const ordered = labelOrder(items, rankKey, subjectNow, boosted)
       // A craft in a close-up but far beyond the focus says how far it is, as a rim marker
       // does (#126: Voyager 2 beside Venus in Parker's view read as nearby). The layout
       // sizes it from last frame's width plus the suffix's change; the write comes last.
@@ -602,7 +605,7 @@ export function OrreryPage() {
         items
           .filter((i) => i.kind === 'asteroid' && inView(i))
           .map((i) => rankOf.get(i.name) ?? { key: i.name, pha: i.pha ?? false, distAu: Infinity }),
-        selectedRef.current,
+        rankKey,
         width,
       )
       // Planets' drawn discs (Saturn's with its rings, #119): craft and moon labels keep
@@ -641,7 +644,7 @@ export function OrreryPage() {
             y: i.y,
             visible: inView(i) && (i.kind !== 'asteroid' || labelledAsteroids.has(i.name)),
             mustShow: i.name === subjectNow,
-            priority: i.name === 'Earth' || i.name === 'Sun' || i.name === selectedRef.current,
+            priority: i.name === 'Earth' || i.name === 'Sun' || i.name === rankKey,
             // Planets, the focused planet's moons and the deep-space craft try farther rungs
             // before hiding (#131). Voyager 2's label at 390 px had only a slot over the time
             // bar until the bar became furniture (#130); its near slots meet the guide chip.
@@ -683,6 +686,10 @@ export function OrreryPage() {
           ring.style.top = `${String(item.y)}px`
         }
         if (!node) continue
+        // Behind Earth (#219) the label still sits where its object projects, over Earth:
+        // it goes faint, as the chosen satellite's ring does. Written only when it changes.
+        const occluded = item.behindEarth ? 'true' : ''
+        if (node.dataset['occluded'] !== occluded) node.dataset['occluded'] = occluded
         const distance = node.querySelector<HTMLElement>('[data-rim-distance]')
         const edge = rimEdges.get(item.name)
         const p = rimPlaces.get(item.name)

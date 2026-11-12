@@ -91,9 +91,11 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
     return lookupOrbit(fine, fine.start + ((n - 1) / 2) * fine.step)
   }, [fine])
 
+  // The close approaches are keyed by designation (#216): the renderer draws a twin once.
+  const designation = object?.designation ?? null
   useEffect(() => {
-    renderer?.setLookup(key && fine ? { key, label, fine, orbit } : null)
-  }, [renderer, key, label, fine, orbit])
+    renderer?.setLookup(key && fine ? { key, label, designation, fine, orbit } : null)
+  }, [renderer, key, label, designation, fine, orbit])
 
   // "Show in orrery": once drawn where the clock is, fly there and open the inspector.
   const jd = simMs / DAY_MS + JD_UNIX_EPOCH
