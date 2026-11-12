@@ -3,7 +3,8 @@ import { fetchLaunchesEnvelope } from '@/lib/api/launches'
 import { toError } from '@/lib/toError'
 import type { LaunchesResponse } from '@/schemas/launches'
 
-export function useLaunches(): {
+/** `enabled` false (a view with no globe, #172) fetches nothing. */
+export function useLaunches(enabled = true): {
   data: LaunchesResponse | undefined
   isLoading: boolean
   error: Error | null
@@ -14,6 +15,7 @@ export function useLaunches(): {
     staleTime: 30 * 60 * 1000,
     refetchInterval: 30 * 60 * 1000,
     refetchOnWindowFocus: true,
+    enabled,
   })
 
   return {

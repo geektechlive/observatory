@@ -68,7 +68,7 @@ function fakeWorker(statuses: number[]) {
         positions,
         status: Uint8Array.from(loaded.map((_, i) => statuses[i] ?? SAT_OK)),
         ms: 3,
-        engine: 'wasm',
+        engine: 'js',
       }
       return Promise.resolve(reply)
     },

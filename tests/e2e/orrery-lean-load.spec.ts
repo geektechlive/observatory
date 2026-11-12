@@ -23,8 +23,17 @@ const EARTH_ONLY_API = [
   '/api/launches',
   '/api/aurora',
 ]
-/** Chunks only the Earth page needs. */
-const EARTH_ONLY_CHUNKS = ['EarthConsoleRest', 'land-110m', 'propagate']
+/**
+ * Chunks only the Earth page needs, and the Earth textures a desktop #orrery used to
+ * download from index.html's static preloads (#173).
+ */
+const EARTH_ONLY_CHUNKS = [
+  'EarthConsoleRest',
+  'land-110m',
+  'propagate',
+  '/textures/day-2048',
+  '/textures/night-2048',
+]
 
 function recordRequests(page: Page): string[] {
   const urls: string[] = []
@@ -75,5 +84,16 @@ test('a cold load of #earth still fetches its feeds', async ({ page }) => {
   await page.goto('/#earth')
   for (const api of ['/api/quakes', '/api/eonet', '/api/launches', '/api/iss-tle']) {
     await expect.poll(() => urls.includes(api), { timeout: 15_000 }).toBe(true)
+  }
+})
+
+test('a desktop #earth starts its textures at boot, in the texture loader’s CORS mode', async ({
+  page,
+}) => {
+  await page.goto('/#earth')
+  for (const name of ['day-2048', 'night-2048']) {
+    const link = page.locator(`link[rel="preload"][href="/textures/${name}.webp"]`)
+    await expect(link).toHaveCount(1)
+    await expect(link).toHaveAttribute('crossorigin', 'anonymous')
   }
 })

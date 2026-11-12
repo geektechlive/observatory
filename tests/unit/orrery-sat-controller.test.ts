@@ -79,7 +79,7 @@ class FakeWorker implements SatWorker {
       positions: new Float32Array(n * 3).fill(7000),
       status: new Uint8Array(n).fill(status),
       ms: 12,
-      engine: 'wasm',
+      engine: 'js',
     })
   }
   release(): void {

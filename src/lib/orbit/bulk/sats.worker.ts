@@ -4,11 +4,10 @@
  * SGP4 pass over all of them per frame, off the main thread. The logic is in
  * satHandler.ts; this only wires it to the worker's messages.
  */
-import { bulkRuntime } from './bulkEci'
 import { createSatHandler, type SatRequest } from './satHandler'
 
 const scope = self as unknown as DedicatedWorkerGlobalScope
-const handle = createSatHandler({ runtime: bulkRuntime })
+const handle = createSatHandler()
 
 scope.onmessage = (event: MessageEvent<SatRequest>) => {
   void handle(event.data).then(({ reply, transfer }) => {

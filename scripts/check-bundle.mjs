@@ -42,7 +42,8 @@ export const BUDGETS = {
   planetTextureTotal: 700_000,
   // #98 measured the satellite worker at 69.3 kB gzip: satellite.js with its embedded
   // single-thread WASM (the #97 bulk worker alone was ~44 kB) plus zod for the body check.
-  satWorkerGzip: 80_000,
+  // #137 dropped the WASM path, which the CSP blocks (ADR 0011): 69.6 -> 35.7 kB gzip.
+  satWorkerGzip: 40_000,
   // #115 measured the ten spacecraft models at 110-426 kB each, 2.16 MB together. Only the
   // focused craft's model loads, so the total is disk, not a visitor's download. The total
   // is sized for all of tier A (#194, docs/reference/satellite-models.md, "Budget plan"):
@@ -66,6 +67,9 @@ const THREE_MARKER = 'WebGLRenderer'
 // orbit to propagate, not with the page (#97): in the first load it cost ~5 kB gzip
 // and split the first-load code into 18 chunks.
 const SGP4_MARKER = 'SemiLatusRectumBelowZero'
+// WebAssembly.instantiate/compile(Streaming), new WebAssembly.Module or .Instance: compiling WASM,
+// as opposed to feature-detecting it (#137).
+const WASM_MARKER = /\bWebAssembly\s*\.\s*(?:instantiate|compile|Module|Instance)/
 // The orrery (#91) is a whole page behind its tab: its page and renderer name these in
 // markup and on the canvas, and neither may reach the first load.
 const ORRERY_MARKERS = ['data-orrery-page', 'orreryWebgl']
@@ -207,6 +211,22 @@ export function checkBundle(distDir, budgets = BUDGETS) {
     withDetail.length > 0
       ? `${withDetail.join(', ')} contains the detail view: it must load on first open (OrreryPage.tsx lazy DetailView)`
       : 'detail view not in first-load chunks',
+  )
+
+  // #137: the CSP has no 'wasm-unsafe-eval' (ADR 0011), so production can never compile
+  // WebAssembly. Code that tries is dead weight (the satellite worker's BulkPropagator
+  // was ~34 kB gzip of it), so no chunk may carry it.
+  const withWasm = readdirSync(join(distDir, 'assets')).filter(
+    (name) =>
+      name.endsWith('.js') &&
+      WASM_MARKER.test(readFileSync(join(distDir, 'assets', name), 'utf8')),
+  )
+  add(
+    'no-wasm',
+    withWasm.length === 0,
+    withWasm.length > 0
+      ? `${withWasm.join(', ')} instantiates WebAssembly, which the CSP blocks (ADR 0011)`
+      : 'no chunk instantiates WebAssembly',
   )
 
   let sawOrreryPage = false

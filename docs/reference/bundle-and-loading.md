@@ -30,9 +30,9 @@ files appeared (#158, #159). (`JplLookup` did not split it; why was not checked.
 
 - **The fix is in `vite.config.ts`: two `codeSplitting` groups tagged `$initial`** (a module the
   entry imports statically, directly or not). `vendor` (priority 10, `node_modules`) takes the
-  libraries, `app` takes our own code, whatever the lazy chunks use. The first load is now
-  `index`, `vendor` and a 599 B `rolldown-runtime` file (3 files, 150.6 kB gzip against 151.0 kB
-  in 4 files), so a new lazy chunk can't split it. `tests/unit/vite-chunking.test.ts` pins the
+  libraries, `app` takes our own code, whatever the lazy chunks use. The first load is
+  `index`, `vendor` and a 599 B `rolldown-runtime` file (3 files; 150.6 kB gzip against 151.0 kB in
+  4 files when the split landed, 151.9 kB on 2026-11-12), so a new lazy chunk can't split it. `tests/unit/vite-chunking.test.ts` pins the
   config. Library code now sits in `vendor`: an app-only edit (a dial label) left the `vendor`
   and `rolldown-runtime` file names unchanged, checked 2026-11-08.
 - **Chains, not file counts, cost time (#155, #168).** The site is HTTP/2 (`nextHopProtocol`
@@ -92,15 +92,35 @@ were fetched for a page never shown. The globe's data hooks (`useGlobeData`) liv
 `EarthColumns` (App.tsx), not in `App`, and the coastline chunk (`landRings`) loads on its first
 call, not at module import, because that import sits in the entry.
 `tests/e2e/orrery-lean-load.spec.ts` counts what a cold `#orrery` asks for. The orrery keeps
-solar-wind, cme, dsn, spacetrack and discos (it shows them). Still wasted: the static
-`index.html` preloads of the two 2048 Earth textures on desktop `#orrery`, and `#sun`/`#sky`
-still run `useGlobeData` (ISS TLE, launches, quakes, aurora) for a globe they don't draw.
+solar-wind, cme, dsn, spacetrack and discos (it shows them), and no Earth texture (#173,
+below).
+
+`#sun` and `#sky` draw no globe, so `useGlobeData` passes `enabled = false` to the globe's
+feeds there (#172): the hooks still run, so the stage never remounts, but they fetch nothing
+and `useIss` loads no SGP4 and runs no loop. Measured 2026-11-12 on a cold local build
+(`tests/e2e/sun-sky-lean-load.spec.ts`): `#sun` dropped from 17 to 13 API paths (no ISS TLE,
+launches, quakes or aurora; about 13.7 kB on production's wire) and from 17 to 15 scripts
+(propagate and satellite.js, 11 kB gzip). `#sky` dropped from 16 to 14 API paths (launches and
+quakes) and from 17 to 16 scripts (propagate); its Tonight panel still reads the ISS TLE, aurora
+and satellite.js for passes. The ticker's feeds (eonet, fireball) are on every view.
 
 ## Earth textures (#85, #87)
 
-They start with the page, small pair first. `index.html` preloads `day-2048.webp` and
-`night-2048.webp` on screens 900px and wider only (`media`): on a 4G phone the early 310 kB
-delayed the app's first paint by ~160 ms. For the same reason there is no `Link` header for them,
+They start with the page, small pair first. On screens 900px and wider only
+(`EARLY_TEXTURES_MEDIA`), `main.tsx` calls `preloadTexturesAtBoot` before React renders, which
+adds preload links for `day-2048.webp` and `night-2048.webp` when the view draws the globe
+(Earth, Orbit). On a 4G phone the early 310 kB delayed the app's first paint by ~160 ms.
+
+- **Why not static links in `index.html` (#173).** They were there until 2026-11-12, but the HTML
+  can't see the hash, so a desktop `#orrery`, `#sun` or `#sky` downloaded 310 kB of Earth it
+  never drew. A hash-checking inline script would need a CSP change (`script-src` allows no
+  inline script). Measured locally (`vite preview`, 20 Mbps, 40 ms RTT, cache off, median of 5,
+  tight runs): desktop `#orrery` to `data-orrery-mode="webgl"` 604 to 538 ms; desktop Earth to
+  `data-globe-textures` 609 to 617 ms, since the textures now start after the entry runs. No
+  API data locally, so production's contention with the orrery's ~300 kB of data is not in
+  these numbers.
+
+For the same reason there is no `Link` header for them,
 which can't be limited by screen size, so they get no Early Hint. Narrower screens get the same
 links from `preloadTextures` (`src/lib/texturePreload.ts`) when GlobeHost starts the renderer
 import (#87): that is after first paint, and without it the pictures waited ~430 ms for the chunk
@@ -108,7 +128,8 @@ to finish. An SVG-only visitor never downloads them. Every tier draws 2048 first
 tier then loads 4096 and swaps it in (`globeTextures` in `src/lib/globe3d.ts`, `upgradeTextures`
 in `GlobeRenderer`). Never preload 4096: the tier is picked at runtime. The preloads carry
 `crossorigin` because three's `TextureLoader` requests in CORS mode; drop either side and every
-visitor downloads the file twice. `texture-preload.test.ts` pins all of this. The canvas's
+visitor downloads the file twice. `texture-preload.test.ts` and `texture-preload-dynamic.test.ts` pin all of this;
+`orrery-lean-load.spec.ts` and `sun-sky-lean-load.spec.ts` check that no texture is fetched. The canvas's
 `data-globe-textures` says which pair is drawn.
 
 ## Layout shift (#169)

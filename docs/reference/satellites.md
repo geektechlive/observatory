@@ -72,16 +72,17 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
   same KV key because `supgpCount` is an optional field older clients drop.
 - **The worker** (`sats.worker.ts`, logic in `satHandler.ts`): `fetchOrrerySatsBody` hands it the
   body undecoded, by transfer. It decodes it (`OrrerySatsSchema`, then each row by hand), and
-  answers each frame with one `BulkPropagator` pass over every loaded group: ECI (TEME) km plus a
+  answers each frame with one JS `propagate` pass over every loaded group: ECI (TEME) km plus a
   status byte per object (`SAT_OK`, `SAT_FAILED`, `SAT_OUT_OF_WINDOW` past ±3 days of the
-  object's epoch). Frames go back through `release()` and are written in place. JS `propagate`
-  takes over if the WASM runtime won't load. `loadSatWorker` imports it on first use.
+  object's epoch). Frames go back through `release()` and are written in place. `loadSatWorker`
+  imports it on first use.
   - Names, NORAD ids, epochs and which objects carry SupGP elements (`supgp`, from the body's
     `supgpCount`, flagged before bad rows are dropped; #209) cross once per load or unload
     (`SatFieldInfo`); each frame
     carries only its field `version`. Sending 19,540 names with every pass cost the main thread a
     structured clone for nothing.
-- check-bundle: `sat-worker-gzip` (80 kB; 69.3 kB measured) and `entry-has-no-sat-worker`.
+- check-bundle: `sat-worker-gzip` (40 kB; 35.7 kB measured since #137, 69.6 kB with the WASM
+  path), `entry-has-no-sat-worker`, and `no-wasm` (no chunk may compile WebAssembly).
 - **Main-thread code never imports `satField.ts` or the API client into the renderer.**
   - `satField.ts` brings satellite.js and zod. The status bytes live in the import-free
     `satStatus.ts`.
@@ -142,9 +143,10 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
     before its group loads, and choosing it opens the Earth orbit view and switches the stations
     on. Everything else is found in the satellite browser, below.
 - **SGP4 engine on the deployed site:** see [ADR 0011](../decisions/0011-sgp4-runs-in-javascript-under-the-csp.md).
-  Our CSP's `script-src` has no `'wasm-unsafe-eval'`, so `BulkPropagator` fails to compile in the
-  worker ("violates the following Content Security policy directive"), and `propagateFieldJs`
-  takes over (`data-sat-engine="js"`). Local `pnpm preview` ignores `_headers`, so it runs WASM.
+  Our CSP's `script-src` has no `'wasm-unsafe-eval'`, so satellite.js's WASM `BulkPropagator`
+  failed to compile in the worker ("violates the following Content Security policy directive")
+  and the JS path ran. #137 removed the WASM path (2026-11-12): the worker runs JS everywhere,
+  local preview included, and `data-sat-engine` always reads `js`.
   - **The JS path is the faster one.** Measured 2026-11-07 on this Mac, Chromium on the real GPU,
     all 19,540 objects: JS took 5–11 ms a pass on the orrery-98 preview, and WASM took 90–122 ms
     in local preview. No main-thread long tasks either way. The iPhone 15 Pro target is a pass of
@@ -299,11 +301,13 @@ The multi-thread WASM build is stubbed out, and SGP4 loads on first use.
     in 4 chunks after, and 150.6 kB in 3 files since #162.
 - `propagate()` returns `null` when SGP4 fails (decayed, bad elements), and `satrec.error` says
   why.
-- **Bulk SGP4 for #98** lives in `src/lib/orbit/bulk/`: `BulkPropagator` on the single-thread
-  WASM runtime, inside a worker.
-  - The runtime embeds its WASM, so it needs no extra asset and no COOP/COEP. The worker builds
-    to one file of about 44 kB gzip in the default IIFE format.
-  - It matches the JS `propagate` to under a metre, and an SGP4 error comes out as NaN.
+- **Bulk SGP4 for #98** lives in `src/lib/orbit/bulk/`, inside a worker, as one JS `propagate`
+  call per object. The #97 spike used `BulkPropagator` on the single-thread WASM runtime; #137
+  removed it (the CSP blocks it, and JS was faster). An SGP4 error comes out as NaN.
+- **The stub is still needed without our WASM code** (checked 2026-11-12, #137): every
+  satellite.js import reaches the barrel, whose `wasm/runtimes/index.js` dynamically imports
+  `#wasm-multi-thread`. With the alias removed, `vite build` fails again with the IIFE
+  top-level-await error while bundling the worker.
 - `passes.ts` uses v7's `shadowFraction`/`sunPos` cone, which matched our old cylinder test on
   all 25,920 ISS samples over 3 days. `tonight.ts` keeps its own Sun (agreement 0.0011°).
   `tests/unit/sat7-compare.test.ts` holds both claims.

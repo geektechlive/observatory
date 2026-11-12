@@ -79,9 +79,9 @@ Details: [docs/reference/bundle-and-loading.md](docs/reference/bundle-and-loadin
 - **Bloom is high tier only and `pnpm verify` never draws it.** A change to `three/bloom.ts` needs a real-GPU look. Never use `UnrealBloomPass.renderToScreen`.
 - Expand is a CSS full-screen lens, not the Fullscreen API (#89). A new stage takes `size` from `useLensSize`.
 - **The orrery's renderer: `schedule()` is the only place a frame is requested** (#91 frame-loop leak).
-- **No `'wasm-unsafe-eval'` in the CSP**: production SGP4 runs in JS, and craft models are Draco-decoded at build time (ADR 0011).
+- **No `'wasm-unsafe-eval'` in the CSP**: SGP4 runs in JS only (`check-bundle`'s `no-wasm`), and craft models are Draco-decoded at build time (ADR 0011).
 - Craft silhouettes are our own paths: **never an agency logo or insignia.** Imagery credits live in `src/lib/orrery/imagery.ts` and `craftModels.ts`.
-- `vite.config.ts` aliases satellite.js's `#wasm-multi-thread` to a stub; keep it.
+- `vite.config.ts` aliases satellite.js's `#wasm-multi-thread` to a stub; keep it: the build fails without it (#137).
 - When a control the orrery guide explains changes, update `guide/sections.ts` in the same change.
 - **CSP hosts dev can't check:** `api.open-meteo.com`, `services.swpc.noaa.gov` (img and connect) and both Cloudflare Insights hosts (`static.cloudflareinsights.com` in `script-src`, `cloudflareinsights.com` in `connect-src`) are pinned by unit tests.
 - The console's CSP error for `/cdn-cgi/challenge-platform/.../jsd/main.js` is expected (#67). Don't "fix" it in the CSP; ask before turning off `enable_js` for the zone.

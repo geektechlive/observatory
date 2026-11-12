@@ -44,7 +44,7 @@ export interface SatSnapshot {
   failed: number
   /** The last worker pass, ms, and which SGP4 ran it. */
   passMs: number | null
-  engine: 'wasm' | 'js' | null
+  engine: 'js' | null
 }
 
 export interface SatTick {
@@ -79,7 +79,7 @@ export class SatController {
   private lastPassWall = Number.NEGATIVE_INFINITY
   private lastPassSim = Number.NaN
   private passMs: number | null = null
-  private engine: 'wasm' | 'js' | null = null
+  private engine: 'js' | null = null
   private counts = { drawn: 0, outOfWindow: 0, failed: 0 }
   private timer: ReturnType<typeof setTimeout> | null = null
   private disposed = false

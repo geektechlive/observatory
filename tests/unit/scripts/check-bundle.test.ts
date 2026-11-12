@@ -313,6 +313,27 @@ describe('checkBundle', () => {
         expect(failures(checkBundle(dir, budgets))).toContain('entry-has-no-sat-worker')
       }
     })
+
+    // #137: the CSP has no 'wasm-unsafe-eval' (ADR 0011), so WebAssembly can never run in
+    // production; code that instantiates it is dead weight in whatever chunk carries it.
+    it('fails when any chunk instantiates WebAssembly', () => {
+      for (const files of [
+        {
+          'assets/index-abc.js': 'x',
+          'assets/sats.worker-q1.js': 'WebAssembly.instantiate(b)',
+        } as Record<string, string>,
+        { 'assets/index-abc.js': 'x', 'assets/sats.worker-q1.js': 'new WebAssembly.Module(b)' },
+        { 'assets/index-abc.js': 'await WebAssembly.instantiateStreaming(r)' },
+        { 'assets/index-abc.js': 'new WebAssembly.Instance(m, {})' },
+      ]) {
+        expect(failures(checkBundle(fakeDist(files), budgets))).toEqual(['no-wasm'])
+      }
+      const clean = checkBundle(
+        fakeDist({ 'assets/index-abc.js': 'x', 'assets/sats.worker-q1.js': 'w' }),
+        budgets,
+      ) as Finding[]
+      expect(clean.find((f) => f.rule === 'no-wasm')?.ok).toBe(true)
+    })
   })
 })
 

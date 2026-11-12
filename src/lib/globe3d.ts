@@ -123,7 +123,7 @@ export interface EarthTextureSet {
 }
 
 export interface GlobeTexturePlan {
-  /** Drawn first by every tier; index.html preloads exactly this pair (#85). */
+  /** Drawn first by every tier; preloadTexturesAtBoot preloads exactly this pair (#85, #173). */
   first: EarthTextureSet
   /** High tier only: loaded after the first draw and swapped in. */
   upgrade?: EarthTextureSet | undefined

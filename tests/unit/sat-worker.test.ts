@@ -1,14 +1,13 @@
 /**
  * The satellite worker's message handling (#98), run here in Node: groups load from the
- * fetched body, frames come back in group order with reusable buffers, and the JS path
- * takes over if the WASM runtime will not load.
+ * fetched body, and frames come back in group order with reusable buffers. SGP4 runs in
+ * JS only since #137 (ADR 0011).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { bulkRuntime } from '@/lib/orbit/bulk/bulkEci'
 import { SAT_OK } from '@/lib/orbit/bulk/satField'
 import { createSatHandler, type SatReply } from '@/lib/orbit/bulk/satHandler'
 import { createSatWorker } from '@/lib/orbit/bulk/satsClient'
@@ -60,7 +59,7 @@ function expectType<T extends SatReply['type']>(
 
 describe('createSatHandler (#98)', () => {
   it('loads groups and answers a frame in load order, with each group’s span', async () => {
-    const handle = createSatHandler({ runtime: bulkRuntime })
+    const handle = createSatHandler()
     const a = expectType(
       (await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })).reply,
       'loaded',
@@ -85,14 +84,14 @@ describe('createSatHandler (#98)', () => {
     expect(frame).not.toHaveProperty('names')
     expect(frame.positions).toHaveLength(9)
     expect(frame.status[0]).toBe(SAT_OK)
-    expect(frame.engine).toBe('wasm')
+    expect(frame.engine).toBe('js')
     expect(frame.ms).toBeGreaterThanOrEqual(0)
     // The buffers are transferred, not copied.
     expect(transfer).toEqual([frame.positions.buffer, frame.status.buffer])
   })
 
   it('reloading a group replaces it; unloading removes it', async () => {
-    const handle = createSatHandler({ runtime: bulkRuntime })
+    const handle = createSatHandler()
     await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
     await handle({ type: 'load', id: 2, body: body('stations', rowsOf('stations').slice(0, 1)) })
     let frame = expectType((await handle({ type: 'propagate', id: 3, dateMs: AT })).reply, 'frame')
@@ -108,7 +107,7 @@ describe('createSatHandler (#98)', () => {
   })
 
   it('writes into returned buffers rather than allocating new ones', async () => {
-    const handle = createSatHandler({ runtime: bulkRuntime })
+    const handle = createSatHandler()
     await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
     const first = expectType(
       (await handle({ type: 'propagate', id: 2, dateMs: AT })).reply,
@@ -128,19 +127,8 @@ describe('createSatHandler (#98)', () => {
     expect(second.positions).toBe(first.positions)
   })
 
-  it('falls back to JS propagate when the WASM runtime fails to load', async () => {
-    const handle = createSatHandler({ runtime: () => Promise.reject(new Error('no wasm')) })
-    await handle({ type: 'load', id: 1, body: body('stations', rowsOf('stations')) })
-    const frame = expectType(
-      (await handle({ type: 'propagate', id: 2, dateMs: AT })).reply,
-      'frame',
-    )
-    expect(frame.engine).toBe('js')
-    expect(frame.status[0]).toBe(SAT_OK)
-  })
-
   it('answers a bad body with an error naming the request, not a crash', async () => {
-    const handle = createSatHandler({ runtime: bulkRuntime })
+    const handle = createSatHandler()
     const reply = (
       await handle({ type: 'load', id: 7, body: new TextEncoder().encode('nope').buffer })
     ).reply

@@ -1,7 +1,7 @@
 /**
  * The satellite propagation core for the orrery (#98), run here in Node: stored groups
- * decoded and turned into satrecs, then one pass of satellite.js 7's WASM
- * BulkPropagator per frame. Spec Part 17: a six-digit object and the ISS must match the
+ * decoded and turned into satrecs, then one pass of satellite.js's JS propagate per
+ * frame (the WASM path went with #137). Spec Part 17: a six-digit object and the ISS must match the
  * library's own JS propagate; the ±3-day epoch window is enforced.
  */
 import { readFileSync } from 'node:fs'
@@ -10,12 +10,10 @@ import { join } from 'node:path'
 import * as satellite from 'satellite.js'
 import { describe, expect, it } from 'vitest'
 
-import { bulkRuntime } from '@/lib/orbit/bulk/bulkEci'
 import {
   buildSatField,
   decodeSatGroup,
   propagateField,
-  propagateFieldJs,
   SAT_FAILED,
   SAT_OK,
   SAT_OUT_OF_WINDOW,
@@ -148,7 +146,7 @@ describe('propagateField (#98, spec Part 17)', () => {
   const field = buildSatField([{ group: 'other', rows: PICK.map(row) }])
 
   it('matches satellite.js propagate from the full OMM record to under a kilometre', async () => {
-    const { positions, status } = propagateField(await bulkRuntime(), field, AT)
+    const { positions, status } = propagateField(field, AT)
     PICK.forEach((name, i) => {
       const js = satellite.propagate(
         satellite.json2satrec(full(name) as satellite.OMMJsonObject),
@@ -167,9 +165,8 @@ describe('propagateField (#98, spec Part 17)', () => {
 
   it('refuses a date more than three days from an object’s own epoch', async () => {
     const issEpoch = Date.parse('2026-11-06T11:57:30.503Z')
-    const rt = await bulkRuntime()
     for (const at of [issEpoch + 3.5 * 86_400_000, issEpoch - 3.5 * 86_400_000]) {
-      const { positions, status } = propagateField(rt, field, at)
+      const { positions, status } = propagateField(field, at)
       expect(status[0]).toBe(SAT_OUT_OF_WINDOW)
       expect(Number.isNaN(positions[0])).toBe(true)
     }
@@ -179,24 +176,15 @@ describe('propagateField (#98, spec Part 17)', () => {
     const hyperbolic = [...row('SARAMAGO')] as SatRow
     hyperbolic[5] = 1.2
     const odd = buildSatField([{ group: 'other', rows: [hyperbolic] }])
-    const { positions, status } = propagateField(await bulkRuntime(), odd, AT)
+    const { positions, status } = propagateField(odd, AT)
     expect(status[0]).toBe(SAT_FAILED)
     expect(Number.isNaN(positions[0])).toBe(true)
   })
 
   it('writes into the buffers it is handed back (double buffering)', async () => {
-    const rt = await bulkRuntime()
-    const first = propagateField(rt, field, AT)
-    const second = propagateField(rt, field, AT + 1000, first)
+    const first = propagateField(field, AT)
+    const second = propagateField(field, AT + 1000, first)
     expect(second.positions).toBe(first.positions)
     expect(second.status).toBe(first.status)
-  })
-
-  it('the JS fallback agrees with the WASM path', async () => {
-    const wasm = propagateField(await bulkRuntime(), field, AT)
-    const js = propagateFieldJs(field, AT)
-    expect(Array.from(js.status)).toEqual(Array.from(wasm.status))
-    for (let i = 0; i < wasm.positions.length; i++)
-      expect(Math.abs((js.positions[i] ?? 0) - (wasm.positions[i] ?? 0))).toBeLessThan(0.01)
   })
 })

@@ -8,6 +8,7 @@ import { defaultRetry } from '@/hooks/useSourceQuery'
 import { onRevalidating } from '@/lib/api/client'
 import { refetchOnceAfter } from '@/lib/api/revalidate'
 import { isOrreryHash, prefetchOrrery, scheduleOrreryIdlePrefetch } from '@/lib/orreryPrefetch'
+import { preloadTexturesAtBoot } from '@/lib/texturePreload'
 
 import { App } from './App'
 
@@ -32,6 +33,11 @@ onRevalidating(
     void queryClient.invalidateQueries({ refetchType: 'active' })
   }),
 )
+
+// The Earth textures every globe tier draws first (#85, #173), for the views that draw the
+// globe and on desktop-size screens only; a phone gets them from GlobeHost after first
+// paint (#87). Static links in index.html made a desktop #orrery, #sun or #sky fetch them.
+preloadTexturesAtBoot(window.location.hash)
 
 // The orrery's code arrived in two hops, each a round trip (#168). When the address is the
 // orrery, ask for all of it now, before React renders; otherwise fetch it once the Earth

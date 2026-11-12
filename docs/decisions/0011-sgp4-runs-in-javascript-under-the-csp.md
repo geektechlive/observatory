@@ -20,9 +20,17 @@ at build time ([reference/orrery.md](../reference/orrery.md#spacecraft-shapes-11
 
 - The CSP stays strict, and the faster path is the one in production.
 - Local `pnpm preview` runs a different engine than production; `data-sat-engine` says which.
-- The WASM path stays as code for environments without the CSP.
+- The WASM path stays as code for environments without the CSP. (Superseded 2026-11-12, below.)
 - Revisit if a measurement on a target phone (the iPhone 15 Pro: a pass ≤ 300 ms, frames
   ≤ 33 ms) shows the JS path missing its budget.
+
+## Addendum (2026-11-12, #137)
+
+The WASM path is removed. No environment we ship to runs it, and JS was the faster engine, so
+the code was 34 kB gzip of dead weight in the satellite worker (69.6 kB to 35.7 kB).
+`check-bundle`'s `no-wasm` rule now fails any chunk that compiles WebAssembly. The
+`#wasm-multi-thread` alias stays: satellite.js's barrel still reaches the multi-thread build, and
+the build fails without it.
 
 ## Evidence
 

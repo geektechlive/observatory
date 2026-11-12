@@ -1,15 +1,17 @@
 /**
- * The Earth textures start with the page (#85). index.html preloads the 2048 pair
- * every tier draws first; 4096 is never preloaded, because the tier is picked at
- * runtime and a phone must not pay for it. The preload only saves a download when it
- * matches the texture loader's request exactly: same URL and CORS mode (three's
- * loaders default to crossOrigin 'anonymous'), or the browser fetches the file twice.
+ * The Earth textures start with the page (#85). On a desktop-size screen, main.tsx
+ * preloads the 2048 pair every tier draws first, for the views that draw the globe only
+ * (#173); 4096 is never preloaded, because the tier is picked at runtime and a phone must
+ * not pay for it. The preload only saves a download when it matches the texture loader's
+ * request exactly: same URL and CORS mode (three's loaders default to crossOrigin
+ * 'anonymous'), or the browser fetches the file twice (texture-preload-dynamic.test.ts).
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 
 import { globeTextures } from '@/lib/globe3d'
+import { EARLY_TEXTURES_MEDIA } from '@/lib/texturePreload'
 
 const ROOT = join(__dirname, '..', '..')
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
@@ -21,11 +23,15 @@ const imagePreloads = [...html.matchAll(/<link\b[^>]*>/g)]
 
 const href = (tag: string) => /href="([^"]+)"/.exec(tag)?.[1]
 
-describe('Earth texture preload (#85)', () => {
-  const first = globeTextures({ textureWidth: 4096 }).first
+describe('Earth texture preload (#85, #173)', () => {
+  it('draws the 2048 pair first on every tier, the pair the boot preload asks for', () => {
+    expect(globeTextures({ textureWidth: 4096 }).first.width).toBe(2048)
+  })
 
-  it('preloads exactly the 2048 pair the globe draws first', () => {
-    expect(imagePreloads.map(href)).toEqual([first.day, first.night])
+  // A static link can't see the hash: a desktop #orrery, #sun or #sky downloaded 310 kB of
+  // Earth for nothing (#173). main.tsx's preloadTexturesAtBoot asks by view instead.
+  it('preloads no texture from index.html', () => {
+    expect(imagePreloads.map(href)).toEqual([])
   })
 
   it('never preloads a 4096 texture', () => {
@@ -33,16 +39,16 @@ describe('Earth texture preload (#85)', () => {
     expect(headers).not.toContain('4096')
   })
 
-  it('preloads in the CORS mode the texture loader uses, so nothing downloads twice', () => {
-    for (const tag of imagePreloads) {
-      expect(tag).toMatch(/\scrossorigin(\s|>|\/|="anonymous")/)
-      expect(tag).toContain('type="image/webp"')
-    }
+  it('starts the boot preload from the entry, before React renders', () => {
+    const main = readFileSync(join(ROOT, 'src', 'main.tsx'), 'utf8')
+    const boot = main.indexOf('preloadTexturesAtBoot(window.location.hash)')
+    expect(boot).toBeGreaterThan(-1)
+    expect(boot).toBeLessThan(main.indexOf('createRoot('))
   })
 
-  it('preloads on desktop-size screens only, so a phone keeps its bandwidth for the app', () => {
+  it('starts on desktop-size screens only, so a phone keeps its bandwidth for the app', () => {
     // On a 4G phone the early 310 kB pulled the app's first paint back ~160 ms (#85).
-    for (const tag of imagePreloads) expect(tag).toContain('media="(min-width: 900px)"')
+    expect(EARLY_TEXTURES_MEDIA).toBe('(min-width: 900px)')
   })
 
   it('sends no texture Link header: a header cannot be limited by screen size', () => {

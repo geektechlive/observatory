@@ -428,4 +428,13 @@ describe('useIss', () => {
     })
     expect(result.current.error).toBeNull()
   })
+
+  // The Sun and Sky views draw no globe (#172): no TLE fetch, no SGP4, no position.
+  it('fetches nothing and propagates nothing when disabled', async () => {
+    const { result } = renderHook(() => useIss(false), { wrapper: createWrapper() })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mockedFetchIssTle).not.toHaveBeenCalled()
+    expect(mockedPropagateIss).not.toHaveBeenCalled()
+    expect(result.current.position).toBeNull()
+  })
 })

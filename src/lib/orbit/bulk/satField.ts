@@ -8,19 +8,15 @@
  * says why: SGP4 failed, or the date is more than three days from the object's own
  * element epoch, where the spec refuses to draw it.
  */
-import * as satellite from 'satellite.js'
+import { json2satrec, propagate, type SatRec } from 'satellite.js'
 
 import { OrrerySatsSchema } from '@/schemas/orrerySats'
 
 import { launchOrder, orbitClassOf } from '../orbitClass'
 import { EPOCH_WINDOW_MS, rowEpochMs, rowToOmm, type SatGroupId, type SatRow } from '../satCatalog'
-import type { bulkRuntime } from './bulkEci'
-import { propagateBulk } from './bulkEci'
 import { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW } from './satStatus'
 
 export { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW }
-
-type Runtime = Awaited<ReturnType<typeof bulkRuntime>>
 
 export interface SatGroupRows {
   group: SatGroupId
@@ -35,7 +31,7 @@ export interface SatField {
   /** NORAD ids in field order, for picking and the inspector. */
   ids: string[]
   names: string[]
-  satrecs: satellite.SatRec[]
+  satrecs: SatRec[]
   epochMs: Float64Array
   /** Orbit class code per object (orbitClass.ts), for the satellite browser (#158). */
   orbit: Uint8Array
@@ -101,7 +97,7 @@ export function buildSatField(groups: SatGroupRows[]): SatField {
     field.groups.push({ group, start: field.count, count: rows.length })
     for (const [i, row] of rows.entries()) {
       supgp.push(flags?.[i] ?? 0)
-      field.satrecs.push(satellite.json2satrec(rowToOmm(row)))
+      field.satrecs.push(json2satrec(rowToOmm(row)))
       field.ids.push(row[1])
       field.names.push(row[0])
       epochs.push(rowEpochMs(row))
@@ -139,25 +135,17 @@ function settle(field: SatField, dateMs: number, frame: SatFrame): SatFrame {
   return frame
 }
 
-/** One SGP4 pass over the whole field in WebAssembly (satellite.js 7 BulkPropagator). */
-export function propagateField(
-  rt: Runtime,
-  field: SatField,
-  dateMs: number,
-  reuse?: SatFrame,
-): SatFrame {
-  const frame = frameFor(field, reuse)
-  if (field.count > 0) propagateBulk(rt, field.satrecs, [new Date(dateMs)], frame.positions)
-  return settle(field, dateMs, frame)
-}
-
-/** The same pass with satellite.js's JS propagate, for when the WASM runtime won't load. */
-export function propagateFieldJs(field: SatField, dateMs: number, reuse?: SatFrame): SatFrame {
+/**
+ * One SGP4 pass over the whole field with satellite.js's JS propagate. The WASM
+ * BulkPropagator is gone (#137): the CSP blocks WebAssembly (ADR 0011), and JS measured
+ * 5-11 ms a pass over 19,540 objects against WASM's 90-122 ms.
+ */
+export function propagateField(field: SatField, dateMs: number, reuse?: SatFrame): SatFrame {
   const frame = frameFor(field, reuse)
   const date = new Date(dateMs)
   for (let i = 0; i < field.count; i++) {
     const satrec = field.satrecs[i]
-    const pv = satrec ? satellite.propagate(satrec, date) : null
+    const pv = satrec ? propagate(satrec, date) : null
     frame.positions[i * 3] = pv ? pv.position.x : Number.NaN
     frame.positions[i * 3 + 1] = pv ? pv.position.y : Number.NaN
     frame.positions[i * 3 + 2] = pv ? pv.position.z : Number.NaN

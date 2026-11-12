@@ -165,7 +165,7 @@ function observeWithIntersection(el: Element, cb: (visible: boolean) => void): (
 const defaultDeps: RendererDeps = {
   createRenderer: () => new WebGLRenderer({ antialias: true, alpha: true }),
   loadTexture: (url) => {
-    // Must match the crossorigin on index.html's texture preloads (#85): a different
+    // Must match the crossorigin on the texture preloads (texturePreload.ts, #85): a different
     // CORS mode makes the browser ignore the preload and download the file again.
     const loader = new TextureLoader()
     loader.setCrossOrigin('anonymous')

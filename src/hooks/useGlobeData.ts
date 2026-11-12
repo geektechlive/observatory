@@ -10,6 +10,7 @@ import { useLaunches } from '@/hooks/useLaunches'
 import { useQuakes } from '@/hooks/useQuakes'
 import { useSatellites } from '@/hooks/useSatellites'
 import { eventsByLane, laneCensus, layerStatus } from '@/lib/census'
+import { isGlobeView } from '@/lib/texturePreload'
 import { isPointGeometry } from '@/schemas/eonet'
 import { useUiStore } from '@/store/ui'
 
@@ -28,16 +29,20 @@ export function useGlobeData() {
   const layers = useUiStore((s) => s.layers)
   // ORBIT reframes the globe as a tracking station: orbital layers always on.
   const tracking = view === 'orbit'
+  // Sun and Sky put their own stage in the lens and draw no globe (#172), so the
+  // globe's feeds stay off there. The hooks still run (App never remounts the stage);
+  // they just don't fetch. eonet is the ticker's too, so it is fetched on every view.
+  const globe = isGlobeView(view)
 
-  const { position: issPos, trail: issTrail, intervalMs: issIntervalMs } = useIss()
+  const { position: issPos, trail: issTrail, intervalMs: issIntervalMs } = useIss(globe)
   const eventsQuery = useEvents()
-  const launchQuery = useLaunches()
-  const fireballQuery = useFireball(layers.fireballs)
-  const quakeQuery = useQuakes()
-  const { data: gdacsData } = useGdacs(layers.disasters)
-  const satellites = useSatellites(layers.satellites || tracking)
-  const firesQuery = useFires(layers.fires)
-  const { data: auroraData } = useAurora(layers.aurora)
+  const launchQuery = useLaunches(globe)
+  const fireballQuery = useFireball(globe && layers.fireballs)
+  const quakeQuery = useQuakes(globe)
+  const { data: gdacsData } = useGdacs(globe && layers.disasters)
+  const satellites = useSatellites(globe && (layers.satellites || tracking))
+  const firesQuery = useFires(globe && layers.fires)
+  const { data: auroraData } = useAurora(globe && layers.aurora)
 
   const eventsData = eventsQuery.data
   const launchData = launchQuery.data

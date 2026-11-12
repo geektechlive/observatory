@@ -4,17 +4,13 @@
  * request with one SGP4 pass over all of them.
  */
 import type { SatGroupId, SatRow } from '../satCatalog'
-import type { bulkRuntime } from './bulkEci'
 import {
   buildSatField,
   decodeSatGroup,
   propagateField,
-  propagateFieldJs,
   type SatField,
   type SatFrame,
 } from './satField'
-
-type Runtime = Awaited<ReturnType<typeof bulkRuntime>>
 
 export type SatRequest =
   /** The /api/orrery-sats body as fetched, transferred undecoded. */
@@ -65,20 +61,15 @@ export type SatReply =
       status: Uint8Array
       /** Time for the pass, ms: the spec's iPhone target is ≤ 300 ms with Starlink on. */
       ms: number
-      engine: 'wasm' | 'js'
+      /** Always JS since #137 dropped the WASM path; kept as `data-sat-engine`. */
+      engine: 'js'
     }
   | { type: 'error'; id: number; message: string }
 
-export interface SatHandlerDeps {
-  runtime: () => Promise<Runtime>
-}
-
-export function createSatHandler(deps: SatHandlerDeps) {
+export function createSatHandler() {
   const loaded = new Map<SatGroupId, { rows: SatRow[]; supgp: Uint8Array }>()
   let field: SatField = buildSatField([])
   let version = 0
-  // null: the WASM runtime failed once, so every pass uses the JS path.
-  let runtime: Promise<Runtime | null> | null = null
 
   const rebuild = () => {
     field = buildSatField([...loaded].map(([group, g]) => ({ group, ...g })))
@@ -94,14 +85,13 @@ export function createSatHandler(deps: SatHandlerDeps) {
     launch: field.launch.slice(),
     supgp: field.supgp.slice(),
   })
-  const wasm = () => {
-    runtime ??= deps.runtime().catch(() => null)
-    return runtime
+  // The worker answers through a promise, the same shape it had while the WASM runtime
+  // loaded asynchronously (#137), so the shim and its callers are unchanged.
+  return function handle(req: SatRequest): Promise<{ reply: SatReply; transfer: Transferable[] }> {
+    return Promise.resolve(answer(req))
   }
 
-  return async function handle(
-    req: SatRequest,
-  ): Promise<{ reply: SatReply; transfer: Transferable[] }> {
+  function answer(req: SatRequest): { reply: SatReply; transfer: Transferable[] } {
     try {
       if (req.type === 'load') {
         const began = performance.now()
@@ -130,13 +120,9 @@ export function createSatHandler(deps: SatHandlerDeps) {
           transfer: [],
         }
       }
-      const rt = await wasm()
-      // Read after the await: a load handled meanwhile has already changed the field.
       const at = version
       const began = performance.now()
-      const frame = rt
-        ? propagateField(rt, field, req.dateMs, req.reuse)
-        : propagateFieldJs(field, req.dateMs, req.reuse)
+      const frame = propagateField(field, req.dateMs, req.reuse)
       const ms = performance.now() - began
       return {
         reply: {
@@ -147,7 +133,7 @@ export function createSatHandler(deps: SatHandlerDeps) {
           positions: frame.positions,
           status: frame.status,
           ms,
-          engine: rt ? 'wasm' : 'js',
+          engine: 'js',
         },
         transfer: [frame.positions.buffer, frame.status.buffer],
       }
