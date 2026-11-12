@@ -40,6 +40,8 @@ export interface SatFieldInfo {
   /** Orbit class and launch order per object, for the satellite browser (#158). */
   orbit: Uint8Array
   launch: Int32Array
+  /** 1 where the object's elements are CelesTrak SupGP (#209); absent means all GP. */
+  supgp?: Uint8Array | undefined
 }
 
 export type SatReply =
@@ -72,14 +74,14 @@ export interface SatHandlerDeps {
 }
 
 export function createSatHandler(deps: SatHandlerDeps) {
-  const loaded = new Map<SatGroupId, SatRow[]>()
+  const loaded = new Map<SatGroupId, { rows: SatRow[]; supgp: Uint8Array }>()
   let field: SatField = buildSatField([])
   let version = 0
   // null: the WASM runtime failed once, so every pass uses the JS path.
   let runtime: Promise<Runtime | null> | null = null
 
   const rebuild = () => {
-    field = buildSatField([...loaded].map(([group, rows]) => ({ group, rows })))
+    field = buildSatField([...loaded].map(([group, g]) => ({ group, ...g })))
     version += 1
   }
   const info = (): SatFieldInfo => ({
@@ -90,6 +92,7 @@ export function createSatHandler(deps: SatHandlerDeps) {
     epochMs: field.epochMs.slice(),
     orbit: field.orbit.slice(),
     launch: field.launch.slice(),
+    supgp: field.supgp.slice(),
   })
   const wasm = () => {
     runtime ??= deps.runtime().catch(() => null)
@@ -102,8 +105,8 @@ export function createSatHandler(deps: SatHandlerDeps) {
     try {
       if (req.type === 'load') {
         const began = performance.now()
-        const { group, rows, dropped } = decodeSatGroup(req.body)
-        loaded.set(group, rows)
+        const { group, rows, supgp, dropped } = decodeSatGroup(req.body)
+        loaded.set(group, { rows, supgp })
         rebuild()
         const ms = performance.now() - began
         return {

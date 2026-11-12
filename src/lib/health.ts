@@ -97,6 +97,20 @@ function nonEmptyArrayField(data: unknown, key: string): boolean {
   return Array.isArray(value) && value.length > 0
 }
 
+/** A satellite group's optional SupGP count (#209) is a whole number within its rows. */
+function supgpCountFits(data: unknown): boolean {
+  if (!isRecord(data) || data['supgpCount'] === undefined) return true
+  const count = data['supgpCount']
+  const rows = data['rows']
+  return (
+    typeof count === 'number' &&
+    Number.isInteger(count) &&
+    count >= 0 &&
+    Array.isArray(rows) &&
+    count <= rows.length
+  )
+}
+
 export const SOURCES: Record<SourceName, SourceContract> = {
   aftershocks: {
     // Most weeks no recent quake has a USGS forecast, so an empty list is a real answer.
@@ -192,7 +206,8 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     label: 'Orrery Satellites',
     headline: false,
     maxAgeMs: 36 * HOUR,
-    required: (data) => nonEmptyArrayField(data, 'rows'),
+    // Starlink's supgpCount (#209), when present, counts its leading SupGP rows.
+    required: (data) => nonEmptyArrayField(data, 'rows') && supgpCountFits(data),
   },
   'people-in-space': {
     label: 'People In Space',

@@ -11,9 +11,11 @@ import {
   buildSatGroups,
   celestrakFetchText,
   celestrakGroupUrl,
+  celestrakStrictFetch,
   refreshSatGroups,
   SAT_KEY,
   SATS_MAX_AGE_MS,
+  SUPGP_STARLINK_URL,
   // @ts-expect-error plain ESM script, no type declarations
 } from '../../../scripts/celestrak-groups.mjs'
 // @ts-expect-error plain ESM script, no type declarations
@@ -179,6 +181,125 @@ describe('celestrakFetchText', () => {
     const retrying = () => Promise.resolve('[1]')
     await expect(celestrakFetchText('u', { fetchImpl, retrying })).resolves.toBe('[1]')
   })
+})
+
+describe('Starlink from CelesTrak SupGP (#209)', () => {
+  // SpaceX-derived elements for two of the three Starlinks in the samples, plus one the
+  // `active` slice lacks (a pre-catalogue or cross-tagged object).
+  const starlinks = (SAMPLES['active'] ?? []).filter((r) =>
+    (r as { OBJECT_NAME: string }).OBJECT_NAME.startsWith('STARLINK'),
+  ) as Record<string, unknown>[]
+  const SUPGP = JSON.stringify([
+    ...starlinks
+      .slice(0, 2)
+      .map((r) => ({ ...r, MEAN_MOTION: 15.123456789, DATA_SOURCE: 'SpaceX-E', RMS: '0.275' })),
+    { ...starlinks[0], NORAD_CAT_ID: 999999, OBJECT_NAME: 'STARLINK-NEW', DATA_SOURCE: 'SpaceX-E' },
+  ])
+  const isSupGp = (url: string) => url === SUPGP_STARLINK_URL
+
+  it('asks for the Starlink SupGP file as OMM JSON', () => {
+    expect(SUPGP_STARLINK_URL).toBe(
+      'https://celestrak.org/NORAD/elements/supplemental/sup-gp.php?FILE=starlink&FORMAT=json',
+    )
+  })
+
+  it('downloads it once, after the eight GP groups, and prefers it by NORAD id', async () => {
+    const asked: string[] = []
+    const { groups, requests, supplemental } = await buildSatGroups({
+      now: NOW,
+      fetchText: (url: string) => {
+        asked.push(url)
+        return fromSamples(url)
+      },
+      fetchSupText: (url: string) => {
+        asked.push(url)
+        return Promise.resolve(SUPGP)
+      },
+      pauseMs: 0,
+    })
+    expect(requests).toBe(9)
+    expect(asked.at(-1)).toBe(SUPGP_STARLINK_URL)
+    expect(asked.filter(isSupGp)).toHaveLength(1)
+    const starlink = groups.find((g: { id: string }) => g.id === 'starlink')?.payload as Payload & {
+      supgpCount: number
+    }
+    expect(starlink.count).toBe(3)
+    expect(starlink.supgpCount).toBe(2)
+    expect(starlink.rows.slice(0, 2).map((r) => r[4])).toEqual([15.123456789, 15.123456789])
+    expect(starlink.rows.map((r) => r[1])).not.toContain('999999')
+    expect(supplemental).toEqual({ matched: 2, gpOnly: 1, supplementalOnly: 1, error: null })
+  })
+
+  it('a failed SupGP download leaves Starlink on GP elements, as a warning', async () => {
+    const { entry, writes } = await refreshSatGroups({
+      now: NOW,
+      fetchText: fromSamples,
+      fetchSupText: () => Promise.reject(new Error('CelesTrak SupGP: HTTP 503, not retried')),
+      pauseMs: 0,
+      readPrevious: () => Promise.resolve(null),
+      classifyFailure,
+    })
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(true)
+    expect(entry.detail).toMatch(/SupGP.*503/)
+    const starlink = JSON.parse(
+      (writes as Write[]).find((w) => w.key === SAT_KEY('starlink'))?.value ?? '{}',
+    ) as { count: number; supgpCount: number }
+    expect(starlink.count).toBe(3)
+    expect(starlink.supgpCount).toBe(0)
+  })
+
+  it('is not asked once any earlier CelesTrak request failed', async () => {
+    let supAsked = 0
+    const { supplemental } = await buildSatGroups({
+      now: NOW,
+      fetchText: (url: string) =>
+        groupOf(url) === 'weather' ? Promise.reject(new Error('HTTP 503')) : fromSamples(url),
+      fetchSupText: () => {
+        supAsked += 1
+        return Promise.resolve(SUPGP)
+      },
+      pauseMs: 0,
+    })
+    expect(supAsked).toBe(0)
+    expect(supplemental.error).toMatch(/not asked/)
+  })
+
+  it('reports the counts in the step detail', async () => {
+    const { entry } = await refreshSatGroups({
+      now: NOW,
+      fetchText: fromSamples,
+      fetchSupText: () => Promise.resolve(SUPGP),
+      pauseMs: 0,
+      readPrevious: () => Promise.resolve(null),
+      classifyFailure,
+    })
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(false)
+    expect(entry.detail).toMatch(/SupGP 2 of 3 Starlink/)
+  })
+})
+
+describe('celestrakStrictFetch (#209)', () => {
+  it('returns the body of a 200', async () => {
+    const fetchImpl = () => Promise.resolve(new Response('[]', { status: 200 }))
+    await expect(celestrakStrictFetch('u', { fetchImpl, timeoutMs: 1000 })).resolves.toBe('[]')
+  })
+
+  it.each([201, 304, 403, 404, 429, 503])(
+    'stops at once on HTTP %i, with no retry',
+    async (status) => {
+      let calls = 0
+      const fetchImpl = () => {
+        calls += 1
+        return Promise.resolve(new Response(status === 304 ? null : 'no', { status }))
+      }
+      await expect(celestrakStrictFetch('u', { fetchImpl, timeoutMs: 1000 })).rejects.toThrow(
+        new RegExp(`HTTP ${String(status)}`),
+      )
+      expect(calls).toBe(1)
+    },
+  )
 })
 
 describe('refreshSatGroups', () => {

@@ -11,10 +11,12 @@ import { describe, expect, it } from 'vitest'
 import {
   CELESTRAK_FETCH,
   EPOCH_WINDOW_MS,
+  overlaySupplemental,
   rowEpochMs,
   rowToOmm,
   SAT_FIELDS,
   SAT_GROUPS,
+  type SatRow,
   splitGroups,
   toRow,
 } from '@/lib/orbit/satCatalog'
@@ -111,5 +113,66 @@ describe('groups', () => {
 
   it('the epoch window is three days', () => {
     expect(EPOCH_WINDOW_MS).toBe(3 * 86_400_000)
+  })
+})
+
+describe('overlaySupplemental (#209)', () => {
+  const row = (name: string, id: string, epoch: string, meanMotion = 15): SatRow => [
+    name,
+    id,
+    '2020-001A',
+    epoch,
+    meanMotion,
+    0.0001,
+    53,
+    10,
+    20,
+    30,
+    0.0001,
+    0,
+    0,
+  ]
+  const gp = [
+    row('STARLINK-1', '1', '2026-11-10T00:00:00'),
+    row('STARLINK-2', '2', '2026-11-10T00:00:00'),
+    row('STARLINK-3', '3', '2026-11-10T00:00:00'),
+  ]
+
+  it('prefers SupGP elements by NORAD id and puts them first', () => {
+    const sup = [row('STARLINK-3', '3', '2026-11-11T00:00:00', 15.5)]
+    const { rows, supplemental, supplementalOnly } = overlaySupplemental(gp, sup)
+    expect(supplemental).toBe(1)
+    expect(supplementalOnly).toBe(0)
+    expect(rows.map((r) => r[1])).toEqual(['3', '1', '2'])
+    expect(rows[0]?.[4]).toBe(15.5)
+  })
+
+  it('drops SupGP objects the GP slice lacks, so every object stays in one group', () => {
+    const sup = [
+      row('STARLINK-9', '9', '2026-11-11T00:00:00'),
+      row('STARLINK-1', '1', '2026-11-11T00:00:00'),
+    ]
+    const { rows, supplemental, supplementalOnly } = overlaySupplemental(gp, sup)
+    expect(rows).toHaveLength(3)
+    expect(rows.map((r) => r[1])).not.toContain('9')
+    expect(supplemental).toBe(1)
+    expect(supplementalOnly).toBe(1)
+  })
+
+  it('keeps the newest epoch when SupGP lists one object twice', () => {
+    const sup = [
+      row('STARLINK-2', '2', '2026-11-11T06:00:00', 15.6),
+      row('STARLINK-2', '2', '2026-11-11T00:00:00', 15.4),
+    ]
+    const { rows, supplemental } = overlaySupplemental(gp, sup)
+    expect(supplemental).toBe(1)
+    expect(rows[0]?.[4]).toBe(15.6)
+    expect(rows).toHaveLength(3)
+  })
+
+  it('with no SupGP rows the GP slice comes back as it was', () => {
+    const { rows, supplemental } = overlaySupplemental(gp, [])
+    expect(rows).toEqual(gp)
+    expect(supplemental).toBe(0)
   })
 })

@@ -31,3 +31,4 @@ that makes the decision.
 | [0021](0021-the-detail-view-has-its-own-canvas.md)            | The close-up model view has a canvas and renderer of its own, and the orrery steps aside  | #203           |
 | [0022](0022-visitors-see-only-the-sources-the-orrery-uses.md) | Visitors see only the sources the orrery uses; the full registry lives in docs            | #207           |
 | [0023](0023-optional-orrery-data-has-its-own-key.md)          | Optional orrery data gets its own key, so only the visitors who ask for it pay            | #99            |
+| [0024](0024-starlink-elements-from-supgp.md)                  | Starlink's elements come from CelesTrak SupGP, fetched once a run on the strictest terms  | #209           |

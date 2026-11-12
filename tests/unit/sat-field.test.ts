@@ -86,6 +86,22 @@ describe('decodeSatGroup', () => {
   it('throws on a body that is not a stored group', () => {
     expect(() => decodeSatGroup(new TextEncoder().encode('{"x":1}').buffer)).toThrow()
   })
+
+  it('marks the first supgpCount rows as SupGP, counted before bad rows are dropped (#209)', () => {
+    const bad = ['BROKEN', '1', '', 'not a date', 1, 0, 0, 0, 0, 0, 0, 0, 0]
+    const rows = [row('STARLINK-1008'), bad as unknown as SatRow, row('STARLINK-1012')]
+    const text = JSON.stringify({ ...payload('starlink', rows), supgpCount: 2 })
+    const decoded = decodeSatGroup(new TextEncoder().encode(text).buffer)
+    expect(decoded.rows.map((r) => r[0])).toEqual(['STARLINK-1008', 'STARLINK-1012'])
+    expect(decoded.supgp).toEqual(Uint8Array.from([1, 0]))
+  })
+
+  it('reads a body without supgpCount (before #209) as all GP', () => {
+    const text = JSON.stringify(payload('starlink', [row('STARLINK-1008')]))
+    expect(decodeSatGroup(new TextEncoder().encode(text).buffer).supgp).toEqual(
+      Uint8Array.from([0]),
+    )
+  })
 })
 
 describe('buildSatField', () => {
@@ -113,6 +129,18 @@ describe('buildSatField', () => {
     expect(field.launch).toHaveLength(2)
     expect(field.launch[0]).toBe(1998 * 1000 + 67)
     expect(field.launch[1]).toBeGreaterThan(2019 * 1000)
+  })
+
+  it('carries each object’s element source, GP unless its group says SupGP (#209)', () => {
+    const field = buildSatField([
+      { group: 'stations', rows: [row('ISS (ZARYA)')] },
+      {
+        group: 'starlink',
+        rows: [row('STARLINK-1008'), row('STARLINK-1012')],
+        supgp: Uint8Array.from([1, 0]),
+      },
+    ])
+    expect(field.supgp).toEqual(Uint8Array.from([0, 1, 0]))
   })
 })
 

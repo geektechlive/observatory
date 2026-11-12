@@ -4,19 +4,47 @@ Thousands of satellites in the orrery's Earth frame, the satellite browser, and 
 from Space-Track.org and ESA DISCOSweb. Also SGP4 and satellite.js. Decisions:
 [ADR 0011](../decisions/0011-sgp4-runs-in-javascript-under-the-csp.md),
 [ADR 0012](../decisions/0012-satellites-live-in-the-earth-frame.md),
-[ADR 0013](../decisions/0013-space-track-and-discosweb-on-their-terms.md).
+[ADR 0013](../decisions/0013-space-track-and-discosweb-on-their-terms.md),
+[ADR 0024](../decisions/0024-starlink-elements-from-supgp.md).
 
 ## Satellites (#98)
 
 They are CelesTrak OMM in nine disjoint KV groups, `celestrak:gp:<group>:v1`, drawn in the
 orrery's Earth frame ([orrery-data.md](orrery-data.md#the-earth-frame-92-renderer-half)).
-`scripts/celestrak-groups.mjs` runs in the refresh job: eight downloads (`CELESTRAK_FETCH`), one
-at a time, 2 s apart.
+`scripts/celestrak-groups.mjs` runs in the refresh job: eight GP downloads (`CELESTRAK_FETCH`)
+and then Starlink's supplemental GP, one at a time, 2 s apart.
 
-- **Starlink is cut out of `active` by name**, never downloaded on its own: CelesTrak's
-  `starlink` group equalled the STARLINK-named objects in `active` (11,204 each, 2026-11-07).
-  `other` is whatever in `active` is in no named group, so it is stored only when every named
-  group came back. Each object is stored once; the debris groups don't overlap `active`.
+- **Starlink is cut out of `active` by name**; its GP group is never downloaded on its own:
+  CelesTrak's `starlink` group equalled the STARLINK-named objects in `active` (11,204 each,
+  2026-11-07). `other` is whatever in `active` is in no named group, so it is stored only when
+  every named group came back. Each object is stored once; the debris groups don't overlap
+  `active`.
+- **Starlink's elements come from CelesTrak SupGP where it has them (#209).**
+  `sup-gp.php?FILE=starlink&FORMAT=json` carries elements CelesTrak fits to the ephemerides
+  SpaceX publishes (every row `"DATA_SOURCE":"SpaceX-E"`, with an `RMS`), which are more
+  accurate than the radar-based GP. `overlaySupplemental` (`satCatalog.ts`) replaces a GP row
+  with the SupGP row of the same NORAD id (the newest epoch if SupGP lists one twice), puts the
+  replaced rows first and stores their number as `supgpCount` in the Starlink body. SupGP
+  objects that aren't in `active`'s Starlink slice are dropped, so no object lands in two groups.
+  - **CelesTrak's usage policy** asks for SupGP no more than once per 2 h update; the job runs
+    every 6 h and asks once. `celestrakStrictFetch` accepts only a 200 and never retries, as the
+    policy says. It is not asked at all when `active` gave no Starlink slice or any GP request
+    in the same run failed. Its timeout is 60 s, capped by what is left of the job's deadline.
+  - **A failed SupGP download is a warning, not an incident**: Starlink is stored on GP elements
+    (`supgpCount: 0`). That overwrites the last SupGP copy for 6 h, until the next run; GP was
+    what the orrery used before #209.
+  - **Measured from the dry run of 2026-11-12 05:41 UTC (no KV write):** SupGP answered 5,106,473
+    bytes, 11,195 records, all `SpaceX-E`, epochs 2026-11-10 17:13 to 2026-11-12 03:02 UTC. Every
+    one matched a Starlink in `active` (11,195 of 11,195; none dropped). The whole step, nine
+    requests with 2 s pauses, took 52 s. The stored Starlink body is 1,652,288 bytes, 476.9 kB at
+    gzip -6, against 1,690,009 bytes and 550.0 kB for the GP body production served the same
+    hour (SupGP's numbers carry fewer digits). Workers KV takes values up to 25 MiB
+    (developers.cloudflare.com/kv/platform/limits, read 2026-11-12).
+  - **Credit.** CelesTrak's SupGP and usage pages state no attribution terms, and SpaceX's
+    manifest (`api.starlink.com/public-files/ephemerides/MANIFEST.txt`) states none in the part
+    read. The orrery says where the elements come from anyway: the inspector's Source line for a
+    SupGP object ("CelesTrak supplemental GP, fitted to SpaceX's published Starlink
+    ephemerides"), the Starlink switch's hint, the Data sources list and the guide.
 - **Rows, not OMM objects** (`src/lib/orbit/satCatalog.ts`, no imports, so the `.mjs` job
   imports it): `SAT_FIELDS` order, NORAD ids as strings (six-digit numbers since 2026-07:
   SARAMAGO is 100000). `rowToOmm` gives json2satrec what it reads.
@@ -27,14 +55,19 @@ at a time, 2 s apart.
 - Measured from 2026-11-07's data: 19,540 objects, 2.87 MB (938 kB gzip) across nine keys, so 36
   KV writes a day at four runs.
 - `/api/orrery-sats?group=` streams one group (`_kvBody.ts`), allow-listed, 400 otherwise. The
-  health check probes `stations`.
+  health check probes `stations`. Its contract (`health.ts`) also checks that a `supgpCount`,
+  when present, is a whole number within the rows (#209). It is not in the Cache API
+  (`_cache.ts`): `_kvBody.ts` serves it with `Cache-Control` only, and the SupGP body kept the
+  same KV key because `supgpCount` is an optional field older clients drop.
 - **The worker** (`sats.worker.ts`, logic in `satHandler.ts`): `fetchOrrerySatsBody` hands it the
   body undecoded, by transfer. It decodes it (`OrrerySatsSchema`, then each row by hand), and
   answers each frame with one `BulkPropagator` pass over every loaded group: ECI (TEME) km plus a
   status byte per object (`SAT_OK`, `SAT_FAILED`, `SAT_OUT_OF_WINDOW` past ±3 days of the
   object's epoch). Frames go back through `release()` and are written in place. JS `propagate`
   takes over if the WASM runtime won't load. `loadSatWorker` imports it on first use.
-  - Names, NORAD ids and epochs cross once per load or unload (`SatFieldInfo`); each frame
+  - Names, NORAD ids, epochs and which objects carry SupGP elements (`supgp`, from the body's
+    `supgpCount`, flagged before bad rows are dropped; #209) cross once per load or unload
+    (`SatFieldInfo`); each frame
     carries only its field `version`. Sending 19,540 names with every pass cost the main thread a
     structured clone for nothing.
 - check-bundle: `sat-worker-gzip` (80 kB; 69.3 kB measured) and `entry-has-no-sat-worker`.
@@ -86,8 +119,8 @@ at a time, 2 s apart.
     where the satellites only faded.
 - **Switches** (`satToggles.ts`, `SatControls.tsx`): one per kind, each explained, with the three
   debris clouds behind one.
-  - Starlink and debris start off: Starlink is 520 kB gzip against about 300 kB for the rest
-    switched on (measured 2026-11-07).
+  - Starlink and debris start off: Starlink is about 480 kB gzip on SupGP elements (550 kB on
+    GP; measured 2026-11-12, #209) against about 300 kB for the rest switched on (2026-11-07).
   - The status line counts the objects CelesTrak hasn't updated in over 3 days, which are left
     out even today (105 of 5,669 on 2026-11-07). The stage notice waits until a quarter are
     hidden, once the clock has moved days away.
@@ -133,8 +166,9 @@ without a name. Not in the global search, on purpose.
   "about 370 kB": the 16 shards measured on 2026-11-09 from production, 370 kB gzip in all, 22.5 to
   23.7 kB each, 2,171 to 2,260 rows each.
 - **A group that is off** shows "Turn on <group> (about N kB)" from the measured gzip sizes in
-  `satToggles.ts` (`downloadKb`, from `/api/orrery-sats` on 2026-11-07: Starlink 522 kB, Other
-  active 291, the three debris clouds 139, the rest under 5). Its count is unknown until it has
+  `satToggles.ts` (`downloadKb`, from `/api/orrery-sats` on 2026-11-07: Other active 291, the
+  three debris clouds 139, the rest under 5; Starlink 477 kB from the SupGP dry run of
+  2026-11-12, #209). Its count is unknown until it has
   loaded. Under every list a "Switched off" row offers the rest.
 - **Re-entry rows** for objects not in the loaded field are listed, not hidden, and say why only
   as far as the browser can know. While any group is off or still loading (Starlink and the

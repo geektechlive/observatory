@@ -16,6 +16,9 @@ import type { SatInfo } from './three/OrreryRenderer'
 
 const GROUP_LABEL = new Map(SAT_TOGGLES.flatMap((t) => t.groups.map((g) => [g, t.label] as const)))
 const WINDOW_DAYS = EPOCH_WINDOW_MS / 86_400_000
+/** Starlink's elements where CelesTrak's supplemental GP has them (#209). */
+const SUPGP_SOURCE =
+  'CelesTrak supplemental GP, fitted to SpaceX’s published Starlink ephemerides (OMM)'
 
 interface SatFactsProps {
   info: SatInfo
@@ -86,7 +89,9 @@ export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsPr
           {Number.isFinite(info.epochMs) ? epochAgeText(info.epochMs, simMs) : 'unknown'}
         </dd>
         <dt>Source</dt>
-        <dd className={styles.inspectorText ?? ''}>CelesTrak GP data (OMM)</dd>
+        <dd className={styles.inspectorText ?? ''}>
+          {info.supgp === true ? SUPGP_SOURCE : 'CelesTrak GP data (OMM)'}
+        </dd>
         {catalog && (
           <>
             <dt>Kind</dt>

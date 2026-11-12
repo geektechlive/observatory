@@ -25,6 +25,8 @@ type Runtime = Awaited<ReturnType<typeof bulkRuntime>>
 export interface SatGroupRows {
   group: SatGroupId
   rows: SatRow[]
+  /** 1 where a row carries CelesTrak SupGP elements (#209), aligned with rows; absent = GP. */
+  supgp?: Uint8Array | undefined
 }
 
 export interface SatField {
@@ -39,6 +41,8 @@ export interface SatField {
   orbit: Uint8Array
   /** Launch order per object (orbitClass.ts launchOrder), 0 when unknown (#158). */
   launch: Int32Array
+  /** 1 where the object's elements are CelesTrak SupGP, 0 for GP (#209). */
+  supgp: Uint8Array
 }
 
 export interface SatFrame {
@@ -55,10 +59,25 @@ function isSatRow(value: unknown): value is SatRow {
 }
 
 /** A stored group's body (as fetched, undecoded) as rows; bad rows are dropped and counted. */
-export function decodeSatGroup(body: ArrayBuffer): SatGroupRows & { dropped: number } {
+export function decodeSatGroup(
+  body: ArrayBuffer,
+): SatGroupRows & { supgp: Uint8Array; dropped: number } {
   const parsed = OrrerySatsSchema.parse(JSON.parse(new TextDecoder().decode(body)))
-  const rows = parsed.rows.filter(isSatRow)
-  return { group: parsed.group, rows, dropped: parsed.rows.length - rows.length }
+  // The first supgpCount stored rows are SupGP (#209): flag them before any is dropped.
+  const supgpCount = parsed.supgpCount ?? 0
+  const rows: SatRow[] = []
+  const flags: number[] = []
+  parsed.rows.forEach((row, i) => {
+    if (!isSatRow(row)) return
+    rows.push(row)
+    flags.push(i < supgpCount ? 1 : 0)
+  })
+  return {
+    group: parsed.group,
+    rows,
+    supgp: Uint8Array.from(flags),
+    dropped: parsed.rows.length - rows.length,
+  }
 }
 
 /** Every group's satrecs, concatenated in the order given. */
@@ -72,13 +91,16 @@ export function buildSatField(groups: SatGroupRows[]): SatField {
     epochMs: new Float64Array(0),
     orbit: new Uint8Array(0),
     launch: new Int32Array(0),
+    supgp: new Uint8Array(0),
   }
   const epochs: number[] = []
   const orbits: number[] = []
   const launches: number[] = []
-  for (const { group, rows } of groups) {
+  const supgp: number[] = []
+  for (const { group, rows, supgp: flags } of groups) {
     field.groups.push({ group, start: field.count, count: rows.length })
-    for (const row of rows) {
+    for (const [i, row] of rows.entries()) {
+      supgp.push(flags?.[i] ?? 0)
       field.satrecs.push(satellite.json2satrec(rowToOmm(row)))
       field.ids.push(row[1])
       field.names.push(row[0])
@@ -91,6 +113,7 @@ export function buildSatField(groups: SatGroupRows[]): SatField {
   field.epochMs = Float64Array.from(epochs)
   field.orbit = Uint8Array.from(orbits)
   field.launch = Int32Array.from(launches)
+  field.supgp = Uint8Array.from(supgp)
   return field
 }
 

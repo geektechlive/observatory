@@ -35,6 +35,25 @@ describe('<SatFacts> (#98)', () => {
     expect(text).toMatch(/CelesTrak/)
   })
 
+  it('credits SpaceX’s ephemerides for a Starlink on SupGP elements, and only then (#209)', () => {
+    const starlink = {
+      key: 'sat:44714',
+      noradId: '44714',
+      name: 'STARLINK-1008',
+      group: 'starlink' as const,
+      epochMs: T0 - 3_600_000,
+      teme: [EARTH_RADIUS_KM + 550, 0, 0] as [number, number, number],
+    }
+    const { unmount } = render(<SatFacts info={{ ...starlink, supgp: true }} simMs={T0} />)
+    expect(document.body.textContent).toMatch(
+      /CelesTrak supplemental GP, fitted to SpaceX’s published Starlink ephemerides/,
+    )
+    unmount()
+    render(<SatFacts info={starlink} simMs={T0} />)
+    expect(document.body.textContent).toMatch(/CelesTrak GP data \(OMM\)/)
+    expect(document.body.textContent).not.toMatch(/SpaceX’s published/)
+  })
+
   it('adds Space-Track’s catalogue, ESA DISCOS’s physical facts and a re-entry, each credited (#101)', () => {
     render(
       <SatFacts

@@ -270,7 +270,8 @@ export const DATA_SOURCES: readonly DataSource[] = [
     name: 'CelesTrak',
     sourceId: 'celestrak',
     url: 'https://celestrak.org/NORAD/documentation/gp-data-formats.php',
-    gives: 'The orbit data for about 19,500 satellites.',
+    gives:
+      'The orbit data for about 19,500 satellites. Starlink’s comes from CelesTrak’s supplemental data, fitted to the orbits SpaceX publishes for its satellites, wherever CelesTrak has it.',
     fresh:
       'Refreshed every 6 hours. A satellite more than 3 days from its orbit data’s epoch is hidden.',
   },

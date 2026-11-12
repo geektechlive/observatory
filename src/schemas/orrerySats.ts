@@ -24,6 +24,8 @@ export const OrrerySatsSchema = z.object({
       'fields are not the catalogue columns',
     ),
   count: z.number().int().nonnegative(),
+  /** Starlink only (#209): the first supgpCount rows carry CelesTrak SupGP elements. */
+  supgpCount: z.number().int().nonnegative().optional(),
   rows: z.array(z.unknown()),
 })
 

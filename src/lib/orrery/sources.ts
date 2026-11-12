@@ -52,7 +52,8 @@ export const SOURCES: readonly OrrerySource[] = [
     id: 'celestrak',
     name: 'CelesTrak',
     docs: 'https://celestrak.org/NORAD/documentation/gp-data-formats.php',
-    gives: 'The orbit data behind every satellite on the orrery.',
+    gives:
+      'The orbit data behind every satellite on the orrery. For Starlink it is CelesTrak’s supplemental data, fitted to the orbits SpaceX publishes, wherever CelesTrak has it.',
   },
   {
     id: 'space-track',

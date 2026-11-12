@@ -8,9 +8,10 @@
  *
  * Groups are disjoint: every object is stored once, so the client never downloads one
  * twice. Starlink is cut out of CelesTrak's `active` group by name (the `starlink`
- * group equalled the STARLINK-named objects in `active`, 11,204 each, 2026-11-07), which
- * spares CelesTrak a 4.7 MB download every run. `other` is whatever in `active` is in no
- * named group.
+ * group equalled the STARLINK-named objects in `active`, 11,204 each, 2026-11-07), and
+ * their elements are then replaced by CelesTrak's supplemental GP, from SpaceX's own
+ * ephemerides, where it has them (#209, `overlaySupplemental`). `other` is whatever in
+ * `active` is in no named group.
  */
 
 export type SatGroupId =
@@ -193,6 +194,38 @@ export function rowToOmm(row: SatRow): {
 /** A row's element epoch, ms since 1970 (UTC). */
 export function rowEpochMs(row: SatRow): number {
   return Date.parse(epochText(row[3]))
+}
+
+/**
+ * Starlink with CelesTrak's supplemental GP laid over it (#209): SupGP's elements,
+ * fitted to SpaceX's own published ephemerides, replace the radar-based GP elements
+ * object by object (keyed on NORAD id). SupGP objects the GP slice lacks are dropped, so
+ * every object stays in exactly one group. The replaced rows come first, so a stored
+ * group says which rows are SupGP with one count (`supgpCount`).
+ */
+export function overlaySupplemental(
+  gp: readonly SatRow[],
+  sup: readonly SatRow[],
+): { rows: SatRow[]; supplemental: number; supplementalOnly: number } {
+  const gpIds = new Set(gp.map((row) => row[1]))
+  const newest = new Map<string, SatRow>()
+  let supplementalOnly = 0
+  for (const row of sup) {
+    if (!gpIds.has(row[1])) {
+      supplementalOnly += 1
+      continue
+    }
+    const held = newest.get(row[1])
+    if (!held || rowEpochMs(row) > rowEpochMs(held)) newest.set(row[1], row)
+  }
+  const replaced: SatRow[] = []
+  const kept: SatRow[] = []
+  for (const row of gp) {
+    const better = newest.get(row[1])
+    if (better) replaced.push(better)
+    else kept.push(row)
+  }
+  return { rows: [...replaced, ...kept], supplemental: replaced.length, supplementalOnly }
 }
 
 /**

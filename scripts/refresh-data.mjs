@@ -34,6 +34,8 @@
 //   ... --dry-run --only=orrery-dwarfs --dwarfs-out=/tmp/dwarfs.json
 //                                            just the dwarf planets (#99 item 8)
 //   ... --dry-run --only=celestrak-groups    just the orrery's satellite groups (#98)
+//   ... --sats-out=dir                       with it, save each group's body and the raw
+//                                            Starlink SupGP answer (#209) in dir
 //   ... --dry-run --only=spacetrack --spacetrack-out=/tmp/st.json
 //                                            just Space-Track (#101); needs SPACETRACK_USER
 //                                            and SPACETRACK_PASS, else it is skipped;
@@ -48,11 +50,16 @@
 //   SPACETRACK_USER, SPACETRACK_PASS  the Space-Track.org account (#101); never logged
 //   DISCOSWEB_TOKEN                   the ESA DISCOSweb token (#101); never logged
 
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
-import { celestrakFetchText, refreshSatGroups } from './celestrak-groups.mjs'
+import {
+  celestrakFetchText,
+  celestrakStrictFetch,
+  refreshSatGroups,
+  SUPGP_TIMEOUT_MS,
+} from './celestrak-groups.mjs'
 import { buildOrreryBodies, DEFAULT_BUDGET_MS as BODIES_BUDGET_MS } from './orrery-bodies.mjs'
 import { buildOrreryNeo, DEFAULT_BUDGET_MS as NEO_BUDGET_MS } from './orrery-neo.mjs'
 import {
@@ -561,6 +568,20 @@ function budgetDeps(deps) {
   }
 }
 
+/** A dry run's satellite bodies and the raw SupGP answer, saved locally (#209); never KV. */
+async function saveSatsDryRun(dir, satWrites, supText) {
+  await mkdir(dir, { recursive: true })
+  for (const write of satWrites) {
+    const file = resolve(dir, `${write.key.replaceAll(':', '_')}.json`)
+    await writeFile(file, write.value)
+    console.log(`  saved ${write.key} to ${file} (${String(write.value.length)} bytes)`)
+  }
+  if (supText !== null) {
+    await writeFile(resolve(dir, 'supgp-starlink-raw.json'), supText)
+    console.log(`  saved the raw SupGP answer (${String(supText.length)} bytes)`)
+  }
+}
+
 // ---------------------------------------------------------------- main
 
 /** Fetch every tracked satellite; fails only if none validate. */
@@ -1056,6 +1077,7 @@ async function main(argv) {
   const dwarfsOut = argv.find((a) => a.startsWith('--dwarfs-out='))?.slice('--dwarfs-out='.length)
   const stOut = argv.find((a) => a.startsWith('--spacetrack-out='))?.slice('--spacetrack-out='.length)
   const discosOut = argv.find((a) => a.startsWith('--discos-out='))?.slice('--discos-out='.length)
+  const satsOut = argv.find((a) => a.startsWith('--sats-out='))?.slice('--sats-out='.length)
   const config = dryRun ? null : readConfig()
   const report = []
   const writes = []
@@ -1140,17 +1162,28 @@ async function main(argv) {
 
   if (!only || only === 'celestrak-groups') {
     // The orrery's satellites (#98), one KV key per group; see celestrak-groups.mjs.
+    // Starlink's SupGP (#209): one strict request, its timeout inside the deadline.
+    let supText = null
+    const began = Date.now()
     const { entry, writes: satWrites } = await refreshSatGroups({
       now: Date.now(),
       fetchText: beforeDeadline(
         (url) => celestrakFetchText(url, { retrying: (u) => fetchWithRetry(u) }),
         deadline,
       ),
+      fetchSupText: beforeDeadline(async (url) => {
+        supText = await celestrakStrictFetch(url, {
+          timeoutMs: stepBudget(SUPGP_TIMEOUT_MS, deadline),
+        })
+        return supText
+      }, deadline),
       readPrevious: (key) => readKv(key, config),
       classifyFailure,
     })
+    console.log(`  ${entry.signature} took ${String(Math.round((Date.now() - began) / 1000))} s`)
     report.push(entry)
     for (const write of satWrites) writes.push({ ...write, entry })
+    if (dryRun && satsOut) await saveSatsDryRun(satsOut, satWrites, supText)
   }
 
   let stCatalog = null

@@ -94,6 +94,19 @@ describe('SOURCES', () => {
     expect(SOURCES['orrery-sats'].required({ rows: [['ISS (ZARYA)', '25544']] })).toBe(true)
   })
 
+  it('rejects a Starlink body whose SupGP count is not a count of its rows (#209)', () => {
+    const rows = [
+      ['STARLINK-1008', '44714'],
+      ['STARLINK-1012', '44716'],
+    ]
+    const ok = SOURCES['orrery-sats'].required
+    expect(ok({ rows, supgpCount: 2 })).toBe(true)
+    expect(ok({ rows, supgpCount: 0 })).toBe(true)
+    expect(ok({ rows, supgpCount: 3 })).toBe(false)
+    expect(ok({ rows, supgpCount: -1 })).toBe(false)
+    expect(ok({ rows, supgpCount: '2' })).toBe(false)
+  })
+
   it('gives every source a label and a positive max age', () => {
     for (const name of SOURCE_NAMES) {
       const contract = SOURCES[name]

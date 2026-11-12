@@ -27,6 +27,8 @@ function field(version: number, groups: SatGroupId[]): SatFieldInfo {
     epochMs: new Float64Array(groups.length).fill(T0 - 3_600_000),
     orbit: new Uint8Array(groups.length),
     launch: new Int32Array(groups.length),
+    // The fake's Starlink carries SupGP elements (#209).
+    supgp: Uint8Array.from(groups.map((g) => (g === 'starlink' ? 1 : 0))),
   }
 }
 
@@ -163,6 +165,12 @@ describe('SatLayer (#98)', () => {
     expect(layer.marker.visible).toBe(true)
     expect(layer.selectedLabel()).toEqual({ key: 'sat:25544', label: 'ISS (ZARYA)' })
     expect(layer.listGroup('stations')).toEqual([{ key: 'sat:25544', name: 'ISS (ZARYA)' }])
+  })
+
+  it('says which objects carry SupGP elements, for the inspector’s source line (#209)', async () => {
+    const { layer } = await loadedLayer(['stations', 'starlink'])
+    expect(layer.info(satKey('25544'))?.supgp).toBe(false)
+    expect(layer.info(satKey('44713'))?.supgp).toBe(true)
   })
 
   it('rings the objects predicted to re-enter, where loaded and drawn (#101)', async () => {

@@ -29,6 +29,11 @@ mean day to day:
   fetches and validates TLEs from a normal network and writes `tle:iss:v1` /
   `tle:satellites:v1`. The handlers fall back to live CelesTrak, then a hardcoded
   `FALLBACK_TLE`.
+- **CelesTrak's usage policy** (https://celestrak.org/usage-policy.php, read 2026-11-12): "only
+  download data once per update"; GP and SupGP both update every 2 hours; "M2M (machine-to-machine)
+  software should immediately stop querying when it receives any non-HTTP 200 responses". The orrery's groups
+  and Starlink's SupGP follow it as [satellites.md](satellites.md) describes. The page states no
+  numeric error limit and no attribution or redistribution terms.
 - **RocketLaunch.live is unreachable from Workers egress too** (seen 2026-10-09, #30), though it
   answers laptops and GitHub runners. `/api/launches` is KV-first: it serves
   `rll:launches:next:v1:backup` (written every 6 h by the refresh job) while it is ≤ 12 h old.
@@ -164,7 +169,9 @@ Both data-refresh jobs write `incident-report.json`, and `scripts/report-inciden
 - **One deadline, 6 minutes (#128), inside the workflow's 10-minute `timeout-minutes`.** A job
   killed by that limit writes no incident report, so its failures would go unreported. The JPL
   steps' own budgets (4, 2 and 1.5 min) are capped by what is left of it (`stepBudget`), and no
-  source, TLE or CelesTrak group starts a fetch once it has passed (`beforeDeadline`). A source
+  source, TLE or CelesTrak group starts a fetch once it has passed (`beforeDeadline`). Starlink's
+  SupGP download (#209) also takes its timeout from `stepBudget` (60 s, or less if less is
+  left), so it never runs past the deadline. A source
   cut short ships what it has or is judged by its KV copy's age. `ci-contract.test.ts` checks
   that the deadline, plus one fetch still running past it (100 s) and a minute for setup, KV
   writes and the reporter, fits the timeout. The step took 2 min 13 s on 2026-11-07.

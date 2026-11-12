@@ -151,6 +151,8 @@ export interface SatInfo {
   name: string
   group: SatGroupId
   epochMs: number
+  /** Its elements are CelesTrak SupGP, from SpaceX's ephemerides (#209); absent means GP. */
+  supgp?: boolean
   /** TEME km now, or null when it has no position at this date. */
   teme: [number, number, number] | null
   /**
@@ -455,6 +457,7 @@ export class SatLayer {
       name: field.names[i] ?? id,
       group: span?.group ?? 'other',
       epochMs: field.epochMs[i] ?? Number.NaN,
+      supgp: field.supgp?.[i] === 1,
       teme: this.temeAt(i),
       computed,
       pending: !computed && this.ctl.passing(),

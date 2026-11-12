@@ -1,8 +1,8 @@
 /**
  * The Earth orbit switches (#98): one per kind of satellite, over the nine stored
  * CelesTrak groups (the three debris clouds share one). Starlink starts off: it is more
- * than half the objects and a 520 kB download (gzip, measured 2026-11-07), against about
- * 300 kB for everything else switched on; one tap adds it.
+ * than half the objects and a 480 kB download (gzip, measured 2026-11-12, #209), against
+ * about 300 kB for everything else switched on; one tap adds it.
  */
 import { EPOCH_WINDOW_MS, type SatGroupId } from '@/lib/orbit/satCatalog'
 import type { SatSnapshot } from '@/lib/orrery/satController'
@@ -33,9 +33,11 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
   {
     id: 'starlink',
     label: 'Starlink',
-    hint: 'SpaceX’s internet satellites, over 11,000 in low orbit. A bigger download (about 0.5 MB)',
+    hint: 'SpaceX’s internet satellites, over 11,000 in low orbit, placed from SpaceX’s own orbit data where CelesTrak has it. A bigger download (about 0.5 MB)',
     groups: ['starlink'],
-    downloadKb: 522,
+    // SupGP elements (#209): 477 kB at gzip -6 from the 2026-11-12 dry run, against 550 kB
+    // for the GP body production served the same hour.
+    downloadKb: 477,
   },
   {
     id: 'gps',
