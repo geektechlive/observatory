@@ -165,3 +165,53 @@ export const ISS_TLE = {
   line1: '1 25544U 98067A   26312.17541007  .00012511  00000+0  23266-3 0  9990',
   line2: '2 25544  51.6320 307.5621 0007219   1.6306 358.4705 15.49256954594075',
 }
+
+/** Two open storms (#175): the ticker's first items, a short strip whose loop copy shows. */
+export const EONET = {
+  title: 'EONET Events',
+  description: 'Natural events from EONET.',
+  link: 'https://eonet.gsfc.nasa.gov/api/v3/events',
+  events: [
+    ['EONET_26159', 'Tropical Cyclone 03S', '2026-11-08T12:00:00Z', [50.9, -11.9]],
+    ['EONET_26157', 'Typhoon Cempaka', '2026-11-08T06:00:00Z', [144.2, 19.1]],
+  ].map(([id, title, date, coordinates]) => ({
+    id,
+    title,
+    description: null,
+    link: `https://eonet.gsfc.nasa.gov/api/v3/events/${String(id)}`,
+    closed: null,
+    categories: [{ id: 'severeStorms', title: 'Severe Storms' }],
+    sources: [{ id: 'JTWC', url: 'https://www.metoc.navy.mil/jtwc/' }],
+    geometry: [{ type: 'Point', magnitudeValue: 35, magnitudeUnit: 'kts', date, coordinates }],
+  })),
+}
+
+/**
+ * Space-Track's re-entry predictions (#175), the ticker's leading items when they
+ * arrive first. Shapes from production 2026-11-12, dates moved after the test's clock.
+ */
+export const SPACETRACK = {
+  generatedAt: '2026-11-08T15:20:00.000Z',
+  citation: 'Space-Track.org (USSPACECOM)',
+  tip: {
+    fetchedAt: '2026-11-08T15:20:00.000Z',
+    reentries: [
+      ['45390', '2026-11-09T08:28:00Z'],
+      ['45780', '2026-11-09T11:13:00Z'],
+      ['45384', '2026-11-10T12:52:00Z'],
+    ].map(([noradId, decayEpoch]) => ({
+      noradId,
+      decayEpoch,
+      windowMin: 720,
+      msgEpoch: '2026-11-08T08:38:00Z',
+      lat: 21.9,
+      lon: 320.3,
+      highInterest: false,
+    })),
+  },
+  decays: null,
+  boxscore: null,
+  satcatAt: null,
+  names: { '45390': 'STARLINK-1284', '45780': 'STARLINK-1496', '45384': 'STARLINK-1267' },
+  missing: [],
+}

@@ -91,6 +91,10 @@ load mounted the Earth columns for a render: EarthConsoleRest, propagate, and ni
 were fetched for a page never shown. The globe's data hooks (`useGlobeData`) live in
 `EarthColumns` (App.tsx), not in `App`, and the coastline chunk (`landRings`) loads on its first
 call, not at module import, because that import sits in the entry.
+The initial `layers` come from `layersFromHash` the same way (#176), and persist's `merge` lets a
+`?layers=` link beat saved preferences: applied in the mount effect, the default layers mounted
+for one render, and `#orbit?layers=fires` fetched `/api/aurora` for a layer the link turns off
+(`tests/e2e/hash-layers.spec.ts`). No painted frame showed the defaults, so CLS was not affected.
 `tests/e2e/orrery-lean-load.spec.ts` counts what a cold `#orrery` asks for. The orrery keeps
 solar-wind, cme, dsn, spacetrack and discos (it shows them), and no Earth texture (#173,
 below).
@@ -150,9 +154,15 @@ desktop p75 0.244). Sources:
 when they do, so they are deliberately not preloaded. A new lead panel needs a `reserve` class
 too. `tests/e2e/layout-shift.spec.ts` replays `/` with staggered feed answers
 (`feedFixtures.ts`, trimmed production data) and holds the sum under 0.01 (the shipped code
-scored 0.044 and 0.019 there). Known leftover: the ticker's first item jumps when more items
-arrive (about 0.005), and the phone `#orrery` header moves 30 px at about 3 s (0.025). Real-visitor
-CLS is re-checked under #177.
+scored 0.044 and 0.019 there). Known leftover: the phone `#orrery` header moves 30 px at about
+3 s (0.025). Real-visitor CLS is re-checked under #177.
+
+The ticker's first fill waits for Space-Track (up to 3 s; with reduced motion, whose still
+strip shows 8 items, until it answers or fails) so its re-entries lead the strip
+(#101); after that it keeps items in arrival order, and it places its loop copy by a transform
+(#175): a late feed joins the end of the strip instead of pushing the items already scrolling,
+and the copy moves without a layout shift. The test holds the ticker's share at zero; it was
+0.0095 at 1920 px with Space-Track answering after EONET.
 
 ## Real-visitor numbers
 

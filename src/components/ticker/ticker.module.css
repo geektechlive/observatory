@@ -58,18 +58,36 @@
   align-self: stretch;
 }
 
+/* As wide as one strip of items; the loop copy hangs off its end (#175). */
 .inner {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  white-space: nowrap;
+  position: relative;
+  width: max-content;
   height: 100%;
   animation: ticker-scroll var(--ticker-duration, 60s) linear infinite;
   will-change: transform;
 }
 
-.inner:hover,
-.inner:focus-within {
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+  height: 100%;
+}
+
+/* Placed one strip along by a transform, not by layout: an item joining the strip moves
+   this copy without a layout shift (#175). */
+.loopCopy {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: max-content;
+  transform: translateX(100%);
+}
+
+/* Hovering anywhere on the track pauses it: the inert loop copy takes no hover, and the
+   strip may not reach the right edge (#175). */
+.inner:focus-within,
+.track:hover .inner {
   animation-play-state: paused;
 }
 
@@ -79,7 +97,7 @@
   }
 
   to {
-    transform: translateX(-50%);
+    transform: translateX(-100%);
   }
 }
 

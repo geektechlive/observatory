@@ -6,18 +6,30 @@
  * position, and the globe's lens growing after first paint. Fonts were not a source: the
  * layout does not reflow when they swap. This test replays the load with delayed feeds
  * and sums the layout-shift entries the way the CLS metric does (ignoring shifts that
- * follow input).
+ * follow input), at 1440, 1920 and 390 px wide. It also holds the ticker at zero (#175):
+ * Space-Track's re-entries landing after the storms used to push the storms a screen
+ * width along (0.0095 at 1920 px here). The re-entries must still lead (#101).
  */
 import { expect, type Page, test } from '@playwright/test'
 
-import { AFTERSHOCKS, CO2, ISS_TLE, NWS_ALERTS, SOLAR_WIND } from './feedFixtures'
+import {
+  AFTERSHOCKS,
+  CO2,
+  EONET,
+  ISS_TLE,
+  NWS_ALERTS,
+  SOLAR_WIND,
+  SPACETRACK,
+} from './feedFixtures'
 
 const FALLBACK_DELAY_MS = 500
 /**
  * Google's "good" is 0.1. This replay is milder than a real load (its feeds come from
  * a mock), so 0.1 would have passed the code that shipped: that scored 0.044 at 1440 px
  * and 0.019 at 1920 px here, and about 0.07 to 0.09 against production. With the fixes
- * it scores 0.0002 and 0.0028, so the budget sits an order of magnitude under "good".
+ * it scored 0.0002 and 0.0028; with the ticker's feeds added (#175) it scores about
+ * 0.0005 at 1440 px, 0.0029 at 1920 px and 0.0018 at 390 px, so the budget sits an
+ * order of magnitude under "good".
  */
 const CLS_BUDGET = 0.01
 
@@ -50,11 +62,19 @@ const QUAKES = {
 
 async function watchShifts(page: Page) {
   await page.addInitScript(() => {
-    const shifts: { value: number; hadRecentInput: boolean }[] = []
+    const shifts: { value: number; hadRecentInput: boolean; inTicker: boolean }[] = []
     new PerformanceObserver((list) => {
       for (const e of list.getEntries()) {
-        const entry = e as PerformanceEntry & { value: number; hadRecentInput: boolean }
-        shifts.push({ value: entry.value, hadRecentInput: entry.hadRecentInput })
+        const entry = e as PerformanceEntry & {
+          value: number
+          hadRecentInput: boolean
+          sources: { node: Node | null }[]
+        }
+        const inTicker = entry.sources.some((s) => {
+          const el = s.node instanceof Element ? s.node : (s.node?.parentElement ?? null)
+          return el?.closest('[aria-label="Live event feed"]') != null
+        })
+        shifts.push({ value: entry.value, hadRecentInput: entry.hadRecentInput, inTicker })
       }
     }).observe({ type: 'layout-shift', buffered: true })
     ;(window as unknown as { layoutShifts: typeof shifts }).layoutShifts = shifts
@@ -72,6 +92,10 @@ const FEEDS: Record<string, { body: unknown; delayMs: number }> = {
   '/api/aftershocks': { body: AFTERSHOCKS, delayMs: 900 },
   '/api/nws-alerts': { body: NWS_ALERTS, delayMs: 1100 },
   '/api/co2': { body: CO2, delayMs: 1300 },
+  // The ticker's feeds (#175): Space-Track's re-entries lead the ticker but land after
+  // the storms already scrolling, so a strip in feed order pushed the storms along.
+  '/api/eonet': { body: EONET, delayMs: 600 },
+  '/api/spacetrack': { body: SPACETRACK, delayMs: 1500 },
 }
 
 /** Answer each feed after its delay; every other feed as unavailable. */
@@ -87,19 +111,23 @@ async function delayFeeds(page: Page) {
   })
 }
 
-async function cumulativeShift(page: Page): Promise<number> {
-  return page.evaluate(() =>
-    (
-      window as unknown as { layoutShifts: { value: number; hadRecentInput: boolean }[] }
-    ).layoutShifts
-      .filter((s) => !s.hadRecentInput)
-      .reduce((sum, s) => sum + s.value, 0),
-  )
+/** The CLS sum, and the part of it with a source inside the ticker. */
+async function cumulativeShift(page: Page): Promise<{ total: number; ticker: number }> {
+  return page.evaluate(() => {
+    const shifts = (
+      window as unknown as {
+        layoutShifts: { value: number; hadRecentInput: boolean; inTicker: boolean }[]
+      }
+    ).layoutShifts.filter((s) => !s.hadRecentInput)
+    const sum = (list: typeof shifts) => list.reduce((total, s) => total + s.value, 0)
+    return { total: sum(shifts), ticker: sum(shifts.filter((s) => s.inTicker)) }
+  })
 }
 
 for (const viewport of [
   { width: 1440, height: 900 },
   { width: 1920, height: 1080 },
+  { width: 390, height: 844 },
 ]) {
   test(`a cold ${String(viewport.width)}px load of / stays under ${String(CLS_BUDGET)} CLS`, async ({
     page,
@@ -110,9 +138,15 @@ for (const viewport of [
     await delayFeeds(page)
     await page.goto('/')
     await expect(page.getByText('central Mid-Atlantic Ridge')).toBeVisible()
+    const ticker = page.getByRole('region', { name: 'Live event feed' })
+    await expect(ticker.getByText('STARLINK-1284').first()).toBeAttached()
     // Let the globe, the ISS readout and every late panel settle.
     await page.waitForTimeout(3000)
     const cls = await cumulativeShift(page)
-    expect(cls, `cumulative layout shift ${cls.toFixed(4)}`).toBeLessThan(CLS_BUDGET)
+    // Re-entries still lead the strip (#101), and items arriving never move the ones
+    // already there (#175).
+    await expect(ticker.locator('[class*="label"]').first()).toHaveText('RE-ENTRY')
+    expect(cls.ticker, `ticker layout shift ${cls.ticker.toFixed(4)}`).toBe(0)
+    expect(cls.total, `cumulative layout shift ${cls.total.toFixed(4)}`).toBeLessThan(CLS_BUDGET)
   })
 }

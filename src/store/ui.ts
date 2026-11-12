@@ -77,6 +77,32 @@ export function isLayerKey(value: string): value is LayerKey {
   return Object.prototype.hasOwnProperty.call(DEFAULT_LAYERS, value)
 }
 
+/**
+ * The layers a link names (`#earth?layers=iss,quakes`): those on, every other one off.
+ * Null when the hash says nothing about layers, so saved preferences stand.
+ */
+export function layersFromHash(hash: string): Record<LayerKey, boolean> | null {
+  const queryPart = hash.replace(/^#\/?/, '').split('?')[1]
+  if (queryPart === undefined) return null
+  const param = new URLSearchParams(queryPart).get('layers')
+  if (param === null) return null
+  const named = new Set(param.split(',').map((s) => s.trim()))
+  // A link that names no real layer (`layers=nope`) says nothing: turning every layer
+  // off, and saving that, would only lose the visitor's own choice.
+  if (!LAYER_KEYS.some((k) => named.has(k))) return null
+  return Object.fromEntries(LAYER_KEYS.map((k) => [k, named.has(k)])) as Record<LayerKey, boolean>
+}
+
+/**
+ * A layers link, read before anything renders (#176), as initialView does for the view.
+ * Applied in an effect, the default layers mounted for one render first: on
+ * `#orbit?layers=fires` that fetched the aurora feed for a layer the link turns off.
+ */
+function hashLayers(): Record<LayerKey, boolean> | null {
+  if (typeof window === 'undefined') return null
+  return layersFromHash(window.location.hash)
+}
+
 /** The user's location, once they ask for it (#78). Rounded to 0.1°, never persisted. */
 export interface Observer {
   lat: number
@@ -153,7 +179,7 @@ export const useUiStore = create<UiState>()(
     (set, get) => ({
       view: initialView(),
       mapMode: 'globe',
-      layers: DEFAULT_LAYERS,
+      layers: hashLayers() ?? DEFAULT_LAYERS,
       tickerPaused: false,
       selectedEventId: null,
       quotaRemaining: null,
@@ -196,13 +222,14 @@ export const useUiStore = create<UiState>()(
         mapMode: state.mapMode,
       }),
       // A blob written before a layer existed would leave that key undefined
-      // while typed boolean, so persisted layers are merged over the defaults.
+      // while typed boolean, so persisted layers are merged over the defaults. A layers
+      // link beats both (#176); hydration runs this even when nothing is saved.
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<PersistedUiState>
         return {
           ...current,
           mapMode: saved.mapMode ?? current.mapMode,
-          layers: { ...DEFAULT_LAYERS, ...(saved.layers ?? {}) },
+          layers: hashLayers() ?? { ...DEFAULT_LAYERS, ...(saved.layers ?? {}) },
         }
       },
     },

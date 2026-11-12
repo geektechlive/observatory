@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react'
 
 import {
   type ConsoleView,
-  isLayerKey,
   LAYER_KEYS,
   type LayerKey,
+  layersFromHash,
   useUiStore,
   viewFromHash,
 } from '@/store/ui'
@@ -12,26 +12,22 @@ import {
 interface HashState {
   view: ConsoleView | null
   /** null when the URL says nothing about layers, so saved prefs win. */
-  layers: LayerKey[] | null
+  layers: Record<LayerKey, boolean> | null
 }
 
 function parseHash(): HashState {
-  const raw = window.location.hash.replace(/^#\/?/, '')
-  const queryPart = raw.split('?')[1]
-  const view = viewFromHash(window.location.hash)
+  const { hash } = window.location
+  return { view: viewFromHash(hash), layers: layersFromHash(hash) }
+}
 
-  if (queryPart === undefined) return { view, layers: null }
-
-  const layersParam = new URLSearchParams(queryPart).get('layers')
-  if (layersParam === null) return { view, layers: null }
-
-  const layers = layersParam
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .filter(isLayerKey)
-
-  return { view, layers }
+/**
+ * Puts the hash's view and layers in the store in one update, so persist saves once
+ * (a write per layer was about 15). Nothing the hash doesn't change is written.
+ */
+function applyHash({ view, layers }: HashState): void {
+  const viewChange = view && view !== useUiStore.getState().view ? { view } : null
+  if (!viewChange && !layers) return
+  useUiStore.setState({ ...viewChange, ...(layers ? { layers } : null) })
 }
 
 /** Views that draw the Earth globe or map, the only ones the layers apply to. */
@@ -74,20 +70,14 @@ export function useHashView(): void {
   const layers = useUiStore((s) => s.layers)
   const previousViewRef = useRef<ConsoleView | null>(null)
 
-  // Initialize from the hash on first mount, then canonicalize it in place.
-  // Intentionally mount-only: rerunning on any store change would re-apply a
-  // stale URL over live user input. Store access goes through `getState()` so
-  // the empty deps list is honest and no eslint-disable is needed.
+  // The store already starts on the hash's view and layers (#167, #176); this mount
+  // effect re-applies them, which saves a link's layers as the visitor's preferences,
+  // then canonicalizes the hash in place. Intentionally mount-only: rerunning on any
+  // store change would re-apply a stale URL over live user input. Store access goes
+  // through `getState()` so the empty deps list is honest and no eslint-disable is
+  // needed.
   useEffect(() => {
-    const { setView, setLayer } = useUiStore.getState()
-    const parsed = parseHash()
-    if (parsed.view) setView(parsed.view)
-    if (parsed.layers) {
-      const enabled = new Set<LayerKey>(parsed.layers)
-      LAYER_KEYS.forEach((key) => {
-        setLayer(key, enabled.has(key))
-      })
-    }
+    applyHash(parseHash())
     const state = useUiStore.getState()
     previousViewRef.current = state.view
     window.history.replaceState(null, '', buildHash(state.view, state.layers, window.location.hash))
@@ -96,15 +86,7 @@ export function useHashView(): void {
   // Respond to back/forward and manual hash edits.
   useEffect(() => {
     const onHashChange = () => {
-      const { setView, setLayer } = useUiStore.getState()
-      const parsed = parseHash()
-      if (parsed.view) setView(parsed.view)
-      if (parsed.layers) {
-        const enabled = new Set<LayerKey>(parsed.layers)
-        LAYER_KEYS.forEach((key) => {
-          setLayer(key, enabled.has(key))
-        })
-      }
+      applyHash(parseHash())
     }
     window.addEventListener('hashchange', onHashChange)
     return () => {

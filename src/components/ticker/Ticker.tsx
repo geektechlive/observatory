@@ -1,34 +1,65 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { useReducedMotion } from '@/hooks/useReducedMotion'
-import { useTicker } from '@/hooks/useTicker'
+import { type TickerItem as TickerItemData, useTicker } from '@/hooks/useTicker'
 import { useUiStore } from '@/store/ui'
 
+import { keepArrivalOrder } from './arrivalOrder'
 import styles from './ticker.module.css'
 import { TickerItem } from './TickerItem'
+import { useFirstFillReady } from './useFirstFillReady'
 
 const TICKER_SPEED_PX_PER_S = 160
 
+/**
+ * The live items, kept as state derived during render: the first fill in useTicker's
+ * order, then anything new joins the end, where it moves nothing already showing (#175).
+ */
+function useArrivalOrder(items: TickerItemData[]): TickerItemData[] {
+  const [order, setOrder] = useState<readonly string[]>([])
+  const ordered = keepArrivalOrder(order, items)
+  const ids = ordered.map((item) => item.id)
+  if (ids.join('\n') !== order.join('\n')) setOrder(ids)
+  return ordered
+}
+
+const NO_ITEMS: TickerItemData[] = []
+
 export function Ticker() {
-  const items = useTicker()
+  const live = useTicker()
   const reducedMotion = useReducedMotion()
+  const items = useArrivalOrder(useFirstFillReady(reducedMotion) ? live : NO_ITEMS)
   const tickerPaused = useUiStore((s) => s.tickerPaused)
   const setTickerPaused = useUiStore((s) => s.setTickerPaused)
   const setSelectedEventId = useUiStore((s) => s.setSelectedEventId)
 
   const displayItems = reducedMotion ? items.slice(0, 8) : items
 
-  const innerRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
   const [tickerDuration, setTickerDuration] = useState(60)
 
   useLayoutEffect(() => {
-    if (!innerRef.current) return
-    const width = innerRef.current.scrollWidth
+    if (!stripRef.current) return
+    const width = stripRef.current.offsetWidth
     if (width === 0) return
-    // Animation scrolls -50% of total width; derive duration from target speed
-    const duration = (width * 0.5) / TICKER_SPEED_PX_PER_S
+    // The animation scrolls one strip's width; derive the duration from the target speed.
+    const duration = width / TICKER_SPEED_PX_PER_S
     setTickerDuration(Math.max(15, duration))
   }, [displayItems.length])
+
+  const strip = displayItems.map((item) => (
+    <TickerItem
+      key={item.id}
+      item={item}
+      onClick={
+        item.id.startsWith('eonet-')
+          ? () => {
+              setSelectedEventId(item.id)
+            }
+          : undefined
+      }
+    />
+  ))
 
   return (
     <div className={styles.ticker ?? ''} role="region" aria-label="Live event feed">
@@ -54,7 +85,6 @@ export function Ticker() {
           <span className={styles.empty ?? ''}>Awaiting telemetry…</span>
         ) : (
           <div
-            ref={innerRef}
             className={styles.inner ?? ''}
             style={
               {
@@ -63,24 +93,22 @@ export function Ticker() {
               } as React.CSSProperties
             }
           >
-            {displayItems.map((item) => (
-              <TickerItem
-                key={item.id}
-                item={item}
-                onClick={
-                  item.id.startsWith('eonet-')
-                    ? () => {
-                        setSelectedEventId(item.id)
-                      }
-                    : undefined
-                }
-              />
-            ))}
-            {/* Duplicate for seamless loop — hidden from screen readers */}
-            {!reducedMotion &&
-              displayItems.map((item) => (
-                <TickerItem key={`${item.id}-dup`} item={item} aria-hidden={true} />
-              ))}
+            <div ref={stripRef} className={styles.strip ?? ''}>
+              {strip}
+            </div>
+            {/* The copy that makes the loop seamless. It sits one strip along by a
+                transform, not by layout, so an item joining the strip never moves it
+                (#175), and it repeats the strip's own markup so the two are the same
+                width. Inert: hidden from screen readers and out of the tab order. */}
+            {!reducedMotion && (
+              <div
+                className={`${styles.strip ?? ''} ${styles.loopCopy ?? ''}`}
+                aria-hidden="true"
+                inert
+              >
+                {strip}
+              </div>
+            )}
           </div>
         )}
       </div>
