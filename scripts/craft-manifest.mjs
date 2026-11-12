@@ -60,15 +60,27 @@ const NASA_REPO_EVIDENCE = {
 const NASA_REPO_LOGOS_DATE = '2026-11-11'
 
 /** An entry for a model built from a file in NASA-3D-Resources at the pinned commit. */
-function nasaRepo({ folder, file, sha256, family, triangles, logos, transforms, outputSha256 }) {
+function nasaRepo({
+  folder,
+  file,
+  sha256,
+  parts,
+  family,
+  triangles,
+  logos,
+  logosDate = NASA_REPO_LOGOS_DATE,
+  transforms,
+  outputSha256,
+}) {
   return {
-    sources: [{ file, sha256 }],
+    // One source file, or `parts` ({ file, sha256 } each) for a model assembled from several.
+    sources: parts ?? [{ file, sha256 }],
     sourceUrl: `${NASA_REPO}/tree/${NASA_SHA}/3D%20Models/${encodeURIComponent(folder)}`,
     sourceVersion: NASA_SHA,
     licence: NASA_LICENCE,
     licenceEvidence: NASA_REPO_EVIDENCE,
     family,
-    logosChecked: { date: NASA_REPO_LOGOS_DATE, result: 'clean', detail: logos },
+    logosChecked: { date: logosDate, result: 'clean', detail: logos },
     triangles,
     // The build-time edits (the same object as in scripts/craft-sources.mjs; a test fails when
     // they differ) and the hash of the shipped bytes. A rebuild changes the bytes, so it must
@@ -436,5 +448,47 @@ export const MANIFEST = {
     outputSha256: '9b442be269b44ca420408589707f61c5b88987f811caeaf2471f17c96a501c2b',
     logos:
       "No texture images in the file (26 plain materials; 'ICESAT2-instrumentimage' is a plain white material, not a picture). NASA's preview render viewed. Real-GPU renders of the shipped file along all six axes, and close renders of the body: no insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
+  }),
+  // Fourth batch (#194, tier C): stand-ins for satellites with no model of their own. They
+  // are shown only as family stand-ins (modelDescriptor.ts), never as an object's own model.
+  cubesat: nasaRepo({
+    folder: 'CubeSat - 2 RU Generic',
+    file: 'CubeSat - 2 RU Generic.glb',
+    sha256: '30633496ef3aea790ec00782772757c78744ccaf08c9322eca380a6c4ad57ec9',
+    family: 'cubesat',
+    // 36,896 in the source; the build lands at 12,227.
+    triangles: 12_000,
+    transforms: { aim: 12_000 },
+    outputSha256: '388269ffe82ec48712001f7dc9c13a513a39d80768c636fe23c7db080969d6de',
+    logosDate: '2026-11-12',
+    logos:
+      "No texture images in the file (every one of its materials is a plain colour): the solar cells, the plates and the cream strip are geometry. Real-GPU renders of the shipped file from the front, both sides, the back, the top and the bottom, and 4x close renders of the electronics plate at the top of all four faces and of the strip at mid-height on two of them: black and cream hardware blocks, white tabs and a cream wire, with no lettering, number, insignia, meatball, worm, patch, flag or company logo, modelled or painted. NASA's preview render viewed.",
+  }),
+  // Three Satellite Kit parts, set together by buildGenericBus in craft-models.mjs: the parts
+  // share one coordinate frame, so they are placed as NASA's own preview places them, with
+  // no scaling or moving by us. There is no `transforms` to record.
+  'generic-bus': nasaRepo({
+    folder: 'Satellite Kit',
+    parts: [
+      {
+        file: 'Satellite Kit body 1.glb',
+        sha256: '169428dc5a8bdf748f71f7b0c85124a9e52194fb5bbaf7e43811fbc30f9727ea',
+      },
+      {
+        file: 'Satellite Kit wings 2.glb',
+        sha256: 'b4b6d84ad0356a83dcbe640fda5a1c603c024e84591a65f650f662d3ef34bed1',
+      },
+      {
+        file: 'Satellite Kit radio 2.glb',
+        sha256: '1d39f09fe11ca15f041e0ddb99b35360bcf37d649d8b3feca729ff89bed39ad4',
+      },
+    ],
+    family: 'generic-bus',
+    triangles: 1_100,
+    transforms: {},
+    outputSha256: 'b879d208587165fd61abbcc34f91729595347ea7055a42cef7cd666f65cf7dd5',
+    logosDate: '2026-11-12',
+    logos:
+      "No texture images in any of the three files (plain colour materials: a grey cylinder, blue wings, a yellow and a white box, white dishes). NASA's preview render of the kit viewed. Real-GPU renders of the shipped file from the front, a side, the back, the top and the bottom: no lettering, insignia, meatball, worm, patch, flag or company logo, modelled or painted.",
   }),
 }

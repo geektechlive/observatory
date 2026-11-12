@@ -27,10 +27,12 @@ import {
   compactPrimitive,
   dedup,
   getBounds,
+  mergeDocuments,
   prune,
   quantize,
   simplify,
   textureCompress,
+  unpartition,
   weld,
 } from '@gltf-transform/functions'
 import draco3d from 'draco3dgltf'
@@ -171,6 +173,14 @@ function pruneSmallComponents(doc, error) {
   console.log(`pruned small components: ${before / 3} -> ${after / 3} tris`)
 }
 
+/** Decoded already: drop the compression extensions so the browser needs no decoder. */
+function dropCompressionExtensions(doc) {
+  for (const ext of doc.getRoot().listExtensionsUsed()) {
+    const id = ext.extensionName
+    if (id === 'KHR_draco_mesh_compression' || id === 'EXT_meshopt_compression') ext.dispose()
+  }
+}
+
 async function build(io, name, source, srcDir, outDir) {
   const {
     textures = true,
@@ -214,11 +224,7 @@ async function build(io, name, source, srcDir, outDir) {
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEXTURE_SIZE, TEXTURE_SIZE] }),
     quantize(),
   )
-  // Decoded already: drop the compression extensions so the browser needs no decoder.
-  for (const ext of doc.getRoot().listExtensionsUsed()) {
-    const id = ext.extensionName
-    if (id === 'KHR_draco_mesh_compression' || id === 'EXT_meshopt_compression') ext.dispose()
-  }
+  dropCompressionExtensions(doc)
   const out = join(outDir, `${name}.glb`)
   await io.write(out, doc)
   const bounds = getBounds(doc.getRoot().listScenes()[0])
@@ -298,6 +304,48 @@ async function buildNewHorizons(io, srcDir, outDir) {
   return triangleCount(doc)
 }
 
+/**
+ * The generic bus (#194, tier C): three parts of NASA's Satellite Kit, each a separate file,
+ * set together as one satellite: a cylinder body, a pair of solar wings and a radio box with
+ * two dishes. The parts are modelled in one shared frame (the wings' connectors start at the
+ * body's skin, the dishes sit on its top), so they are merged as they are: no scaling or
+ * moving by us, which is how NASA's own preview of the kit places them. Choosing these three
+ * out of the kit's nine is ours, and the credit says the parts were arranged for this site
+ * (modelDescriptor.ts).
+ */
+const BUS_PARTS = [
+  'Satellite Kit body 1.glb',
+  'Satellite Kit wings 2.glb',
+  'Satellite Kit radio 2.glb',
+]
+
+async function buildGenericBus(io, srcDir, outDir) {
+  const name = 'generic-bus'
+  assertSourceFiles(name, MANIFEST[name], BUS_PARTS)
+  const doc = new Document()
+  const scene = doc.createScene()
+  for (const file of BUS_PARTS) {
+    const source = await io.read(join(srcDir, file))
+    const mergedScene = mergeDocuments(doc, source).get(source.getRoot().listScenes()[0])
+    for (const node of mergedScene.listChildren()) scene.addChild(node)
+    mergedScene.dispose()
+  }
+  await doc.transform(unpartition())
+  stripAttributes(doc, true)
+  await doc.transform(dedup(), weld())
+  const before = triangleCount(doc)
+  await doc.transform(prune(), quantize())
+  dropCompressionExtensions(doc)
+  const out = join(outDir, `${name}.glb`)
+  await io.write(out, doc)
+  const bounds = getBounds(doc.getRoot().listScenes()[0])
+  const size = bounds.max.map((v, i) => +(v - bounds.min[i]).toFixed(4))
+  console.log(
+    `${name}: ${BUS_PARTS.length} Satellite Kit parts, ${before} tris, ${statSync(out).size} B, extent ${size.join(' x ')}`,
+  )
+  return triangleCount(doc)
+}
+
 async function main() {
   const srcDir = process.argv[2]
   if (!srcDir) throw new Error('usage: node scripts/craft-models.mjs <source-dir> [name...]')
@@ -319,6 +367,10 @@ async function main() {
     if (only.length === 0 || only.includes('new-horizons')) {
       gateSources('new-horizons', srcDir)
       built.set('new-horizons', await buildNewHorizons(io, srcDir, staging))
+    }
+    if (only.length === 0 || only.includes('generic-bus')) {
+      gateSources('generic-bus', srcDir)
+      built.set('generic-bus', await buildGenericBus(io, srcDir, staging))
     }
     for (const [name, triangles] of built) {
       try {

@@ -35,3 +35,4 @@ that makes the decision.
 | [0025](0025-tonight-comets-are-a-slice.md)                    | The Tonight panel's comets are a slice the refresh job cuts, under a key of their own     | #135           |
 | [0026](0026-charon-is-a-window-drawn-to-plutos-scale.md)      | Charon ships as a window around each refresh, drawn to Pluto's own scale                  | #99            |
 | [0027](0027-one-test-run-at-a-time.md)                        | One test run at a time on this machine, enforced by a lock with a cool-down               | #224           |
+| [0028](0028-stand-in-models-by-name-and-group.md)             | Satellites with no model get a labelled stand-in, picked by name and group (proposed)     | #194           |

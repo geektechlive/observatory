@@ -75,4 +75,7 @@ export const SOURCES = {
   // Their solar arrays are hundreds of cell quads: kept whole (craft-simplify.mjs).
   fermi: { aim: 14_000, keep: ['GPMcore-SolarFaces'] },
   icesat2: { aim: 14_000, keep: ['ICESAT2-Solar'] },
+  // Fourth batch, the stand-ins (#194, tier C). The generic bus has no entry here: it is
+  // assembled from three Satellite Kit files by its own function (buildGenericBus).
+  cubesat: { aim: 12_000 },
 }

@@ -7,7 +7,10 @@
  *
  * No three.js here: this module is data and lookups only.
  */
+import type { SatGroupId } from '@/lib/orbit/satCatalog'
+
 import { type Attitude, CRAFT_MODELS, type CraftModel, type StandInKey } from './craftModels'
+import { satFamily } from './satFamily'
 
 /** Whether a model is this object's own, or a stand-in shared by its family. */
 export type ModelScope = 'own' | 'family'
@@ -354,11 +357,43 @@ export const SATELLITE_MODELS_BY_NORAD: SatelliteModelTable = {
   ...BATCH3_MODELS,
 }
 
+// Tier C (#194): stand-ins for satellites with no model. Both are always `family`, shown with
+// the "not the exact shape of" note. Which satellite gets which: satFamily.ts. The axes are
+// ours, set when the models were assembled (docs/reference/satellite-models.md).
+/** NASA's 2U CubeSat for the Flock and Lemur fleets (both 3U, so approximate). */
+const CUBESAT_MODEL = nasaSatellite(
+  {
+    file: '/models/craft/cubesat.glb',
+    sourceUrl: `${RES}/cubesat-2-ru-generic/`,
+    credit: 'NASA/Christopher R. Meaney',
+    attitude: 'earth',
+    axis: [0, -1, 0],
+    attitudeNote: 'Long axis toward Earth (a stand-in: the real pose is not modelled)',
+  },
+  'family',
+)
+/** A body, two solar wings and a dish from NASA's Satellite Kit, arranged for this site. */
+const GENERIC_BUS_MODEL = nasaSatellite(
+  {
+    file: '/models/craft/generic-bus.glb',
+    sourceUrl: `${RES}/satellite-kit/`,
+    credit: 'NASA/Ames Research Center (Satellite Kit parts, arranged for this site)',
+    attitude: 'earth',
+    // The dishes sit on the cylinder's +Y end and face along +Y.
+    axis: [0, 1, 0],
+    attitudeNote: 'Dish end toward Earth (a stand-in: the real pose is not modelled)',
+  },
+  'family',
+)
+
 /**
- * By family id (a lower-case slug such as `starlink`): a stand-in shared by the family
- * (`scope: 'family'`). Empty until the family models land (#194).
+ * By family id (`SatFamily`, satFamily.ts): a stand-in shared by the family
+ * (`scope: 'family'`).
  */
-export const SATELLITE_MODELS_BY_FAMILY: SatelliteModelTable = {}
+export const SATELLITE_MODELS_BY_FAMILY: SatelliteModelTable = {
+  cubesat: CUBESAT_MODEL,
+  'generic-bus': GENERIC_BUS_MODEL,
+}
 
 interface SatelliteTables {
   readonly byNorad: SatelliteModelTable
@@ -379,23 +414,32 @@ export function modelForSatellite(
   return family === null ? undefined : tables.byFamily[family]
 }
 
+/** What `modelForKey` reads of a loaded satellite (the renderer's `SatInfo` has all three). */
+export interface SatelliteFacts {
+  readonly noradId: string
+  readonly name?: string | undefined
+  readonly group?: SatGroupId | undefined
+}
+
 const NAIF_KEY_PREFIX = 'naif:'
 const SAT_KEY_PREFIX = 'sat:'
 
 /**
  * The model for an orrery scene key (#203), or undefined: `naif:<id>` is a spacecraft
  * (a moon's key has the same shape and is not in the table), `sat:<norad>` a satellite
- * the renderer has loaded. `satellite` reads what the renderer knows of a satellite key;
- * it has no family field yet, so only an object's own entry can match until it does.
+ * the renderer has loaded. `satellite` reads what the renderer knows of a satellite key:
+ * its name and group give the family stand-in (`satFamily`) when it has no model of its own.
  */
 export function modelForKey(
   key: string,
-  satellite: (key: string) => { readonly noradId: string } | null,
+  satellite: (key: string) => SatelliteFacts | null,
   tables?: SatelliteTables,
 ): ModelDescriptor | undefined {
   if (key.startsWith(NAIF_KEY_PREFIX))
     return spacecraftDescriptor(key.slice(NAIF_KEY_PREFIX.length))
   if (!key.startsWith(SAT_KEY_PREFIX)) return undefined
   const info = satellite(key)
-  return info ? modelForSatellite(info.noradId, null, tables) : undefined
+  if (!info) return undefined
+  const family = info.name === undefined ? null : satFamily(info.name, info.group)
+  return modelForSatellite(info.noradId, family, tables)
 }

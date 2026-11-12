@@ -134,8 +134,8 @@ has been checked for logos yet.
 | Jason-1 / OSTM                     | Jason-3 (look-alike)                           | 593 kB / 925 kB                         | **OSTM (Jason-2) built**, Jason-3 being a near copy; shown for Jason-3 as a stand-in                             |
 | Jason CS                           | Sentinel-6A, 6B                                | 2.1 MB                                  | **Built**; Sentinel-6A own, 6B its twin as a stand-in                                                            |
 | GPM                                | GPM Core                                       | 2.26 MB                                 | **Built**                                                                                                        |
-| CubeSat 1RU, 2RU, ICECube, MiRaTa  | Generic stand-in for CubeSat fleets            | 149–445 kB                              | Flock and Lemur are 3U, so approximate                                                                           |
-| Satellite Kit (body, wings, radio) | Generic stand-in for any bus                   | 3–15 kB each                            | Assembled by us, as for New Horizons                                                                             |
+| CubeSat 1RU, 2RU, ICECube, MiRaTa  | Generic stand-in for CubeSat fleets            | 149–445 kB                              | **2RU built** for Flock and Lemur (both 3U, so approximate); the others are not used                             |
+| Satellite Kit (body, wings, radio) | Generic stand-in for any bus                   | 3–15 kB each                            | **Built**: body 1, wings 2 and radio 2, merged as NASA's own preview places them                                 |
 
 About 53 active objects have a same-mission NASA model (including 8 look-alikes): few by count,
 but they are the named objects people click.
@@ -429,13 +429,61 @@ The search was by name on Sketchfab only, so this means "not found that way", no
 exist". Still to search: the Gaia Sky repository, the Celestia Motherlode, Wikimedia Commons
 and Printables.
 
-Stand-ins, labelled as stand-ins:
+Stand-ins, labelled as stand-ins (the first two are built, below: "The fourth batch"):
 
-- NASA's Satellite Kit parts, assembled per family.
-- NASA's CubeSat models for CubeSat fleets.
+- NASA's Satellite Kit parts, set together as one generic bus.
+- NASA's 2U CubeSat for the Flock and Lemur fleets.
 - ["Low-poly Satellite Model"](https://plewr.itch.io/low-poly-satellite-model) by plewr, "License
   type: CC0", 59 kB GLB (VERIFIED page; contents not inspected).
 - A dot for debris and the long tail.
+
+## The fourth batch: stand-ins by family (#194, tier C, 2026-11-12)
+
+Two models for satellites that have none of their own, from the same pinned NASA commit and
+through the same gate. Both are always shown as family stand-ins (`scope: 'family'`), so Look
+closer says "A stand-in shared by this kind of satellite. It is not the exact shape of <name>."
+The decision and its reach: [ADR 0028](../decisions/0028-stand-in-models-by-name-and-group.md).
+
+| Model       | Source file (SHA-256 prefix)                                                          | Raw                     | Built     | Triangles (source, built, budget) | Credit                                                                      |
+| ----------- | ------------------------------------------------------------------------------------- | ----------------------- | --------- | --------------------------------- | --------------------------------------------------------------------------- |
+| cubesat     | `CubeSat - 2 RU Generic.glb` 30633496                                                 | 206,108 B               | 267,412 B | 36,896, 12,227, 12,000            | NASA/Christopher R. Meaney (the page's Source field)                        |
+| generic-bus | `Satellite Kit body 1.glb` 169428dc, `wings 2` b4b6d84a, `radio 2` 1d39f09f (3 files) | 2,916 + 8,172 + 8,752 B | 17,580 B  | 1,032 built, budget 1,100         | NASA/Ames Research Center (the kit page's Source), "arranged for this site" |
+
+**Picking the CubeSat.** NASA publishes 1RU, 2RU, ICECube and MiRaTa. Flock and Lemur are 3U, so
+the 2RU (two stacked units) is the nearest in proportion. It is approximate, and the stand-in
+wording says so. It carries 36,896 triangles because every solar cell is geometry; at 12k the
+cells are still distinct at the size Look closer draws it.
+
+**The generic bus.** The nine Satellite Kit files share one coordinate frame (the wing
+connectors start at the body's skin, the dishes sit on its top), so three of them are merged
+as they are, with no scaling or placing of ours. Body 1 is a grey cylinder (body 3 is red,
+body 2 a flat plate), wings 2 are two panels, radio 2 is a box with two dishes. The dishes face
++Y, which the descriptor uses as the Earth-facing axis; the real attitude is not modelled. The
+parts are Draco-compressed, so the build decodes them, merges them with `mergeDocuments` and
+writes plain quantized GLB (`buildGenericBus` in `scripts/craft-models.mjs`).
+
+**Logo check (2026-11-12).** Neither model has a texture image. Real-GPU renders of the shipped
+files (`pnpm test:e2e` with `--use-angle=metal`) from the front, both sides, the back, the top and the
+bottom, and 4x close renders of the CubeSat's electronics plate on all four faces and its
+mid-height strip: hardware blocks only, no lettering, insignia or logo.
+
+**Who gets which** (CelesTrak `active`, 16,899 rows read 2026-11-12, split into groups as
+`splitGroups` does; objects that have a model of their own are left out; counted by a
+throwaway script, so give or take one):
+
+| Stand-in    | Rule (`satFamily` in `src/lib/orrery/satFamily.ts`)                    | Objects |
+| ----------- | ---------------------------------------------------------------------- | ------- |
+| cubesat     | name starts `FLOCK ` or `LEMUR-` (109 Flock, 95 Lemur), in a bus group | 204     |
+| generic-bus | any other object in `gps-ops`, `weather`, `science` or `other`         | 5,429   |
+| none        | `starlink` (11,195), `stations` (16 without a model), debris           | 11,211  |
+
+The generic bus therefore also shows for GPS (32 in `gps-ops`) and GLONASS (28 of the 144 `COSMOS` rows in
+`other`) until models of their own land. Starlink and
+the stations are left out on purpose: to add Starlink, add `starlink` to `BUS_GROUPS`.
+
+The two add 284,992 B; the models total 7,555,260 B, under the 8,500,000 B `craftModelTotal`.
+Neither is over `craftModelBytes`. First load is unchanged: the models are fetched only when
+Look closer opens.
 
 ## Coverage, 2026-11-10
 
@@ -453,7 +501,7 @@ or stay a dot.
 
 **`craftModelTotal` was raised on 2026-11-11 to 8,500,000 B** with the second batch, which took
 the shipped total from 2,671,904 B to 3,854,632 B, past the old 3,000,000 B. The third batch
-brought it to 6,050,964 B, and Fermi and ICESat-2 to 7,270,268 B. The per-model budget on the
+brought it to 6,050,964 B, Fermi and ICESat-2 to 7,270,268 B, and the CubeSat and generic bus stand-ins to 7,555,260 B. The per-model budget on the
 uncompressed shipped file (`craftModelBytes`) was **raised from 500 kB to 850 kB** on 2026-11-11
 for ICESat-2 (805,664 B), whose solar arrays are kept unsimplified. Only the focused object's
 model is ever loaded, so the total is deploy size, not a visitor's download.
@@ -496,7 +544,7 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
 - [x] OCO-2, SORCE, SDO, SWAS, Chandra, MMS, THEMIS, CYGNSS, GRACE (for GRACE-FO), OSTM (for
       Jason-3), Sentinel-6, GPM: built, gated and registered (third batch).
 - [x] Fermi and ICESat-2: shipped with their arrays kept whole (`keep`).
-- [ ] The CubeSat and Satellite Kit stand-ins (they need family lookup, not built yet).
+- [x] The CubeSat and Satellite Kit stand-ins: built, gated and registered by family (fourth batch, 2026-11-12).
 - [ ] Starlink (Malacodart): not downloaded or measured yet; it is the one model that could exceed
       the trial mean size.
 
@@ -506,7 +554,7 @@ Proposed wording for the issue's "NASA models" item (the issue is not edited fro
    budget, a look for logos and a visual check.
 2. NASA's guidelines don't mention modifying files; the README says "without copyright". This is
    the position we already took for the 10 craft.
-3. Only the ten craft shipped before the gate (as "unrecorded") and the twenty-four satellite models
-   (the three batches, Fermi and ICESat-2) are checked for logos. Every other model needs its textures viewed before it ships.
+3. Only the ten craft shipped before the gate (as "unrecorded") and the twenty-six satellite models
+   (the three batches, Fermi, ICESat-2 and the two stand-ins) are checked for logos. Every other model needs its textures viewed before it ships.
 4. NASA's pages list a person or a company as "Source" (Hubble (A): DigitalSpace Corporation). The
    credit repeats it; the rights position is still the README's "free and without copyright".
