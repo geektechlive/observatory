@@ -64,6 +64,47 @@ describe('ENU and the cardinal azimuths', () => {
     expect(toward(1000, 0, 0).altitude).toBeCloseTo(90, 6)
   })
 
+  // At (0, 0) the east-north-up turn is the identity, so it can't catch a wrong sign or
+  // a swapped axis. Away from it, the cardinal points come from the Earth's axis alone:
+  // the celestial pole lies due north at an altitude equal to the latitude, and due
+  // east is along the equator's direction of rotation, on the horizon (#99).
+  it.each([
+    ['Kitt Peak', 31.9583, -111.5967, 2.1],
+    ['Sydney', -33.8688, 151.2093, 0.05],
+    ['Tromsø', 69.6492, 18.9553, 0],
+  ])('%s: north, east, south and west from the Earth’s axis', (_site, lat, lon, h) => {
+    const observer = { lat, lon, heightKm: h }
+    const at = wgs84ToEcef(lat, lon, h)
+    const lonRad = lon / DEG
+    const far = 1e6
+    const look = (dx: number, dy: number, dz: number) =>
+      altAzFromEcef({ x: at.x + far * dx, y: at.y + far * dy, z: at.z + far * dz }, observer)
+
+    // Azimuths compared round the circle, so 359.9999999° counts as north.
+    const azOff = (az: number, want: number) => Math.abs(((az - want + 540) % 360) - 180)
+
+    const pole = look(0, 0, 1)
+    expect(azOff(pole.azimuth, 0)).toBeLessThan(1e-6)
+    expect(pole.altitude).toBeCloseTo(lat, 6)
+    const southPole = look(0, 0, -1)
+    expect(azOff(southPole.azimuth, 180)).toBeLessThan(1e-6)
+    expect(southPole.altitude).toBeCloseTo(-lat, 6)
+    const east = look(-Math.sin(lonRad), Math.cos(lonRad), 0)
+    expect(azOff(east.azimuth, 90)).toBeLessThan(1e-6)
+    expect(east.altitude).toBeCloseTo(0, 6)
+    const west = look(Math.sin(lonRad), -Math.cos(lonRad), 0)
+    expect(azOff(west.azimuth, 270)).toBeLessThan(1e-6)
+    expect(west.altitude).toBeCloseTo(0, 6)
+  })
+
+  it('puts the 45° N geodetic point where the WGS84 closed form does', () => {
+    // a cos φ / √(1 - e² sin² φ) and a (1 - e²) sin φ / √(1 - e² sin² φ) at φ = 45°,
+    // with a = 6378.137 km and f = 1/298.257223563.
+    const p = wgs84ToEcef(45, 0, 0)
+    expect(p.x).toBeCloseTo(4517.590879, 5)
+    expect(p.z).toBeCloseTo(4487.348409, 5)
+  })
+
   it('names the compass point', () => {
     expect([0, 90, 180, 270, 337.5, 359].map(compassPoint)).toEqual([
       'N',

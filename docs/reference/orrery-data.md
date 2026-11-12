@@ -257,10 +257,21 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
   `horizons.ts`): osculating elements, M1/k1 (or 1I's H), the solution and its data arc. Outside
   the arc the path is extrapolated. When Horizons fails, a comet keeps SBDB's elements
   (`elementsSource`).
-- **Two-body is only a fallback.** `src/lib/orrery/conic.ts` solves ellipses, parabolas and
-  hyperbolas (no imports, so the job uses it too). Against Horizons it is within 2,000 km for 3I
-  a few days from its epoch, but 4.2 million km off for 161P and 1I, whose elements are years
-  old. Draw from the spans; use the conic outside them and say so.
+- **Two-body is only a fallback.** `src/lib/orrery/conic.ts` holds the one Kepler solver for
+  every shape (#99 item 1): elliptic by Newton from E₀ = M below e = 0.8, else π; hyperbolic
+  (M = e sinh H − H); Barker's equation for e = 1 exactly. It has no imports, so the job uses
+  it too, and `kepler.ts` re-exports it for the planets. Near e = 1 the equations and positions
+  are written so nothing cancels, so an orbit on e = 1 ± δ slides into the parabola in
+  proportion to δ down to δ = 1e-12 (`orrery-kepler-solvers.test.ts`); the old 1e-9 parabolic
+  band was off by up to 26 km at its edge for q = 0.5 au, and 234 km for q = 5 au 55 years
+  from perihelion.
+- **How far two-body holds** (`orrery-smallbodies-horizons.test.ts`, on the production payload
+  of 2026-11-12, against its own Horizons samples, from each object's osculating elements):
+  1I within 10,000 km over ±30 days of its epoch (worst 5,697 km), 2I 2,500 km over ±60 days
+  (1,621), 3I 5,000 km over ±60 days (3,275), and the periodic comet P/2026 T1 2,500 km over
+  its whole fine span, −6 to +54 days (1,412). A year from the epoch all three visitors are over 100,000 km
+  off, and 161P, whose elements are from 2021, was 5.2 million km off. So the conic draws
+  lines and cross-checks the samples; it never places a marker outside the spans.
 - **v∞ is for the visitors only:** 26.4, 32.3 and 58.0 km/s. A comet's osculating e can be just
   over 1 (C/2024 T5, 1.0022) while it is still bound.
 - Measured in a live dry run on 2026-11-07: 19 JPL requests in 26 s, all 15 placed, 164 KB (72

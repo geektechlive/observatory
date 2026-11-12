@@ -11,9 +11,38 @@ const RAD = Math.PI / 180
 const K = 0.01720209895
 const KM_PER_AU = 149_597_870.7
 const AU_PER_DAY_IN_KMS = KM_PER_AU / 86_400
-/** Closer to 1 than this, the orbit is solved as a parabola. */
-const PARABOLIC_BAND = 1e-9
 const MAX_ITERATIONS = 100
+/** Newton stops once a step is this small against the anomaly itself. */
+const RELATIVE_STEP = 1e-15
+/** Below this |x|, x - sin x and sinh x - x come from their series. */
+const SERIES_BELOW = 1
+
+/**
+ * x - sin x and sinh x - x without cancellation: near 0 both are about x³/6, and
+ * subtracting two nearly equal numbers would keep only the digits they differ in. Near
+ * e = 1 the anomalies are small and these differences carry the whole answer (#99).
+ */
+function xMinusSin(x: number): number {
+  if (Math.abs(x) >= SERIES_BELOW) return x - Math.sin(x)
+  return oddSeries(x, -1)
+}
+function sinhMinusX(x: number): number {
+  if (Math.abs(x) >= SERIES_BELOW) return Math.sinh(x) - x
+  return oddSeries(x, 1)
+}
+/** x³/3! + s x⁵/5! + s² x⁷/7! + ..., s = ±1, for |x| < 1 (19! > 10^17, so 9 terms do). */
+function oddSeries(x: number, s: number): number {
+  let term = x
+  let sum = 0
+  for (let k = 1; k <= 9; k += 1) {
+    term *= (s * x * x) / (2 * k * (2 * k + 1))
+    sum += term
+  }
+  return s * sum
+}
+/** 1 - cos x and cosh x - 1, written as 2 sin²(x/2) and 2 sinh²(x/2) for the same reason. */
+const oneMinusCos = (x: number) => 2 * Math.sin(x / 2) ** 2
+const coshMinusOne = (x: number) => 2 * Math.sinh(x / 2) ** 2
 
 export interface ConicElements {
   /** Eccentricity: < 1 ellipse, 1 parabola, > 1 hyperbola. */
@@ -49,64 +78,91 @@ export interface Direction {
  * so the start is ±π on M's side, and the answer is shifted back by the same turns.
  * Wrapping into [0, 2π) instead turned a tiny negative M into 2π minus it and lost its
  * digits: a near-parabolic ellipse before perihelion came out 0.0002 au off.
+ *
+ * Near e = 1 the equation is written (1 - e) sin E + (E - sin E) = M, so neither part
+ * cancels (#99): 1 - e is exact in floating point, and E - sin E comes from its series.
  */
 export function solveEllipticAnomaly(meanAnomaly: number, e: number): number {
   const turns = Math.round(meanAnomaly / (2 * Math.PI)) * 2 * Math.PI
   const M = meanAnomaly - turns
+  if (M === 0) return turns
+  const oneMinusE = 1 - e
   let E = e < 0.8 ? M : M < 0 ? -Math.PI : Math.PI
   for (let k = 0; k < MAX_ITERATIONS; k += 1) {
-    const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E))
+    const f = oneMinusE * Math.sin(E) + xMinusSin(E) - M
+    const dE = f / (oneMinusE + e * oneMinusCos(E))
     E -= dE
-    if (Math.abs(dE) <= 1e-15 * Math.max(1, Math.abs(E))) break
+    if (!(Math.abs(dE) > RELATIVE_STEP * Math.abs(E))) break
   }
   return E + turns
 }
 
-/** H from M = e sinh H - H, by Newton from Danby's start, sign(M) ln(2|M|/e + 1.8). */
+/**
+ * H from M = e sinh H - H, by Newton from Danby's start, sign(M) ln(2|M|/e + 1.8).
+ * Written (e - 1) sinh H + (sinh H - H) = M, so it holds its digits near e = 1 (#99).
+ */
 export function solveHyperbolicAnomaly(meanAnomaly: number, e: number): number {
   const M = meanAnomaly
+  if (M === 0) return 0
+  const eMinusOne = e - 1
   let H = Math.sign(M) * Math.log((2 * Math.abs(M)) / e + 1.8)
   for (let k = 0; k < MAX_ITERATIONS; k += 1) {
-    const dH = (e * Math.sinh(H) - H - M) / (e * Math.cosh(H) - 1)
+    const f = eMinusOne * Math.sinh(H) + sinhMinusX(H) - M
+    const dH = f / (eMinusOne * Math.cosh(H) + coshMinusOne(H))
     H -= dH
-    if (Math.abs(dH) <= 1e-15 * Math.max(1, Math.abs(H))) break
+    if (!(Math.abs(dH) > RELATIVE_STEP * Math.abs(H))) break
   }
   return H
 }
 
 /**
  * D = tan(ν/2) from Barker's equation D + D³/3 = W, in closed form. Solved for |W| and
- * signed after, because A + √(A² + 1) loses its digits for large negative A.
+ * signed after, because A + √(A² + 1) loses its digits for large negative A. With
+ * B = ∛(A + √(A² + 1)), D = B - 1/B, written 2A / (B² + 1 + 1/B²) so a small W, near
+ * perihelion, keeps its digits too.
  */
 export function solveBarker(W: number): number {
   const A = 1.5 * Math.abs(W)
   const B = Math.cbrt(A + Math.sqrt(A * A + 1))
-  return Math.sign(W) * (B - 1 / B)
+  return (Math.sign(W) * 2 * A) / (B * B + 1 + 1 / (B * B))
 }
 
-/** Position in the orbit's own plane: perihelion on +x, motion towards +y. */
+/**
+ * Position in the orbit's own plane: perihelion on +x, motion towards +y. Only e = 1
+ * exactly is a parabola; an orbit a hair either side is solved as the ellipse or the
+ * hyperbola it is, written so nothing cancels, and so slides into the parabola (#99).
+ * (The old way, a parabola within 1e-9 of e = 1 and the plain formulae outside it, was
+ * off by up to 26 km at the band's edge for q = 0.5 au and 234 km for q = 5 au, 55
+ * years from perihelion: often more than the orbit's real departure from the parabola.)
+ */
 function perifocal(el: ConicElements, jd: number): { xp: number; yp: number; r: number } {
   const { e, q } = el
   const dt = jd - el.tp
-  if (Math.abs(e - 1) < PARABOLIC_BAND) {
+  if (e === 1) {
     const D = solveBarker(dt * K * Math.sqrt(1 / (2 * q * q * q)))
     return { xp: q * (1 - D * D), yp: 2 * q * D, r: q * (1 + D * D) }
   }
   if (e < 1) {
-    const a = q / (1 - e)
+    // a(cos E - e) = q - a(1 - cos E), and a(1 - e cos E) = q + a e (1 - cos E).
+    const oneMinusE = 1 - e
+    const a = q / oneMinusE
     const E = solveEllipticAnomaly((K / Math.sqrt(a * a * a)) * dt, e)
+    const versin = oneMinusCos(E)
     return {
-      xp: a * (Math.cos(E) - e),
-      yp: a * Math.sqrt(1 - e * e) * Math.sin(E),
-      r: a * (1 - e * Math.cos(E)),
+      xp: q - a * versin,
+      yp: a * Math.sqrt(oneMinusE * (1 + e)) * Math.sin(E),
+      r: q + a * e * versin,
     }
   }
-  const a = q / (e - 1)
+  // a(e - cosh H) = q - a(cosh H - 1), and a(e cosh H - 1) = q + a e (cosh H - 1).
+  const eMinusOne = e - 1
+  const a = q / eMinusOne
   const H = solveHyperbolicAnomaly((K / Math.sqrt(a * a * a)) * dt, e)
+  const coshm1 = coshMinusOne(H)
   return {
-    xp: a * (e - Math.cosh(H)),
-    yp: a * Math.sqrt(e * e - 1) * Math.sinh(H),
-    r: a * (e * Math.cosh(H) - 1),
+    xp: q - a * coshm1,
+    yp: a * Math.sqrt(eMinusOne * (e + 1)) * Math.sinh(H),
+    r: q + a * e * coshm1,
   }
 }
 

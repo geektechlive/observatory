@@ -1,4 +1,6 @@
 # Upstream answers kept byte for byte, as SWPC served them (#213).
 tests/unit/functions/fixtures/swpc-solar-regions-early.json
+# /api/orrery-smallbodies kept byte for byte, as production served it (#99).
+tests/unit/fixtures/smallbodies/orrery-smallbodies-2026-11-12.json
 # Recorded upstream pages kept byte for byte; never reformatted (owner rule).
 tests/unit/scripts/fixtures/

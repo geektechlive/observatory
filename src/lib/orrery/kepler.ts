@@ -4,9 +4,11 @@
  * puts the error at 10–600 arcsec in longitude depending on the planet: far below a
  * pixel on any orrery we draw. Pure: callers pass the date.
  *
- * Comets and interstellar objects, on parabolas and hyperbolas as well as ellipses, are
- * solved in conic.ts (#99), which has no imports so the refresh job can use it too.
+ * One Kepler solver serves every orbit shape (#99): elliptic, hyperbolic and Barker's
+ * parabolic equation. It lives in conic.ts, which has no imports so the refresh job can
+ * use it too, and is re-exported here; the planets solve with the same elliptic solver.
  */
+import { solveEllipticAnomaly } from './conic'
 import {
   ELEMENTS,
   ELEMENTS_T2,
@@ -22,9 +24,6 @@ const RAD = Math.PI / 180
 const DEG = 180 / Math.PI
 const J2000 = 2451545.0
 const DAYS_PER_CENTURY = 36525
-/** JPL's tolerance for the approximate formulae, degrees. */
-const TOLERANCE_DEG = 1e-6
-const MAX_ITERATIONS = 50
 
 export interface Heliocentric {
   /** Ecliptic and equinox of J2000, au. x points to the equinox. */
@@ -50,20 +49,15 @@ function wrap180(deg: number): number {
   return deg - 360 * Math.round(deg / 360)
 }
 
+export { solveBarker, solveEllipticAnomaly, solveHyperbolicAnomaly } from './conic'
+
 /**
- * Eccentric anomaly E (degrees) from Kepler's equation M = E - e* sin E, by JPL's Newton
- * iteration with e* = e in degrees. M in degrees.
+ * Eccentric anomaly E (degrees) from Kepler's equation M = E - e sin E, M in degrees: the
+ * shared elliptic solver (conic.ts), converted. It converges to full precision, tighter
+ * than the 1e-6° JPL asks of its own iteration.
  */
 export function solveKepler(meanAnomalyDeg: number, e: number): number {
-  const eStar = e * DEG
-  let E = meanAnomalyDeg + eStar * Math.sin(meanAnomalyDeg * RAD)
-  for (let i = 0; i < MAX_ITERATIONS; i += 1) {
-    const dM = meanAnomalyDeg - (E - eStar * Math.sin(E * RAD))
-    const dE = dM / (1 - e * Math.cos(E * RAD))
-    E += dE
-    if (Math.abs(dE) <= TOLERANCE_DEG) break
-  }
-  return E
+  return solveEllipticAnomaly(meanAnomalyDeg * RAD, e) * DEG
 }
 
 /**
