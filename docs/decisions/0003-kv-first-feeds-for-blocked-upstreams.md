@@ -29,6 +29,14 @@ CAD, CelesTrak groups, Space-Track and DISCOSweb.
   the signal.
 - Revisit a source when its upstream answers Workers again and offers a usable API.
 
+## Addendum, 2026-11-12: CelesTrak has no live tier
+
+`/api/iss-tle` and `/api/satellites` no longer try live CelesTrak between fresh and stale KV
+(#214). CelesTrak still blocks Workers egress, so the request could only fail, and its usage
+policy says to stop querying on any non-200; a live try on every cache miss broke that. Their
+order is now fresh KV, then stale KV marked degraded, then the hardcoded fallback. The refresh
+job is the only CelesTrak caller (#212). `/api/launches` keeps its live RocketLaunch.live tier.
+
 ## Evidence
 
 - #30, #72; commits b23b449, abef6c4.

@@ -3,7 +3,7 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 import type { IssTle } from '../../src/schemas/iss-tle'
 import { IssTleSchema } from '../../src/schemas/iss-tle'
 import type { CacheableResult } from './_cache'
-import { cachedJson, fetchUpstream } from './_cache'
+import { cachedJson } from './_cache'
 
 // KV-first TLE serving.
 //
@@ -14,11 +14,10 @@ import { cachedJson, fetchUpstream } from './_cache'
 // READ KV. They must never write it: the free plan allows 1,000 writes/day and a
 // write on the request path burns that budget in minutes.
 //
-// Order of preference: fresh KV, then a best-effort live CelesTrak fetch (still
-// wired up in case the block lifts or a preview runs from a different egress),
-// then stale KV, then a hardcoded fallback.
-
-const CELESTRAK_URL = 'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE'
+// Order of preference: fresh KV, then stale KV, then a hardcoded fallback. There is
+// no live CelesTrak fetch (#214): CelesTrak blocks Workers egress, so every such
+// request failed, and its usage policy says to stop querying on any non-200. See
+// docs/reference/data-feeds-and-monitoring.md.
 
 /** KV key written by scripts/refresh-data.mjs. */
 export const KV_ISS_TLE_KEY = 'tle:iss:v1'
@@ -35,8 +34,6 @@ export const FRESH_TTL_SECONDS = 3600
  * "fallback" (and a stale X-Data-Age) for an hour after KV recovers.
  */
 export const DEGRADED_TTL_SECONDS = 300
-
-const LIVE_TIMEOUT_MS = 10_000
 
 /**
  * Last-resort ISS TLE. Fetched from CelesTrak on 2026-09-07 (epoch 26250.17589239).
@@ -114,34 +111,16 @@ export async function readKvEnvelope<T>(
   }
 }
 
-/** Parse CelesTrak's 3-line TLE text block. Structural checks only. */
-export function parseTle(text: string): IssTle | null {
-  const lines = text
-    .trim()
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0)
-  if (lines.length < 3) return null
-
-  const [name, line1, line2] = lines
-  if (!name || !line1 || !line2) return null
-  if (!line1.startsWith('1 ') || !line2.startsWith('2 ')) return null
-  return { name, line1, line2 }
-}
-
-type FetchUpstream = typeof fetchUpstream
-
 interface Env {
   OBSERVATORY_CACHE: KVNamespace
 }
 
 /**
  * Build the /api/iss-tle payload. Exported so tests can drive every branch with a
- * fake KV and a fake fetch, without stubbing the Cache API.
+ * fake KV, without stubbing the Cache API. Makes no upstream request.
  */
 export async function produceIssTle(
   kv: KvReader | undefined,
-  fetchImpl: FetchUpstream = fetchUpstream,
   now: number = Date.now(),
 ): Promise<CacheableResult> {
   const cached = await readKvEnvelope<unknown>(kv, KV_ISS_TLE_KEY, now)
@@ -160,23 +139,6 @@ export async function produceIssTle(
     }
   }
 
-  try {
-    const upstream = await fetchImpl(CELESTRAK_URL, undefined, { timeoutMs: LIVE_TIMEOUT_MS })
-    if (upstream.ok) {
-      const live = parseTle(await upstream.text())
-      const validated = live ? IssTleSchema.safeParse(live) : null
-      if (validated?.success) {
-        return {
-          body: JSON.stringify(validated.data),
-          ttl: FRESH_TTL_SECONDS,
-          extraHeaders: { 'X-Data-Source': 'live', 'X-Data-Age': '0' },
-        }
-      }
-    }
-  } catch {
-    // Timeout or network error. Fall through to the stale/fallback path.
-  }
-
   if (cached) {
     const validated = IssTleSchema.safeParse(cached.data)
     if (validated.success) {
@@ -186,6 +148,8 @@ export async function produceIssTle(
         degraded: true,
         extraHeaders: {
           'X-Data-Source': 'kv-stale',
+          // Upstream-caused, so health holds it for 4 runs (#71) like _kvBody.
+          'X-Error-Kind': 'upstream',
           'X-Data-Age': String(cached.ageSeconds),
         },
       }
@@ -196,7 +160,7 @@ export async function produceIssTle(
     body: JSON.stringify(FALLBACK_TLE),
     ttl: DEGRADED_TTL_SECONDS,
     degraded: true,
-    extraHeaders: { 'X-Data-Source': 'fallback' },
+    extraHeaders: { 'X-Data-Source': 'fallback', 'X-Error-Kind': 'upstream' },
   }
 }
 

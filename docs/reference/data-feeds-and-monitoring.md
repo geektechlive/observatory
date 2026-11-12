@@ -27,8 +27,11 @@ mean day to day:
 - **CelesTrak is unreachable from Cloudflare Workers egress** (522 since ~2026-09-03) though it
   works from anywhere else. `/api/iss-tle` and `/api/satellites` are KV-first: a GitHub Action
   fetches and validates TLEs from a normal network and writes `tle:iss:v1` /
-  `tle:satellites:v1`. The handlers fall back to live CelesTrak, then a hardcoded
-  `FALLBACK_TLE`.
+  `tle:satellites:v1`. The handlers serve fresh KV, then stale KV marked degraded
+  (`X-Data-Source: kv-stale`), then a hardcoded fallback (`FALLBACK_TLE` for the ISS, an empty
+  list for satellites; `X-Data-Source: fallback`), both with `X-Error-Kind: upstream` so a stale
+  copy is held like any upstream outage, not paged at once. They never ask CelesTrak (#214): the request
+  could only fail from Workers, and each visitor's cache miss would repeat it.
 - **CelesTrak's usage policy** (https://celestrak.org/usage-policy.php, read 2026-11-12): "only
   download data once per update"; GP and SupGP both update every 2 hours; "M2M (machine-to-machine)
   software should immediately stop querying when it receives any non-HTTP 200 responses". Every

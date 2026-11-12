@@ -2,7 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { SatellitesResponseSchema } from '../../src/schemas/satellites'
 import type { CacheableResult } from './_cache'
-import { cachedJson, fetchUpstream } from './_cache'
+import { cachedJson } from './_cache'
 import type { KvReader } from './iss-tle'
 import { DEGRADED_TTL_SECONDS, FRESH_TTL_SECONDS, readKvEnvelope } from './iss-tle'
 
@@ -24,8 +24,6 @@ export const SATS: { label: string; catnr: number }[] = [
 /** KV key written by scripts/refresh-data.mjs. */
 export const KV_SATELLITES_KEY = 'tle:satellites:v1'
 
-const LIVE_TIMEOUT_MS = 10_000
-
 /** Record shape stored inside the KV envelope's `data` array. */
 export interface KvSatelliteRecord {
   label: string
@@ -34,8 +32,6 @@ export interface KvSatelliteRecord {
   line1: string
   line2: string
 }
-
-type FetchUpstream = typeof fetchUpstream
 
 interface Env {
   OBSERVATORY_CACHE: KVNamespace
@@ -68,38 +64,12 @@ export function buildSatellitesBody(records: unknown, updatedAt: string): string
   return validated.success ? JSON.stringify(validated.data) : null
 }
 
-async function fetchSatLive(
-  label: string,
-  catnr: number,
-  fetchImpl: FetchUpstream,
-): Promise<{ name: string; line1: string; line2: string } | null> {
-  try {
-    const res = await fetchImpl(
-      `https://celestrak.org/NORAD/elements/gp.php?CATNR=${catnr}&FORMAT=TLE`,
-      undefined,
-      { timeoutMs: LIVE_TIMEOUT_MS },
-    )
-    if (!res.ok) return null
-    const lines = (await res.text())
-      .trim()
-      .split('\n')
-      .map((l) => l.trim())
-    const line1 = lines.find((l) => l.startsWith('1 '))
-    const line2 = lines.find((l) => l.startsWith('2 '))
-    if (!line1 || !line2) return null
-    return { name: label, line1, line2 }
-  } catch {
-    return null
-  }
-}
-
 /**
  * Build the /api/satellites payload. Exported so tests can drive every branch with a
- * fake KV and a fake fetch, without stubbing the Cache API.
+ * fake KV, without stubbing the Cache API. Makes no upstream request (#214).
  */
 export async function produceSatellites(
   kv: KvReader | undefined,
-  fetchImpl: FetchUpstream = fetchUpstream,
   now: number = Date.now(),
 ): Promise<CacheableResult> {
   const cached = await readKvEnvelope<unknown>(kv, KV_SATELLITES_KEY, now)
@@ -118,21 +88,6 @@ export async function produceSatellites(
     }
   }
 
-  // Best-effort live path. Two subrequests, well inside the 50-per-invocation limit.
-  const results = await Promise.all(SATS.map((s) => fetchSatLive(s.label, s.catnr, fetchImpl)))
-  const live = results.filter((s): s is NonNullable<typeof s> => s !== null)
-  if (live.length > 0) {
-    const nowIso = new Date(now).toISOString()
-    const validated = SatellitesResponseSchema.safeParse({ satellites: live, updatedAt: nowIso })
-    if (validated.success) {
-      return {
-        body: JSON.stringify(validated.data),
-        ttl: FRESH_TTL_SECONDS,
-        extraHeaders: { 'X-Data-Source': 'live', 'X-Data-Age': '0' },
-      }
-    }
-  }
-
   if (cached) {
     const body = buildSatellitesBody(cached.data, cached.fetchedAt)
     if (body !== null) {
@@ -142,6 +97,8 @@ export async function produceSatellites(
         degraded: true,
         extraHeaders: {
           'X-Data-Source': 'kv-stale',
+          // Upstream-caused, so health holds it for 4 runs (#71) like _kvBody.
+          'X-Error-Kind': 'upstream',
           'X-Data-Age': String(cached.ageSeconds),
         },
       }
@@ -154,7 +111,7 @@ export async function produceSatellites(
     body: JSON.stringify({ satellites: [], updatedAt: new Date(now).toISOString() }),
     ttl: DEGRADED_TTL_SECONDS,
     degraded: true,
-    extraHeaders: { 'X-Data-Source': 'fallback' },
+    extraHeaders: { 'X-Data-Source': 'fallback', 'X-Error-Kind': 'upstream' },
   }
 }
 

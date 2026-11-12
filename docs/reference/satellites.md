@@ -56,7 +56,9 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
   only, never retried. A non-200, or no answer at all (a network error or timeout), stops the
   gate, and the later requests fail at once without being sent ("not asked: CelesTrak stopped
   this run after …"). A 200 whose body won't parse fails only its own group. Each source that
-  isn't refreshed keeps its KV copy and is judged by its age (36 h).
+  isn't refreshed keeps its KV copy and is judged by its age (36 h). The refresh job is the only
+  CelesTrak caller: `/api/iss-tle` and `/api/satellites` read KV only and never fetch CelesTrak
+  live (#214).
 - **CelesTrak answers 403 "GP data has not updated since your last successful download"** when
   one address asks again inside its 2 h update cycle (seen 2026-11-07 after a local probe). It is
   a non-200, so it stops the run too, and the reason names it. Copies are read back only for

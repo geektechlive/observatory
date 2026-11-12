@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The real _cache module talks to the Cloudflare Cache API, which does not exist in
 // this environment. Mock it with a factory so the module is never loaded: these tests
@@ -9,20 +9,11 @@ vi.mock('../../../functions/api/_cache', () => ({
   upstreamError: vi.fn(),
 }))
 
-const {
-  FALLBACK_TLE,
-  KV_ISS_TLE_KEY,
-  KV_MAX_AGE_SECONDS,
-  parseTle,
-  produceIssTle,
-  readKvEnvelope,
-} = await import('../../../functions/api/iss-tle')
+const { fetchUpstream } = await import('../../../functions/api/_cache')
+const { FALLBACK_TLE, KV_ISS_TLE_KEY, KV_MAX_AGE_SECONDS, produceIssTle, readKvEnvelope } =
+  await import('../../../functions/api/iss-tle')
 const { KV_SATELLITES_KEY, buildSatellitesBody, produceSatellites } =
   await import('../../../functions/api/satellites')
-
-const ISS_TLE_TEXT = `ISS (ZARYA)
-1 25544U 98067A   26250.17589239  .00004561  00000+0  90859-4 0  9999
-2 25544  51.6308 254.3052 0005020 115.4261 244.7248 15.49013499584466`
 
 const ISS_TLE = {
   name: 'ISS (ZARYA)',
@@ -32,6 +23,7 @@ const ISS_TLE = {
 
 const NOW = Date.parse('2026-09-07T00:00:00.000Z')
 const HOUR_MS = 3600_000
+const TEN_DAYS_MS = 10 * 24 * HOUR_MS
 
 function fakeKv(entries: Record<string, string>) {
   return {
@@ -41,17 +33,6 @@ function fakeKv(entries: Record<string, string>) {
 
 function envelope(data: unknown, fetchedAt: string): string {
   return JSON.stringify({ fetchedAt, source: 'celestrak', data })
-}
-
-/** Stands in for _cache's fetchUpstream. */
-function fakeFetch(response: { ok: boolean; text: string } | Error) {
-  return vi.fn(() => {
-    if (response instanceof Error) return Promise.reject(response)
-    return Promise.resolve({
-      ok: response.ok,
-      text: () => Promise.resolve(response.text),
-    } as unknown as Response)
-  })
 }
 
 // A producer result is either a Response (uncached passthrough) or a payload object.
@@ -69,23 +50,24 @@ function asPayload(result: unknown): Payload {
   return result as Payload
 }
 
-describe('parseTle', () => {
-  it('parses a CelesTrak three-line block and trims the padded name', () => {
-    expect(parseTle(ISS_TLE_TEXT)).toEqual(ISS_TLE)
-  })
+// CelesTrak blocks Workers egress and its usage policy says to stop on any non-200
+// (#214), so neither Function may ask it anything on the request path. Every test
+// below spies on both ways a Function could reach the network.
+let globalFetch: ReturnType<typeof vi.spyOn>
 
-  it('returns null when fewer than three lines are present', () => {
-    expect(parseTle(`ISS (ZARYA)\n${ISS_TLE.line1}`)).toBeNull()
-  })
-
-  it('returns null when the line prefixes are wrong', () => {
-    expect(parseTle(`ISS (ZARYA)\n${ISS_TLE.line2}\n${ISS_TLE.line1}`)).toBeNull()
-  })
-
-  it('returns null for an empty body', () => {
-    expect(parseTle('')).toBeNull()
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  globalFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no network in tests'))
 })
+
+afterEach(() => {
+  globalFetch.mockRestore()
+})
+
+function expectNoUpstreamRequest() {
+  expect(fetchUpstream).not.toHaveBeenCalled()
+  expect(globalFetch).not.toHaveBeenCalled()
+}
 
 describe('readKvEnvelope', () => {
   it('returns null when there is no KV binding', async () => {
@@ -133,19 +115,14 @@ describe('readKvEnvelope', () => {
 })
 
 describe('produceIssTle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   it('serves fresh KV without touching the network', async () => {
-    const fetchImpl = fakeFetch(new Error('should not be called'))
     const kv = fakeKv({
       [KV_ISS_TLE_KEY]: envelope(ISS_TLE, new Date(NOW - HOUR_MS).toISOString()),
     })
 
-    const payload = asPayload(await produceIssTle(kv, fetchImpl, NOW))
+    const payload = asPayload(await produceIssTle(kv, NOW))
 
-    expect(fetchImpl).not.toHaveBeenCalled()
+    expectNoUpstreamRequest()
     expect(JSON.parse(payload.body)).toEqual(ISS_TLE)
     expect(payload.degraded).toBeUndefined()
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('kv')
@@ -153,70 +130,51 @@ describe('produceIssTle', () => {
     expect(payload.ttl).toBe(3600)
   })
 
-  it('falls forward to a live fetch when KV is missing', async () => {
-    const fetchImpl = fakeFetch({ ok: true, text: ISS_TLE_TEXT })
-
-    const payload = asPayload(await produceIssTle(fakeKv({}), fetchImpl, NOW))
-
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(payload.body)).toEqual(ISS_TLE)
-    expect(payload.extraHeaders?.['X-Data-Source']).toBe('live')
-    expect(payload.degraded).toBeUndefined()
-  })
-
-  it('tries live first when KV is stale, then serves live', async () => {
-    const old = { ...ISS_TLE, name: 'ISS (OLD)' }
-    const kv = fakeKv({
-      [KV_ISS_TLE_KEY]: envelope(old, new Date(NOW - 10 * 24 * 3600_000).toISOString()),
-    })
-    const fetchImpl = fakeFetch({ ok: true, text: ISS_TLE_TEXT })
-
-    const payload = asPayload(await produceIssTle(kv, fetchImpl, NOW))
-
-    expect(payload.extraHeaders?.['X-Data-Source']).toBe('live')
-    expect(JSON.parse(payload.body).name).toBe('ISS (ZARYA)')
-  })
-
-  it('serves stale KV, marked degraded, when the live fetch fails', async () => {
-    const fetchedAt = new Date(NOW - 10 * 24 * 3600_000).toISOString()
+  it('serves stale KV, marked degraded, without asking CelesTrak', async () => {
+    const fetchedAt = new Date(NOW - TEN_DAYS_MS).toISOString()
     const kv = fakeKv({ [KV_ISS_TLE_KEY]: envelope(ISS_TLE, fetchedAt) })
-    const fetchImpl = fakeFetch(new Error('522'))
 
-    const payload = asPayload(await produceIssTle(kv, fetchImpl, NOW))
+    const payload = asPayload(await produceIssTle(kv, NOW))
 
+    expectNoUpstreamRequest()
     expect(payload.degraded).toBe(true)
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('kv-stale')
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
+    expect(payload.extraHeaders?.['X-Data-Age']).toBe(String(TEN_DAYS_MS / 1000))
     expect(payload.ttl).toBe(300)
     expect(JSON.parse(payload.body)).toEqual(ISS_TLE)
   })
 
-  it('serves the hardcoded fallback when KV and the live fetch both fail', async () => {
-    const fetchImpl = fakeFetch(new Error('522'))
+  it('serves the hardcoded fallback, without asking CelesTrak, when KV is missing', async () => {
+    const payload = asPayload(await produceIssTle(fakeKv({}), NOW))
 
-    const payload = asPayload(await produceIssTle(undefined, fetchImpl, NOW))
-
+    expectNoUpstreamRequest()
     expect(payload.degraded).toBe(true)
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('fallback')
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
+    expect(payload.ttl).toBe(300)
     expect(JSON.parse(payload.body)).toEqual(FALLBACK_TLE)
   })
 
-  it('treats a non-ok upstream response as a failure', async () => {
-    const fetchImpl = fakeFetch({ ok: false, text: '' })
+  it('serves the hardcoded fallback when there is no KV binding', async () => {
+    const payload = asPayload(await produceIssTle(undefined, NOW))
 
-    const payload = asPayload(await produceIssTle(fakeKv({}), fetchImpl, NOW))
-
+    expectNoUpstreamRequest()
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('fallback')
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
   })
 
-  it('ignores a fresh KV entry whose payload fails schema validation', async () => {
+  it('falls back when a fresh KV entry fails schema validation', async () => {
     const kv = fakeKv({
       [KV_ISS_TLE_KEY]: envelope({ nope: true }, new Date(NOW - HOUR_MS).toISOString()),
     })
-    const fetchImpl = fakeFetch({ ok: true, text: ISS_TLE_TEXT })
 
-    const payload = asPayload(await produceIssTle(kv, fetchImpl, NOW))
+    const payload = asPayload(await produceIssTle(kv, NOW))
 
-    expect(payload.extraHeaders?.['X-Data-Source']).toBe('live')
+    expectNoUpstreamRequest()
+    expect(payload.degraded).toBe(true)
+    expect(payload.extraHeaders?.['X-Data-Source']).toBe('fallback')
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
   })
 })
 
@@ -248,53 +206,52 @@ describe('produceSatellites', () => {
     { label: 'Tiangong', catnr: 48274, name: 'CSS', line1: '1 css', line2: '2 css' },
   ]
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   it('serves fresh KV without touching the network', async () => {
-    const fetchImpl = fakeFetch(new Error('should not be called'))
     const fetchedAt = new Date(NOW - HOUR_MS).toISOString()
     const kv = fakeKv({ [KV_SATELLITES_KEY]: envelope(records, fetchedAt) })
 
-    const payload = asPayload(await produceSatellites(kv, fetchImpl, NOW))
+    const payload = asPayload(await produceSatellites(kv, NOW))
 
-    expect(fetchImpl).not.toHaveBeenCalled()
+    expectNoUpstreamRequest()
     const parsed = JSON.parse(payload.body)
     expect(parsed.satellites.map((s: { name: string }) => s.name)).toEqual(['Hubble', 'Tiangong'])
     expect(parsed.updatedAt).toBe(fetchedAt)
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('kv')
   })
 
-  it('falls forward to live CelesTrak fetches when KV is missing', async () => {
-    const fetchImpl = fakeFetch({ ok: true, text: `NAME\n1 live\n2 live` })
-
-    const payload = asPayload(await produceSatellites(fakeKv({}), fetchImpl, NOW))
-
-    expect(fetchImpl).toHaveBeenCalledTimes(2)
-    expect(payload.extraHeaders?.['X-Data-Source']).toBe('live')
-    expect(JSON.parse(payload.body).satellites).toHaveLength(2)
-  })
-
-  it('serves stale KV, marked degraded, when the live fetch fails', async () => {
-    const fetchedAt = new Date(NOW - 10 * 24 * 3600_000).toISOString()
+  it('serves stale KV, marked degraded, without asking CelesTrak', async () => {
+    const fetchedAt = new Date(NOW - TEN_DAYS_MS).toISOString()
     const kv = fakeKv({ [KV_SATELLITES_KEY]: envelope(records, fetchedAt) })
-    const fetchImpl = fakeFetch(new Error('522'))
 
-    const payload = asPayload(await produceSatellites(kv, fetchImpl, NOW))
+    const payload = asPayload(await produceSatellites(kv, NOW))
 
+    expectNoUpstreamRequest()
     expect(payload.degraded).toBe(true)
+    expect(payload.ttl).toBe(300)
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('kv-stale')
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
+    expect(payload.extraHeaders?.['X-Data-Age']).toBe(String(TEN_DAYS_MS / 1000))
     expect(JSON.parse(payload.body).satellites).toHaveLength(2)
   })
 
-  it('serves an empty degraded list when nothing is available', async () => {
-    const fetchImpl = fakeFetch(new Error('522'))
+  it('serves an empty degraded list, without asking CelesTrak, when KV is missing', async () => {
+    const payload = asPayload(await produceSatellites(fakeKv({}), NOW))
 
-    const payload = asPayload(await produceSatellites(undefined, fetchImpl, NOW))
-
+    expectNoUpstreamRequest()
     expect(payload.degraded).toBe(true)
     expect(payload.extraHeaders?.['X-Data-Source']).toBe('fallback')
-    expect(JSON.parse(payload.body).satellites).toEqual([])
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
+    expect(JSON.parse(payload.body)).toEqual({
+      satellites: [],
+      updatedAt: new Date(NOW).toISOString(),
+    })
+  })
+
+  it('serves the empty fallback when there is no KV binding', async () => {
+    const payload = asPayload(await produceSatellites(undefined, NOW))
+
+    expectNoUpstreamRequest()
+    expect(payload.extraHeaders?.['X-Data-Source']).toBe('fallback')
+    expect(payload.extraHeaders?.['X-Error-Kind']).toBe('upstream')
   })
 })
