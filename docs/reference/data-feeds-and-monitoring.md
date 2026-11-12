@@ -204,6 +204,12 @@ mean day to day:
   "after 3 attempts" failure took about 70 ms and never reached the upstream. A response with
   `X-Cache: NEG` now waits 65 s before the next attempt. Retry any cached endpoint past its cache
   window.
+- **It checks CARTO's map credit (#221).** Once per run, with no retry, it fetches the live
+  dark-matter style the world map loads and checks its sources' `attribution` names CARTO and
+  OpenStreetMap (credits are licence terms, #179; the e2e serves a dated copy, #143). Its entry
+  is `health:carto-map-credit`. A style that answers without the credit is drift and opens on
+  the first run; CARTO not answering (network error, timeout, HTTP error, unreadable body) is
+  upstream and held for 4 runs like any outage.
 
 ## Alerts are GitHub issues
 

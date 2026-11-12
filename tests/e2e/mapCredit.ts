@@ -4,7 +4,8 @@ import type { Page } from '@playwright/test'
  * CARTO's dark-matter-nolabels style, trimmed to its one source and two of its layers
  * (copied verbatim from the live style.json on 2026-11-12). The credit comes from the
  * source's `attribution`, which MapLibre shows once the style has loaded and a frame has
- * drawn one of the source's layers. If CARTO changes its credit, this copy won't notice.
+ * drawn one of the source's layers. If CARTO changes its credit, this copy won't notice;
+ * the scheduled health check's `carto-map-credit` does (#221).
  */
 const CARTO_STYLE = {
   version: 8,

@@ -4,6 +4,7 @@
 // Hits the eight endpoints that the dashboard cannot render without, asserts that
 // each one actually carries data (not just a 200 with nulls), and treats the
 // X-Data-Degraded marker as a failure so a silent fallback cannot pass unnoticed.
+// It also fetches CARTO's live map style once and checks its credit (#221).
 //
 // Usage:
 //   node scripts/check-health.mjs
@@ -107,7 +108,9 @@ export const CHECKS = [
     check: (b) =>
       Array.isArray(b?.approaches) &&
       b.approaches.length > 0 &&
-      b.approaches.every((x) => typeof x?.closeApproach?.distAu === 'number' && x?.fine !== undefined),
+      b.approaches.every(
+        (x) => typeof x?.closeApproach?.distAu === 'number' && x?.fine !== undefined,
+      ),
   },
   // The orrery's comets and interstellar objects (#99): KV-only, written by the refresh job.
   {
@@ -161,7 +164,9 @@ export const CHECKS = [
     requires: 'a TIP re-entries list, each with its predicted time',
     check: (b) =>
       Array.isArray(b?.tip?.reentries) &&
-      b.tip.reentries.every((r) => typeof r?.noradId === 'string' && typeof r?.decayEpoch === 'string'),
+      b.tip.reentries.every(
+        (r) => typeof r?.noradId === 'string' && typeof r?.decayEpoch === 'string',
+      ),
   },
   // ESA DISCOS (#101): KV-only, read by the refresh job with the owner's token.
   {
@@ -342,6 +347,79 @@ export async function runCheck(baseUrl, spec) {
   }
 }
 
+/**
+ * The basemap style WorldMap.tsx loads. Its sources' `attribution` is the map's credit,
+ * and credits are licence terms (#179). The e2e serves a dated copy (#143), so only this
+ * check notices if CARTO changes the live credit (#221).
+ */
+export const CARTO_STYLE_URL =
+  'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json'
+/** The report entry's name: `health:carto-map-credit` in the issue title and Discord. */
+export const MAP_CREDIT_CHECK = 'carto-map-credit'
+const REQUIRED_CREDITS = ['CARTO', 'OpenStreetMap']
+/** How much of the found credit text an incident quotes. */
+const CREDIT_EXCERPT = 160
+
+/** The attribution text of every source in a style, tags stripped, or '' if none. */
+function styleCredit(style) {
+  const sources = Object.values(style?.sources ?? {})
+  return sources
+    .map((s) => (typeof s?.attribution === 'string' ? s.attribution : ''))
+    .join(' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Fetch CARTO's live style once (no retries) and check its credit names CARTO and
+ * OpenStreetMap. CARTO not answering is upstream (`errorKind: 'upstream'`, held #71);
+ * a style that answers without the credit is drift (`reason: 'contract'`, alerts at once).
+ */
+export async function checkMapCredit(fetchImpl = fetch) {
+  const started = Date.now()
+  const base = { path: MAP_CREDIT_CHECK }
+  const upstream = (status, note) => ({
+    ...base,
+    ok: false,
+    status,
+    ms: Date.now() - started,
+    errorKind: 'upstream',
+    note,
+  })
+
+  let res
+  let style
+  try {
+    res = await fetchImpl(CARTO_STYLE_URL, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+    if (!res.ok) return upstream(res.status, `CARTO style HTTP ${String(res.status)}`)
+    style = await res.json()
+  } catch (err) {
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+    const why = timedOut ? `timeout after ${String(TIMEOUT_MS)} ms` : String(err?.message ?? err)
+    return upstream(res?.status ?? 0, `CARTO style unreadable: ${why}`)
+  }
+
+  const ms = Date.now() - started
+  const credit = styleCredit(style)
+  const missing = REQUIRED_CREDITS.filter((name) => !credit.includes(name))
+  if (missing.length > 0) {
+    const found = credit ? `"${credit.slice(0, CREDIT_EXCERPT)}"` : 'none'
+    const note = `credit missing ${missing.join(' and ')} (found: ${found})`
+    return { ...base, ok: false, status: res.status, ms, reason: 'contract', note }
+  }
+  return {
+    ...base,
+    ok: true,
+    status: res.status,
+    ms,
+    note: `credits ${REQUIRED_CREDITS.join(' and ')}`,
+  }
+}
+
 /** Run the specs with a fixed worker-pool concurrency, preserving input order. */
 async function runAll(baseUrl, specs, concurrency) {
   const results = new Array(specs.length)
@@ -405,6 +483,7 @@ function printTable(results) {
 
 export async function main({
   runAll: run = runAll,
+  checkCredit = checkMapCredit,
   writeReport = (text) => writeFile(REPORT_PATH, text),
   log = console.log,
   error = console.error,
@@ -412,7 +491,8 @@ export async function main({
   const baseUrl = (process.env.BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '')
   log(`health check against ${baseUrl}\n`)
 
-  const results = await run(baseUrl, CHECKS, CONCURRENCY)
+  const [endpoints, credit] = await Promise.all([run(baseUrl, CHECKS, CONCURRENCY), checkCredit()])
+  const results = [...endpoints, credit]
   printTable(results)
   await writeReport(JSON.stringify(toReport(results), null, 2))
 

@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  CARTO_STYLE_URL,
+  checkMapCredit,
   CHECKS,
   isTransient,
   judgeStale,
   main,
+  MAP_CREDIT_CHECK,
   NEG_RETRY_DELAY_MS,
   retryDelayMs,
   REVALIDATE_RECHECK_MS,
@@ -457,10 +460,104 @@ describe('probed endpoints (#42, #61)', () => {
   })
 })
 
+describe("CARTO's map credit (#221)", () => {
+  // Trimmed from the live dark-matter-nolabels style.json (2026-11-12), as in
+  // tests/e2e/mapCredit.ts: the credit is the source's `attribution`.
+  const LIVE_ATTRIBUTION =
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/about-carto/">CARTO</a>'
+  const style = (attribution?: string) => ({
+    version: 8,
+    sources: {
+      protomaps: { type: 'vector', ...(attribution === undefined ? {} : { attribution }) },
+    },
+    layers: [],
+  })
+  const fakeFetch = (body: unknown, status = 200) =>
+    vi.fn(async () => new Response(JSON.stringify(body), { status }))
+
+  it('asks for the style the map loads, once', async () => {
+    const fetch = fakeFetch(style(LIVE_ATTRIBUTION))
+    await checkMapCredit(fetch)
+    expect(CARTO_STYLE_URL).toBe(
+      'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json',
+    )
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith(CARTO_STYLE_URL, expect.anything())
+  })
+
+  it('passes when the attribution credits CARTO and OpenStreetMap', async () => {
+    const r = await checkMapCredit(fakeFetch(style(LIVE_ATTRIBUTION)))
+    expect(r).toMatchObject({ path: MAP_CREDIT_CHECK, ok: true, status: 200 })
+    expect(toReport([r])[0]).toEqual({
+      signature: `health:${MAP_CREDIT_CHECK as string}`,
+      ok: true,
+      detail: expect.stringContaining('PASS') as unknown,
+    })
+  })
+
+  it('opens a drift incident on the first run when a credit is missing', async () => {
+    const r = await checkMapCredit(fakeFetch(style('&copy; CARTO')))
+    expect(r).toMatchObject({ ok: false, status: 200, reason: 'contract' })
+    expect(r.note).toContain('OpenStreetMap')
+    const [entry] = toReport([r])
+    expect(entry).toMatchObject({ ok: false })
+    expect(entry).not.toHaveProperty('upstream')
+  })
+
+  it('calls a style with no attribution at all drift', async () => {
+    const r = await checkMapCredit(fakeFetch(style()))
+    expect(r).toMatchObject({ ok: false, reason: 'contract' })
+    expect(toReport([r])[0]).not.toHaveProperty('upstream')
+  })
+
+  it('holds a fetch failure as upstream: CARTO down is not drift (#71)', async () => {
+    const down = vi.fn(async () => Promise.reject(new TypeError('fetch failed')))
+    const r = await checkMapCredit(down)
+    expect(r).toMatchObject({ ok: false, status: 0, errorKind: 'upstream' })
+    expect(toReport([r])[0]).toMatchObject({ ok: false, upstream: true })
+  })
+
+  it('holds an HTTP error from CARTO as upstream, without retrying', async () => {
+    const fetch = fakeFetch({ error: 'x' }, 503)
+    const r = await checkMapCredit(fetch)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(r).toMatchObject({ ok: false, status: 503, errorKind: 'upstream' })
+    expect(toReport([r])[0]).toMatchObject({ upstream: true })
+  })
+
+  it('holds an unreadable (non-JSON) body as upstream, not drift', async () => {
+    const html = vi.fn(async () =>
+      Promise.resolve(new Response('<html>busy</html>', { status: 200 })),
+    )
+    const r = await checkMapCredit(html)
+    expect(r).toMatchObject({ ok: false, errorKind: 'upstream' })
+    expect(toReport([r])[0]).toMatchObject({ upstream: true })
+  })
+
+  it('is reported alongside the endpoints by main', async () => {
+    const written: string[] = []
+    await main({
+      runAll: () => Promise.resolve([]),
+      checkCredit: () => checkMapCredit(fakeFetch(style('&copy; CARTO'))),
+      writeReport: (text: string) => {
+        written.push(text)
+        return Promise.resolve()
+      },
+      log: () => undefined,
+      error: () => undefined,
+    })
+    expect(JSON.parse(written[0] ?? '[]')).toEqual([
+      expect.objectContaining({ signature: `health:${MAP_CREDIT_CHECK as string}`, ok: false }),
+    ])
+  })
+})
+
 describe('exit code (#120)', () => {
   // The incident reporter (issue + Discord) is the alert. A red job only made GitHub
   // email about outages nobody could fix, every 6 h.
-  const quiet = { log: () => undefined, error: () => undefined }
+  const passingCredit = () =>
+    Promise.resolve({ path: 'map-credit', ok: true, status: 200, ms: 1, note: 'ok' })
+  const quiet = { log: () => undefined, error: () => undefined, checkCredit: passingCredit }
 
   it('exits 0 once a failing endpoint is written to the incident report', async () => {
     const written: string[] = []
@@ -474,9 +571,9 @@ describe('exit code (#120)', () => {
       ...quiet,
     })
     expect(code).toBe(0)
-    expect(JSON.parse(written[0] ?? '[]')).toEqual([
+    expect(JSON.parse(written[0] ?? '[]')).toContainEqual(
       expect.objectContaining({ signature: 'health:/api/donki', ok: false }),
-    ])
+    )
   })
 
   it('fails when the report cannot be written: then nothing would alert', async () => {
