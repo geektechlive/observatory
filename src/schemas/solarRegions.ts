@@ -17,8 +17,9 @@ export const ActiveRegionSchema = z.object({
   location: z.string(),
   latitude: z.number(),
   longitude: z.number(),
-  area: z.number(),
-  spotClass: z.string(),
+  area: z.number().nullable(),
+  // Null on an early day, before SWPC compiles its region summary (#213).
+  spotClass: z.string().nullable(),
   magClass: z.string().nullable(),
   spots: z.number().nullable(),
   c: z.number().nullable(),
@@ -33,6 +34,7 @@ export const SolarRegionsSchema = z.object({
     .object({
       observedDate: z.string(),
       validAt: z.string(),
+      preliminary: z.boolean(),
       items: z.array(ActiveRegionSchema),
     })
     .nullable(),

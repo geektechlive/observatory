@@ -9,7 +9,8 @@ import { cachedJson, contractError, type ErrorKind, fetchUpstream, upstreamError
 // filter measured about 0.1 ms (docs/reference/data-feeds-and-monitoring.md).
 const PROBABILITIES_FEED = 'https://services.swpc.noaa.gov/json/solar_probabilities.json'
 const REGIONS_FEED = 'https://services.swpc.noaa.gov/json/solar_regions.json'
-// SWPC issues both once a day (the region summary at 00:30 UTC, the odds at 22:00 UTC).
+// SWPC compiles the region summary at 00:30 UTC and the odds at 22:00 UTC, but the regions
+// file also changes during the day as observatory reports come in (#213: 06:12 on 12 Nov).
 const CACHE_TTL_SECONDS = 30 * 60
 const DEGRADED_TTL_SECONDS = 120
 
@@ -29,7 +30,7 @@ async function fetchHalf<T>(url: string, parse: (json: unknown) => T | null): Pr
 }
 
 export const onRequest: PagesFunction = (ctx) =>
-  cachedJson(ctx, 'noaa:solar-regions:v1', CACHE_TTL_SECONDS, async () => {
+  cachedJson(ctx, 'noaa:solar-regions:v2', CACHE_TTL_SECONDS, async () => {
     const [odds, regions] = await Promise.all([
       fetchHalf(PROBABILITIES_FEED, parseProbabilities),
       fetchHalf(REGIONS_FEED, parseRegions),

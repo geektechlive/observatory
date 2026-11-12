@@ -7,10 +7,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { onRequest } from '../../../functions/api/solar-regions'
+import { regionOnDisc } from '../../../src/lib/sunDisc'
 import { parseProbabilities, parseRegions } from '../../../src/lib/swpcRegions'
 import { installFakeCache, makeCtx } from './_fakeCache'
 import PROBABILITIES from './fixtures/swpc-solar-probabilities.json'
 import REGIONS from './fixtures/swpc-solar-regions.json'
+import EARLY from './fixtures/swpc-solar-regions-early.json'
 
 describe('parseProbabilities', () => {
   it("reads the newest forecast's day-1 odds and the day they are for", () => {
@@ -74,6 +76,7 @@ describe('parseRegions', () => {
     expect(parseRegions(plageOnly)).toEqual({
       observedDate: '2026-11-11',
       validAt: '2026-11-12T00:00:00Z',
+      preliminary: false,
       items: [],
     })
   })
@@ -82,6 +85,69 @@ describe('parseRegions', () => {
     expect(parseRegions({ error: 'nope' })).toBeNull()
     expect(parseRegions([])).toBeNull()
     expect(parseRegions([{ observed_date: 'yesterday', region: 'x' }])).toBeNull()
+  })
+})
+
+/**
+ * #213: SWPC's file at 06:14 UTC on 2026-11-12, kept byte for byte (unformatted, so it is in
+ * .prettierignore). Its newest rows, observed_date 2026-11-12, are early reports: SWPC's own
+ * sunspot_report.json at the same time held one observation for the day, Learmonth's at
+ * 01:50 UTC, which saw 4566 at S08W48 and which SWPC carried to S08W61 for 12/2400Z. The
+ * spot and magnetic classes are null and every region's flare odds are 0 until the region
+ * summary is compiled at 00:30 the next day.
+ */
+describe('parseRegions on an early-day file (#213)', () => {
+  const early = parseRegions(EARLY)
+
+  it('keeps every region with spots even before SWPC issues its class', () => {
+    expect(early?.observedDate).toBe('2026-11-12')
+    // Nine rows for 12 Nov. 4570 has no spots and no area (plage only in SRS 316 IA): dropped.
+    expect(early?.items.map((r) => r.region)).toEqual([
+      4565, 4566, 4568, 4569, 4572, 4573, 4574, 4575,
+    ])
+  })
+
+  it('says the positions are valid at the end of the observed day, as on a complete day', () => {
+    expect(early?.validAt).toBe('2026-11-13T00:00:00Z')
+  })
+
+  it('puts 4566 where Learmonth saw it at 01:50 when turned back from that valid time', () => {
+    const big = early?.items.find((r) => r.region === 4566)
+    expect(big).toBeDefined()
+    if (!big || !early) return
+    const p = regionOnDisc(big, early.validAt, new Date('2026-11-12T01:50:00Z'))
+    // Learmonth's own report: S08W48. x = cos(lat) sin(W), so W = asin(x / cos(lat)).
+    const westDeg =
+      (Math.asin((p?.x ?? 0) / Math.cos((big.latitude * Math.PI) / 180)) * 180) / Math.PI
+    expect(westDeg).toBeGreaterThan(47)
+    expect(westDeg).toBeLessThan(49)
+  })
+
+  it('marks the day early, leaves the class unissued and drops the placeholder zero odds', () => {
+    expect(early?.preliminary).toBe(true)
+    const big = early?.items.find((r) => r.region === 4566)
+    expect(big).toEqual({
+      region: 4566,
+      location: 'S08W61',
+      latitude: -8,
+      longitude: -61,
+      area: 300,
+      spotClass: null,
+      magClass: null,
+      spots: 23,
+      c: null,
+      m: null,
+      x: null,
+      proton: null,
+    })
+    // 4565 and 4569 keep yesterday's classes, but their odds are SWPC's zeros too.
+    expect(early?.items.every((r) => r.m === null)).toBe(true)
+  })
+
+  it('calls a complete day complete and keeps its odds', () => {
+    const done = parseRegions(REGIONS)
+    expect(done?.preliminary).toBe(false)
+    expect(done?.items.find((r) => r.region === 4566)?.m).toBe(40)
   })
 })
 

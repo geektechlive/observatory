@@ -4,8 +4,9 @@
  * SWPC gives heliographic latitude and longitude from the central meridian, valid at
  * 00:00 UTC. SDO's "latest" frames are north-up (checked against the 2026-11-12 HMI
  * magnetogram), so the only tilt to apply is B0, the solar equator's tilt toward Earth.
- * The image is newer than the positions, so each region is turned forward by the Sun's
- * differential rotation to the image's time. Past two days that turn is too uncertain
+ * Each region is turned by the Sun's differential rotation from that time to the image's:
+ * forward for a complete day, back for an early day's positions, which SWPC carries to the
+ * end of the day (#213). Past two days that turn is too uncertain
  * (regions evolve), so no marker is drawn. Details: docs/reference/data-feeds-and-monitoring.md.
  */
 
@@ -19,7 +20,8 @@ export const MAX_TURN_HOURS = 48
 
 /**
  * SWPC's region summary comes out at 00:30 UTC with positions valid at 00:00, so a current
- * one is at most about 24.5 h old. Past this, SWPC hasn't issued a newer one.
+ * one is at most about 24.5 h old. Early reports for the new day are valid at its end, in
+ * the future, until then (#213). Past this, SWPC hasn't issued anything newer.
  */
 export const REGIONS_CURRENT_HOURS = 30
 

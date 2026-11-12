@@ -55,22 +55,40 @@ mean day to day:
   `products/geospace/propagated-solar-wind-1-hour.json` via the shared `functions/api/_swpc.ts`.
   Its cells are numbers, not numeric strings.
 - **SWPC active regions and flare odds (#210), `/api/solar-regions`.** Worker-direct, Cache API
-  for 30 minutes, key `noaa:solar-regions:v1`. Parsers in `src/lib/swpcRegions.ts`.
+  for 30 minutes, key `noaa:solar-regions:v2` (v2: early days, #213). Parsers in
+  `src/lib/swpcRegions.ts`.
   - `solar_regions.json` is ~104 kB: about 180 rows, 30 days of daily region reports, newest
-    first. Only the newest `observed_date` is validated and kept, and only rows with an area
-    and spot class (the Solar Region Summary's "Regions with Sunspots"; plage-only and departed
-    regions have nulls). Parsing both files measured 0.12 ms warm and 1.7 ms cold in Node 26
-    on 2026-11-12, so it fits the 10 ms Worker limit without a refresh-job step.
+    first. Only the newest `observed_date` is validated and kept, and only rows with spots
+    (`number_spots > 0` or an area): the Solar Region Summary's "Regions with Sunspots".
+    Plage-only and departed regions have neither. Parsing both files measured 0.12 ms warm and
+    1.7 ms cold in Node 26 on 2026-11-12, so it fits the 10 ms Worker limit without a
+    refresh-job step.
   - A row's position is SWPC's "Locations Valid at" time, the **end** of `observed_date` UTC:
     the 2026-11-11 rows matched SRS 316, "Locations Valid at 11/2400Z", issued 12 Nov 00:30.
+    Over all 31 days in the 2026-11-12 file, each day's Carrington longitude plus central
+    meridian distance matched the Sun's computed L0 at the end of that day to about 1°.
     Longitude is degrees from the central meridian, **east positive** (S09E65 is 65).
+  - **Early days (#213).** The newest day's rows appear during that day, before the summary
+    (12 Nov's at 06:12 UTC). They come from individual observatory reports: SWPC's
+    `sunspot_report.json` held one for 12 Nov, Learmonth at 01:50, which saw 4566 at S08W48
+    and gave it as S08W61, carried forward to 12/2400Z like the summary's positions (the
+    row says S08W61 too). So `validAt` is the end of the day even then, hours in the future,
+    and `sunDisc.ts` turns the marks back to the image. Area and spot count are that report's.
+    Spot and magnetic classes are null, and every region's flare odds are 0, including 4566,
+    which had M 40 the day before: placeholders. Regions Learmonth didn't report (4565, 4569)
+    are copied from the day before with their classes. Rule: a spotted row with a null
+    `spot_class` marks the day `preliminary`; the parser then sets every region's odds to
+    null, and the panel shows "–" titled "Not yet issued by SWPC" and says these are early
+    reports. No spotted row lacked a class on any of the other 30 days. Chosen over falling
+    back to the last complete day because the early positions are a day newer and check out
+    against the observatory report; the cost is classes and odds missing until 00:30 UTC.
   - `solar_probabilities.json`: the newest `date` row's `*_1_day` odds are for the **next** UTC
     day. The 2026-11-11 row (M 45, X 5, proton 5) matched the 3-day predictions issued
     11 Nov 22:00 for 12 Nov.
   - A half answer is a 200 marked degraded with `X-Error-Kind` and `X-Data-Source: swpc`. Both
     halves down is a 503, or a 500 when both changed shape. Not a headline source (ADR 0018),
     and not in `check-health.mjs`, like the other below-the-fold Sun feeds.
-  - The disc marks (`src/lib/sunDisc.ts`) turn each position forward by Snodgrass-Ulrich
+  - The disc marks (`src/lib/sunDisc.ts`) turn each position by Snodgrass-Ulrich
     differential rotation from the valid time to the SDO image's time, tilt by B0, and scale
     by the limb radius per instrument (AIA 2.4"/px, HMI 2.016"/px in the 1024 px frames; SDO's
     latest frames are north-up). More than 48 h apart, no mark is drawn. Checked against

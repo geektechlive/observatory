@@ -1,0 +1,4 @@
+# Upstream answers kept byte for byte, as SWPC served them (#213).
+tests/unit/functions/fixtures/swpc-solar-regions-early.json
+# Recorded upstream pages kept byte for byte; never reformatted (owner rule).
+tests/unit/scripts/fixtures/

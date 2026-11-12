@@ -49,8 +49,9 @@ export interface ActiveRegion {
   latitude: number
   /** Degrees from the central meridian, east positive, as SWPC gives it. */
   longitude: number
-  area: number
-  spotClass: string
+  area: number | null
+  /** Null until SWPC compiles the day's region summary (#213). */
+  spotClass: string | null
   magClass: string | null
   spots: number | null
   c: number | null
@@ -61,8 +62,13 @@ export interface ActiveRegion {
 
 export interface ActiveRegions {
   observedDate: string
-  /** SWPC's "Locations Valid at" time: the end of the observed day, UTC. */
+  /**
+   * SWPC's "Locations Valid at" time: the end of the observed day, UTC. On an early day
+   * this is still ahead: SWPC carries each report's positions forward to it (#213).
+   */
   validAt: string
+  /** Early reports only: classes and region odds not yet issued (#213). */
+  preliminary: boolean
   items: ActiveRegion[]
 }
 
@@ -95,9 +101,35 @@ export function parseProbabilities(json: unknown): FlareOdds | null {
   }
 }
 
+type RegionRow = z.infer<typeof RegionRowSchema>
+
+function hasSpots(r: RegionRow): boolean {
+  return (r.number_spots ?? 0) > 0 || r.area !== null
+}
+
+function toRegion(r: RegionRow, preliminary: boolean): ActiveRegion {
+  return {
+    region: r.region,
+    location: r.location,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    area: r.area,
+    spotClass: r.spot_class,
+    magClass: r.mag_class,
+    spots: r.number_spots,
+    // On an early day SWPC's odds are 0 for every region, placeholders until the summary.
+    c: preliminary ? null : r.c_flare_probability,
+    m: preliminary ? null : r.m_flare_probability,
+    x: preliminary ? null : r.x_flare_probability,
+    proton: preliminary ? null : r.proton_probability,
+  }
+}
+
 /**
- * The newest day's regions with sunspots (the region summary's section I). Rows without
- * an area or spot class are plage-only or departed regions, which have no spot to mark.
+ * The newest day's regions with sunspots (the region summary's section I). A row with
+ * neither spots nor area is a plage-only or departed region, with no spot to mark.
+ * A spotted row without a spot class means the day is early (#213): SWPC has early
+ * observatory reports but has not compiled the summary, so classes and odds are not issued.
  * Only the newest day's rows are validated, so the cost stays flat as the file grows.
  */
 export function parseRegions(json: unknown): ActiveRegions | null {
@@ -114,24 +146,14 @@ export function parseRegions(json: unknown): ActiveRegions | null {
   const parsed = z.array(RegionRowSchema).safeParse(newest)
   if (!parsed.success || parsed.data.length === 0) return null
 
-  const items: ActiveRegion[] = []
-  for (const r of parsed.data) {
-    if (r.area === null || r.spot_class === null) continue
-    items.push({
-      region: r.region,
-      location: r.location,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      area: r.area,
-      spotClass: r.spot_class,
-      magClass: r.mag_class,
-      spots: r.number_spots,
-      c: r.c_flare_probability,
-      m: r.m_flare_probability,
-      x: r.x_flare_probability,
-      proton: r.proton_probability,
-    })
+  const spotted = parsed.data.filter(hasSpots)
+  const preliminary = spotted.some((r) => r.spot_class === null)
+  const items = spotted.map((r) => toRegion(r, preliminary)).sort((a, b) => a.region - b.region)
+  // Early rows too: each observatory's position is carried to the end of the day (#213).
+  return {
+    observedDate: newestDate,
+    validAt: `${nextDay(newestDate)}T00:00:00Z`,
+    preliminary,
+    items,
   }
-  items.sort((a, b) => a.region - b.region)
-  return { observedDate: newestDate, validAt: `${nextDay(newestDate)}T00:00:00Z`, items }
 }

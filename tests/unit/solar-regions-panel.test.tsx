@@ -14,6 +14,7 @@ import { parseProbabilities, parseRegions } from '@/lib/swpcRegions'
 
 import PROBABILITIES from './functions/fixtures/swpc-solar-probabilities.json'
 import REGIONS from './functions/fixtures/swpc-solar-regions.json'
+import EARLY from './functions/fixtures/swpc-solar-regions-early.json'
 
 const hooks = vi.hoisted(() => ({
   useSolarRegions: vi.fn<() => { data: unknown; isLoading: boolean; error: Error | null }>(),
@@ -28,6 +29,9 @@ const FULL = {
   regions: parseRegions(REGIONS),
   updatedAt: '2026-11-12T05:35:00Z',
 }
+
+// SWPC's file at 06:14 UTC the same morning: early rows for 12 Nov (#213).
+const EARLY_DAY = { ...FULL, regions: parseRegions(EARLY) }
 
 function answer(data: unknown, error: Error | null = null) {
   hooks.useSolarRegions.mockReturnValue({ data, isLoading: false, error })
@@ -103,6 +107,28 @@ describe('SolarRegionsPanel', () => {
     render(<SolarRegionsPanel />)
     expect(screen.queryByText(/as of/i)).toBeNull()
     expect(screen.queryByText(/latest issued/i)).toBeNull()
+  })
+
+  it('lists early-day regions with spots, the class and odds shown as not yet issued (#213)', () => {
+    answer(EARLY_DAY)
+    render(<SolarRegionsPanel />)
+    const table = screen.getByRole('table', { name: /active regions/i })
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(8)
+    const big = rows.find((r) => r.textContent.includes('4566'))
+    expect(big?.textContent).toContain('S08W61')
+    expect(big?.textContent).not.toContain('0%')
+    const unissued = within(big as HTMLElement).getAllByTitle(/not yet issued by swpc/i)
+    expect(unissued).toHaveLength(2)
+    expect(unissued.every((c) => c.textContent === '–')).toBe(true)
+    expect(screen.getByText(/early reports/i)).toBeTruthy()
+  })
+
+  it('says nothing about early reports on a complete day', () => {
+    answer(FULL)
+    render(<SolarRegionsPanel />)
+    expect(screen.queryByText(/early reports/i)).toBeNull()
+    expect(screen.queryAllByTitle(/not yet issued/i)).toHaveLength(0)
   })
 
   it('says the feed did not answer when the request failed', () => {

@@ -50,10 +50,27 @@ function Odds({ odds }: { odds: FlareOdds }) {
   )
 }
 
-function Regions({ items, validAt }: { items: ActiveRegion[]; validAt: string }) {
+interface RegionsData {
+  items: ActiveRegion[]
+  validAt: string
+  observedDate: string
+  preliminary: boolean
+}
+
+/** A value SWPC hasn't issued yet on an early day (#213). */
+function Unissued() {
+  return <span title="Not yet issued by SWPC">–</span>
+}
+
+function Regions({ items, validAt, observedDate, preliminary }: RegionsData) {
   const outOfDate = regionsOutOfDate(validAt, new Date()) ? (
     <p className={styles.note ?? ''}>
       SWPC has not issued a newer region summary: these are as of {utcDay(validAt.slice(0, 10))}.
+    </p>
+  ) : preliminary ? (
+    <p className={styles.note ?? ''}>
+      Early reports for {utcDay(observedDate)}: SWPC issues the magnetic classes and region odds
+      with its daily summary at 00:30 UTC.
     </p>
   ) : null
   if (items.length === 0) {
@@ -67,16 +84,25 @@ function Regions({ items, validAt }: { items: ActiveRegion[]; validAt: string })
   return (
     <>
       {outOfDate}
-      <RegionTable items={items} validAt={validAt} />
+      <RegionTable items={items} validAt={validAt} preliminary={preliminary} />
     </>
   )
 }
 
-function RegionTable({ items, validAt }: { items: ActiveRegion[]; validAt: string }) {
+function RegionTable({
+  items,
+  validAt,
+  preliminary,
+}: {
+  items: ActiveRegion[]
+  validAt: string
+  preliminary: boolean
+}) {
   return (
     <table className={styles.table ?? ''} aria-label="Active regions">
       <caption className={styles.caption ?? ''}>
         Positions at {utcDay(validAt.slice(0, 10))} 00:00 UTC
+        {preliminary ? ', carried forward by SWPC' : ''}
       </caption>
       <thead>
         <tr>
@@ -97,10 +123,10 @@ function RegionTable({ items, validAt }: { items: ActiveRegion[]; validAt: strin
           <tr key={r.region}>
             <th scope="row">{r.region}</th>
             <td>{r.location}</td>
-            <td>{r.area}</td>
+            <td>{r.area ?? '—'}</td>
             <td>{r.spots ?? '—'}</td>
-            <td>{magClassWords(r.magClass)}</td>
-            <td>{r.m === null ? '—' : `${String(r.m)}%`}</td>
+            <td>{preliminary && r.magClass === null ? <Unissued /> : magClassWords(r.magClass)}</td>
+            <td>{r.m !== null ? `${String(r.m)}%` : preliminary ? <Unissued /> : '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -136,7 +162,7 @@ export function SolarRegionsPanel() {
           <p className={styles.note ?? ''}>The flare odds did not load.</p>
         )}
         {data.regions ? (
-          <Regions items={data.regions.items} validAt={data.regions.validAt} />
+          <Regions {...data.regions} />
         ) : (
           <p className={styles.note ?? ''}>The region list did not load.</p>
         )}
