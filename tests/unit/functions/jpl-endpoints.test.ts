@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NOT_CONFIGURED_HEADER } from '../../../functions/api/_jpl'
 import { onRequest as lookup } from '../../../functions/api/lookup'
 import { onRequest as trajectory } from '../../../functions/api/trajectory'
+import { SOURCES } from '../../../src/lib/health'
 import { readLookupResponse, TrajectoryResponseSchema } from '../../../src/schemas/jplLookup'
 import erosVectors from '../fixtures/jpl-lookup/horizons-eros.json'
 import apophis from '../fixtures/jpl-lookup/sbdb-apophis.json'
@@ -174,5 +175,39 @@ describe('/api/trajectory (#100)', () => {
     const again = await run(trajectory, path, { JPL_QUEUE: ns })
     expect(again.res.headers.get('X-Cache')).toBe('HIT')
     expect(asked).toHaveLength(2)
+  })
+})
+
+describe('the client health contracts agree with these Functions (#148)', () => {
+  const lookupBody = async (body: unknown, jplStatus = 200) => {
+    const { ns } = fakeQueue(() => ({ jplStatus, body }))
+    return (await run(lookup, '/api/lookup?q=eros', { JPL_QUEUE: ns })).res.json()
+  }
+
+  it('accepts every kind of lookup answer: an object, a list and "not found"', async () => {
+    const required = SOURCES['jpl-lookup'].required
+    expect(required(await lookupBody(apophis))).toBe(true)
+    expect(required(await lookupBody(halley, 300))).toBe(true)
+    expect(required(await lookupBody(none))).toBe(true)
+  })
+
+  it('accepts sampled vectors and an answer that says where the ephemeris ends', async () => {
+    const required = SOURCES['jpl-trajectory'].required
+    const path = '/api/trajectory?id=sb:20000433&start=2026-11-01&end=2026-11-03&step=1d'
+    const answer = async (vectors: unknown) => {
+      const { ns } = fakeQueue((url) =>
+        url.includes('sbdb.api')
+          ? { jplStatus: 200, body: eros }
+          : { jplStatus: 200, body: vectors },
+      )
+      return (await run(trajectory, path, { JPL_QUEUE: ns })).res.json()
+    }
+    expect(required(await answer(erosVectors))).toBe(true)
+    const refused = {
+      signature: erosVectors.signature,
+      result:
+        'Target body name: 433 Eros (A898 PA)\nNo ephemeris for target "433 Eros (A898 PA)" after A.D. 2100-JAN-01 00:00:00.0000 TDB\n',
+    }
+    expect(required(await answer(refused))).toBe(true)
   })
 })

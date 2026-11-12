@@ -1,3 +1,4 @@
+import { SOURCES } from '@/lib/health'
 import { heliocentric } from '@/lib/orrery/kepler'
 import {
   type LookupResponse,
@@ -33,6 +34,7 @@ function retryAfter(res: Response): number | null {
 
 async function getLookupJson<T>(
   url: string,
+  source: 'jpl-lookup' | 'jpl-trajectory',
   read: (raw: unknown) => T | null,
 ): Promise<LookupState<T>> {
   let res: Response
@@ -54,7 +56,11 @@ async function getLookupJson<T>(
       : { state: 'unavailable', reason: 'busy', retryAfterS: wait }
   }
   const data = read(await res.json().catch(() => null))
-  return data === null ? { state: 'unavailable', reason: 'failed' } : { state: 'ok', data }
+  // Parsed but empty (no samples, an empty list) is drift, not an answer (#148, ADR 0004).
+  if (data === null || !SOURCES[source].required(data)) {
+    return { state: 'unavailable', reason: 'failed' }
+  }
+  return { state: 'ok', data }
 }
 
 const readTrajectory = (raw: unknown): TrajectoryResponse | null => {
@@ -63,7 +69,7 @@ const readTrajectory = (raw: unknown): TrajectoryResponse | null => {
 }
 
 export function fetchLookup(q: string): Promise<LookupState<LookupResponse>> {
-  return getLookupJson(`/api/lookup?q=${encodeURIComponent(q)}`, readLookupResponse)
+  return getLookupJson(`/api/lookup?q=${encodeURIComponent(q)}`, 'jpl-lookup', readLookupResponse)
 }
 
 const UNIX_EPOCH_JD = 2440587.5
@@ -99,7 +105,7 @@ export function fetchTrajectorySpan(
   span: { start: string; end: string; step: string },
 ): Promise<LookupState<TrajectoryResponse>> {
   const params = new URLSearchParams({ id, start: span.start, end: span.end, step: span.step })
-  return getLookupJson(`/api/trajectory?${params.toString()}`, readTrajectory)
+  return getLookupJson(`/api/trajectory?${params.toString()}`, 'jpl-trajectory', readTrajectory)
 }
 
 const AU_KM = 149_597_870.7

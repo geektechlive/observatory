@@ -31,6 +31,8 @@ export type SourceName =
   | 'gdacs'
   | 'geomag'
   | 'iss-tle'
+  | 'jpl-lookup'
+  | 'jpl-trajectory'
   | 'launches'
   | 'mars-weather'
   | 'neo'
@@ -96,6 +98,21 @@ function nonEmptyArrayField(data: unknown, key: string): boolean {
   return Array.isArray(value) && value.length > 0
 }
 
+/** An SBDB answer (#148): "not found", a non-empty list, or one object with its SPK-ID. */
+function lookupAnswered(result: unknown): boolean {
+  if (!isRecord(result)) return false
+  if (result['type'] === 'none') return true
+  if (result['type'] === 'list') return nonEmptyArrayField(result, 'matches')
+  return result['type'] === 'object' && nonEmptyStringField(result['object'], 'spkid')
+}
+
+/** A sampled span with at least one whole sample of position and velocity (#148). */
+function wholeSamples(fine: unknown): boolean {
+  if (!isRecord(fine)) return false
+  const samples = fine['samples']
+  return Array.isArray(samples) && samples.length > 0 && samples.length % 6 === 0
+}
+
 export const SOURCES: Record<SourceName, SourceContract> = {
   aftershocks: {
     // Most weeks no recent quake has a USGS forecast, so an empty list is a real answer.
@@ -142,6 +159,29 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     headline: true,
     maxAgeMs: 36 * HOUR,
     required: (data) => nonEmptyStringField(data, 'line1') && nonEmptyStringField(data, 'line2'),
+  },
+  // The orrery search's on-demand JPL answers (#100, #148). Not headline: only a search
+  // asks, so a cold load never would. Both cache a day; the predicates live here, and
+  // src/lib/api/jplLookup.ts refuses an answer that fails them.
+  'jpl-lookup': {
+    // "Not found" is a real answer; a list must list something, an object must have its id.
+    label: 'JPL Lookup',
+    headline: false,
+    maxAgeMs: 2 * DAY,
+    required: (data) => isRecord(data) && lookupAnswered(data['result']),
+  },
+  'jpl-trajectory': {
+    // Whole samples (six numbers each), or no samples but where the ephemeris ends.
+    label: 'JPL Trajectory',
+    headline: false,
+    maxAgeMs: 2 * DAY,
+    required: (data) =>
+      isRecord(data) &&
+      nonEmptyStringField(data['object'], 'spkid') &&
+      (wholeSamples(data['fine']) ||
+        (data['fine'] === null &&
+          (nonEmptyStringField(data, 'availableFrom') ||
+            nonEmptyStringField(data, 'availableTo')))),
   },
   launches: { label: 'Launches', headline: true, maxAgeMs: 12 * HOUR, required: hasContent },
   'mars-weather': {

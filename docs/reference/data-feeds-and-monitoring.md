@@ -53,6 +53,11 @@ mean day to day:
 - **Upstream drift is silent by default.** A feed that changes shape yields an
   empty-but-HTTP-200 payload. `src/lib/health.ts` gives every source a content contract so this
   reads as an error, and `scripts/check-health.mjs` probes the headline endpoints on a schedule.
+- **The on-demand JPL answers have contracts too (#148).** The scheduled probe checks one cached
+  Eros span, so it never sees a list, a "not found", a comet or a span past the ephemeris.
+  `jpl-lookup` and `jpl-trajectory` in `src/lib/health.ts` (not headline: only a search asks)
+  are applied by `src/lib/api/jplLookup.ts`, which calls an answer that fails them "JPL didn't
+  answer this time" instead of drawing nothing, and `useLookupHealth` reports them to the store.
 - **The header's pill judges the view on screen (#178, ADR 0018).** `VIEW_HEADLINES` lists each
   view's headline sources; SYNCING until they have all reported, LIVE when all pass, DEGRADED
   otherwise. One site-wide list of seven never settled, because no view mounts every hook (on

@@ -119,6 +119,58 @@ describe('fetchTrajectorySpan (#145)', () => {
   })
 })
 
+describe('the client health contracts (#148)', () => {
+  const span = { start: '2025-12-04', end: '2027-12-04', step: '2d' }
+  const trajectory = (fine: unknown, availableTo: string | null = null) => ({
+    generatedAt: '2026-11-07T00:00:00Z',
+    frame: 'ecliptic-J2000',
+    center: 'Sun',
+    timeScale: 'TDB',
+    units: { position: 'au', velocity: 'au/day' },
+    sourceType: 'ephemeris',
+    provider: 'jpl-horizons',
+    object,
+    target: '433 Eros (A898 PA)',
+    request: { start: '2025-12-04', end: '2027-12-04', stepMinutes: 2880 },
+    fine,
+    availableFrom: null,
+    availableTo,
+  })
+
+  it('calls a trajectory that parses but carries no samples a failure, not an empty drawing', async () => {
+    vi.stubGlobal('fetch', ok(trajectory({ start: 2461000.5, step: 2, samples: [] })))
+    expect(await fetchTrajectorySpan('sb:20000433', span)).toEqual({
+      state: 'unavailable',
+      reason: 'failed',
+    })
+    vi.stubGlobal('fetch', ok(trajectory(null)))
+    expect(await fetchTrajectorySpan('sb:20000433', span)).toEqual({
+      state: 'unavailable',
+      reason: 'failed',
+    })
+  })
+
+  it('still accepts samples, and an answer that says where the ephemeris ends', async () => {
+    vi.stubGlobal(
+      'fetch',
+      ok(trajectory({ start: 2461000.5, step: 2, samples: [1, 2, 3, 4, 5, 6] })),
+    )
+    expect((await fetchTrajectorySpan('sb:20000433', span)).state).toBe('ok')
+    vi.stubGlobal('fetch', ok(trajectory(null, '2100-01-01T00:00:00.000Z')))
+    expect((await fetchTrajectorySpan('sb:20000433', span)).state).toBe('ok')
+  })
+
+  it('calls a lookup list with no matches a failure', async () => {
+    const list = {
+      query: 'eros',
+      provider: 'jpl-sbdb',
+      result: { type: 'list', count: 0, matches: [] },
+    }
+    vi.stubGlobal('fetch', ok(list))
+    expect(await fetchLookup('eros')).toEqual({ state: 'unavailable', reason: 'failed' })
+  })
+})
+
 describe('trajectoryFacts', () => {
   // Eros's own Horizons vectors for 2026-11-01..03 (fixtures/jpl-lookup/horizons-eros.json).
   const t: TrajectoryResponse = {

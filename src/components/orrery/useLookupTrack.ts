@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { useLookupHealth } from '@/hooks/useJplLookup'
 import { fetchTrajectorySpan, type LookupState, type Unavailable } from '@/lib/api/jplLookup'
 import { shortName } from '@/lib/orrery/asteroids'
 import {
@@ -123,6 +124,7 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
       return Math.min(RETRY_MAX_S, Math.max(RETRY_MIN_S, a.retryAfterS ?? 15)) * 1000
     },
   })
+  useLookupHealth('jpl-trajectory', query.data)
   const trajectory =
     query.data?.state === 'ok' && query.data.data.object.spkid === spkid ? query.data.data : null
 
