@@ -82,7 +82,7 @@ import {
   sunlitFocusDirection,
 } from './framing'
 import { loadGltfScene } from './gltfLoad'
-import { type LookupData, LookupLayer } from './lookupLayer'
+import { type LookupData, LookupLayer, lookupMarkerRadius } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
 import { clampRadius, craftModelPx, DWARF_MIN_PX, PX_CEILING, SMALL_BODY_MIN_PX } from './pxClamp'
@@ -162,8 +162,6 @@ const ASTEROID_MIN_PX = 2.5
 const L1_MIN_PX = 3.5
 /** The chosen satellite's marker never draws smaller than this, px (#98). */
 const SAT_MARKER_MIN_PX = 4
-/** A looked-up object's marker never draws smaller than this, px (#145). */
-const LOOKUP_MIN_PX = 3.5
 /** A looked-up object this close to Earth, au, is framed with Earth as well as the Sun (#145). */
 const LOOKUP_WITH_EARTH_AU = 3
 /** A re-entry ring around a satellite never draws smaller than this, px (#101). */
@@ -400,7 +398,7 @@ export class OrreryRenderer {
     )
     // Its orbit line is an orbit: the Orbits switch hides it with the planets' (#145), and
     // the comets' and interstellar objects' lines with them (#99).
-    this.orbitGroup.add(this.heliopause, this.lookup.path, this.small.paths)
+    this.orbitGroup.add(this.heliopause, this.lookup.path, this.lookup.nearPath, this.small.paths)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
     // they sit with the planets' orbit lines under the Orbits switch too.
     this.bodyGroup.add(this.moons.group)
@@ -493,7 +491,10 @@ export class OrreryRenderer {
       this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX, PX_CEILING.satMarker)
     if (this.sats.selectRing.visible)
       this.floorPx(this.sats.selectRing, PX_CEILING.satSelect, PX_CEILING.satSelect)
-    if (this.lookup.marker.visible) this.floorPx(this.lookup.marker, LOOKUP_MIN_PX)
+    if (this.lookup.marker.visible) {
+      const depth = this.lookup.marker.position.distanceTo(this.camera.position)
+      this.lookup.marker.scale.setScalar(lookupMarkerRadius(this.unitsPerPx(depth)))
+    }
     for (const s of this.small.visible()) {
       if (s.group === 'dwarfs') this.floorPx(s.mesh, DWARF_MIN_PX, PX_CEILING.dwarf)
       else this.floorPx(s.mesh, SMALL_BODY_MIN_PX, PX_CEILING.smallBody)
@@ -556,6 +557,7 @@ export class OrreryRenderer {
       asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
       satMarker: this.sats.marker.visible ? px(this.sats.marker) : null,
       satSelect: this.sats.selectRing.visible ? px(this.sats.selectRing) : null,
+      lookup: this.lookup.marker.visible ? px(this.lookup.marker) : null,
       satReentry: maxOf(this.sats.flagRings()),
       smallBody: maxOf(
         this.small
@@ -611,7 +613,15 @@ export class OrreryRenderer {
     // Any craft near Earth (the L1/L2 ones; Europa Clipper on its Earth flyby) goes into
     // the frame with the Moon and the close approaches, so they share one scale.
     this.craft.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
-    this.lookup.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
+    // A looked-up object's pass is placed against Earth at each of its dates (#151).
+    this.lookup.placeNear({
+      t: frame.t,
+      earthTrack: this.earthTrack,
+      maxAu: NEAR_FRAME_AU,
+      earth: frame.earth,
+      radius: frame.radius,
+      at: (helio, jd) => this.near.placeNearAt(helio, jd, frame, NEAR_FRAME_AU),
+    })
     this.small.placeNear((helio) => this.near.placeNear(helio, frame, NEAR_FRAME_AU))
     this.near.place(this.lastJd, frame)
   }
@@ -1626,6 +1636,8 @@ export class OrreryRenderer {
     // The looked-up object (#145): its key while drawn, and its orbit line's points.
     d['orreryLookup'] = this.lookup.labelled()?.key ?? ''
     d['orreryLookupPath'] = String(this.lookup.pathPoints())
+    // Its pass near Earth through the open Earth frame (#151).
+    d['orreryLookupNearPath'] = String(this.lookup.nearPathPoints())
     // Comets and interstellar objects (#99): markers drawn, lines drawn, and their keys.
     const small = this.small.counts()
     d['orrerySmallBodies'] = String(small.drawn)

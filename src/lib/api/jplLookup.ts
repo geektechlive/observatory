@@ -1,4 +1,5 @@
 import { SOURCES } from '@/lib/health'
+import { stateAt } from '@/lib/orrery/ephemeris'
 import { heliocentric } from '@/lib/orrery/kepler'
 import {
   type LookupResponse,
@@ -25,11 +26,22 @@ export type LookupState<T> =
     }
 
 const NOT_FOUND = 404
+const TOO_MANY = 429
+/**
+ * A negative entry (`X-Cache: NEG`, functions/api/_cache.ts) is replayed for 60 s, so
+ * asking sooner gets the same answer: wait this long at least (#141).
+ */
+const NEG_WAIT_S = 61
 
-/** Retry-After in seconds, when the queue sent one. */
+/**
+ * How long to wait, s, or null when nothing says: the queue's or the rate limit's
+ * Retry-After, and past a replayed negative entry's 60 s.
+ */
 function retryAfter(res: Response): number | null {
   const s = Number(res.headers.get('Retry-After'))
-  return Number.isFinite(s) && s > 0 ? s : null
+  const said = Number.isFinite(s) && s > 0 ? s : null
+  if (res.headers.get('X-Cache') !== 'NEG') return said
+  return Math.max(said ?? 0, NEG_WAIT_S)
 }
 
 async function getLookupJson<T>(
@@ -48,8 +60,11 @@ async function getLookupJson<T>(
       return { state: 'unavailable', reason: 'not-set-up' }
     }
     if (res.status === NOT_FOUND) return { state: 'unavailable', reason: 'not-found' }
-    // 503 is the queue refusing or JPL not answering: worth another try shortly.
-    if (res.status !== 503) return { state: 'unavailable', reason: 'failed' }
+    // 503 is the queue refusing or JPL not answering, 429 the site's /api rate limit (the
+    // Functions' or the zone's, #141): worth another try once they say.
+    if (res.status !== 503 && res.status !== TOO_MANY) {
+      return { state: 'unavailable', reason: 'failed' }
+    }
     const wait = retryAfter(res)
     return wait === null
       ? { state: 'unavailable', reason: 'busy' }
@@ -72,34 +87,10 @@ export function fetchLookup(q: string): Promise<LookupState<LookupResponse>> {
   return getLookupJson(`/api/lookup?q=${encodeURIComponent(q)}`, 'jpl-lookup', readLookupResponse)
 }
 
-const UNIX_EPOCH_JD = 2440587.5
-const DAY_MS = 86_400_000
-const FIRST_DAY = '1900-01-01'
-const LAST_DAY = '2100-12-31'
-
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
-
 /**
- * The day before to the day after the date's UTC day: three daily samples. Whole days
- * keep the cache key the same for everyone looking that day. Null outside 1900–2100.
+ * Horizons samples for a span (#145: the two years the orrery draws a looked-up object
+ * from; since #152 the search card reads its position from the same span).
  */
-export function trajectoryWindow(jd: number): { start: string; end: string } | null {
-  const day = Math.floor(jd - UNIX_EPOCH_JD) * DAY_MS
-  const start = isoDay(day - DAY_MS)
-  const end = isoDay(day + DAY_MS)
-  return start < FIRST_DAY || end > LAST_DAY ? null : { start, end }
-}
-
-export function fetchTrajectoryAround(
-  id: string,
-  jd: number,
-): Promise<LookupState<TrajectoryResponse>> {
-  const window = trajectoryWindow(jd)
-  if (!window) return Promise.resolve({ state: 'unavailable', reason: 'out-of-range' })
-  return fetchTrajectorySpan(id, { ...window, step: '1d' })
-}
-
-/** Horizons samples for a span (#145: the two years the orrery draws a looked-up object from). */
 export function fetchTrajectorySpan(
   id: string,
   span: { start: string; end: string; step: string },
@@ -110,10 +101,9 @@ export function fetchTrajectorySpan(
 
 const AU_KM = 149_597_870.7
 const DAY_S = 86_400
-const STRIDE = 6
 
 export interface TrajectoryFacts {
-  /** The sample the facts are read from (Julian date, TDB). */
+  /** The date the facts are for (Julian date, TDB). */
   sampleJd: number
   sunAu: number
   /** From Earth placed with JPL's approximate elements, so approximate itself. */
@@ -121,23 +111,21 @@ export interface TrajectoryFacts {
   speedKmS: number
 }
 
-/** Distance from the Sun and Earth and speed, at the sample nearest `jd`. */
+/**
+ * Distance from the Sun and Earth and speed at `jd`, Hermite between the samples as the
+ * orrery draws it (#152: the card reads the orrery's 2-day span); null outside them.
+ */
 export function trajectoryFacts(t: TrajectoryResponse, jd: number): TrajectoryFacts | null {
   const fine = t.fine
-  if (!fine) return null
-  const count = Math.floor(fine.samples.length / STRIDE)
-  if (count === 0) return null
-  const i = Math.min(count - 1, Math.max(0, Math.round((jd - fine.start) / fine.step)))
-  const [x = 0, y = 0, z = 0, vx = 0, vy = 0, vz = 0] = fine.samples.slice(
-    i * STRIDE,
-    i * STRIDE + STRIDE,
-  )
-  const sampleJd = fine.start + i * fine.step
-  const earth = heliocentric('Earth', sampleJd)
+  const s = fine ? stateAt({ fine, coarse: null }, jd) : null
+  if (!s) return null
+  const { x, y, z } = s.position
+  const v = s.velocity
+  const earth = heliocentric('Earth', jd)
   return {
-    sampleJd,
+    sampleJd: jd,
     sunAu: Math.hypot(x, y, z),
     earthAu: Math.hypot(x - earth.x, y - earth.y, z - earth.z),
-    speedKmS: (Math.hypot(vx, vy, vz) * AU_KM) / DAY_S,
+    speedKmS: (Math.hypot(v.x, v.y, v.z) * AU_KM) / DAY_S,
   }
 }

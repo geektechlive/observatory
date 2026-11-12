@@ -23,6 +23,8 @@ interface LookupFactsProps {
   simMs: number
   /** A failed answer in plain words (useLookupTrack), or null. */
   problem: string | null
+  /** JPL stayed busy through every retry (#141 review): ask again, at the visitor's word. */
+  onRetry?: (() => void) | undefined
   loading: boolean
   onRemove: () => void
 }
@@ -38,6 +40,7 @@ export function LookupFacts({
   earth,
   simMs,
   problem,
+  onRetry,
   loading,
   onRemove,
 }: LookupFactsProps) {
@@ -67,6 +70,13 @@ export function LookupFacts({
       {problem && (
         <p className={styles.inspectorText ?? ''} role="status">
           {problem}
+        </p>
+      )}
+      {onRetry && (
+        <p className={styles.inspectorText ?? ''}>
+          <button type="button" className={styles.chipBtn ?? ''} onClick={onRetry}>
+            Try again
+          </button>
         </p>
       )}
       {!problem && !d && (

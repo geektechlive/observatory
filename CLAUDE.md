@@ -42,7 +42,7 @@ Details: [docs/reference/data-feeds-and-monitoring.md](docs/reference/data-feeds
 - **Never proxy an upstream status code.**
 - **A new client fetcher uses `apiFetch` or `getJson`, never bare `fetch`** (stale-while-revalidate refetch, #83).
 - **When a fix changes what a cached endpoint returns, bump its cache key.**
-- Retry infrastructure (0, 5xx, 429), never contracts; a retry against a cached endpoint must outlast the 60 s negative cache.
+- Retry infrastructure (0, 5xx, 429), never contracts; a retry against a cached endpoint must outlast the 60 s negative cache. Two layers send 429 on `/api/` (zone rule and `_middleware.ts`): see the data-feeds doc.
 - The refresh job has one 6-minute deadline inside the 10-minute workflow timeout (#128); new steps respect `stepBudget`/`beforeDeadline`.
 - Open-Meteo is called from the browser after the user shares a location; never proxy it (#79).
 - Credentials (Space-Track, DISCOSweb) live only in Actions secrets and the login form or `Authorization` header: **never in a URL, error, log line, payload or fixture** (ADR 0013). **Never delete `spacetrack:history:v1`** (GP_HISTORY is once per lifetime). Every surface showing Space-Track data credits "Space-Track.org".

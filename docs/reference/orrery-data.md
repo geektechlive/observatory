@@ -153,6 +153,20 @@ budget).
   would be about 35 KB per object. `asteroidState` uses `close` where it covers the date, else
   `fine`; `approachPathTimes` draws the chosen pass from both. Copies written before #136 parse
   with `close: null`.
+- **A pass inside 0.001 au gets a third span, `closest` (#142):** 10-minute samples over ±6 h of
+  CAD's closest approach (73), one more Horizons request each, made after every object is placed
+  so a spent budget never costs a placement (a failure is a `missing` warning). Such a pass lasts
+  minutes. Measured on 2026 TP128 (7,490 km from Earth's centre, CAD) against Horizons' 1-minute
+  geocentric vectors over ±3 h: the 3 h span drew its closest at 6,982 km
+  (`closestApproachFromSamples`, −6.8%) and up to 3,855 km off (17% of the distance, worst just
+  before closest approach); the 10-minute span draws 7,490.0 km at closest and at most 17 km
+  off (0.19%). A 15-minute step was 52 km (0.5%). The 1-minute vectors' own minimum, 7,502 km,
+  is a grid row 21 s before CAD's time; at 21.5 km/s that miss adds about 14 km, so
+  Horizons and CAD agree. Eight passes in the 2026-11-12 payload were inside 0.001 au, so about
+  eight more requests a run. `asteroidState`, `approachPathTimes` and
+  `closestApproachFromSamples` use the finest span that covers the date (`orrery-closest-span.test.ts`,
+  on a recorded TP128 fixture). The KV key stays `horizons:neo:v1`: the field is added, and
+  copies written before #142 parse with `closest: null`.
 - **Naming a small body (`src/lib/orrery/closeApproach.ts`):** a numbered asteroid is `'433;'`, a
   provisional one `'DES=2026 UE2;'`. `DES=433;` returns 248370 (2005 QN173), checked live
   2026-11-07, so `targetMatchesDesignation` checks every answer's target name; a mismatch goes
@@ -200,7 +214,8 @@ near 15.6. Direction is kept; not to scale beyond GEO, and the inspector says so
   the range rate flips sign at it (`orrery-asteroids.test.ts`). On the #136 dry-run payload (39
   objects) the time was within 0.7 min for all, and the distance within 1% for all but 2026
   TP128, which passed 7,490 km from Earth's centre (about 1,100 km up): 6.8% off, because that
-  pass takes minutes and the samples are 3 h apart.
+  pass takes minutes and the samples are 3 h apart. Since #142 such passes carry a 10-minute
+  span and draw within 0.2% (see the close approaches above).
 - **The Earth–Moon/L1 preset** (`earthPresetView`) aims at Earth from beside the Sun–Earth line,
   so L1 and L2 sit to either side, 13.5 frame units held above the time bar, and follows Earth.
   Focusing Earth uses its distance; a close approach, L1 or an L1/L2 craft is focused from 40
@@ -412,9 +427,13 @@ queue).
   card says lookup isn't available yet, and the health probe (a fixed 2026-01 span of Eros,
   cached, so most runs never reach JPL) only warns (`notConfiguredWarns`).
 - **The search** (`SearchBox.tsx`): with no match among what the orrery carries, it offers
-  "Search JPL for …". The card (`JplLookup.tsx`, its own lazy chunk) shows SBDB's answer and,
-  from three daily Horizons samples around the sim date, the distance from the Sun and Earth
-  (Earth from the planet tables) and the speed.
+  "Search JPL for …". The card (`JplLookup.tsx`, its own lazy chunk) shows SBDB's answer and
+  the distance from the Sun and Earth (Earth from the planet tables) and the speed at the sim
+  date, Hermite on the same two-year span the orrery draws (`useLookupSpan`, one query key for
+  both, #152). "Show in orrery" then asks JPL for nothing more: one queue request per lookup,
+  not two (the card used to ask for three daily samples of its own). The card waits for the
+  clock to settle in a new span as the orrery does (`useSettledSpan`, `LOOKUP_SETTLE_MS`), so a
+  scrub with the card open asks once, not once per 120-day step.
 - **"Show in orrery" (#145) draws the object.** The card puts it in `lookupStore.ts`;
   `useLookupTrack.ts` asks `/api/trajectory` for two years around the sim date at 2-day steps
   (366 samples of the 600 allowed, `lookupSpan` in `src/lib/orrery/lookupTrack.ts`).
@@ -424,15 +443,35 @@ queue).
     (`LOOKUP_SETTLE_MS`): a scrub across years sends one request, not one per span. The last span
     keeps drawing meanwhile (react-query `placeholderData`); the marker hides wherever no sample
     covers the date.
-  - A busy queue's `Retry-After` is said in words ("Trying again in 20 s.") and honoured, 5–60 s;
-    nothing else is retried. 404 reads "JPL has no object with this id".
+  - A busy queue's `Retry-After` is said in words ("Trying again in 20 s.") and honoured, 5–120 s
+    (`lookupRetryMs`). A 429 from the site's `/api/` rate limit is busy too (#141), and a busy
+    answer replayed from the 60 s negative cache (`X-Cache: NEG`, which carries no
+    `Retry-After`) waits 61 s, not the 15 s default, which only met the same replay again.
+    Five retries at most per span (`LOOKUP_MAX_RETRIES`); then the card and the inspector say
+    "JPL is still busy" and offer "Try again", so an open card never polls a busy JPL for good.
+    Nothing else is retried. 404 reads "JPL has no object with this id".
   - `three/lookupLayer.ts`: one marker on the samples (Hermite, never extrapolated) in the Space
     objects lane colour (`LANES.space.emit`), apart from the amber approaches and cyan craft,
-    joining the Earth frame within 0.1 au like the craft. Its line is the osculating ellipse
+    joining the Earth frame within 0.1 au like the craft. The marker is a point, 3.5 to 5 px
+    whatever the camera's distance (`lookupMarkerRadius`, `PX_CEILING.smallBody`, #153): a
+    fixed scene size drew Apophis bigger than Venus once the camera framed it close. Its line is the osculating ellipse
     through the state at the span's centre (`osculatingLoop`, shared with the moons, about the
     Sun's GM), so Halley shows its whole orbit from two sampled years; an unbound object
     (3I/ATLAS) draws its sampled path. The line is rebuilt only when the object or scale mode
     changes, and sits under the Orbits switch.
+  - Near Earth with the frame open (#151), the line joins the frame too: the stretch of its
+    samples within 0.1 au of Horizons' Earth is drawn as a pass, each point placed against
+    Earth at its own date (`EarthNeighbourhood.placeNearAt`), as the close approaches' paths
+    are. `lookupNearTimes` picks up to 240 dates, a minute apart at closest approach and
+    spreading geometrically to the 0.1 au edges; the date shown is one of the points, so the
+    dot is on the line, not on a chord. The loop's points within 0.1 au of Earth are left out
+    while the pass is drawn (the longest run that is left), so there is no second, true-scale
+    line through the frame. Earth's samples cover only ±30 days of the refresh, so for a date
+    outside them (Apophis on 13 April 2029, seen today) the frame stays closed and the object
+    and its loop stay at their true places. `data-orrery-lookup-near-path` counts the pass's
+    points. The lookup's samples are 2 days apart, too coarse for a pass of a few hours:
+    2026 VQ11 (31,453 km, CAD) is drawn at 19,241 km at its closest (−39%, measured on the
+    recorded 2026-11-12 answer), where its close-approach copy's 3 h span gives 31,474 km.
   - The inspector opens at once (`LookupFacts.tsx`: kind, orbit class, NEO/PHA, distances, light
     time, range rate, the samples' span and step, which line is drawn); the camera flies there
     once the samples cover the date. "Remove from orrery", on the card or in the inspector,

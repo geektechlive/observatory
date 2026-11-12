@@ -30,9 +30,12 @@ export const WINDOW_DAYS = 30
 const DIST_MAX_AU = '0.05'
 /**
  * Objects placed with Horizons: each costs one request (about 1.5 s with the pause), so
- * 40 plus CAD, its PHA filter and Scout fit the step's 2 minutes. CAD lists about 200
- * objects over ±30 days; up to 25 are kept for ±10 days of now, as before #136, and the
- * rest of the month fills the other 15.
+ * 40 plus CAD, its PHA filter and Scout fit the step's 2 minutes (about 65 s). CAD lists
+ * about 200 objects over ±30 days; up to 25 are kept for ±10 days of now, as before #136,
+ * and the rest of the month fills the other 15. Each placed pass inside 0.001 au then
+ * costs one more (#142): 8 on 2026-11-12, about 77 s in all. The worst case, all 40 that
+ * near, would be 83 requests (about 125 s), past the budget: the extras come last, so the
+ * budget cuts them (listed in `missing`), never a placement.
  */
 export const MAX_APPROACHES = 40
 const NEAR_DAYS = 10
@@ -40,6 +43,16 @@ const NEAR_APPROACHES = 25
 /** Horizons step: 3 h, kept whole within ±3 days of closest approach, daily elsewhere. */
 const STEP_DAYS = 0.125
 const SPLIT = { wideEvery: 8, closeDays: 3 }
+/**
+ * A pass inside this, au, also gets a 10-minute span over ±6 h of closest approach (#142):
+ * such a pass lasts minutes, and 3 h samples drew 2026 TP128 (7,490 km) 6.8% short; 10
+ * minutes drew it within 0.2% of Horizons' 1-minute vectors. One request each, after
+ * every object is placed, so a spent budget never costs a placement.
+ */
+const CLOSEST_MAX_AU = 0.001
+const CLOSEST_STEP_DAYS = 10 / 1440
+const CLOSEST_STEPS = 72
+const CLOSEST_HALF_DAYS = (CLOSEST_STEPS / 2) * CLOSEST_STEP_DAYS
 /** ESA's risk list runs to about 2,200 objects; the payload keeps the top by Palermo scale. */
 const RISK_LIST_TOP = 50
 /** Pause before each JPL request (the craft step's last one may have just ended). */
@@ -146,17 +159,18 @@ export async function buildOrreryNeo({
     nearLimit,
     limit,
   })
+  const veryClose = []
   for (const row of picked) {
     const id = `sb:${row.des}`
     let fine = null
     let close = null
     let target = null
+    const spec = {
+      naifId: row.des,
+      command: horizonsSmallBodyCommand(row.des),
+      targetOk: (t) => targetMatchesDesignation(row.des, t),
+    }
     try {
-      const spec = {
-        naifId: row.des,
-        command: horizonsSmallBodyCommand(row.des),
-        targetOk: (t) => targetMatchesDesignation(row.des, t),
-      }
       const got = await fetchSpan(spec, start, stop, STEP_DAYS, horizonsAsk, now)
       if (!got.samples) throw new Error('no samples in the window')
       const split = splitApproachSpans(got.samples, row.jd, SPLIT)
@@ -188,7 +202,24 @@ export async function buildOrreryNeo({
       target,
       fine,
       close,
+      closest: null,
     })
+    if (close && row.distAu < CLOSEST_MAX_AU) {
+      veryClose.push({ index: approaches.length - 1, row, spec })
+    }
+  }
+
+  // The very close passes' 10-minute spans (#142), on a whole-minute grid around CAD's time.
+  for (const { index, row, spec } of veryClose) {
+    try {
+      const startJd = Math.round((row.jd - CLOSEST_HALF_DAYS) * 1440) / 1440
+      const stopJd = startJd + CLOSEST_STEPS * CLOSEST_STEP_DAYS
+      const got = await fetchSpan(spec, startJd, stopJd, CLOSEST_STEP_DAYS, horizonsAsk, now)
+      if (!got.samples) throw new Error('no samples around closest approach')
+      approaches[index] = { ...approaches[index], closest: toSpan(got.samples, true) }
+    } catch (err) {
+      missing.push({ id: `sb:${row.des}`, reason: `closest-approach span: ${reasonOf(err)}` })
+    }
   }
 
   const placed = new Set(approaches.map((a) => a.des))

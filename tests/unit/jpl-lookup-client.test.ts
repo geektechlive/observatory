@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  fetchLookup,
-  fetchTrajectoryAround,
-  fetchTrajectorySpan,
-  trajectoryFacts,
-  trajectoryWindow,
-} from '@/lib/api/jplLookup'
+import { fetchLookup, fetchTrajectorySpan, trajectoryFacts } from '@/lib/api/jplLookup'
 import type { TrajectoryResponse } from '@/schemas/jplLookup'
 
 // The orrery search's on-demand lookup client (#100).
@@ -53,40 +47,37 @@ describe('fetchLookup', () => {
     vi.stubGlobal('fetch', ok({ unexpected: true }))
     expect(await fetchLookup('eros')).toEqual({ state: 'unavailable', reason: 'failed' })
   })
-})
 
-describe('trajectoryWindow', () => {
-  it('asks a day either side of the date, so repeat searches share a cache entry', () => {
-    const jd = 2461352.3 // 2026-11-07 19:12 TDB
-    expect(trajectoryWindow(jd)).toEqual({ start: '2026-11-06', end: '2026-11-08' })
-  })
-
-  it('refuses dates outside 1900–2100', () => {
-    expect(trajectoryWindow(2415000)).toBeNull() // 1899
-    expect(trajectoryWindow(2488500)).toBeNull() // 2101
-  })
-})
-
-describe('fetchTrajectoryAround', () => {
-  it('asks /api/trajectory for three daily samples', async () => {
-    const fetch = vi.fn(async () => new Response('{}', { status: 404 }))
-    vi.stubGlobal('fetch', fetch)
-    const r = await fetchTrajectoryAround('sb:20000433', 2461352.3)
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/trajectory?id=sb%3A20000433&start=2026-11-06&end=2026-11-08&step=1d',
-      undefined,
-    )
-    expect(r).toEqual({ state: 'unavailable', reason: 'not-found' })
-  })
-
-  it('does not ask for a date it cannot serve', async () => {
-    const fetch = vi.fn()
-    vi.stubGlobal('fetch', fetch)
-    expect(await fetchTrajectoryAround('sb:1', 2415000)).toEqual({
+  it('reads a 429 from the /api rate limit as busy, with its Retry-After (#141)', async () => {
+    const answer = (headers: Record<string, string>) =>
+      vi.fn(async () => new Response('{"error":"Rate limit exceeded"}', { status: 429, headers }))
+    vi.stubGlobal('fetch', answer({ 'Retry-After': '60' }))
+    expect(await fetchLookup('eros')).toEqual({
       state: 'unavailable',
-      reason: 'out-of-range',
+      reason: 'busy',
+      retryAfterS: 60,
     })
-    expect(fetch).not.toHaveBeenCalled()
+    // The zone's rule may send none: busy all the same, the hook's own wait applies.
+    vi.stubGlobal('fetch', answer({}))
+    expect(await fetchLookup('eros')).toEqual({ state: 'unavailable', reason: 'busy' })
+  })
+
+  it('waits out a replayed negative answer: 61 s, past its 60 s (#141)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('{"error":"JPL is busy"}', {
+            status: 503,
+            headers: { 'X-Cache': 'NEG', 'Retry-After': '20' },
+          }),
+      ),
+    )
+    expect(await fetchTrajectorySpan('sb:20000433', { start: 'a', end: 'b', step: '2d' })).toEqual({
+      state: 'unavailable',
+      reason: 'busy',
+      retryAfterS: 61,
+    })
   })
 })
 
@@ -199,8 +190,8 @@ describe('trajectoryFacts', () => {
     availableTo: null,
   }
 
-  it('reads the sample nearest the date: distance from the Sun and Earth, and speed', () => {
-    const f = trajectoryFacts(t, 2461346.6)
+  it('reads the samples at the date: distance from the Sun and Earth, and speed', () => {
+    const f = trajectoryFacts(t, 2461346.5)
     expect(f?.sampleJd).toBe(2461346.5)
     // |r| of the 2026-11-02 sample.
     expect(f?.sunAu).toBeCloseTo(
@@ -214,7 +205,17 @@ describe('trajectoryFacts', () => {
     expect(f?.earthAu).toBeLessThan(3.5)
   })
 
-  it('has nothing to say without samples', () => {
+  it('between samples, interpolates at the date itself (#152: they are 2 days apart)', () => {
+    const f = trajectoryFacts(t, 2461346.0)
+    expect(f?.sampleJd).toBe(2461346.0)
+    const r0 = Math.hypot(0.2863368944893412, -1.710461176296138, -0.1389562053649563)
+    const r1 = Math.hypot(0.297885147524694, -1.70998236296689, -0.1370791524300279)
+    expect(f?.sunAu).toBeGreaterThan(Math.min(r0, r1))
+    expect(f?.sunAu).toBeLessThan(Math.max(r0, r1))
+  })
+
+  it('has nothing to say without samples, or outside them', () => {
     expect(trajectoryFacts({ ...t, fine: null }, 2461346.6)).toBeNull()
+    expect(trajectoryFacts(t, 2461340)).toBeNull()
   })
 })

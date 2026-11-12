@@ -57,7 +57,7 @@ export function earthFrameRadii(km: number): number {
 }
 
 /** Scene direction of an ecliptic vector (place3d's axes), unit length, and its length. */
-function sceneDirection(rel: Vec3): { dir: Vec3; au: number } {
+export function sceneDirection(rel: Vec3): { dir: Vec3; au: number } {
   const au = Math.hypot(rel.x, rel.y, rel.z)
   if (au === 0) return { dir: { x: 0, y: 0, z: 0 }, au }
   return { dir: { x: rel.x / au, y: rel.z / au, z: -rel.y / au }, au }
@@ -110,14 +110,18 @@ export function earthFrameOffset(
   t: number,
 ): Vec3 {
   const { dir, au } = sceneDirection(relAu)
-  const open = earthRadiusScene * earthFrameRadii(au * AU_KM)
-  const r =
-    t <= 0 || trueOffset <= 0
-      ? trueOffset
-      : t >= 1
-        ? open
-        : Math.exp(Math.log(trueOffset) * (1 - t) + Math.log(open) * t)
+  const r = earthFrameDistance(trueOffset, earthRadiusScene * earthFrameRadii(au * AU_KM), t)
   return { x: dir.x * r, y: dir.y * r, z: dir.z * r }
+}
+
+/**
+ * The drawn distance from Earth, scene units: `trueOffset` (place3d's) at t = 0 to `open`
+ * (the open frame's) at t = 1, in log space between.
+ */
+export function earthFrameDistance(trueOffset: number, open: number, t: number): number {
+  if (t <= 0 || trueOffset <= 0) return trueOffset
+  if (t >= 1) return open
+  return Math.exp(Math.log(trueOffset) * (1 - t) + Math.log(open) * t)
 }
 
 /**

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 
-import { useJplLookup, useJplTrajectory } from '@/hooks/useJplLookup'
+import { useJplLookup, useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
 import { type LookupState, trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
+import { lookupSpan } from '@/lib/orrery/lookupTrack'
 import type { LookupObject } from '@/schemas/jplLookup'
 
 import styles from './jpl-lookup.module.css'
@@ -71,12 +72,37 @@ function ShowInOrrery({ object }: { object: LookupObject }) {
 
 const fmt = (n: number, digits: number) => n.toFixed(digits)
 
+/**
+ * Where Horizons puts it at the sim date, from the two years the orrery draws it from
+ * (#152): "Show in orrery" then needs no request of its own.
+ */
 function Position({ object }: { object: LookupObject }) {
   const { sim } = useSimTime(1000)
   const jd = sim / DAY_MS + UNIX_EPOCH_JD
-  const traj = useJplTrajectory(object.id, jd)
+  // A scrub across spans asks once, where the clock settles, as the orrery does.
+  const wanted = lookupSpan(sim)
+  const span = useSettledSpan(wanted, object.spkid)
+  const traj = useLookupSpan(object.spkid, span)
+  if (!wanted) return <p className={styles.muted ?? ''}>{UNAVAILABLE['out-of-range']}</p>
   if (traj.isPending) return <p className={styles.muted ?? ''}>Asking JPL Horizons where it is…</p>
   const answer = traj.data
+  if (traj.gaveUp) {
+    // Five retries spent (#141 review): asked again only when the visitor says.
+    return (
+      <p className={styles.muted ?? ''}>
+        JPL is still busy.{' '}
+        <button
+          type="button"
+          className={styles.close ?? ''}
+          onClick={() => {
+            void traj.refetch()
+          }}
+        >
+          Try again
+        </button>
+      </p>
+    )
+  }
   if (answer?.state !== 'ok') {
     return <p className={styles.muted ?? ''}>{unavailable(answer)}</p>
   }

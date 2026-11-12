@@ -1,16 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { useLookupHealth } from '@/hooks/useJplLookup'
-import { fetchTrajectorySpan, type LookupState, type Unavailable } from '@/lib/api/jplLookup'
+import { useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
+import type { LookupState, Unavailable } from '@/lib/api/jplLookup'
 import { shortName } from '@/lib/orrery/asteroids'
-import {
-  lookupKey,
-  lookupOrbit,
-  type LookupSpan,
-  lookupSpan,
-  spanCovers,
-} from '@/lib/orrery/lookupTrack'
+import { lookupKey, lookupOrbit, lookupSpan, spanCovers } from '@/lib/orrery/lookupTrack'
 import type { LookupObject, TrajectoryResponse } from '@/schemas/jplLookup'
 
 import type { CatalogItem } from './catalog'
@@ -25,14 +18,12 @@ import type { OrreryRenderer, SceneKey } from './three/OrreryRenderer'
  * request, not one per span it passes.
  */
 
-/** How long the clock must rest in a new span before it is asked for, ms. */
-export const LOOKUP_SETTLE_MS = 1200
-const HOUR_MS = 3_600_000
-/** A busy queue is asked again after its Retry-After, kept in these bounds, s. */
-const RETRY_MIN_S = 5
-const RETRY_MAX_S = 60
+export { LOOKUP_SETTLE_MS } from '@/hooks/useJplLookup'
 const JD_UNIX_EPOCH = 2440587.5
 const DAY_MS = 86_400_000
+
+/** JPL stayed busy through every retry. */
+const GAVE_UP = 'JPL is still busy. Try again in a minute.'
 
 const PROBLEM: Record<Unavailable, string> = {
   'not-set-up': 'On-demand lookup isn’t available yet.',
@@ -43,8 +34,10 @@ const PROBLEM: Record<Unavailable, string> = {
 }
 
 /** The card's and inspector's words for a failed answer. */
-export function lookupProblem(a: LookupState<unknown> | undefined): string | null {
+export function lookupProblem(a: LookupState<unknown> | undefined, gaveUp = false): string | null {
   if (!a || a.state === 'ok') return null
+  // Five retries spent (#141 review): the visitor asks again.
+  if (gaveUp) return GAVE_UP
   if (a.reason === 'busy' && a.retryAfterS !== undefined) {
     return `JPL is busy right now. Trying again in ${String(Math.round(a.retryAfterS))} s.`
   }
@@ -66,6 +59,10 @@ export interface LookupView {
   problem: string | null
   /** The answer said no for good (not found, not set up): a link to it can let go. */
   failed: boolean
+  /** JPL stayed busy through every retry: the inspector offers "Try again". */
+  gaveUp: boolean
+  /** Ask JPL again now. */
+  retry: () => void
 }
 
 interface Options {
@@ -74,57 +71,13 @@ interface Options {
   select: (key: SceneKey) => void
 }
 
-interface Requested {
-  spkid: string
-  span: LookupSpan
-}
-
-/**
- * The span to ask for: the clock's own at once for a new object, else once the clock has
- * rested in a new span for LOOKUP_SETTLE_MS. Keyed on strings, so the page's once-a-second
- * render doesn't restart the wait.
- */
-function useSettledSpan(wanted: LookupSpan | null, spkid: string | null): LookupSpan | null {
-  const [requested, setRequested] = useState<Requested | null>(null)
-  const current = requested?.spkid === spkid ? requested : null
-  const wantKey = wanted && spkid ? JSON.stringify({ spkid, span: wanted }) : ''
-  const currentKey = current ? JSON.stringify(current) : ''
-  useEffect(() => {
-    if (wantKey === currentKey) return
-    const timer = setTimeout(
-      () => {
-        setRequested(wantKey ? (JSON.parse(wantKey) as Requested) : null)
-      },
-      currentKey ? LOOKUP_SETTLE_MS : 0,
-    )
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [wantKey, currentKey])
-  return current?.span ?? null
-}
-
 export function useLookupTrack({ renderer, simMs, select }: Options): LookupView {
   const shown = useLookupStore((s) => s.shown)
   const spkid = shown?.spkid ?? null
   const span = useSettledSpan(spkid ? lookupSpan(simMs) : null, spkid)
-  const query = useQuery({
-    queryKey: ['jpl-lookup-track', spkid, span?.start, span?.end],
-    queryFn: () =>
-      fetchTrajectorySpan(`sb:${spkid ?? ''}`, span ?? { start: '', end: '', step: '' }),
-    enabled: spkid !== null && span !== null,
-    staleTime: HOUR_MS,
-    retry: false,
-    // Keep drawing the last span while the next is asked for (checked per object below).
-    placeholderData: (previous) => previous,
-    // A busy queue says when to come back; nothing else is retried.
-    refetchInterval: (q) => {
-      const a = q.state.data
-      if (a?.state !== 'unavailable' || a.reason !== 'busy') return false
-      return Math.min(RETRY_MAX_S, Math.max(RETRY_MIN_S, a.retryAfterS ?? 15)) * 1000
-    },
-  })
-  useLookupHealth('jpl-trajectory', query.data)
+  // The search card asked for this same span (#152): drawing it costs no new request.
+  // Keep drawing the last span while the next is asked for (checked per object below).
+  const query = useLookupSpan(spkid, span, true)
   const trajectory =
     query.data?.state === 'ok' && query.data.data.object.spkid === spkid ? query.data.data : null
 
@@ -165,7 +118,12 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
     renderer.focusOn(key)
   }, [renderer, key, focusOnLoad, covers, select])
 
-  const problem = query.data?.state === 'unavailable' ? lookupProblem(query.data) : null
+  const problem =
+    query.data?.state === 'unavailable' ? lookupProblem(query.data, query.gaveUp) : null
+  const { refetch } = query
+  const retry = useCallback(() => {
+    void refetch()
+  }, [refetch])
   const failed =
     query.data?.state === 'unavailable' &&
     (query.data.reason === 'not-found' ||
@@ -196,5 +154,7 @@ export function useLookupTrack({ renderer, simMs, select }: Options): LookupView
     loading: spkid !== null && (span === null || query.isFetching),
     problem,
     failed,
+    gaveUp: query.gaveUp,
+    retry,
   }
 }

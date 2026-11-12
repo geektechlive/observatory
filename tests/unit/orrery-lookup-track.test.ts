@@ -5,6 +5,7 @@ import {
   isLookupKey,
   LOOKUP_STEP_DAYS,
   lookupKey,
+  lookupNearTimes,
   lookupOrbit,
   lookupSpan,
   lookupSpkid,
@@ -154,5 +155,40 @@ describe('lookupOrbit (#145)', () => {
 
   it('is null when no sample covers the date', () => {
     expect(lookupOrbit(keplerSpan(2.2, 0.3, start, 2, 200), start - 5)).toBeNull()
+  })
+})
+
+describe('lookupNearTimes (#151)', () => {
+  // A straight pass by a fixed Earth at the origin: 0.0003 au miss at 0.005 au/day,
+  // closest at day 100.5 of a 2-day span; within 0.1 au for 20 days either side.
+  const CA = 2461100.5
+  const v = 0.005
+  const samples: number[] = []
+  for (let i = 0; i < 101; i += 1) {
+    const t = 2461000.5 + i * 2 - CA
+    samples.push(v * t, 0.0003, 0, v, 0, 0)
+  }
+  const fine: SampledSpan = { start: 2461000.5, step: 2, samples }
+  const earthAt = () => ({ x: 0, y: 0, z: 0 })
+
+  it('runs from where it comes within reach to where it leaves, a minute apart at closest', () => {
+    const times = lookupNearTimes(fine, earthAt, 0.1, 240)
+    expect(times.length).toBeGreaterThan(200)
+    expect([...times].sort((a, b) => a - b)).toEqual(times)
+    const first = times[0] ?? 0
+    const last = times.at(-1) ?? 0
+    expect(first).toBeCloseTo(CA - 20, 2)
+    expect(last).toBeCloseTo(CA + 20, 2)
+    const i = times.reduce(
+      (b, t, k) => (Math.abs(t - CA) < Math.abs((times[b] ?? 0) - CA) ? k : b),
+      0,
+    )
+    expect(times[i]).toBeCloseTo(CA, 3)
+    expect((times[i + 1] ?? 0) - (times[i] ?? 0)).toBeLessThan(2 / 1440)
+  })
+
+  it('is empty when the object never comes that near, or Earth has no samples', () => {
+    expect(lookupNearTimes(fine, earthAt, 0.0001, 240)).toEqual([])
+    expect(lookupNearTimes(fine, () => null, 0.1, 240)).toEqual([])
   })
 })

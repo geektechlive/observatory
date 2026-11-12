@@ -199,6 +199,36 @@ describe('useLookupTrack (#145)', () => {
     })
   })
 
+  it('stops asking after five retries, then offers to try again (#141 review)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      fetchSpan.mockResolvedValue({ state: 'unavailable', reason: 'busy', retryAfterS: 5 })
+      const { result } = setup()
+      act(() => {
+        useLookupStore.getState().show(apophis)
+      })
+      await waitFor(() => {
+        expect(fetchSpan).toHaveBeenCalledTimes(1)
+      })
+      for (let k = 0; k < 8; k += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(6_000)
+        })
+      }
+      // The first ask and five retries; then it waits for the visitor.
+      expect(fetchSpan).toHaveBeenCalledTimes(6)
+      expect(result.current.gaveUp).toBe(true)
+      expect(result.current.problem).toBe('JPL is still busy. Try again in a minute.')
+      await act(async () => {
+        result.current.retry()
+        await vi.advanceTimersByTimeAsync(10)
+      })
+      expect(fetchSpan).toHaveBeenCalledTimes(7)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('removing it takes it out of the scene', async () => {
     fetchSpan.mockImplementation(async (_id, span) => ({ state: 'ok', data: answer(span) }))
     const { renderer } = setup()

@@ -261,5 +261,15 @@ Both data-refresh jobs write `incident-report.json`, and `scripts/report-inciden
   posts to the absolute URL `https://cloudflareinsights.com/cdn-cgi/rum`, not to our own origin,
   so allowing only the script host loads the beacon and then silently blocks every beacon it
   sends. Verified in a browser, 2026-09-08.
+- **Two layers answer 429 on `/api/` (#141, read 2026-11-12):** the zone's rate-limiting rule
+  "observatory API rate limit" (50 requests per 10 s per `ip.src` + `cf.colo.id`, then a 10 s
+  block, Cloudflare's default 429 page, which counts cache HITs too) and the Functions'
+  `_middleware.ts` (60 a minute per isolate, JSON `{"error":"Rate limit exceeded"}` with
+  `Retry-After: 60`, seen only by requests that reach a Function). A cold orrery load sends
+  about 17 `/api/` requests, so five tabs at once from one address can trip either. Which one
+  sent #141's 429s wasn't captured. The client waits out both: the orrery bodies query retries
+  a 429 after 61 s (`bodiesRetryDelay`; a 5xx keeps the 2/4/8 s backoff, since its KV
+  pass-through keeps no negative entry), and a JPL lookup reads a 429 as busy and comes back
+  after its `Retry-After` (61 s at least for a replayed negative entry, `X-Cache: NEG`).
 - When a fix doesn't show on the plain URL of an `/api/` endpoint but does with `?x=1`, the zone's
   cache rule is holding the old answer: purge that URL (#61, #72).

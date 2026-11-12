@@ -123,6 +123,87 @@ export function describeLookup(
   }
 }
 
+/** Golden-section steps for the closest approach, and bisection steps for the window's edges. */
+const REFINE_STEPS = 40
+/** The nearest times to closest approach on the drawn pass, days (1 minute). */
+const NEAREST_STEP_DAYS = 1 / 1440
+
+/**
+ * When to place the drawn pass of a looked-up object near Earth (#151), sorted: from where
+ * it comes within `maxAu` of Earth to where it leaves, on the stretch of the span around
+ * its closest approach. Spaced geometrically out from closest approach (a minute apart
+ * there, days apart at the edges), as the Earth frame's scale is logarithmic in distance.
+ * `earthAt` is Horizons' Earth, null where it has no samples; empty when the object never
+ * comes that near while Earth is covered. The edges are kept: an object already near at
+ * the span's start or still near at its end draws from or to there.
+ */
+export function lookupNearTimes(
+  fine: SampledSpan,
+  earthAt: (jd: number) => Vec3 | null,
+  maxAu: number,
+  points: number,
+): number[] {
+  const dist = (jd: number): number => {
+    const s = stateAt({ fine, coarse: null }, jd)
+    const e = s ? earthAt(jd) : null
+    if (!s || !e) return Infinity
+    const p = s.position
+    return Math.hypot(p.x - e.x, p.y - e.y, p.z - e.z)
+  }
+  const n = Math.floor(fine.samples.length / 6)
+  const at = (i: number) => fine.start + i * fine.step
+  let best = -1
+  let bestD = Infinity
+  for (let i = 0; i < n; i += 1) {
+    const d = dist(at(i))
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  }
+  if (best < 0 || !(bestD < maxAu)) return []
+  // The closest approach, between the nearest sample's neighbours.
+  const g = (Math.sqrt(5) - 1) / 2
+  let lo = at(Math.max(0, best - 1))
+  let hi = at(Math.min(n - 1, best + 1))
+  for (let k = 0; k < REFINE_STEPS; k += 1) {
+    const m1 = hi - g * (hi - lo)
+    const m2 = lo + g * (hi - lo)
+    if (dist(m1) < dist(m2)) hi = m2
+    else lo = m1
+  }
+  const tMin = (lo + hi) / 2
+  // The window's edges: the last sample inside on each side, then bisect to maxAu.
+  const edge = (dir: 1 | -1): number => {
+    let i = best
+    while (i + dir >= 0 && i + dir < n && dist(at(i + dir)) < maxAu) i += dir
+    if (i + dir < 0 || i + dir >= n) return at(i)
+    let inside = at(i)
+    let outside = at(i + dir)
+    for (let k = 0; k < REFINE_STEPS; k += 1) {
+      const mid = (inside + outside) / 2
+      if (dist(mid) < maxAu) inside = mid
+      else outside = mid
+    }
+    return inside
+  }
+  const start = Math.min(edge(-1), tMin)
+  const end = Math.max(edge(1), tMin)
+  const side = Math.max(1, Math.floor((points - 1) / 2))
+  const spread = (reach: number): number[] => {
+    if (reach <= 0) return []
+    const first = Math.min(NEAREST_STEP_DAYS, reach)
+    const out: number[] = []
+    for (let j = 0; j < side; j += 1) {
+      out.push(side === 1 ? reach : first * (reach / first) ** (j / (side - 1)))
+    }
+    return out
+  }
+  const before = spread(tMin - start).map((d) => tMin - d)
+  const after = spread(end - tMin).map((d) => tMin + d)
+  return [...before.reverse(), tMin, ...after]
+}
+
 /** The Sun's GM, au³/day²: Gauss's gravitational constant squared. */
 const SUN_MU = 0.01720209895 ** 2
 const ORBIT_POINTS = 256

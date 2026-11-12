@@ -27,7 +27,9 @@ function horizonsAnswer(url: URL) {
   const command = strip(url.searchParams.get('COMMAND'))
   const start = Number(strip(url.searchParams.get('START_TIME')).replace(/^JD/, ''))
   const stop = Number(strip(url.searchParams.get('STOP_TIME')).replace(/^JD/, ''))
-  const step = 0.125
+  // '3 h' or, for a very close pass's span (#142), '10 m'.
+  const size = strip(url.searchParams.get('STEP_SIZE'))
+  const step = size.endsWith(' m') ? Number.parseInt(size, 10) / 1440 : 0.125
   const des = command.replace(/^DES=/, '').replace(/;$/, '')
   const target = /^\d+$/.test(des) ? `${des} Somebody (2002 VE68)` : `(${des})`
   const n = Math.round((stop - start) / step) + 1
@@ -105,9 +107,10 @@ describe('buildOrreryNeo', () => {
     const { deps, jplCalls } = fake()
     const { payload, requests } = await buildOrreryNeo(deps)
     expect(OrreryNeoSchema.parse(payload)).toBeTruthy()
-    // CAD, its PHA filter, Scout, then one Horizons request per selected object.
+    // CAD, its PHA filter, Scout, one Horizons request per selected object, then one per
+    // pass inside 0.001 au (#142).
     expect(jplCalls.slice(0, 3)).toEqual(['cad', 'cad-pha', 'scout'])
-    expect(requests).toBe(3 + 6)
+    expect(requests).toBe(3 + 6 + 2)
     expect(payload.approaches).toHaveLength(6)
   })
 
@@ -142,6 +145,39 @@ describe('buildOrreryNeo', () => {
     )
     expect(a.close.samples.length / 6).toBeGreaterThanOrEqual(47)
     expect(parsed.window).toEqual({ from: '2026-10-08', to: '2026-12-07' })
+  })
+
+  it('adds a 10-minute span over ±6 h for a pass inside 0.001 au, after placing all (#142)', async () => {
+    const asked: URL[] = []
+    const { deps, jplCalls } = fake({
+      horizons: (url) => {
+        asked.push(url)
+        return horizonsAnswer(url)
+      },
+    })
+    const { payload, requests } = await buildOrreryNeo(deps)
+    const parsed = OrreryNeoSchema.parse(payload)
+    // 2026 UE2 (0.00083 au) and 2026 VY2 (0.00076 au) of the fixture's six.
+    const near = parsed.approaches.filter((a) => a.closeApproach.distAu < 0.001)
+    expect(near.map((a) => a.des).sort()).toEqual(['2026 UE2', '2026 VY2'])
+    expect(requests).toBe(3 + 6 + 2)
+    // The extra requests come last, so they never cost an object its placement.
+    const dense = asked.slice(-2)
+    expect(dense.map((u) => u.searchParams.get('STEP_SIZE'))).toEqual(["'10 m'", "'10 m'"])
+    expect(jplCalls.slice(-2).every((c) => c.startsWith('horizons:'))).toBe(true)
+    for (const a of parsed.approaches) {
+      if (a.closeApproach.distAu >= 0.001) {
+        expect(a.closest).toBeNull()
+        continue
+      }
+      const s = a.closest
+      if (!s) throw new Error(`expected a closest span for ${a.des}`)
+      expect(s.step).toBeCloseTo(10 / 1440, 9)
+      expect(s.samples.length / 6).toBe(73)
+      const end = s.start + 72 * s.step
+      expect(s.start).toBeLessThanOrEqual(a.closeApproach.jd - 0.24)
+      expect(end).toBeGreaterThanOrEqual(a.closeApproach.jd + 0.24)
+    }
   })
 
   it('keeps this week’s objects when the month holds more than the limit (#136)', async () => {
@@ -212,5 +248,23 @@ describe('buildOrreryNeo', () => {
       id: expect.stringMatching(/^sb:/),
       reason: 'time budget spent',
     })
+  })
+
+  it('a budget spent during the close passes’ extra spans costs no placement (#142)', async () => {
+    const { deps } = fake()
+    // One tick per JPL request: CAD, the PHA filter, Scout and the six placements fit
+    // (ticks 2 to 10 against a start of 1); both extra requests (ticks 11, 12) do not.
+    let t = 0
+    const { payload } = await buildOrreryNeo({ ...deps, budgetMs: 9, clock: () => (t += 1) })
+    const parsed = OrreryNeoSchema.parse(payload)
+    expect(parsed.approaches).toHaveLength(6)
+    expect(parsed.approaches.every((a) => a.fine !== null && a.close !== null)).toBe(true)
+    expect(parsed.approaches.every((a) => a.closest === null)).toBe(true)
+    for (const des of ['2026 UE2', '2026 VY2']) {
+      expect(parsed.missing).toContainEqual({
+        id: `sb:${des}`,
+        reason: 'closest-approach span: time budget spent',
+      })
+    }
   })
 })

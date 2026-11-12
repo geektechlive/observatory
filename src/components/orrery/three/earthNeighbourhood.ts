@@ -114,6 +114,21 @@ export class EarthNeighbourhood {
     return new Vector3(frame.earth.x + o.x, frame.earth.y + o.y, frame.earth.z + o.z)
   }
 
+  /**
+   * Where something at a heliocentric position at another date is drawn in the frame
+   * (#151): relative to Earth at that date, not now, so a looked-up object's pass is drawn
+   * as it moves past Earth. Null without Horizons' Earth at that date or beyond `maxAu`.
+   */
+  placeNearAt(helio: Vec3, jd: number, frame: EarthFrameView, maxAu = Infinity): Vector3 | null {
+    const e = this.earthAt(jd)
+    if (!e) return null
+    const rel = { x: helio.x - e.x, y: helio.y - e.y, z: helio.z - e.z }
+    if (Math.hypot(rel.x, rel.y, rel.z) > maxAu) return null
+    const trueOffset = frame.toScene(helio).sub(frame.toScene(e)).length()
+    const o = earthFrameOffset(rel, frame.radius, trueOffset, frame.t)
+    return new Vector3(frame.earth.x + o.x, frame.earth.y + o.y, frame.earth.z + o.z)
+  }
+
   /** Place the approaches, the Sun–Earth line and the L1 marker. */
   place(jd: number, frame: EarthFrameView): void {
     this.asteroids.place(jd, frame)

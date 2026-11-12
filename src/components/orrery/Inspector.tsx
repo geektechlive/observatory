@@ -227,6 +227,7 @@ export function Inspector({
             earth={tracks?.find((t) => t.naifId === '399') ?? null}
             simMs={simMs}
             problem={lookup?.problem ?? null}
+            onRetry={lookup?.gaveUp ? lookup.retry : undefined}
             loading={lookup?.loading ?? false}
             onRemove={onRemoveLookup ?? onClose}
           />

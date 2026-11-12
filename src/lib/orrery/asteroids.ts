@@ -41,35 +41,53 @@ export function shortName(full: string): string {
   return bare?.[1] ?? name
 }
 
+/** The object's spans, finest first: 10 minutes (#142), 3 h (#136), daily. */
+const spansOf = (a: OrreryApproach): SampledSpan[] =>
+  [a.closest, a.close, a.fine].filter((s): s is SampledSpan => s !== null)
+
 /**
- * Heliocentric state from the object's samples, or null outside them: the 3 h span
- * around the pass where it covers the date (#136), else the daily one.
+ * Heliocentric state from the object's samples, or null outside them: the finest span
+ * that covers the date, 10 minutes at a pass inside 0.001 au (#142), 3 h around the pass
+ * (#136), else daily.
  */
 export function asteroidState(a: OrreryApproach, jd: number) {
-  const near = a.close ? stateAt({ fine: a.close, coarse: null }, jd) : null
-  if (near) return near
-  return a.fine ? stateAt({ fine: a.fine, coarse: null }, jd) : null
+  for (const span of spansOf(a)) {
+    const s = stateAt({ fine: span, coarse: null }, jd)
+    if (s) return s
+  }
+  return null
 }
 
 const spanTimes = (s: SampledSpan) =>
   Array.from({ length: s.samples.length / 6 }, (_, i) => s.start + i * s.step)
 
 /**
- * When to place the drawn pass (#136): every 3 h sample around closest approach, where
- * the object moves fastest across the sky, and the daily span spread over what is left
- * of `max` points. Sorted, never outside the samples.
+ * When to place the drawn pass (#136): every sample of the finer spans around closest
+ * approach (10 minutes, #142, then 3 h), where the object moves fastest across the sky,
+ * and the daily span spread over what is left of `max` points. Sorted, never outside the
+ * samples.
  */
 export function approachPathTimes(a: OrreryApproach, max: number): number[] {
-  const close = a.close ? spanTimes(a.close).slice(0, max) : []
-  if (!a.fine) return close
-  const lo = close[0] ?? Infinity
-  const hi = close.at(-1) ?? -Infinity
-  const wide = spanTimes(a.fine).filter((t) => t < lo || t > hi)
-  const room = max - close.length
-  // Thin the daily span evenly if it does not fit in the room left.
-  const every = room > 0 ? Math.ceil(wide.length / room) : Infinity
-  const kept = wide.filter((_, i) => i % every === 0)
-  return [...kept, ...close].sort((x, y) => x - y)
+  const spans = spansOf(a)
+  const daily = a.fine
+  const kept: number[] = []
+  // Ranges already covered by a finer span: a coarser one adds only times outside them.
+  const covered: [number, number][] = []
+  const outside = (t: number) => covered.every(([lo, hi]) => t < lo || t > hi)
+  for (const span of spans) {
+    const times = spanTimes(span).filter(outside)
+    const room = max - kept.length
+    if (span === daily) {
+      // Thin the daily span evenly if it does not fit in the room left.
+      const every = room > 0 ? Math.ceil(times.length / room) : Infinity
+      kept.push(...times.filter((_, i) => i % every === 0))
+    } else {
+      kept.push(...times.slice(0, Math.max(0, room)))
+    }
+    const all = spanTimes(span)
+    covered.push([all[0] ?? Infinity, all.at(-1) ?? -Infinity])
+  }
+  return kept.sort((x, y) => x - y)
 }
 
 /** Where the object is relative to Horizons' Earth, or null with no data for the date. */
@@ -107,8 +125,9 @@ export function closestApproachFromSamples(
   a: OrreryApproach,
   earthTrack: OrreryTrack | null,
 ): { jd: number; distAu: number } | null {
-  // The 3 h span is built around CAD's closest approach (#136), so the search starts there.
-  const span = a.close ?? a.fine
+  // The finer spans are built around CAD's closest approach (#136, #142), so the search
+  // starts in the finest.
+  const span = spansOf(a)[0]
   if (!span) return null
   const n = Math.floor(span.samples.length / 6)
   const dist = (jd: number) => asteroidGeocentric(a, earthTrack, jd)?.distAu ?? Infinity

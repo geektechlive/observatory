@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLookupStore } from '@/components/orrery/lookupStore'
 import { SearchBox } from '@/components/orrery/SearchBox'
 import { parseSbdbLookup } from '@/lib/orrery/jplLookup'
+import { lookupSpan } from '@/lib/orrery/lookupTrack'
 import { useOrreryClock } from '@/store/orreryClock'
 
 import apophis from './fixtures/jpl-lookup/sbdb-apophis.json'
@@ -116,6 +117,38 @@ describe('SearchBox: JPL fallback (#100)', () => {
     expect(fetch.mock.calls.some(([u]) => u.startsWith('/api/trajectory?id=sb%3A20099942'))).toBe(
       true,
     )
+  })
+
+  it('a scrub across spans asks JPL once, for where the clock settles (#152 review)', async () => {
+    const fetch = stubApi({
+      '/api/lookup': () => json(lookupBody(apophis, 'apophis')),
+      '/api/trajectory': () => json(trajectory),
+    })
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
+    await screen.findByText('99942 Apophis (2004 MN4)')
+    const spans = () => fetch.mock.calls.filter(([u]) => u.startsWith('/api/trajectory')).length
+    await waitFor(() => {
+      expect(spans()).toBe(1)
+    })
+    // Three 120-day grid steps in quick succession, as a scrub passes them.
+    for (const day of ['2027-03-05', '2027-07-05', '2027-11-05']) {
+      act(() => {
+        useOrreryClock.getState().setSimTime(Date.parse(`${day}T00:00:00Z`))
+      })
+      await new Promise((r) => setTimeout(r, 300))
+    }
+    expect(spans()).toBe(1)
+    await waitFor(
+      () => {
+        expect(spans()).toBe(2)
+      },
+      { timeout: 3000 },
+    )
+    const last = fetch.mock.calls.filter(([u]) => u.startsWith('/api/trajectory')).at(-1)?.[0]
+    expect(last).toContain(`start=${lookupSpan(Date.parse('2027-11-05T00:00:00Z'))?.start ?? ''}`)
+    await new Promise((r) => setTimeout(r, 500))
+    expect(spans()).toBe(2)
   })
 
   it('lists several matches and looks up the one chosen', async () => {

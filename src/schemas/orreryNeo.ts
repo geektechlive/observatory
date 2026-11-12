@@ -53,6 +53,12 @@ export const OrreryApproachSchema = z.object({
    * too fast for `fine`'s daily step; null in copies written before #136.
    */
   close: SampledSpanSchema.nullable().default(null),
+  /**
+   * 10-minute samples within ±6 h of closest approach for a pass inside 0.001 au (#142),
+   * which lasts minutes: `close`'s 3 h drew 2026 TP128 6.8% short. Null otherwise and in
+   * copies written before #142.
+   */
+  closest: SampledSpanSchema.nullable().default(null),
 })
 
 export const ScoutObjectSchema = z.object({

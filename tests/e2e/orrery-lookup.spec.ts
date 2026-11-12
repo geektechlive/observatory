@@ -35,9 +35,9 @@ test.beforeEach(async ({ page }) => {
 })
 
 /**
- * JPL answers for Apophis (#145). The orrery's span request (step 2d) is answered with
- * samples, or a busy queue's 503 + Retry-After; the card's own position check (1d) is
- * always answered. Returns the trajectory requests the orrery made, path and query.
+ * JPL answers for Apophis (#145). A span request is answered with samples, or a busy
+ * queue's 503 + Retry-After. Returns every trajectory request made, path and query: the
+ * card and the orrery share one span (#152), so a lookup shown in the orrery asks once.
  */
 async function stubJpl(page: Page, opts: { busy?: boolean } = {}) {
   const asked: string[] = []
@@ -49,8 +49,8 @@ async function stubJpl(page: Page, opts: { busy?: boolean } = {}) {
   await page.route('**/api/trajectory?*', (route) => {
     const url = new URL(route.request().url())
     const step = url.searchParams.get('step') ?? '1d'
-    if (step !== '1d') asked.push(url.pathname + url.search)
-    if (opts.busy && step !== '1d') {
+    asked.push(url.pathname + url.search)
+    if (opts.busy) {
       return route.fulfill({
         status: 503,
         headers: { 'Retry-After': '20', 'X-Error-Kind': 'upstream' },
@@ -113,15 +113,19 @@ test.describe('JPL lookup from the orrery search (#100)', () => {
   test('"Show in orrery" draws it, flies there, links to it, and Remove takes it out (#145)', async ({
     page,
   }) => {
-    await stubJpl(page)
+    const asked = await stubJpl(page)
     await openOrrery(page)
     await page.getByRole('combobox', { name: /find/i }).fill('apophis')
     await page.getByRole('option', { name: 'Search JPL for “apophis”' }).click()
     const card = page.getByRole('region', { name: 'JPL lookup' })
+    await expect(card).toContainText(/au from the Sun/)
     await card.getByRole('button', { name: 'Show in orrery' }).click()
 
     const canvas = page.locator('canvas[data-orrery-webgl]')
     await expect(canvas).toHaveAttribute('data-orrery-lookup', 'lookup:20099942')
+    // The card's position and the orrery's drawing come from one JPL request (#152).
+    expect(asked).toHaveLength(1)
+    expect(asked[0]).toContain('step=2d')
     await expect(canvas).toHaveAttribute('data-orrery-focus', 'lookup:20099942')
     // The whole osculating ellipse: 256 points, closed.
     await expect(canvas).toHaveAttribute('data-orrery-lookup-path', '257')
@@ -150,6 +154,10 @@ test.describe('JPL lookup from the orrery search (#100)', () => {
     const asked = await stubJpl(page)
     await page.goto('/#orrery?t=2027-03-01T00:00:00Z&focus=lookup:20099942')
     const canvas = page.locator('canvas[data-orrery-webgl]')
+    // The drawn radii, written each frame from here on (#153 below).
+    await canvas.evaluate((el) => {
+      el.setAttribute('data-orrery-px', '')
+    })
     await expect(canvas).toHaveAttribute('data-orrery-focus', 'lookup:20099942', {
       timeout: 20_000,
     })
@@ -159,6 +167,18 @@ test.describe('JPL lookup from the orrery search (#100)', () => {
     // One span around the link's date, never the default date's as well.
     expect(asked.filter((u) => u.startsWith('/api/trajectory'))).toHaveLength(1)
     expect(asked[0]).toContain('id=sb%3A20099942')
+    // Framed close, its marker stays a point (#153): 3.5 to 5 px, never near the Sun's.
+    await expect(canvas).toHaveAttribute('data-orrery-animating', 'false')
+    const readPx = async () =>
+      JSON.parse((await canvas.getAttribute('data-orrery-px')) || '{}') as {
+        sun?: number
+        lookup?: number | null
+      }
+    await expect.poll(async () => (await readPx()).lookup ?? null).not.toBeNull()
+    const px = await readPx()
+    expect(px.lookup).toBeLessThanOrEqual(5.01)
+    expect(px.lookup).toBeGreaterThanOrEqual(3.49)
+    expect(px.lookup).toBeLessThan(px.sun ?? 0)
   })
 
   test('a busy JPL queue says so, and how long it asked to wait (#145)', async ({ page }) => {

@@ -114,3 +114,39 @@ describe('LookupFacts (#145)', () => {
     expect(onRemove).toHaveBeenCalledOnce()
   })
 })
+
+describe('LookupFacts once JPL stayed busy (#141 review)', () => {
+  it('offers Try again, which asks JPL again', () => {
+    const onRetry = vi.fn()
+    render(
+      <LookupFacts
+        object={null}
+        trajectory={null}
+        earth={null}
+        simMs={Date.parse('2026-11-07T12:00:00Z')}
+        problem="JPL is still busy. Try again in a minute."
+        onRetry={onRetry}
+        loading={false}
+        onRemove={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('status').textContent).toBe('JPL is still busy. Try again in a minute.')
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no Try again while retries are still in hand', () => {
+    render(
+      <LookupFacts
+        object={null}
+        trajectory={null}
+        earth={null}
+        simMs={Date.parse('2026-11-07T12:00:00Z')}
+        problem="JPL is busy right now. Trying again in 20 s."
+        loading={false}
+        onRemove={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+})
