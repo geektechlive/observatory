@@ -53,8 +53,9 @@ At runtime a model is a `ModelDescriptor` (`src/lib/orrery/modelDescriptor.ts`):
 NAIF id, satellites by NORAD id and then family, each saying whether it is the object's own model
 or a family stand-in. `loadModel` (`three/craftModelLoad.ts`) loads, centres and fits one for any
 view.
-The focused-model layer still loads through its own path; when #194 adds satellites, it should move
-to `loadModel` and dedupe on key plus descriptor.
+The focused-model layer (`CraftModelLayer`) keeps its own loading path, now also used for the
+chosen satellite in the scene (#194, ADR 0030); it dedupes on key plus descriptor and does not
+retry a failed load until the key is cleared.
 
 ## How much of the dot cloud each family is
 

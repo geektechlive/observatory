@@ -28,7 +28,7 @@ import {
 } from '@/lib/orrery'
 import { dwarfNotice, type OrreryEntryGroup } from '@/lib/orrery/dwarfView'
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
-import { modelForKey } from '@/lib/orrery/modelDescriptor'
+import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import { moonBodies } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
 import { reentriesWithin } from '@/lib/spaceTrackText'
@@ -1370,6 +1370,7 @@ export function OrreryPage() {
                 : undefined
             }
             lookCloserRef={lookCloserRef}
+            sceneModel={sceneModel(lookDescriptor)}
             facts={
               detailOpen
                 ? {

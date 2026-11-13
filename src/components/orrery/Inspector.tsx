@@ -8,6 +8,7 @@ import { shortName } from '@/lib/orrery/asteroids'
 import { type BodyName, describePlanet, ORRERY_BODIES } from '@/lib/orrery/bodies'
 import type { OrreryEntry } from '@/lib/orrery/dwarfView'
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
+import type { ModelDescriptor } from '@/lib/orrery/modelDescriptor'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import { isSatKey } from '@/lib/orrery/satView'
 import type { SatcatEntry } from '@/lib/spacetrack'
@@ -135,6 +136,8 @@ interface InspectorProps {
   lookCloser?: LookCloser | undefined
   /** The button's ref, so the page can return focus to it when the view closes. */
   lookCloserRef?: Ref<HTMLButtonElement> | undefined
+  /** The model the scene draws for the chosen satellite, if it has one of its own (#194). */
+  sceneModel?: ModelDescriptor | undefined
   /** Present while the detail view is open: the phone sheet folds and this opens it (#205). */
   facts?: FactsToggle | undefined
   /** The selected comet, interstellar object or dwarf planet (#99), when that is what `body` names. */
@@ -169,6 +172,7 @@ export function Inspector({
   satCatalog,
   lookCloser,
   lookCloserRef,
+  sceneModel,
   facts,
   smallBody,
 }: InspectorProps) {
@@ -262,6 +266,7 @@ export function Inspector({
               catalog={satCatalog}
               physical={discos?.satellites[satellite.noradId] ?? null}
               reentry={reentries?.find((r) => r.noradId === satellite.noradId) ?? null}
+              sceneModel={sceneModel}
             />
           ) : (
             <p className={styles.inspectorText ?? ''} role="status">

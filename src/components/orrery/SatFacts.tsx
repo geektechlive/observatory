@@ -2,6 +2,7 @@ import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import { EPOCH_WINDOW_MS } from '@/lib/orbit/satCatalog'
 import { KM_TO_MI } from '@/lib/orrery'
+import type { ModelDescriptor } from '@/lib/orrery/modelDescriptor'
 import { epochAgeText, satAltitudeKm } from '@/lib/orrery/satView'
 import { objectTypeText, ownerNote, ownerText, rcsText } from '@/lib/satcatWords'
 import type { SatcatEntry } from '@/lib/spacetrack'
@@ -29,6 +30,8 @@ interface SatFactsProps {
   physical?: DiscosObject | null | undefined
   /** Space-Track's latest re-entry prediction for it, if any (#101). */
   reentry?: Reentry | null | undefined
+  /** The model the scene draws in place of its dot, when it has one of its own (#194). */
+  sceneModel?: ModelDescriptor | undefined
 }
 
 /**
@@ -38,7 +41,7 @@ interface SatFactsProps {
  * owns it, when it launched and its radar size, and any re-entry prediction; ESA DISCOS
  * its mass, size and operator (#101).
  */
-export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsProps) {
+export function SatFacts({ info, simMs, catalog, physical, reentry, sceneModel }: SatFactsProps) {
   const altKm = info.teme ? satAltitudeKm(info.teme) : null
   // Without a pass for the loaded objects a null position says nothing about the date (#206).
   const computed = info.computed !== false
@@ -93,6 +96,16 @@ export function SatFacts({ info, simMs, catalog, physical, reentry }: SatFactsPr
         <dd className={styles.inspectorText ?? ''}>
           {info.supgp === true ? SUPGP_SOURCE : 'CelesTrak GP data (OMM)'}
         </dd>
+        {sceneModel && (
+          <>
+            <dt>Shape</dt>
+            <dd className={styles.inspectorText ?? ''}>
+              Its own model once loaded, drawn at a fixed size
+              <br />
+              {`${sceneModel.attitudeNote} · not to scale`}
+            </dd>
+          </>
+        )}
         {catalog && (
           <>
             <dt>Kind</dt>

@@ -26,8 +26,10 @@ export class CraftModelLayer {
   readonly group = new Group()
   private shown: Shown | null = null
   /** The craft whose model is loading, by key; a late model for another is thrown away. */
-  private pending: { key: string; naifId: string } | null = null
+  private pending: { key: string; naifId: string; model: ModelDescriptor } | null = null
   private failed: string | null = null
+  /** The load that failed, so a caller that asks again each frame does not retry it (#194). */
+  private failure: { key: string; model: ModelDescriptor } | null = null
   private readonly load: ModelLoader
   private readonly onChange: () => void
   private readonly quaternion = new Quaternion()
@@ -41,6 +43,8 @@ export class CraftModelLayer {
   /** The focus moved to a spacecraft (or away, with null). */
   show(key: string | null, naifId: string | null): void {
     if (key !== null && (this.shown?.key === key || this.pending?.key === key)) return
+    // A craft asked for again by focus is tried again, as before.
+    this.failure = null
     if (key === null || naifId === null) {
       this.clear()
       return
@@ -53,18 +57,25 @@ export class CraftModelLayer {
     this.showDescriptor(key, naifId, model)
   }
 
-  /** Show any descriptor (a spacecraft's or a satellite's) under `key`; `id` names it in state(). */
+  /**
+   * Show any descriptor (a spacecraft's or a satellite's) under `key`; `id` names it in
+   * state(). Asking again for the same key and descriptor does nothing, a failed one included
+   * (until the key is cleared); a new descriptor under the same key replaces the model.
+   */
   showDescriptor(key: string, id: string, model: ModelDescriptor): void {
-    if (this.shown?.key === key || this.pending?.key === key) return
+    if (this.shown?.key === key && this.shown.model === model) return
+    if (this.pending?.key === key && this.pending.model === model) return
+    if (this.failure?.key === key && this.failure.model === model) return
+    this.failure = null
     this.clear()
     if (model.kind === 'standin') {
       this.mount(key, id, model, buildStandIn(model.standIn))
       return
     }
-    this.pending = { key, naifId: id }
+    this.pending = { key, naifId: id, model }
     this.load(model.file).then(
       (root) => {
-        if (this.pending?.key !== key) {
+        if (this.pending?.key !== key || this.pending.model !== model) {
           disposeTree(root)
           return
         }
@@ -76,13 +87,15 @@ export class CraftModelLayer {
           // A model that cannot be fitted is a failed load: free it, fall back to the icon.
           disposeTree(root)
           this.failed = id
+          this.failure = { key, model }
           this.onChange()
         }
       },
       () => {
-        if (this.pending?.key !== key) return
+        if (this.pending?.key !== key || this.pending.model !== model) return
         this.pending = null
         this.failed = id
+        this.failure = { key, model }
         this.onChange()
       },
     )

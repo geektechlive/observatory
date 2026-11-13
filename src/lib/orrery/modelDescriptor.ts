@@ -414,6 +414,15 @@ export function modelForSatellite(
   return family === null ? undefined : tables.byFamily[family]
 }
 
+/**
+ * The model the scene draws for a satellite: only one of the object's own. A stand-in shared by
+ * a family stays in Look closer, where it carries its note; a generic shape at a fixed size
+ * would only look like the satellite's own (ADR 0030).
+ */
+export function sceneModel(model: ModelDescriptor | undefined): ModelDescriptor | undefined {
+  return model?.scope === 'own' ? model : undefined
+}
+
 /** What `modelForKey` reads of a loaded satellite (the renderer's `SatInfo` has all three). */
 export interface SatelliteFacts {
   readonly noradId: string

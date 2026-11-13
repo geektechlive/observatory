@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { SatFacts } from '@/components/orrery/SatFacts'
 import { EARTH_RADIUS_KM } from '@/lib/orrery/earthFrame'
+import { modelForSatellite } from '@/lib/orrery/modelDescriptor'
 
 afterEach(cleanup)
 
@@ -233,5 +234,32 @@ describe('<SatFacts> (#98)', () => {
     expect(text).not.toMatch(/No position at this date/)
     expect(text).not.toMatch(/Working out/)
     expect(text).toMatch(/Position not available right now/)
+  })
+})
+
+describe('<SatFacts> shape note (#194, ADR 0030)', () => {
+  const iss = {
+    key: 'sat:25544',
+    noradId: '25544',
+    name: 'ISS (ZARYA)',
+    group: 'stations' as const,
+    epochMs: T0 - 3_600_000,
+    teme: [EARTH_RADIUS_KM + 418, 0, 0] as [number, number, number],
+  }
+
+  it('says the model drawn in the scene is at a fixed size, not to scale', () => {
+    const model = modelForSatellite('25544', null)
+    render(<SatFacts info={iss} simMs={T0} sceneModel={model} />)
+    const text = document.body.textContent
+    expect(text).toMatch(/Shape/)
+    expect(text).toMatch(/its own model once loaded/i)
+    expect(text).toMatch(/fixed size/i)
+    expect(text).toMatch(/not to scale/i)
+    expect(text).toContain(model?.attitudeNote ?? 'missing')
+  })
+
+  it('has no Shape row when the scene draws no model', () => {
+    render(<SatFacts info={iss} simMs={T0} />)
+    expect(document.body.textContent).not.toMatch(/Shape/)
   })
 })

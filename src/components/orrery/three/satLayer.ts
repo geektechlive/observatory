@@ -308,6 +308,15 @@ export class SatLayer {
     this.selected = key && isSatKey(key) ? key.slice(SAT_KEY_PREFIX.length) : null
   }
 
+  /**
+   * Stop drawing the marker mesh while the chosen satellite's model stands in for it (#194).
+   * The marker keeps its place, size and `visible`: the label anchors to it and the model's
+   * size is floored by it.
+   */
+  setMarkerDrawn(drawn: boolean): void {
+    this.marker.material.visible = drawn
+  }
+
   /** Each drawn frame: tick the controller, then place everything from the current pass. */
   place(p: SatPlace): void {
     this.radius = p.radius
@@ -508,6 +517,11 @@ export class SatLayer {
       }
     }
     return best === null ? null : satKey(best)
+  }
+
+  /** The loaded field of satellites: a new object whenever it changes, so a cache can key on it (#194). */
+  fieldRef(): object | null {
+    return this.ctl.field()
   }
 
   /** A satellite's details for the inspector, or null when it is not loaded. */

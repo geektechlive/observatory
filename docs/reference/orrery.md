@@ -296,6 +296,26 @@ Real maps on the planets, the live Sun from GOES SUVI.
   - The sprite blends additively but leaves the canvas's alpha alone. Plain `AdditiveBlending`
     wrote an opaque black square into the transparent canvas.
 - **Orrery e2e answer NOAA themselves** (`tests/e2e/swpc.ts`), so they never wait on it.
+- **The chosen satellite with a model of its own is drawn as that model too (#194, ADR 0030).**
+  A second `CraftModelLayer` (`satModels` in `OrreryRenderer`) resolves `modelForKey` for the chosen
+  `sat:<norad>` key each frame, through `sceneModel` (`modelDescriptor.ts`): only a model with
+  `scope: 'own'` is drawn, so a family stand-in stays a dot here and lives in Look closer. Only that
+  model is loaded; it is disposed when the choice moves, its group unloads or the inspector closes.
+  The marker mesh stops drawing (`SatLayer.setMarkerDrawn`) but keeps its place and size: the label
+  anchors to it and it is the model's floor.
+  - **Size is fixed, not true** (`three/satModelFit.ts`, ADR 0030): with the Sun on screen
+    `craftModelPx(sunPx)`, the focused craft's rule (9 px radius at the Sun's 10 px floor); with it off
+    screen 20 px radius (about 40 px across). Either way at most a quarter of Earth's drawn radius
+    (so 14 px at the default Earth-orbit view, where Earth is 56 px; the full 20 needs Earth at
+    80 px) and never under the marker. "On screen" is `sunOnScreen`: the projected Sun in front of
+    the camera with its disc reaching into the view, held on until 48 px clear (hysteresis). The ring
+    is 1.25 of the model, under 0.95 of the Sun while the Sun is on screen (`satRingPx`). The probe
+    `data-orrery-px` reports `satModel`, `satEarth` and `satSunVisible`.
+  - **Labelled:** the stage badge says NOT TO SCALE, and the inspector's Shape row (`SatFacts`) says
+    "Its own model once loaded, drawn at a fixed size" and "not to scale".
+  - An `earth` attitude is nadir (toward Earth's middle as drawn), `sun` points at the Sun; roll
+    about the axis is free. The canvas's `data-orrery-sat-model` reads `loading:`, `model:`,
+    `simplified:` or `failed:sat:<norad>`.
 - **`check-bundle` rules:** each map is under `textureBytes`, all of them together are under
   `planetTextureTotal` (486 kB of 700 kB), and `index.html` must never name one
   (`entry-has-no-planet-textures`).

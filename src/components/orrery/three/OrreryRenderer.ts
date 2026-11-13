@@ -55,6 +55,7 @@ import {
   earthFrameRadius,
   L1_DISTANCE_KM,
 } from '@/lib/orrery/earthFrame'
+import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
 import { labelBehindEarth, ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
@@ -96,6 +97,7 @@ import {
   SMALL_BODY_MIN_PX,
 } from './pxClamp'
 import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
+import { satFacing, satModelPx, satRingPx, SceneModelCache, sunOnScreen } from './satModelFit'
 import { type SmallBodyGroups, SmallBodyLayer } from './smallBodyLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
@@ -298,6 +300,14 @@ export class OrreryRenderer {
   private readonly models = new CraftModelLayer(loadGltfScene, () => {
     this.markDirty()
   })
+  /**
+   * The chosen satellite as a 3D model in place of its marker (#194): its own, or its
+   * family's stand-in. A second layer, so a craft focus and a satellite choice never clear
+   * each other; only the chosen one is loaded, and it is disposed when the choice moves.
+   */
+  private readonly satModels = new CraftModelLayer(loadGltfScene, () => {
+    this.markDirty()
+  })
   /** Earth's neighbourhood (#92): the Earth frame, close approaches, Sun–Earth line, L1. */
   private readonly near = new EarthNeighbourhood()
   /** An object looked up at JPL and shown (#145): its marker and orbit line. */
@@ -356,6 +366,13 @@ export class OrreryRenderer {
   private readonly scratch = new Vector3()
   /** The focused craft model's drawn radius, px, this frame (null when none is drawn). */
   private modelPx: number | null = null
+  /** The chosen satellite model's drawn radius, px, this frame (null when none is drawn). */
+  private satModelPx: number | null = null
+  /** Earth's drawn radius, px, and whether the Sun is on screen, as the satellite model saw them (#194). */
+  private satEarthPx: number | null = null
+  private sunVisible = false
+  /** The chosen satellite's scene model, looked up when the choice or the satellite field changes. */
+  private readonly satModelCache = new SceneModelCache()
   private preset: FocusPreset | null = DEFAULT_PRESET
   /** The view is still exactly a preset's (the user has not turned or zoomed): refit on resize. */
   private presetPristine = true
@@ -412,6 +429,7 @@ export class OrreryRenderer {
       this.craft.stalks,
       this.craft.markers,
       this.models.group,
+      this.satModels.group,
       this.near.group,
       this.sats.group,
       this.lookup.marker,
@@ -510,8 +528,17 @@ export class OrreryRenderer {
     if (this.near.l1.visible) this.floorPx(this.near.l1, L1_MIN_PX, PX_CEILING.l1)
     if (this.sats.marker.visible)
       this.floorPx(this.sats.marker, SAT_MARKER_MIN_PX, PX_CEILING.satMarker)
-    if (this.sats.selectRing.visible)
-      this.floorPx(this.sats.selectRing, PX_CEILING.satSelect, PX_CEILING.satSelect)
+    this.sizeSatModel()
+    if (this.sats.selectRing.visible) {
+      // The ring stands outside a model, still under the Sun.
+      const sun = this.bodies.get('Sun')
+      const ringPx = satRingPx({
+        modelPx: this.satModelPx,
+        sunPx: sun ? this.drawnPx(sun) : Number.NaN,
+        sunVisible: this.sunVisible,
+      })
+      this.floorPx(this.sats.selectRing, ringPx, ringPx)
+    }
     if (this.lookup.marker.visible) {
       const depth = this.lookup.marker.position.distanceTo(this.camera.position)
       this.lookup.marker.scale.setScalar(lookupMarkerRadius(this.unitsPerPx(depth)))
@@ -544,6 +571,7 @@ export class OrreryRenderer {
     this.skins.faceCamera(this.camera.position)
     this.placeMoons()
     this.placeModel()
+    this.placeSatModel()
     this.writePxProbe()
   }
 
@@ -577,6 +605,10 @@ export class OrreryRenderer {
         return side === null ? null : side / 2
       })(),
       model: this.modelPx === null ? null : Math.round(this.modelPx * 100) / 100,
+      satModel: this.satModelPx === null ? null : Math.round(this.satModelPx * 100) / 100,
+      // With the chosen satellite's model: Earth's radius and whether the Sun counted as on screen.
+      satEarth: this.satEarthPx === null ? null : Math.round(this.satEarthPx * 100) / 100,
+      satSunVisible: this.satModelPx === null ? null : this.sunVisible,
       moon: maxOf(this.moons.visible().map((m) => m.mesh)),
       l1: this.near.l1.visible ? px(this.near.l1) : null,
       asteroid: maxOf(this.near.asteroids.visible().map((a) => a.mesh)),
@@ -752,6 +784,86 @@ export class OrreryRenderer {
       this.unitsPerPx(at.distanceTo(this.camera.position)),
       facing,
       this.modelPx,
+    )
+  }
+
+  /** Load, swap or drop the chosen satellite's model to match the choice (#194). */
+  private syncSatModel(): void {
+    const key = this.chosen !== null && isSatKey(this.chosen) ? this.chosen : null
+    const model =
+      key === null
+        ? undefined
+        : this.satModelCache.resolve(key, this.sats.fieldRef(), () =>
+            sceneModel(modelForKey(key, (k) => this.sats.info(k))),
+          )
+    if (key === null || !model) {
+      this.satModels.show(null, null)
+      return
+    }
+    this.satModels.showDescriptor(key, key, model)
+  }
+
+  /**
+   * Once the chosen satellite's marker is placed and floored: decide whether its model is
+   * drawn and how big, and stop drawing the marker mesh when it is (the marker stays the
+   * label's anchor and the floor of the model's size).
+   */
+  private sizeSatModel(): void {
+    this.syncSatModel()
+    const marker = this.sats.marker
+    const earth = this.bodies.get('Earth')
+    const drawn = earth !== undefined && marker.visible && this.satModels.shownKey() !== null
+    this.satModels.group.visible = drawn
+    this.sats.setMarkerDrawn(!drawn)
+    this.satModelPx = null
+    this.satEarthPx = null
+    if (!drawn) {
+      // Nothing to carry over: the next model's first frame starts with the Sun off screen.
+      this.sunVisible = false
+      return
+    }
+    const sun = this.bodies.get('Sun')
+    const sunPx = sun ? this.drawnPx(sun) : Number.NaN
+    this.sunVisible = sun !== undefined && this.sunInView(sun, sunPx)
+    this.satEarthPx =
+      this.occluderRadius / this.unitsPerPx(earth.position.distanceTo(this.camera.position))
+    this.satModelPx = satModelPx({
+      earthPx: this.satEarthPx,
+      markerPx: this.drawnPx(marker),
+      sunPx,
+      sunVisible: this.sunVisible,
+    })
+  }
+
+  /** Whether the Sun is on screen, with a margin that stops it flickering at an edge (#194). */
+  private sunInView(sun: Object3D, sunPx: number): boolean {
+    this.scratch.copy(sun.position).project(this.camera)
+    return sunOnScreen({
+      x: this.scratch.x,
+      y: this.scratch.y,
+      z: this.scratch.z,
+      sunPx,
+      width: this.width,
+      height: this.height,
+      wasOn: this.sunVisible,
+    })
+  }
+
+  /**
+   * The chosen satellite's model at its drawn position, Earth-facing ('earth' attitude is
+   * nadir) or Sun-facing as its descriptor says (#194).
+   */
+  private placeSatModel(): void {
+    const model = this.satModels.shownDescriptor()
+    const earth = this.bodies.get('Earth')
+    if (!model || !earth || this.satModelPx === null) return
+    const at = this.sats.marker.position
+    const sun = this.bodies.get('Sun')?.position ?? earth.position
+    this.satModels.place(
+      at,
+      this.unitsPerPx(at.distanceTo(this.camera.position)),
+      satFacing(model.attitude, at, earth.position, sun),
+      this.satModelPx,
     )
   }
 
@@ -1039,6 +1151,7 @@ export class OrreryRenderer {
     // A chosen satellite gets a marker and a label (#98).
     this.sats.setSelected(key)
     this.chosen = key
+    this.sunVisible = false
     // A chosen close approach draws its sampled pass (#92), and so does a looked-up
     // object that is one (#216).
     this.near.asteroids.setSelected(this.chosenApproach())
@@ -1757,6 +1870,8 @@ export class OrreryRenderer {
     d['orreryTrajectory'] = path ? `${String(path.past)},${String(path.future)}` : ''
     // The focused craft's 3D model: loading:, model:, simplified: or failed:<naif> (#115).
     d['orreryModel'] = this.models.state()
+    // The chosen satellite's model: loading:, model:, simplified: or failed:sat:<norad> (#194).
+    d['orrerySatModel'] = this.satModels.state()
     // Earth's neighbourhood (#92): how open the frame is, approaches drawn, the chosen
     // one's path points, and whether L1 is drawn.
     d['orreryEarthFrame'] = this.near.openness().toFixed(2)
@@ -1819,6 +1934,7 @@ export class OrreryRenderer {
     this.small.dispose()
     this.sats.dispose()
     this.models.dispose()
+    this.satModels.dispose()
     this.moons.dispose()
     this.sunImage.stop()
     this.skins.dispose()

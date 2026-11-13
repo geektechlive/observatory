@@ -2,6 +2,7 @@ import { BoxGeometry, Group, Mesh, MeshStandardMaterial, type Object3D, Vector3 
 import { describe, expect, it, vi } from 'vitest'
 
 import { CraftModelLayer } from '@/components/orrery/three/craftModelLayer'
+import { type ModelDescriptor, modelForKey } from '@/lib/orrery/modelDescriptor'
 
 /** A stand-in for a loaded GLB: one 2 x 2 x 2 box, its dispose spied. */
 function fakeModel() {
@@ -110,5 +111,99 @@ describe('CraftModelLayer (#115)', () => {
     expect(holder.position.x).toBeCloseTo(5)
     // The fake box's robust radius is its corner distance, sqrt(3).
     expect(holder.scale.x).toBeCloseTo((modelPx * unitsPerPx) / Math.sqrt(3), 6)
+  })
+})
+
+describe('CraftModelLayer for a satellite (#194)', () => {
+  const issFacts = () => ({ noradId: '25544', name: 'ISS (ZARYA)', group: 'stations' as const })
+  const busFacts = () => ({ noradId: '43000', name: 'OTHER-1', group: 'other' as const })
+  const descriptor = (
+    key: string,
+    facts: () => { noradId: string; name: string; group: 'stations' | 'other' },
+  ) => {
+    const d = modelForKey(key, facts)
+    if (!d) throw new Error('no descriptor')
+    return d
+  }
+
+  it("loads a satellite's own model by descriptor and names it by the sat key", async () => {
+    const loader = vi.fn(() => Promise.resolve(fakeModel().root))
+    const layer = new CraftModelLayer(loader, () => undefined)
+    layer.showDescriptor('sat:25544', 'sat:25544', descriptor('sat:25544', issFacts))
+    expect(loader).toHaveBeenCalledWith('/models/craft/iss.glb')
+    await flush()
+    expect(layer.state()).toBe('model:sat:25544')
+    expect(layer.shownKey()).toBe('sat:25544')
+  })
+
+  it('loads a family stand-in the same way, under the sat key', async () => {
+    const loader = vi.fn(() => Promise.resolve(fakeModel().root))
+    const layer = new CraftModelLayer(loader, () => undefined)
+    layer.showDescriptor('sat:43000', 'sat:43000', descriptor('sat:43000', busFacts))
+    expect(loader).toHaveBeenCalledWith('/models/craft/generic-bus.glb')
+    await flush()
+    expect(layer.state()).toBe('model:sat:43000')
+  })
+
+  it('replaces the model when the same key gets a different descriptor', async () => {
+    const first = fakeModel()
+    const layer = new CraftModelLayer(
+      () => Promise.resolve(first.root),
+      () => undefined,
+    )
+    layer.showDescriptor('sat:43000', 'sat:43000', descriptor('sat:43000', busFacts))
+    await flush()
+    layer.showDescriptor('sat:43000', 'sat:43000', descriptor('sat:25544', issFacts))
+    await flush()
+    expect(layer.state()).toBe('model:sat:43000')
+    expect(layer.group.children.length).toBe(1)
+  })
+
+  it('throws away a late load for a descriptor it has since replaced under the same key', async () => {
+    const slow = deferred()
+    const fast = deferred()
+    const loads = [slow, fast]
+    const layer = new CraftModelLayer(
+      () => loads.shift()?.promise ?? Promise.reject(new Error('no load')),
+      () => undefined,
+    )
+    const stale = fakeModel()
+    const current = fakeModel()
+    layer.showDescriptor('sat:43000', 'sat:43000', descriptor('sat:43000', busFacts))
+    layer.showDescriptor('sat:43000', 'sat:43000', descriptor('sat:25544', issFacts))
+    // The first load lands while the second is still on its way.
+    slow.resolve(stale.root)
+    await flush()
+    expect(layer.state()).toBe('loading:sat:43000')
+    fast.resolve(current.root)
+    await flush()
+    expect(layer.group.children.length).toBe(1)
+    expect(stale.dispose).toHaveBeenCalled()
+    expect(current.dispose).not.toHaveBeenCalled()
+  })
+
+  it('does not retry a load that failed for the same key and descriptor', async () => {
+    const loader = vi.fn(() => Promise.reject(new Error('404')))
+    const layer = new CraftModelLayer(loader, () => undefined)
+    const d: ModelDescriptor = descriptor('sat:25544', issFacts)
+    layer.showDescriptor('sat:25544', 'sat:25544', d)
+    await flush()
+    expect(layer.state()).toBe('failed:sat:25544')
+    layer.showDescriptor('sat:25544', 'sat:25544', d)
+    layer.showDescriptor('sat:25544', 'sat:25544', d)
+    await flush()
+    expect(loader).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries after the focus has gone elsewhere and come back', async () => {
+    const loader = vi.fn(() => Promise.reject(new Error('404')))
+    const layer = new CraftModelLayer(loader, () => undefined)
+    const d = descriptor('sat:25544', issFacts)
+    layer.showDescriptor('sat:25544', 'sat:25544', d)
+    await flush()
+    layer.show(null, null)
+    layer.showDescriptor('sat:25544', 'sat:25544', d)
+    await flush()
+    expect(loader).toHaveBeenCalledTimes(2)
   })
 })
