@@ -1,0 +1,229 @@
+/* Sky view (#99 item 5): the alt-az dome for one object. Lane colours only for the track
+   (asteroid: thermal, comet: space); the marker is bone, never cyan or red. Darkness is
+   luminance, as in the Tonight strip. Every label is HTML at --text-xs or larger. */
+.body,
+.ask {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--panel-body-pad);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+}
+
+.name {
+  font-size: var(--text-base);
+  color: var(--bone);
+}
+
+.btn {
+  align-self: flex-start;
+  min-height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  color: var(--copper-glow);
+  background: var(--hud-faint);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--copper-2);
+}
+
+.laneComet {
+  --lane: var(--data-space-emit);
+}
+
+.laneAsteroid {
+  --lane: var(--data-thermal-emit);
+}
+
+.dome {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1 / 1;
+  align-self: center;
+}
+
+.bezel {
+  position: absolute;
+  inset: 0;
+}
+
+.bezel svg {
+  width: 100%;
+  height: 100%;
+}
+
+.domeSvg {
+  position: absolute;
+  inset: 9%;
+  width: 82%;
+  height: 82%;
+  overflow: visible;
+}
+
+.well {
+  fill: var(--hull);
+  stroke: var(--plate-edge);
+  stroke-width: 0.01;
+}
+
+.altRing {
+  fill: none;
+  stroke: var(--bone-faint);
+  stroke-width: 0.004;
+  stroke-dasharray: 0.02 0.03;
+  opacity: 0.6;
+}
+
+.axis {
+  stroke: var(--bone-faint);
+  stroke-width: 0.004;
+  opacity: 0.35;
+}
+
+.track {
+  fill: none;
+  stroke: var(--lane);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.hourDot {
+  fill: var(--lane);
+}
+
+.marker {
+  fill: var(--hull);
+  stroke: var(--bone);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.compass,
+.altLabel,
+.hourLabel,
+.markerLabel {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.compass {
+  font-size: var(--text-sm);
+  color: var(--copper-glow);
+}
+
+.altLabel {
+  color: var(--bone-faint);
+}
+
+.hourLabel {
+  color: var(--bone-dim);
+  margin-top: -12px;
+}
+
+.markerLabel {
+  color: var(--bone);
+  margin-top: 14px;
+}
+
+.bandWrap {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.band {
+  display: flex;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.band li {
+  flex-basis: 0;
+  background: var(--hull-2);
+}
+
+.band li[data-darkness='civil'] {
+  background: color-mix(in oklch, var(--bone) 28%, var(--hull-2));
+}
+
+.band li[data-darkness='nautical'] {
+  background: color-mix(in oklch, var(--bone) 16%, var(--hull-2));
+}
+
+.band li[data-darkness='astronomical'] {
+  background: color-mix(in oklch, var(--bone) 8%, var(--hull-2));
+}
+
+.bandNow {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 20px;
+  background: var(--bone);
+  transform: translateX(-1px);
+}
+
+.bandEnds {
+  display: flex;
+  justify-content: space-between;
+}
+
+.note,
+.text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
+}
+
+.hours summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--copper-glow);
+}
+
+.hours ul {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--bone-dim);
+}

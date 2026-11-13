@@ -376,6 +376,58 @@ only that brightness is an estimate from JPL's H and G, with G = 0.15 where JPL 
   tonight: above 10° 21:40–04:10, highest 52° S" (real time, not the orrery clock; no line if
   the samples do not reach tonight).
 
+## Sky view for one object (#99 item 5, [ADR 0033](../decisions/0033-sky-view-address-is-the-state.md))
+
+An alt-az dome for one comet or bright asteroid: `SkyViewPanel` at the top of `SkyConsoleRest`
+(below the fold, so in the lazy Sky chunk). It renders nothing until the address names a target.
+
+- **Link:** `#sky?target=sbc:<SPK-ID>[&t=<ISO UTC>]`, parsed and written by
+  `src/lib/sky/skyLink.ts`. `target` is the orrery's key (`sbc:`; the Tonight slice's own ids
+  are `sb:<SPK-ID>`, and `sb:` in the orrery means a close approach). `t` is a moment; no `t`
+  means live. `useHashView` keeps exactly these two params while the Sky console is open
+  (`OWN_PARAMS`), as it does the orrery's. The panel reads the address (`useSkyLink`), so a
+  Tonight row (a plain `<a href>`), the orrery's inspector button and a pasted link all work.
+- **Time:** from a Tonight row, real time. From the orrery's "See it in your sky", the orrery
+  clock's moment at the press, in `t` (omitted when the clock runs at real time,
+  `clockIsLive`); the view is then fixed at that moment and says "the sky at the orrery's
+  clock". Its **Now** button drops `t`; it does not move the orrery clock.
+- **Opened from the orrery:** the button calls `openSkyView`, which pushes the address with
+  `history.state = { skyFrom: 'orrery' }` and sends `hashchange` by hand (`pushState` sends
+  none). The heading then says "the sky at the orrery's time when you opened this", in local
+  time and UTC; a pasted link with `t` (no mark) says "the sky at <time>", and a live view
+  "the sky now". The button shows only for an object the Tonight slice holds (the slice is
+  fetched, about 11 kB, once a small body is selected); otherwise the inspector says why.
+- **Focus:** opening moves focus to the view's heading; Close returns it to the link that opened
+  it if that still exists, else to the selected console tab.
+- **Coverage rule:** one rule for the track, the hour rows and the marker: `topocentric` places
+  the object (the fine span, then the coarse one, as `stateAt` does) or it does not. The track
+  is sampled every 10 minutes over the night and is "partial" if any sample has no position.
+- **Data:** the Tonight slice only (`useCometsTonight`, about 11 kB gzip), so a target not in it
+  (a close approach, a planet, anything past the slice's week) is reported, not drawn. Samples
+  are the fine span (the coarse one where there is no fine); a night they do not cover draws
+  nothing and says "never extrapolated", a night they cover in part is drawn for that part.
+- **Location:** the visitor's shared real location (`!isFallback`); without it the panel
+  explains and offers "Use my location". The view itself calls nothing with it, but the Tonight panel on the same console sends a shared
+  location to Open-Meteo for cloud cover, and the ask says so.
+- **Drawing:** zenith at the centre, horizon on the rim, **north up, east on the left**
+  (owner, 2026-11-12). `domePoint` is the one projection. The TickRing is only the bezel; its
+  clockwise angles are never used to place anything. Labels are HTML in percent (the SVG draws
+  shapes only), so the 11 px floor holds. The track is the object above the horizon at
+  10-minute samples, with hour marks. The twilight band is the night from sunset to sunrise in
+  civil, nautical, astronomical and dark stretches, as luminance. The track is the thermal lane
+  (asteroid) or the space lane (comet); the marker is bone, never cyan or red.
+- **Text equivalent:** the image's `aria-label`, the "Above 10° …, highest …" line, the
+  moment's altitude, and an "Hour by hour" list (time, altitude and compass point or "below
+  the horizon", darkness).
+- **Code:** `src/lib/sky/track.ts` has no satellite.js. `collectRuns` is the segmentation
+  loop `lib/orbit/passes.ts` used to hold inline; `passes.ts` and `skyRun` both use it, with
+  `iss-passes.test.ts` and `sky-asteroids-tonight.test.ts` as regression gates. Orrery code
+  never imports `passes.ts`.
+- **Measured (2026-11-12):** first load +53 B gzip (152,907 to 152,960; the `OWN_PARAMS` change in
+  `useHashView`); `SkyConsoleRest` 5.2 to 8.3 kB gzip (JS), its CSS 2.0 to 2.7 kB; the shared
+  `track` chunk 6.2 kB and `skyLink` 1.4 kB gzip, loaded with the lazy Sky and orrery chunks;
+  `OrreryPage` +68 B.
+
 ## Dwarf planets (#99 item 8)
 
 Pluto, Ceres, Eris, Makemake and Haumea, in `horizons:dwarfs:v1` (`/api/orrery-dwarfs`), a key

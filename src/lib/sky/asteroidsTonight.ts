@@ -8,17 +8,18 @@
  * where JPL has none. Positions come from Horizons samples only: nothing is extrapolated,
  * and refraction is ignored, so the times are 10-minute samples, not rise and set.
  */
-import { compassPoint } from '@/lib/compass'
 import { asteroidMagnitude, phaseAngleDeg } from '@/lib/orrery/smallBodies'
 
-import { MIN_ALTITUDE } from './cometsTonight'
-import { type Observer, type Sampled, topocentric } from './topocentric'
+import { type Observer, type Sampled } from './topocentric'
+import { type SkyRun, skyRun } from './track'
+
+// The run-finding moved to track.ts (#99 item 5); these stay importable from here.
+export { type SkyRun, skyRun }
 
 /** Fainter than this forecast V is not listed (owner's decision, 2026-11-12). */
 export const FAINTEST_ASTEROID_LISTED = 11
 /** At most this many are listed (owner's decision, 2026-11-12). */
 export const MAX_ASTEROIDS_LISTED = 10
-const STEP_MS = 10 * 60_000
 
 /**
  * What it takes to see a point of light, by V magnitude, from a dark site: the usual star
@@ -44,65 +45,6 @@ export interface TonightAsteroidCandidate extends Sampled {
   h: number
   g: number
   gAssumed: boolean
-}
-
-/** Where a body stands through a window: the stretch above `MIN_ALTITUDE` and its peak. */
-export interface SkyRun {
-  /** The first and last 10-minute sample of the stretch (not exact rise and set). */
-  from: Date
-  to: Date
-  /** The sample where it stands highest, and where. */
-  best: Date
-  altitude: number
-  azimuth: number
-  direction: string
-  /** Distances at `best`, for the magnitude law. */
-  r: number
-  delta: number
-  earthSun: number
-}
-
-/**
- * The stretch of the window it is above `MIN_ALTITUDE`, sampled every 10 minutes; if it
- * rises twice, the stretch with the highest peak. Null if it never gets there or has no
- * samples tonight.
- */
-export function skyRun(
-  body: Sampled,
-  observer: Observer,
-  window: { start: Date; end: Date },
-): SkyRun | null {
-  let best: SkyRun | null = null
-  let current: SkyRun | null = null
-  for (let t = window.start.getTime(); t <= window.end.getTime(); t += STEP_MS) {
-    const at = new Date(t)
-    const sky = topocentric(body, at, observer)
-    if (!sky || sky.altitude < MIN_ALTITUDE) {
-      current = null
-      continue
-    }
-    if (!current) {
-      current = { ...here(at, sky), from: at, to: at }
-      if (!best || current.altitude > best.altitude) best = current
-      continue
-    }
-    current.to = at
-    if (sky.altitude > current.altitude) Object.assign(current, here(at, sky))
-    if (!best || current.altitude > best.altitude) best = current
-  }
-  return best && { ...best }
-}
-
-function here(at: Date, sky: NonNullable<ReturnType<typeof topocentric>>) {
-  return {
-    best: at,
-    altitude: sky.altitude,
-    azimuth: sky.azimuth,
-    direction: compassPoint(sky.azimuth),
-    r: sky.r,
-    delta: sky.delta,
-    earthSun: sky.earthSun,
-  }
 }
 
 export interface TonightAsteroid {

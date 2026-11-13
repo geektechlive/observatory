@@ -33,17 +33,21 @@ function applyHash({ view, layers }: HashState): void {
 /** Views that draw the Earth globe or map, the only ones the layers apply to. */
 const LAYER_VIEWS: ReadonlySet<ConsoleView> = new Set(['earth', 'orbit'])
 
-/** The orrery's own deep-link params (#108; the orrery chunk reads and writes them). */
-const ORRERY_PARAMS: ReadonlySet<string> = new Set(['t', 'focus', 'preset', 'detail'])
+/** The deep-link params a console owns (#108 orrery, #99 sky; its chunk reads and writes them). */
+const OWN_PARAMS: Partial<Record<ConsoleView, ReadonlySet<string>>> = {
+  orrery: new Set(['t', 'focus', 'preset', 'detail']),
+  sky: new Set(['target', 't']),
+}
 
 /**
- * The orrery's params from a hash that is already on the orrery, raw so their encoding
- * stays as written. Anything else (an Earth `layers=`, #109) is dropped.
+ * A console's own params from a hash that is already on it, raw so their encoding stays
+ * as written. Anything else (an Earth `layers=`, #109) is dropped.
  */
-function orreryQuery(hash: string): string {
+function ownQuery(view: ConsoleView, hash: string): string {
+  const own = OWN_PARAMS[view]
   const [viewPart = '', queryPart] = hash.replace(/^#\/?/, '').split('?')
-  if (viewPart.toLowerCase() !== 'orrery' || queryPart === undefined) return ''
-  const kept = queryPart.split('&').filter((p) => ORRERY_PARAMS.has(p.split('=')[0] ?? ''))
+  if (!own || viewPart.toLowerCase() !== view || queryPart === undefined) return ''
+  const kept = queryPart.split('&').filter((p) => own.has(p.split('=')[0] ?? ''))
   return kept.length > 0 ? `?${kept.join('&')}` : ''
 }
 
@@ -52,7 +56,7 @@ export function buildHash(
   layers: Record<LayerKey, boolean>,
   currentHash = '',
 ): string {
-  if (view === 'orrery') return `#orrery${orreryQuery(currentHash)}`
+  if (view === 'orrery' || view === 'sky') return `#${view}${ownQuery(view, currentHash)}`
   if (!LAYER_VIEWS.has(view)) return `#${view}`
   const enabled = LAYER_KEYS.filter((k) => layers[k])
   return enabled.length > 0 ? `#${view}?layers=${enabled.join(',')}` : `#${view}`

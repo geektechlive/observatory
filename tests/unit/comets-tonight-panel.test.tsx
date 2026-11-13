@@ -217,3 +217,15 @@ describe('CometsTonight', () => {
     expect(document.body.textContent).toMatch(/comet data is unavailable/i)
   })
 })
+
+describe('CometsTonight, sky view links (#99 item 5)', () => {
+  it('links each row to its sky view by the orrery key, in real time', () => {
+    query.result = payload([t5], [], WINDOW, [vesta])
+    render(<CometsTonight coords={KITT_PEAK} dark={DARK} nautical={DARK} now={NOW} />)
+    const hrefs = screen
+      .getAllByRole('link', { name: /sky view of/i })
+      .map((a) => a.getAttribute('href'))
+    expect(hrefs).toContain('#sky?target=sbc:20000004')
+    expect(hrefs).toContain('#sky?target=sbc:1004035')
+  })
+})

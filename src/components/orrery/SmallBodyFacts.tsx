@@ -2,13 +2,17 @@ import { useMemo } from 'react'
 
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
+import { useCometsTonight } from '@/hooks/useCometsTonight'
 import { useNow } from '@/hooks/useNow'
 import { type SmallBodyEntry, smallBodyFacts, tonightLine } from '@/lib/orrery/smallBodyView'
+import { findSkyTarget } from '@/lib/sky/tonightTarget'
+import { useOrreryClock } from '@/store/orreryClock'
 import { useUiStore } from '@/store/ui'
 
 import { Distance } from './Distance'
 import styles from './orrery.module.css'
 import { formatSimUtc } from './simDate'
+import { openSkyView } from './skyViewLink'
 
 const SPAN_TEXT = {
   fine: 'JPL Horizons, daily samples with velocity',
@@ -119,11 +123,43 @@ export function SmallBodyFacts({ entry, simMs }: { entry: SmallBodyEntry; simMs:
         <dd className={styles.inspectorText ?? ''}>{formatSimUtc(simMs)}</dd>
       </dl>
       {tonight && <p className={styles.inspectorText ?? ''}>{tonight}</p>}
+      <SkyViewButton entryKey={entry.key} />
       <p className={styles.inspectorText ?? ''}>
         {body.coarse
           ? 'Its line is its path as JPL Horizons samples it.'
           : 'Its orbit line is drawn from its orbital elements (Sun’s pull only), as a line: the marker is placed only from JPL’s samples.'}
       </p>
     </>
+  )
+}
+
+/**
+ * "See it in your sky" (#99 item 5): the sky view reads the Tonight slice only, so the
+ * button shows only for an object that slice holds, and says so for one it does not. The
+ * slice is about 11 kB; it is fetched once a small body is selected, and shared with the
+ * Bright asteroids switch.
+ */
+function SkyViewButton({ entryKey }: { entryKey: string }) {
+  const { data } = useCometsTonight()
+  if (!data) return null
+  if (!findSkyTarget(data, entryKey)) {
+    return (
+      <p className={styles.inspectorText ?? ''}>
+        No sky view for this object: it is not in this week’s Tonight list.
+      </p>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className={styles.chipBtn ?? ''}
+      onClick={() => {
+        // The Sky console takes over from the address (useHashView); the view shows the
+        // sky at this clock's moment, or live when the clock is at real time.
+        openSkyView(entryKey, useOrreryClock.getState(), Date.now())
+      }}
+    >
+      See it in your sky
+    </button>
   )
 }

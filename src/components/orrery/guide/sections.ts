@@ -81,7 +81,7 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
-        text: 'An asteroid’s position comes from JPL Horizons too, as daily samples for about a week around the last refresh; outside that week its marker is hidden, and its line is drawn from its orbital elements. Its brightness is an estimate from JPL’s H and G, with G = 0.15 where JPL has none. If you have shared your location in the Sky view, its inspector adds when it is above 10° in tonight’s dark and where it is highest.',
+        text: 'An asteroid’s position comes from JPL Horizons too, as daily samples for about a week around the last refresh; outside that week its marker is hidden, and its line is drawn from its orbital elements. Its brightness is an estimate from JPL’s H and G, with G = 0.15 where JPL has none. If you have shared your location in the Sky view, its inspector adds when it is above 10° in tonight’s dark and where it is highest. “See it in your sky” on a comet’s or asteroid’s inspector opens the Sky view on that object, drawn for the orrery’s clock (it works for the comets and asteroids in this week’s Tonight list); the Sky view’s Now button jumps to real time.',
       },
       {
         kind: 'p',

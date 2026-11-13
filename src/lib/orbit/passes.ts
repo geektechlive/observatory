@@ -16,6 +16,7 @@ import {
 } from 'satellite.js'
 
 import { compassPoint } from '@/lib/compass'
+import { collectRuns } from '@/lib/sky/track'
 import { sunAltitude } from '@/lib/tonight'
 
 export interface IssPass {
@@ -90,31 +91,29 @@ export function visiblePasses(
     return { time, elevation, azimuth: look.azimuth / RAD, visible }
   }
 
-  const passes: IssPass[] = []
-  let run: Sample[] = []
-  const close = () => {
-    const first = run[0]
-    const last = run.at(-1)
-    if (first && last) {
-      const peak = run.reduce((best, s) => (s.elevation > best.elevation ? s : best), first)
-      passes.push({
-        start: first.time,
-        peak: peak.time,
-        end: last.time,
-        startElevation: first.elevation,
-        maxElevation: peak.elevation,
-        from: compassPoint(first.azimuth),
-        to: compassPoint(last.azimuth),
-      })
-    }
-    run = []
-  }
   const end = from.getTime() + hours * 3_600_000
-  for (let t = from.getTime(); t <= end; t += STEP_MS) {
-    const s = sample(new Date(t))
-    if (s?.visible) run.push(s)
-    else close()
+  // The segmentation is shared with the sky view (lib/sky/track.ts, #99 item 5).
+  return collectRuns(
+    from.getTime(),
+    end,
+    STEP_MS,
+    (t) => sample(new Date(t)),
+    (s) => s.visible,
+  ).map(toPass)
+}
+
+/** A run of visible samples as a pass: where it starts, peaks and ends. */
+function toPass(run: Sample[]): IssPass {
+  const first = run[0] as Sample
+  const last = run[run.length - 1] as Sample
+  const peak = run.reduce((best, s) => (s.elevation > best.elevation ? s : best), first)
+  return {
+    start: first.time,
+    peak: peak.time,
+    end: last.time,
+    startElevation: first.elevation,
+    maxElevation: peak.elevation,
+    from: compassPoint(first.azimuth),
+    to: compassPoint(last.azimuth),
   }
-  close()
-  return passes
 }

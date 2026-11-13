@@ -182,3 +182,10 @@
   font-size: var(--text-sm);
   color: var(--data-space-emit);
 }
+
+/* The row's link to its sky view (#99 item 5) */
+.skyLink {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--copper-glow);
+}

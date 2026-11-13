@@ -4,12 +4,17 @@
  * the payload carries them.
  */
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Inspector } from '@/components/orrery/Inspector'
 import type { SmallBodyEntry } from '@/lib/orrery/smallBodyView'
 import type { OrrerySmallBody } from '@/schemas/orrerySmallBodies'
 import { useUiStore } from '@/store/ui'
+
+// The inspector's sky view button reads the Tonight slice (#99 item 5); these tests are about the facts.
+vi.mock('@/hooks/useCometsTonight', () => ({
+  useCometsTonight: () => ({ data: undefined, error: null }),
+}))
 
 afterEach(cleanup)
 

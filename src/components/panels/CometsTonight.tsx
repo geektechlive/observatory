@@ -17,6 +17,7 @@ import {
   type Reach,
   type TonightComet,
 } from '@/lib/sky/cometsTonight'
+import { serialiseSkyLink, targetOfTonightId } from '@/lib/sky/skyLink'
 
 import styles from './tonight-panel.module.css'
 
@@ -31,6 +32,21 @@ const ASTEROID_REACH_WORDS: Record<AsteroidReach, string> = {
   'naked-eye': 'naked eye, dark sky',
   binoculars: 'binoculars',
   'small-telescope': 'small telescope',
+}
+
+/** The row's link to its sky view (#99 item 5): real time, so no `t`. */
+function SkyLink({ id, name }: { id: string; name: string }) {
+  const target = targetOfTonightId(id)
+  if (target === null) return null
+  return (
+    <a
+      className={styles.skyLink ?? ''}
+      href={serialiseSkyLink({ target, t: null })}
+      aria-label={`Sky view of ${name}`}
+    >
+      Sky view
+    </a>
+  )
 }
 
 const clock = (d: Date) =>
@@ -206,6 +222,7 @@ function CometItem({ c }: { c: TonightComet }) {
       <span className={styles.passWhere ?? ''}>
         {where(c)} · mag {c.magnitude.toFixed(1)} · {c.reach ? REACH_WORDS[c.reach] : ''}
       </span>
+      <SkyLink id={c.id} name={c.name} />
     </li>
   )
 }
@@ -222,6 +239,7 @@ function AsteroidItem({ a }: { a: TonightAsteroid }) {
         above {String(MIN_ALTITUDE)}° {clock(a.from)}–{clock(a.to)} · {where(a)} · mag{' '}
         {a.magnitude.toFixed(1)} · {a.reach ? ASTEROID_REACH_WORDS[a.reach] : ''}
       </span>
+      <SkyLink id={a.id} name={a.name} />
     </li>
   )
 }

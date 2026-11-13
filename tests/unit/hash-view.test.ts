@@ -176,3 +176,23 @@ describe('buildHash keeps the orrery deep link (#108)', () => {
     expect(buildHash('sun', someOn, link)).toBe('#sun')
   })
 })
+
+describe('buildHash keeps the sky view link (#99 item 5)', () => {
+  const link = '#sky?target=sbc:20000004&t=2026-11-14T22:00:00Z'
+
+  it('keeps a sky link as it is, encoding untouched', () => {
+    expect(buildHash('sky', someOn, link)).toBe(link)
+  })
+
+  it('drops anything but the sky params', () => {
+    expect(buildHash('sky', someOn, '#sky?layers=iss&target=sbc:20000004&junk=1')).toBe(
+      '#sky?target=sbc:20000004',
+    )
+  })
+
+  it('writes a bare #sky when arriving from another tab, and never carries its params away', () => {
+    expect(buildHash('sky', someOn, '#orrery?focus=Mars')).toBe('#sky')
+    expect(buildHash('orrery', someOn, link)).toBe('#orrery')
+    expect(buildHash('earth', someOn, link)).toBe('#earth?layers=iss,quakes')
+  })
+})

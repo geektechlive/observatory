@@ -9,9 +9,9 @@
  *
  * Client only: the refresh job never imports this, so it may import freely.
  */
-import { skyRun } from '@/lib/sky/asteroidsTonight'
 import { MIN_ALTITUDE } from '@/lib/sky/cometsTonight'
 import type { Observer } from '@/lib/sky/topocentric'
+import { coveredWindow, skyRun } from '@/lib/sky/track'
 import { darkWindow, NAUTICAL_DARK } from '@/lib/tonight'
 import type { CometsTonightData } from '@/schemas/cometsTonight'
 import type { OrrerySmallBodies, OrrerySmallBody } from '@/schemas/orrerySmallBodies'
@@ -140,30 +140,11 @@ export function asteroidStatus({
   return `${plural(count, 'bright asteroid', 'bright asteroids')} this week, from JPL Horizons`
 }
 
+// The covered-window maths moved to the sky library with the sky view (#99 item 5).
+export { coveredWindow }
+
 const clock = (d: Date) =>
   d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-
-const msOfJd = (jd: number) => (jd - JD_UNIX_EPOCH) * DAY_MS
-
-/**
- * The part of a window a fine span has samples for (never extrapolated), and whether that is
- * less than all of it. Null when the span is absent or misses the window.
- */
-export function coveredWindow(
-  span: OrrerySmallBody['fine'],
-  window: { start: Date; end: Date },
-): { window: { start: Date; end: Date }; partial: boolean } | null {
-  if (!span) return null
-  const first = msOfJd(span.start)
-  const last = msOfJd(span.start + (span.samples.length / 6 - 1) * span.step)
-  const start = Math.max(window.start.getTime(), first)
-  const end = Math.min(window.end.getTime(), last)
-  if (end <= start) return null
-  const partial = start > window.start.getTime() || end < window.end.getTime()
-  return partial
-    ? { window: { start: new Date(start), end: new Date(end) }, partial }
-    : { window, partial }
-}
 
 /**
  * The inspector's line for an asteroid from the visitor's location, in real time (not the
