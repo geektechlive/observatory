@@ -93,14 +93,23 @@ export function darkness(sunAlt: number): Darkness {
 }
 
 const STEP_MS = 5 * 60_000
-const DARK_BELOW = -18
+/** Astronomical dark: the Sun this far below the horizon or lower. */
+export const ASTRONOMICAL_DARK = -18
+/** Nautical dark, where an asteroid's point of light is easy to find (#99 item 4). */
+export const NAUTICAL_DARK = -12
 
 /**
- * The current or next fully dark period (Sun below -18°) within a day, to 5 minutes;
- * null where it never gets fully dark (high latitudes around midsummer).
+ * The current or next dark period (Sun below `below`, -18° unless asked otherwise) within
+ * a day, to 5 minutes; null where it never gets that dark (high latitudes around
+ * midsummer: London's Sun stays above -18° from May to July but dips below -12°).
  */
-export function darkWindow(now: Date, lat: number, lon: number): { start: Date; end: Date } | null {
-  const isDark = (t: number) => sunAltitude(new Date(t), lat, lon) <= DARK_BELOW
+export function darkWindow(
+  now: Date,
+  lat: number,
+  lon: number,
+  below: number = ASTRONOMICAL_DARK,
+): { start: Date; end: Date } | null {
+  const isDark = (t: number) => sunAltitude(new Date(t), lat, lon) <= below
   /** Bisect the step [a, b] where darkness changes, to under a minute. */
   const edge = (a: number, b: number) => {
     const darkAtA = isDark(a)

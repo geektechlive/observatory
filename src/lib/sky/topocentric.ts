@@ -143,6 +143,8 @@ export interface SkyPosition extends AltAz {
   /** Distances from Earth and from the Sun, au, for the magnitude law. */
   delta: number
   r: number
+  /** Earth's distance from the Sun, au: with r and delta it gives the phase angle. */
+  earthSun: number
 }
 
 /** Where a sampled body stands in the observer's sky at a moment, or null without data. */
@@ -153,5 +155,11 @@ export function topocentric(body: Sampled, date: Date, observer: Observer): SkyP
   const look = altAzFromEcef(toEcef(precessToDate(j2000, jd), date), observer)
   const sun = stateAt(body, jd)
   const r = sun ? Math.hypot(sun.position.x, sun.position.y, sun.position.z) : Number.NaN
-  return { ...look, delta: Math.hypot(j2000.x, j2000.y, j2000.z), r }
+  const earth = heliocentric('Earth', jd)
+  return {
+    ...look,
+    delta: Math.hypot(j2000.x, j2000.y, j2000.z),
+    r,
+    earthSun: Math.hypot(earth.x, earth.y, earth.z),
+  }
 }

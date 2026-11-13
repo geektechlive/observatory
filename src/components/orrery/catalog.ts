@@ -93,6 +93,7 @@ export function noDataNotice(items: readonly CatalogItem[]): string | null {
 const SMALL_BODY_GROUP: Record<OrreryEntryGroup, string> = {
   comets: 'Comets',
   interstellar: 'Interstellar objects',
+  asteroids: 'Bright asteroids',
   dwarfs: 'Dwarf planets',
 }
 

@@ -25,6 +25,17 @@ const NOW = Date.UTC(2026, 10, 7, 4)
 const DAY_MS = 86_400_000
 const jdOf = (ms: number) => ms / DAY_MS + 2440587.5
 
+const tonightFixture = (name: string) =>
+  readFileSync(join(__dirname, '..', 'fixtures', 'tonight', name), 'utf8')
+
+/** The asteroids' Horizons target names, as Horizons writes them, by SPK-ID. */
+const ASTEROID_TARGETS = new Map<string, string>(
+  (JSON.parse(tonightFixture('sbdb-asteroids.json')) as { data: unknown[][] }).data.map((r) => [
+    String(r[2]),
+    String(r[0]).trim(),
+  ]),
+)
+
 const HEADERS: Record<string, string> = {
   '50788063': 'horizons-1i.txt',
   '1003639': 'horizons-2i.txt',
@@ -47,11 +58,16 @@ function horizonsAnswer(url: URL, rename?: string) {
     const jd = start + i * step
     return `${String(jd)}, A.D. x, ${String(2 + i * 1e-3)}, 0.4, 0.001, -0.01, 0.016, 0.0001,`
   })
-  const header = fixture(HEADERS[spkid] ?? 'horizons-24p.txt')
-  const [head = ''] = header.split('$$SOE')
-  // Comets borrow 24P's header; name the target after the comet asked for.
+  const asteroid = ASTEROID_TARGETS.get(spkid)
+  // Asteroids borrow Vesta's real header; comets borrow 24P's.
+  const header = asteroid
+    ? tonightFixture('horizons-4vesta.txt')
+    : fixture(HEADERS[spkid] ?? 'horizons-24p.txt')
+  const [head = ''] = header.split('$SOE')
   const named =
-    rename ?? (HEADERS[spkid] ? null : (COMET_TARGETS.get(spkid) ?? 'Somebody (C/1900 A1)'))
+    rename ??
+    asteroid ??
+    (HEADERS[spkid] ? null : (COMET_TARGETS.get(spkid) ?? 'Somebody (C/1900 A1)'))
   const withTarget = named
     ? head.replace(/^Target body name:.*$/m, `Target body name: ${named}   {source: JPL#1}`)
     : head
@@ -70,6 +86,7 @@ const COMET_TARGETS = new Map<string, string>(
 interface FakeOptions {
   horizons?: (url: URL) => string
   sbdb?: () => unknown
+  sbdbAsteroids?: () => unknown
 }
 
 function fake(opts: FakeOptions = {}) {
@@ -82,6 +99,14 @@ function fake(opts: FakeOptions = {}) {
       await new Promise((r) => setTimeout(r, 1))
       const url = new URL(raw)
       if (url.pathname === '/sbdb_query.api') {
+        if (url.searchParams.get('sb-kind') === 'a') {
+          calls.push('sbdb-asteroids')
+          return JSON.stringify(
+            opts.sbdbAsteroids
+              ? opts.sbdbAsteroids()
+              : JSON.parse(tonightFixture('sbdb-asteroids.json')),
+          )
+        }
         calls.push('sbdb')
         return JSON.stringify(opts.sbdb ? opts.sbdb() : JSON.parse(fixture('sbdb-comets.json')))
       }
@@ -110,11 +135,12 @@ function fake(opts: FakeOptions = {}) {
 describe('buildOrrerySmallBodies', () => {
   it('builds a payload the schema accepts, one JPL request at a time', async () => {
     const { deps, calls } = fake()
-    const { payload, requests } = await buildOrrerySmallBodies(deps)
+    const { payload, requests, asteroids } = await buildOrrerySmallBodies(deps)
     expect(OrrerySmallBodiesSchema.parse(payload)).toBeTruthy()
     expect(calls[0]).toBe('sbdb')
-    // SBDB, twelve comets, then each interstellar object's fine and long spans.
-    expect(requests).toBe(1 + 12 + 3 * 2)
+    // SBDB, twelve comets, each interstellar object's fine and long spans, then the
+    // asteroid query and one request per asteroid.
+    expect(requests).toBe(1 + 12 + 3 * 2 + 1 + (asteroids as unknown[]).length)
     expect(payload.comets).toHaveLength(12)
     expect(payload.interstellar.map((o: { name: string }) => o.name)).toEqual([
       '1I/ʻOumuamua',
@@ -182,11 +208,11 @@ describe('buildOrrerySmallBodies', () => {
     const { payload: previous } = await buildOrrerySmallBodies(first.deps)
     const { deps } = fake()
     const later = await buildOrrerySmallBodies({ ...deps, now: NOW + 6 * 3_600_000, previous })
-    expect(later.requests).toBe(1 + 12 + 3)
+    expect(later.requests).toBe(1 + 12 + 3 + 1 + (later.asteroids as unknown[]).length)
     expect(later.payload.interstellar[0].coarse).toEqual(previous.interstellar[0].coarse)
     expect(later.payload.coarseFetchedAt).toBe(previous.coarseFetchedAt)
     const dayLater = await buildOrrerySmallBodies({ ...deps, now: NOW + 25 * 3_600_000, previous })
-    expect(dayLater.requests).toBe(1 + 12 + 3 * 2)
+    expect(dayLater.requests).toBe(1 + 12 + 3 * 2 + 1 + (dayLater.asteroids as unknown[]).length)
   })
 
   it("refuses an answer for the wrong object, keeping SBDB's elements", async () => {
@@ -232,6 +258,97 @@ describe('buildOrrerySmallBodies', () => {
       id: expect.stringMatching(/^sb:/),
       reason: 'time budget spent',
     })
+  })
+})
+
+describe('the bright asteroids', () => {
+  it('places each at ±30 days daily with velocity, brightest first, after the comets and 1I-3I', async () => {
+    const { deps, calls } = fake()
+    const { asteroids, payload } = await buildOrrerySmallBodies(deps)
+    expect(asteroids.length).toBeGreaterThan(0)
+    const first = asteroids[0]
+    expect(first.fine.step).toBe(1)
+    expect(first.fine.samples).toHaveLength(61 * 6)
+    expect(first.fine.start).toBe(jdOf(Date.UTC(2026, 9, 8)))
+    expect(first.target).toBe(ASTEROID_TARGETS.get(first.spkid))
+    expect(first.elements.epochJd).not.toBeNull()
+    const mags = asteroids.map((a: { magnitude: number }) => a.magnitude)
+    expect([...mags].sort((a, b) => a - b)).toEqual(mags)
+    // Not in the comet payload (ADR 0023).
+    expect(JSON.stringify(payload)).not.toContain('asteroids')
+    // Every asteroid request comes after the last interstellar one.
+    const lastInterstellar = calls.map((c) => c.includes('DES=1004083;')).lastIndexOf(true)
+    const firstAsteroid = calls.indexOf('sbdb-asteroids')
+    expect(firstAsteroid).toBeGreaterThan(lastInterstellar)
+    expect(calls.slice(firstAsteroid + 1).every((c) => c.startsWith("horizons:'DES=2000"))).toBe(
+      true,
+    )
+  })
+
+  it("asks by SPK-ID bare, not with the comets' CAP;NOFRAG", async () => {
+    const { deps, calls } = fake()
+    const { asteroids } = await buildOrrerySmallBodies(deps)
+    const spkid = asteroids[0].spkid as string
+    expect(calls.some((c) => c.startsWith(`horizons:'DES=${spkid};'`))).toBe(true)
+  })
+
+  it('uses G = 0.15 and says so where SBDB has none', async () => {
+    const { deps } = fake()
+    const { asteroids } = await buildOrrerySmallBodies(deps)
+    const iris = asteroids.find((a: { des: string }) => a.des === '7')
+    expect(iris).toMatchObject({ g: 0.15, gAssumed: true })
+    const vesta = asteroids.find((a: { des: string }) => a.des === '4')
+    expect(vesta).toMatchObject({ g: 0.32, gAssumed: false })
+  })
+
+  it('refuses an answer for the wrong object and lists it as missing', async () => {
+    const { deps } = fake({
+      horizons: (url) =>
+        (url.searchParams.get('COMMAND') ?? '').includes('DES=20000004;')
+          ? horizonsAnswer(url, '44 Nysa (A857 SA)')
+          : horizonsAnswer(url),
+    })
+    const { asteroids, payload } = await buildOrrerySmallBodies(deps)
+    expect(asteroids.some((a: { des: string }) => a.des === '4')).toBe(false)
+    expect(payload.missing).toContainEqual({
+      id: 'sb:20000004',
+      reason: expect.stringMatching(/Nysa/),
+    })
+  })
+
+  it('still ships the comets and 1I-3I when the asteroid query fails', async () => {
+    const { deps } = fake({ sbdbAsteroids: () => ({ message: 'down' }) })
+    const { asteroids, payload } = await buildOrrerySmallBodies(deps)
+    expect(asteroids).toEqual([])
+    expect(payload.comets).toHaveLength(12)
+    expect(payload.interstellar).toHaveLength(3)
+    expect(payload.missing.map((m: { id: string }) => m.id)).toEqual(['jpl-sbdb-asteroids'])
+  })
+
+  it('lets a spent time budget cut asteroids, never comets or 1I-3I', async () => {
+    const { deps } = fake()
+    let t = 0
+    // 19 requests (SBDB, 12 comets, 6 for 1I-3I) fit; then the asteroid query and two asteroids.
+    const { asteroids, payload } = await buildOrrerySmallBodies({
+      ...deps,
+      budgetMs: 19 + 3,
+      clock: () => (t += 1),
+    })
+    expect(payload.comets).toHaveLength(12)
+    expect(payload.comets.every((c: { fine: unknown }) => c.fine)).toBe(true)
+    expect(payload.interstellar).toHaveLength(3)
+    expect(asteroids).toHaveLength(2)
+    expect(payload.missing.length).toBeGreaterThan(0)
+    expect(
+      payload.missing.every(
+        (m: { id: string; reason: string }) => m.reason === 'time budget spent',
+      ),
+    ).toBe(true)
+  })
+
+  it('never fails the step: asteroids alone cannot save it', async () => {
+    const { deps } = fake({ sbdb: () => ({ message: 'down' }), horizons: () => 'API down' })
+    await expect(buildOrrerySmallBodies(deps)).rejects.toThrow(/no comet or interstellar/)
   })
 })
 

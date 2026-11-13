@@ -635,6 +635,10 @@
   color: var(--data-space-emit);
 }
 
+.brightAsteroidLabel {
+  color: var(--data-thermal-emit);
+}
+
 .dwarfLabel {
   color: var(--data-dwarf);
 }

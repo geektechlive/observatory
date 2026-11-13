@@ -9,7 +9,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { lookupTrajectory } from './lookupPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
-import { ATLAS_ID, COMET_ID, serveSmallBodies } from './smallBodiesPayload'
+import { ATLAS_ID, COMET_ID, serveCometsTonight, serveSmallBodies } from './smallBodiesPayload'
 import { offlineSun } from './swpc'
 
 test.use({ viewport: { width: 1440, height: 900 } })
@@ -29,6 +29,25 @@ async function open(page: Page, hash = '#orrery') {
   })
   return asked
 }
+
+test.describe('Bright asteroids (#99 item 4)', () => {
+  test('the switch starts off, loads only the small Tonight slice, and draws the asteroid', async ({
+    page,
+  }) => {
+    const tonight = await serveCometsTonight(page)
+    const comets = await open(page)
+    await page.waitForTimeout(1000)
+    expect(tonight).toEqual([])
+    const sw = page.getByRole('switch', { name: 'Bright asteroids' })
+    await expect(sw).toHaveAttribute('aria-checked', 'false')
+    await sw.click()
+    await expect.poll(() => tonight.length).toBeGreaterThan(0)
+    await expect.poll(() => attr(page, 'data-orrery-small-body-keys')).toBe('sbc:20000004')
+    await expect(page.getByRole('status').filter({ hasText: /1 bright asteroid/ })).toBeVisible()
+    // The comets' 72 kB payload is never asked for.
+    expect(comets).toEqual([])
+  })
+})
 
 test.describe('Comets & interstellar (#99)', () => {
   test('nothing loads until a switch asks; each switch draws its group with a line', async ({

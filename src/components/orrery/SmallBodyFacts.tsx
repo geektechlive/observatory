@@ -1,6 +1,10 @@
+import { useMemo } from 'react'
+
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
-import { type SmallBodyEntry, smallBodyFacts } from '@/lib/orrery/smallBodyView'
+import { useNow } from '@/hooks/useNow'
+import { type SmallBodyEntry, smallBodyFacts, tonightLine } from '@/lib/orrery/smallBodyView'
+import { useUiStore } from '@/store/ui'
 
 import { Distance } from './Distance'
 import styles from './orrery.module.css'
@@ -20,6 +24,19 @@ export function SmallBodyFacts({ entry, simMs }: { entry: SmallBodyEntry; simMs:
   const { body } = entry
   const f = smallBodyFacts(body, simMs)
   const sol = f.solution
+  // The visitor's own shared location, never the Greenwich stand-in (#78); real time.
+  const observer = useUiStore((s) => s.observer)
+  // Real time, so recomputed once a minute, not on every frame of the orrery clock.
+  const minute = Math.floor(useNow(60_000).getTime() / 60_000)
+  const lat = observer && !observer.isFallback ? observer.lat : null
+  const lon = observer && !observer.isFallback ? observer.lon : null
+  const tonight = useMemo(
+    () =>
+      entry.group === 'asteroids' && lat !== null && lon !== null
+        ? tonightLine(body, { lat, lon }, new Date(minute * 60_000))
+        : null,
+    [entry.group, body, lat, lon, minute],
+  )
   return (
     <>
       <p className={styles.inspectorMeta ?? ''}>
@@ -39,6 +56,12 @@ export function SmallBodyFacts({ entry, simMs }: { entry: SmallBodyEntry; simMs:
             <dd>
               <Distance au={f.sunAu} />
             </dd>
+          </>
+        )}
+        {entry.group === 'asteroids' && body.h !== null && (
+          <>
+            <dt>Absolute magnitude H</dt>
+            <dd className={styles.inspectorText ?? ''}>{body.h.toFixed(2)}</dd>
           </>
         )}
         <dt>Eccentricity</dt>
@@ -95,6 +118,7 @@ export function SmallBodyFacts({ entry, simMs }: { entry: SmallBodyEntry; simMs:
         <dt>Sample time</dt>
         <dd className={styles.inspectorText ?? ''}>{formatSimUtc(simMs)}</dd>
       </dl>
+      {tonight && <p className={styles.inspectorText ?? ''}>{tonight}</p>}
       <p className={styles.inspectorText ?? ''}>
         {body.coarse
           ? 'Its line is its path as JPL Horizons samples it.'

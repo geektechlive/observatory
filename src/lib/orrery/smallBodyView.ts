@@ -9,9 +9,15 @@
  *
  * Client only: the refresh job never imports this, so it may import freely.
  */
+import { skyRun } from '@/lib/sky/asteroidsTonight'
+import { MIN_ALTITUDE } from '@/lib/sky/cometsTonight'
+import type { Observer } from '@/lib/sky/topocentric'
+import { darkWindow, NAUTICAL_DARK } from '@/lib/tonight'
+import type { CometsTonightData } from '@/schemas/cometsTonight'
 import type { OrrerySmallBodies, OrrerySmallBody } from '@/schemas/orrerySmallBodies'
 
 import { conicPath } from './conic'
+import { dwarfBySpkid } from './dwarfs'
 import { stateAt, type TrackState, trajectoryPoints } from './ephemeris'
 import { lookupSpkid } from './lookupTrack'
 import type { Vec3 } from './scale'
@@ -25,7 +31,7 @@ const PATH_PERIHELION_MULT = 2
 /** ...and this far past the farthest point its samples reach. */
 const PATH_SAMPLE_MARGIN = 1.25
 
-export type SmallBodyGroup = 'comets' | 'interstellar'
+export type SmallBodyGroup = 'comets' | 'interstellar' | 'asteroids'
 
 /** A small body to draw: its scene key, label and group, with its payload entry. */
 export interface SmallBodyEntry {
@@ -69,6 +75,118 @@ export function smallBodyEntries(data: OrrerySmallBodies | undefined): SmallBody
     body,
   })
   return [...data.comets.map(entry('comets')), ...data.interstellar.map(entry('interstellar'))]
+}
+
+/**
+ * The bright asteroids (#99 item 4), from the Tonight slice (/api/comets-tonight): a
+ * marker on each one's daily Horizons samples and its orbit line from the elements, like a
+ * comet. The slice has no `coarse` span, so a marker is hidden outside the week it
+ * covers. Ceres is left out: the dwarf planets draw it, from their own data, and one
+ * object must not be drawn twice under one key.
+ */
+export function asteroidEntries(data: CometsTonightData | undefined): SmallBodyEntry[] {
+  if (!data) return []
+  return data.asteroids
+    .filter((a) => dwarfBySpkid(a.spkid) === undefined)
+    .map((a) => ({
+      key: smallBodyKey(a.spkid),
+      label: a.name,
+      group: 'asteroids' as const,
+      body: {
+        id: a.id,
+        spkid: a.spkid,
+        des: a.name,
+        name: a.name,
+        kind: 'asteroid' as const,
+        interstellar: false,
+        discovered: null,
+        magnitude: null,
+        m1: null,
+        k1: null,
+        h: a.h,
+        elements: a.elements,
+        elementsSource: 'horizons' as const,
+        vInfKms: null,
+        solution: null,
+        target: null,
+        availableFrom: null,
+        availableTo: null,
+        fine: a.fine,
+        coarse: null,
+      },
+    }))
+}
+
+/** An `sbc:` key for an asteroid (SPK-ID 20000000 + its number) that is not a dwarf planet. */
+export function isAsteroidKey(key: string): boolean {
+  if (!isSmallBodyKey(key)) return false
+  const spkid = key.slice(KEY_PREFIX.length)
+  return /^2\d{7}$/.test(spkid) && dwarfBySpkid(spkid) === undefined
+}
+
+/** The "Bright asteroids" switch's status line: what is loaded, or why there is none. */
+export function asteroidStatus({
+  status,
+  enabled,
+  count,
+}: {
+  status: 'pending' | 'error' | 'success'
+  enabled: boolean
+  count: number
+}): string {
+  if (!enabled) return ''
+  if (status === 'pending') return 'Loading from JPL Horizons…'
+  if (status === 'error') return 'Asteroid data is not available right now.'
+  return `${plural(count, 'bright asteroid', 'bright asteroids')} this week, from JPL Horizons`
+}
+
+const clock = (d: Date) =>
+  d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+
+const msOfJd = (jd: number) => (jd - JD_UNIX_EPOCH) * DAY_MS
+
+/**
+ * The part of a window a fine span has samples for (never extrapolated), and whether that is
+ * less than all of it. Null when the span is absent or misses the window.
+ */
+export function coveredWindow(
+  span: OrrerySmallBody['fine'],
+  window: { start: Date; end: Date },
+): { window: { start: Date; end: Date }; partial: boolean } | null {
+  if (!span) return null
+  const first = msOfJd(span.start)
+  const last = msOfJd(span.start + (span.samples.length / 6 - 1) * span.step)
+  const start = Math.max(window.start.getTime(), first)
+  const end = Math.min(window.end.getTime(), last)
+  if (end <= start) return null
+  const partial = start > window.start.getTime() || end < window.end.getTime()
+  return partial
+    ? { window: { start: new Date(start), end: new Date(end) }, partial }
+    : { window, partial }
+}
+
+/**
+ * The inspector's line for an asteroid from the visitor's location, in real time (not the
+ * orrery's clock): when it is above 10° in the coming nautical dark, and where it is
+ * highest. Sampled every 10 minutes, so no exact rise and set. It says only what the
+ * samples support: where they cover just part of the night, the line names that part and
+ * never claims "below 10°" for the rest. Null with no location or no samples tonight.
+ */
+export function tonightLine(
+  body: OrrerySmallBody,
+  observer: Observer | null,
+  now: Date,
+): string | null {
+  if (!observer) return null
+  const lead = 'From your location tonight:'
+  const dark = darkWindow(now, observer.lat, observer.lon, NAUTICAL_DARK)
+  if (!dark) return `${lead} it doesn’t get dark enough to look.`
+  const covered = coveredWindow(body.fine, dark)
+  if (!covered) return null
+  const run = skyRun({ fine: body.fine, coarse: null }, observer, covered.window)
+  if (!run) return covered.partial ? null : `${lead} below ${String(MIN_ALTITUDE)}° in the dark.`
+  const line = `${lead} above ${String(MIN_ALTITUDE)}° ${clock(run.from)}–${clock(run.to)}, highest ${String(Math.round(run.altitude))}° ${run.direction}`
+  return covered.partial ? `${line} (the part of the night the samples cover)` : line
 }
 
 interface StatusInput {

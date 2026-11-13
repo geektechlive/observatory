@@ -106,8 +106,9 @@ export const smallBodies = () => ({
 })
 
 /**
- * A mocked /api/comets-tonight (#135), the Tonight panel's slice: the same comet with a
- * magnitude law, a week of its fine span kept. Returns the request paths seen.
+ * A mocked /api/comets-tonight (#135, #99 item 4), the Tonight panel's slice: the same comet
+ * with a magnitude law, a week of its fine span kept, and one bright asteroid (Vesta) on
+ * the same samples. Returns the request paths seen.
  */
 export async function serveCometsTonight(page: Page): Promise<string[]> {
   const asked: string[] = []
@@ -133,6 +134,26 @@ export async function serveCometsTonight(page: Page): Promise<string[]> {
           fine: week,
           coarse: null,
         })),
+        asteroids: [
+          {
+            id: 'sb:20000004',
+            spkid: '20000004',
+            name: '4 Vesta',
+            h: 3.25,
+            g: 0.32,
+            gAssumed: false,
+            elements: {
+              epochJd: 2458849.5,
+              e: 0.0886,
+              q: 2.1527,
+              tp: 2458247.8,
+              om: 103.8,
+              w: 150.8,
+              i: 7.14,
+            },
+            fine: week,
+          },
+        ],
       },
     })
   })

@@ -32,7 +32,9 @@
 //   ... --dry-run --only=orrery-neo --neo-out=/tmp/neo.json
 //                                            just the close-approach step (#92)
 //   ... --dry-run --only=orrery-smallbodies --smallbodies-out=/tmp/sb.json
-//                                            just the comets and interstellar objects (#99)
+//                                            just the comets, interstellar objects and bright
+//                                            asteroids (#99); --tonight-out=/tmp/t.json also
+//                                            saves the Tonight slice (v2)
 //   ... --dry-run --only=orrery-dwarfs --dwarfs-out=/tmp/dwarfs.json
 //                                            just the dwarf planets (#99 item 8)
 //   ... --dry-run --only=jpl-feeds --jpl-feeds-out=/tmp/feeds.json
@@ -69,7 +71,7 @@ import {
   buildOrrerySmallBodies,
   DEFAULT_BUDGET_MS as SMALLBODIES_BUDGET_MS,
 } from './orrery-smallbodies.mjs'
-import { buildCometsTonight } from './comets-tonight.mjs'
+import { buildCometsTonight, carryForwardAsteroids } from './comets-tonight.mjs'
 import { buildOrreryDwarfs, DEFAULT_BUDGET_MS as DWARFS_BUDGET_MS } from './orrery-dwarfs.mjs'
 import { buildJplFeeds, DEFAULT_BUDGET_MS as JPL_FEEDS_BUDGET_MS } from './jpl-feeds.mjs'
 import { HISTORY_OBJECTS } from '../src/lib/spacetrack.ts'
@@ -112,7 +114,7 @@ const SMALLBODIES_SIGNATURE = 'refresh:orrery-smallbodies'
 /** Spans run 30 days either side, so /api/orrery-smallbodies serves a copy up to 72 h old. */
 const SMALLBODIES_MAX_AGE_MS = 72 * 3_600_000
 /** The Tonight panel's comets (#135): a week of spans cut from the comet body, its own key. */
-export const KEY_COMETS_TONIGHT = 'horizons:comets-tonight:v1'
+export const KEY_COMETS_TONIGHT = 'horizons:comets-tonight:v2'
 /** The orrery's dwarf planets (#99 item 8): their own key, so the comets stay small. */
 export const KEY_ORRERY_DWARFS = 'horizons:dwarfs:v1'
 const DWARFS_SIGNATURE = 'refresh:orrery-dwarfs'
@@ -848,8 +850,12 @@ export async function refreshOrrerySmallBodies(config, deps = {}) {
   const now = deps.now ?? Date.now()
   const previousText = deps.previousText ?? (await readKv(KEY_ORRERY_SMALLBODIES, config))
   const previous = parseJsonOrNull(previousText)
+  const previousTonightText =
+    deps.previousTonightText !== undefined
+      ? deps.previousTonightText
+      : await readKv(KEY_COMETS_TONIGHT, config)
   try {
-    const { payload, requests } = await buildOrrerySmallBodies({
+    const { payload, asteroids, requests } = await buildOrrerySmallBodies({
       now,
       fetchJplJson: deps.fetchJplJson ?? fetchJplJson,
       fetchHorizonsText: deps.fetchHorizonsText ?? fetchHorizonsText,
@@ -860,19 +866,32 @@ export async function refreshOrrerySmallBodies(config, deps = {}) {
     const all = [...payload.comets, ...payload.interstellar]
     const placed = all.filter((b) => b.fine !== null || b.coarse !== null).length
     const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    // No asteroids this run: keep the last slice's while they still cover tonight (#99 item 4).
+    const carried =
+      asteroids.length === 0
+        ? carryForwardAsteroids(parseJsonOrNull(previousTonightText), now)
+        : []
     const detail =
       `ok ${SMALLBODIES_SIGNATURE} ${String(payload.comets.length)} comets, ` +
       `${String(payload.interstellar.length)} interstellar, ${String(placed)} placed, ` +
+      `${String(asteroids.length)} asteroids, ` +
       `${String(requests)} JPL requests` +
-      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
+      (missing.length ? `; WARN missing ${missing.join(', ')}` : '') +
+      (carried.length
+        ? `; WARN ${String(carried.length)} asteroids carried forward from the previous run`
+        : '')
     console.log(detail)
-    const tonight = buildCometsTonight(payload)
+    const tonight = buildCometsTonight(payload, carried.length > 0 ? carried : asteroids)
     return {
-      entry: { signature: SMALLBODIES_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      entry: { signature: SMALLBODIES_SIGNATURE, ok: true, warning: missing.length > 0 || carried.length > 0, detail },
       tonightWrite: {
         key: KEY_COMETS_TONIGHT,
         value: JSON.stringify(tonight),
-        metadata: { fetchedAt: payload.generatedAt, comets: tonight.comets.length },
+        metadata: {
+          fetchedAt: payload.generatedAt,
+          comets: tonight.comets.length,
+          asteroids: tonight.asteroids.length,
+        },
       },
       write: {
         key: KEY_ORRERY_SMALLBODIES,
@@ -1235,6 +1254,7 @@ async function main(argv) {
   const smallOut = argv
     .find((a) => a.startsWith('--smallbodies-out='))
     ?.slice('--smallbodies-out='.length)
+  const tonightOut = argv.find((a) => a.startsWith('--tonight-out='))?.slice('--tonight-out='.length)
   const dwarfsOut = argv.find((a) => a.startsWith('--dwarfs-out='))?.slice('--dwarfs-out='.length)
   const jplFeedsOut = argv
     .find((a) => a.startsWith('--jpl-feeds-out='))
@@ -1303,6 +1323,7 @@ async function main(argv) {
       if (tonightWrite) {
         writes.push({ ...tonightWrite, entry })
         console.log(`  ${KEY_COMETS_TONIGHT}: ${String(tonightWrite.value.length)} bytes`)
+        if (dryRun && tonightOut) await writeFile(tonightOut, tonightWrite.value)
       }
       if (dryRun && smallOut) {
         await writeFile(smallOut, write.value)

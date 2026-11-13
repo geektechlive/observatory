@@ -258,11 +258,13 @@ export const SOURCES: Record<SourceName, SourceContract> = {
   'comets-tonight': {
     // Not headline: the Sky view fetches it only once a visitor shares a location (#135).
     // Cut from the comet payload, where 2I and 3I always carry a magnitude law, so an
-    // empty list is a fault.
-    label: 'Comets Tonight',
+    // empty list is a fault. It also carries the bright asteroids (#99 item 4): the
+    // 130 or so with H under 8 always include some forecast brighter than V 11.5, so an
+    // empty list means the asteroid step broke, though HTTP 200 and the comets say fine.
+    label: 'Comets and Asteroids Tonight',
     headline: false,
     maxAgeMs: 72 * HOUR,
-    required: (data) => nonEmptyArrayField(data, 'comets'),
+    required: (data) => nonEmptyArrayField(data, 'comets') && nonEmptyArrayField(data, 'asteroids'),
   },
   'orrery-sats': {
     // Not headline: only the orrery page asks for it (#98). One CelesTrak group per

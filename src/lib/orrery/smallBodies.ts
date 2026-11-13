@@ -202,6 +202,160 @@ interface Vec3 {
   readonly z: number
 }
 
+// ---- Bright asteroids (#99 item 4) ----------------------------------------------------
+
+/** At most this many asteroids are placed: each costs one Horizons request per run. */
+export const MAX_ASTEROIDS = 14
+/**
+ * The job keeps asteroids forecast to V 11.5 or brighter on the refresh day: half a
+ * magnitude of margin over the panel's V 11 cut (`FAINTEST_ASTEROID_LISTED`), since an
+ * asteroid's brightness moves by a few tenths of a magnitude over the week the slice covers.
+ */
+export const FAINTEST_ASTEROID_MAGNITUDE = 11.5
+/** G where SBDB has none (Astraea, Iris, Hygiea...): the IAU's default slope parameter. */
+export const DEFAULT_SLOPE_G = 0.15
+
+const ASTEROID_FIELDS = ['full_name', 'pdes', 'spkid', 'H', 'G', 'e', 'q', 'tp', 'i', 'om', 'w']
+/** Absolute magnitude under 8 and a semi-major axis inside Jupiter's orbit: the bright main belt. */
+const BRIGHTEST_H = 8
+const MAX_SEMIMAJOR_AU = 5.5
+
+/** SBDB Query: asteroids of absolute magnitude H < 8 with a < 5.5 au, full precision. */
+export function sbdbAsteroidQueryUrl(): string {
+  const params = new URLSearchParams({
+    fields: ASTEROID_FIELDS.join(','),
+    'sb-kind': 'a',
+    'sb-cdata': JSON.stringify({
+      AND: [`H|LT|${String(BRIGHTEST_H)}`, `a|LT|${String(MAX_SEMIMAJOR_AU)}`],
+    }),
+    'full-prec': 'true',
+  })
+  return `${SBDB_QUERY}?${params.toString()}`
+}
+
+export interface SbdbAsteroid {
+  /** "4 Vesta": SBDB's full name without the provisional designation. */
+  name: string
+  /** JPL's designation (the asteroid's number, "4") and SPK-ID (20000004). */
+  des: string
+  spkid: string
+  /** Absolute magnitude and slope parameter of the H,G system; G null where JPL has none. */
+  h: number
+  g: number | null
+  /** Heliocentric ecliptic J2000 elements: e, q (au), tp (JD TDB), i, om, w (degrees). */
+  e: number
+  q: number
+  tp: number
+  i: number
+  om: number
+  w: number
+}
+
+/** SBDB Query's rows as asteroids. Throws if the fields are not the ones asked for. */
+export function parseSbdbAsteroids(json: unknown): SbdbAsteroid[] {
+  const body = json as { fields?: unknown; data?: unknown }
+  if (
+    JSON.stringify(body.fields) !== JSON.stringify(ASTEROID_FIELDS) ||
+    !Array.isArray(body.data)
+  ) {
+    throw new Error(`SBDB Query answered fields ${JSON.stringify(body.fields)}`)
+  }
+  const out: SbdbAsteroid[] = []
+  for (const row of body.data as unknown[][]) {
+    const [fullName, pdes, spkid] = row
+    const [h, g, e, q, tp, i, om, w] = row.slice(3, 11).map(num)
+    if (typeof pdes !== 'string' || h == null) continue
+    if (e == null || q == null || tp == null || i == null || om == null || w == null) continue
+    out.push({
+      name: String(fullName)
+        .replace(/\s*\([^)]*\)\s*$/, '')
+        .trim(),
+      des: pdes,
+      spkid: String(spkid),
+      h,
+      g: g ?? null,
+      e,
+      q,
+      tp,
+      i,
+      om,
+      w,
+    })
+  }
+  return out
+}
+
+/**
+ * Whether Horizons' "Target body name" is the asteroid asked for: "4 Vesta (A807 FA)" for a
+ * numbered one (its number first), "(2024 YR4)" for one with only a designation.
+ */
+export function targetMatchesAsteroid(des: string, target: string | null): boolean {
+  if (!target) return false
+  return /^\d+$/.test(des) ? target.trim().startsWith(`${des} `) : target.includes(`(${des})`)
+}
+
+/** The Sun-target-observer angle, degrees, from the three sides of the triangle (au). */
+export function phaseAngleDeg(r: number, delta: number, earthSun: number): number {
+  const c = (r * r + delta * delta - earthSun * earthSun) / (2 * r * delta)
+  return (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI
+}
+
+/**
+ * The IAU H,G system (adopted 1985; Bowell et al. 1989, "Application of photometric models
+ * to asteroids"): V = H + 5 log10(r Δ) - 2.5 log10[(1 - G) Φ1 + G Φ2], with
+ * Φi = exp(-Ai tan(α/2)^Bi), A1 = 3.33, B1 = 0.63, A2 = 1.87, B2 = 1.22. r and Δ in au,
+ * α (the phase angle) in degrees. Checked against Horizons' APmag for Vesta in
+ * tests/unit/orrery-bright-asteroids.test.ts. An estimate: real asteroids stray from the law.
+ */
+export function asteroidMagnitude(
+  h: number,
+  g: number,
+  r: number,
+  delta: number,
+  phaseDeg: number,
+): number {
+  const t = Math.tan((phaseDeg * Math.PI) / 360)
+  const phi1 = Math.exp(-3.33 * t ** 0.63)
+  const phi2 = Math.exp(-1.87 * t ** 1.22)
+  return h + 5 * Math.log10(r * delta) - 2.5 * Math.log10((1 - g) * phi1 + g * phi2)
+}
+
+export interface ChosenAsteroid extends SbdbAsteroid {
+  /** JPL's H,G forecast V for the refresh's date: an estimate, not a measurement. */
+  magnitude: number
+}
+
+export interface SelectAsteroidOptions {
+  /** Heliocentric position from elements at a JD (conic.ts's `conicPosition`). */
+  positionAt: (el: SbdbAsteroid, jd: number) => Vec3
+  /** Earth's heliocentric position at a JD. */
+  earthAt: (jd: number) => Vec3
+  limit?: number
+  faintest?: number
+}
+
+/** The asteroids the H,G law makes brightest on a date, brightest first, at most `limit`. */
+export function selectAsteroids(
+  asteroids: readonly SbdbAsteroid[],
+  jd: number,
+  opts: SelectAsteroidOptions,
+): ChosenAsteroid[] {
+  const earth = opts.earthAt(jd)
+  const earthSun = Math.hypot(earth.x, earth.y, earth.z)
+  const ranked: ChosenAsteroid[] = []
+  for (const a of asteroids) {
+    const p = opts.positionAt(a, jd)
+    const r = Math.hypot(p.x, p.y, p.z)
+    const delta = Math.hypot(p.x - earth.x, p.y - earth.y, p.z - earth.z)
+    const alpha = phaseAngleDeg(r, delta, earthSun)
+    const magnitude = asteroidMagnitude(a.h, a.g ?? DEFAULT_SLOPE_G, r, delta, alpha)
+    if (magnitude <= (opts.faintest ?? FAINTEST_ASTEROID_MAGNITUDE))
+      ranked.push({ ...a, magnitude })
+  }
+  ranked.sort((a, b) => a.magnitude - b.magnitude)
+  return ranked.slice(0, opts.limit ?? MAX_ASTEROIDS)
+}
+
 export interface SelectOptions {
   /** Heliocentric position from elements at a JD (conic.ts's `conicPosition`). */
   positionAt: (el: SbdbComet, jd: number) => Vec3

@@ -5,7 +5,14 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { darkness, darkWindow, moonAltitude, sunAltitude, tonightStrip } from '@/lib/tonight'
+import {
+  darkness,
+  darkWindow,
+  moonAltitude,
+  NAUTICAL_DARK,
+  sunAltitude,
+  tonightStrip,
+} from '@/lib/tonight'
 
 const KC = { lat: 39.1, lon: -94.6 }
 const GREENWICH = { lat: 51.48, lon: 0 }
@@ -67,6 +74,29 @@ describe('darkWindow', () => {
 
   it('is null where the night never gets fully dark', () => {
     expect(darkWindow(at('2026-06-21T12:00:00Z'), TROMSO.lat, TROMSO.lon)).toBeNull()
+  })
+
+  it('takes another Sun altitude: nautical dark (-12°) for the asteroids (#99 item 4)', () => {
+    const now = at('2026-10-27T18:00:00Z')
+    const w = darkWindow(now, KC.lat, KC.lon, NAUTICAL_DARK)
+    const full = darkWindow(now, KC.lat, KC.lon)
+    expect(w).not.toBeNull()
+    if (!w || !full) return
+    expect(sunAltitude(w.start, KC.lat, KC.lon)).toBeCloseTo(-12, 0)
+    expect(sunAltitude(w.end, KC.lat, KC.lon)).toBeCloseTo(-12, 0)
+    // Nautical dark begins earlier and ends later than astronomical dark.
+    expect(w.start.getTime()).toBeLessThan(full.start.getTime())
+    expect(w.end.getTime()).toBeGreaterThan(full.end.getTime())
+  })
+
+  it('has a nautical window on a midsummer night in London that has no astronomical one', () => {
+    // The Sun gets only to about -15° at 51.5°N on 21 June: twilight all night.
+    const london = { lat: 51.5, lon: -0.1 }
+    const noon = at('2026-06-21T12:00:00Z')
+    expect(darkWindow(noon, london.lat, london.lon)).toBeNull()
+    const w = darkWindow(noon, london.lat, london.lon, NAUTICAL_DARK)
+    expect(w).not.toBeNull()
+    expect(w && w.end.getTime() - w.start.getTime()).toBeGreaterThan(3 * 3_600_000)
   })
 })
 

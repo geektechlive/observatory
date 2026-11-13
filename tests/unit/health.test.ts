@@ -90,8 +90,14 @@ describe('SOURCES', () => {
     // Fetched only once a visitor shares a location on the Sky view, so no view always shows it.
     expect(SOURCES['comets-tonight'].headline).toBe(false)
     expect(SOURCES['comets-tonight'].maxAgeMs).toBe(72 * 3_600_000)
-    expect(SOURCES['comets-tonight'].required({ comets: [] })).toBe(false)
-    expect(SOURCES['comets-tonight'].required({ comets: [{ id: 'sb:1003639' }] })).toBe(true)
+    const comet = { id: 'sb:1003639' }
+    const rock = { id: 'sb:20000004' }
+    expect(SOURCES['comets-tonight'].required({ comets: [], asteroids: [rock] })).toBe(false)
+    // The bright asteroids (#99 item 4) are always there (Vesta alone is above V 7 at
+    // opposition), so a slice without them means the asteroid step broke.
+    expect(SOURCES['comets-tonight'].required({ comets: [comet], asteroids: [] })).toBe(false)
+    expect(SOURCES['comets-tonight'].required({ comets: [comet] })).toBe(false)
+    expect(SOURCES['comets-tonight'].required({ comets: [comet], asteroids: [rock] })).toBe(true)
     expect(Object.values(VIEW_HEADLINES).flat()).not.toContain('comets-tonight')
   })
 

@@ -43,6 +43,11 @@ import { DWARF_HEX, LANES } from '@/lib/palette'
 const HEX: Record<OrreryEntryGroup, string> = {
   comets: LANES.hydro.emit,
   interstellar: LANES.space.emit,
+  // The bright asteroids (#99 item 4): the thermal lane's orange (the geophysical gold sat
+  // too close to the close approaches' amber), apart from comets' ice blue, the visitors'
+  // violet and cyan craft. Orange is also nearer the hazard red than gold was: close
+  // approaches are small markers beside Earth, asteroids labelled dots out in the belt.
+  asteroids: LANES.thermal.emit,
   dwarfs: DWARF_HEX,
 }
 /** The marker's radius before the renderer's px clamp, scene units. */
@@ -68,15 +73,22 @@ export class SmallBodyLayer {
   private readonly markerMaterials: Record<OrreryEntryGroup, MeshBasicMaterial> = {
     comets: markerMaterial('comets'),
     interstellar: markerMaterial('interstellar'),
+    asteroids: markerMaterial('asteroids'),
     dwarfs: markerMaterial('dwarfs'),
   }
   private readonly lineMaterials: Record<OrreryEntryGroup, LineBasicMaterial> = {
     comets: lineMaterial('comets'),
     interstellar: lineMaterial('interstellar'),
+    asteroids: lineMaterial('asteroids'),
     dwarfs: lineMaterial('dwarfs'),
   }
   private items = new Map<string, Item>()
-  private groups: SmallBodyGroups = { comets: false, interstellar: false, dwarfs: false }
+  private groups: SmallBodyGroups = {
+    comets: false,
+    interstellar: false,
+    asteroids: false,
+    dwarfs: false,
+  }
   /** The scale mode the lines were last built for; '' means rebuild. */
   private builtMode = ''
 

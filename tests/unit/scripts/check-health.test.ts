@@ -422,11 +422,19 @@ describe('probed endpoints (#42, #61)', () => {
     expect(c).toBeDefined()
     const span = { start: 1, step: 1, samples: [1, 2, 3, 4, 5, 6] }
     const borisov = { m1: 13.8, k1: 4.5, fine: span, coarse: null }
-    expect(c?.check({ comets: [borisov] })).toBe(true)
-    expect(c?.check({ comets: [{ ...borisov, fine: null, coarse: span }] })).toBe(true)
-    expect(c?.check({ comets: [] })).toBe(false)
-    expect(c?.check({ comets: [{ ...borisov, fine: null }] })).toBe(false)
-    expect(c?.check({ comets: [{ ...borisov, m1: null }] })).toBe(false)
+    const vesta = { h: 3.25, g: 0.32, fine: span }
+    expect(c?.check({ comets: [borisov], asteroids: [vesta] })).toBe(true)
+    expect(
+      c?.check({ comets: [{ ...borisov, fine: null, coarse: span }], asteroids: [vesta] }),
+    ).toBe(true)
+    expect(c?.check({ comets: [], asteroids: [vesta] })).toBe(false)
+    expect(c?.check({ comets: [{ ...borisov, fine: null }], asteroids: [vesta] })).toBe(false)
+    expect(c?.check({ comets: [{ ...borisov, m1: null }], asteroids: [vesta] })).toBe(false)
+    // The bright asteroids (#99 item 4): a list, each with H, G and a sampled span.
+    expect(c?.check({ comets: [borisov] })).toBe(false)
+    expect(c?.check({ comets: [borisov], asteroids: [] })).toBe(false)
+    expect(c?.check({ comets: [borisov], asteroids: [{ ...vesta, h: null }] })).toBe(false)
+    expect(c?.check({ comets: [borisov], asteroids: [{ ...vesta, fine: null }] })).toBe(false)
   })
 
   it('probes on-demand lookup with a fixed past span, so it is cached, not a JPL call (#100)', () => {

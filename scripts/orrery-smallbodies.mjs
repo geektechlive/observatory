@@ -10,11 +10,16 @@ import { conicPosition, solveEllipticAnomaly, vInfinityKms } from '../src/lib/or
 import { coarseStepDays, COARSE_FUTURE_YEARS, FINE_WINDOW_DAYS } from '../src/lib/orrery/craft.ts'
 import { parseSmallBodyHeader } from '../src/lib/horizons.ts'
 import {
+  DEFAULT_SLOPE_G,
   INTERSTELLAR,
+  parseSbdbAsteroids,
   parseSbdbComets,
+  sbdbAsteroidQueryUrl,
   sbdbCometQueryUrl,
+  selectAsteroids,
   selectComets,
   smallBodyCommand,
+  targetMatchesAsteroid,
   targetMatchesSmallBody,
 } from '../src/lib/orrery/smallBodies.ts'
 import { BudgetExceeded, fetchSpan, jdFromMs, toSpan } from './orrery-bodies.mjs'
@@ -69,7 +74,10 @@ async function fetchSmallBodySpan(body, startJd, stopJd, step, ask, now) {
   const spec = {
     naifId: body.spkid,
     command: smallBodyCommand(body.spkid, body.kind),
-    targetOk: (target) => targetMatchesSmallBody(body.des, target),
+    targetOk: (target) =>
+      body.kind === 'asteroid'
+        ? targetMatchesAsteroid(body.des, target)
+        : targetMatchesSmallBody(body.des, target),
   }
   const remember = async (url) => {
     const text = await ask(url)
@@ -81,9 +89,13 @@ async function fetchSmallBodySpan(body, startJd, stopJd, step, ask, now) {
 }
 
 /**
- * Build the /api/orrery-smallbodies payload. `previous` is the last payload, whose long
- * interstellar spans are reused while younger than a day. Objects that fail are listed
- * in `missing`; the step fails only when nothing at all could be placed.
+ * Build the /api/orrery-smallbodies payload, and the bright asteroids beside it (#99 item
+ * 4). `previous` is the last payload, whose long interstellar spans are reused while younger
+ * than a day. Objects that fail are listed in `missing`; the step fails only when no comet
+ * or interstellar object could be placed. The asteroids come last in the one JPL queue, so
+ * a spent time budget cuts asteroids and never comets, and they are returned apart from
+ * the payload: only the Tonight slice carries them (ADR 0023), so the comet body does not
+ * grow for visitors who never switch them on.
  */
 export async function buildOrrerySmallBodies({
   now = Date.now(),
@@ -216,6 +228,8 @@ export async function buildOrrerySmallBodies({
     throw new Error(`no comet or interstellar object could be placed: ${missing.map((m) => m.reason).join('; ')}`)
   }
 
+  const asteroids = await buildAsteroids({ nowJd, fineStart, fineStop, ask, jpl, fetchJplJson, missing, now })
+
   return {
     payload: {
       generatedAt: new Date(now).toISOString(),
@@ -230,6 +244,50 @@ export async function buildOrrerySmallBodies({
       interstellar,
       missing,
     },
+    asteroids,
     requests: asked,
   }
+}
+
+/**
+ * The bright asteroids (#99 item 4): one SBDB query, ranked by the H,G law, then one Horizons
+ * request each for ±30 days daily with velocities, target name checked. A failure of any
+ * kind (the query, one object, the time budget) lands in `missing`; the rest still ship.
+ */
+async function buildAsteroids({ nowJd, fineStart, fineStop, ask, jpl, fetchJplJson, missing, now }) {
+  let chosen = []
+  try {
+    const rows = parseSbdbAsteroids(await jpl(fetchJplJson, sbdbAsteroidQueryUrl()))
+    chosen = selectAsteroids(rows, nowJd, { positionAt: conicPosition, earthAt: earthHeliocentric })
+  } catch (err) {
+    missing.push({ id: 'jpl-sbdb-asteroids', reason: reasonOf(err) })
+  }
+  const asteroids = []
+  for (const a of chosen) {
+    const id = `sb:${a.spkid}`
+    try {
+      const body = { spkid: a.spkid, des: a.des, kind: 'asteroid' }
+      const got = await fetchSmallBodySpan(body, fineStart, fineStop, FINE_STEP_DAYS, ask, now)
+      if (!got.samples) throw new Error('no samples in the window')
+      const elements = got.header
+        ? elementsOf(got.header)
+        : { epochJd: null, e: a.e, q: a.q, tp: a.tp, om: a.om, w: a.w, i: a.i }
+      asteroids.push({
+        id,
+        spkid: a.spkid,
+        des: a.des,
+        name: a.name,
+        h: a.h,
+        g: a.g ?? DEFAULT_SLOPE_G,
+        gAssumed: a.g === null,
+        magnitude: Number(a.magnitude.toFixed(1)),
+        elements,
+        target: got.target ?? null,
+        fine: toSpan(got.samples, true),
+      })
+    } catch (err) {
+      missing.push({ id, reason: reasonOf(err) })
+    }
+  }
+  return asteroids
 }

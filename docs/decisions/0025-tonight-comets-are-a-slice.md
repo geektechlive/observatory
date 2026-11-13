@@ -47,3 +47,10 @@ other side: here the smaller audience's payload is the derived one.
 - Tests: `tests/unit/scripts/comets-tonight.test.ts` (same answers, size),
   `tests/e2e/orrery-dwarfs.spec.ts` (the panel never asks for `/api/orrery-smallbodies`).
 - Measurements: `docs/reference/orrery-data.md` ("Comets tonight").
+
+## Note, 2026-11-12 (#99 item 4)
+
+The slice's key is now `horizons:comets-tonight:v2`: it also carries the bright asteroids,
+cut to the same window ([ADR 0032](0032-bright-asteroids-ride-the-tonight-slice.md)). The
+rule above, that the slice is written only with the body it was cut from, still holds: the
+asteroids come from the same refresh step. The "about 5 KB gzip" figure is now about 11 KB.

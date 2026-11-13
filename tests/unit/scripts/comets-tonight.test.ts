@@ -122,6 +122,59 @@ describe('buildCometsTonight (#135)', () => {
   })
 })
 
+/** A bright asteroid as the job builds it (scripts/orrery-smallbodies.mjs): ±30 days daily. */
+const vesta = {
+  id: 'sb:20000004',
+  spkid: '20000004',
+  des: '4',
+  name: '4 Vesta',
+  h: 3.25,
+  g: 0.32,
+  gAssumed: false,
+  magnitude: 6.9,
+  elements: {
+    epochJd: 2458849.5,
+    e: 0.0886,
+    q: 2.1527,
+    tp: 2458247.8,
+    om: 103.8,
+    w: 150.8,
+    i: 7.14,
+  },
+  target: '4 Vesta (A807 FA)',
+  fine: fixture.comet.fine,
+}
+
+describe('buildCometsTonight with asteroids (#99 item 4)', () => {
+  it('slices each asteroid to the same window, keeping only what the panel and orrery use', () => {
+    const slice = CometsTonightSchema.parse(buildCometsTonight(payload(), [vesta]))
+    expect(slice.asteroids).toHaveLength(1)
+    const a = slice.asteroids[0]
+    expect(Object.keys(a ?? {}).sort()).toEqual(
+      ['elements', 'fine', 'g', 'gAssumed', 'h', 'id', 'name', 'spkid'].sort(),
+    )
+    expect(a?.fine.samples.length ? a.fine.samples.length / 6 : 0).toBeGreaterThanOrEqual(9)
+    expect(a?.fine.samples.length ? a.fine.samples.length / 6 : 99).toBeLessThanOrEqual(10)
+  })
+
+  it('has an empty asteroid list when there are none, and the comets are unchanged', () => {
+    const none = buildCometsTonight(payload())
+    expect(none.asteroids).toEqual([])
+    expect(none.comets).toEqual(buildCometsTonight(payload(), [vesta]).comets)
+  })
+
+  it('drops an asteroid whose span misses the window', () => {
+    const stale = { ...vesta, fine: { ...vesta.fine, start: vesta.fine.start - 400 } }
+    expect(buildCometsTonight(payload(), [stale]).asteroids).toEqual([])
+  })
+
+  it('accepts a v1-shaped body that has no asteroid list', () => {
+    const v1: Record<string, unknown> = { ...buildCometsTonight(payload()) }
+    delete v1.asteroids
+    expect(CometsTonightSchema.parse(v1).asteroids).toEqual([])
+  })
+})
+
 describe('trimSpan', () => {
   const span = { start: 100.5, step: 1, samples: Array.from({ length: 30 }, (_, i) => i) }
 

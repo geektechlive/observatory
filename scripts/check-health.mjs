@@ -150,10 +150,12 @@ export const CHECKS = [
       b.dwarfs.length > 0 &&
       b.dwarfs.every((x) => Array.isArray(x?.coarse?.samples)),
   },
-  // The Tonight panel's comets (#135): KV-only, cut from the comet payload by the refresh job.
+  // The Tonight panel's comets and bright asteroids (#135, #99 item 4): KV-only, cut from the
+  // comet payload and the asteroids by the refresh job.
   {
     path: '/api/comets-tonight',
-    requires: 'a non-empty comets array, each with a magnitude law and a sampled span',
+    requires:
+      'a non-empty comets array (each with a magnitude law and a sampled span) and a non-empty asteroids array (each with H, G and a sampled span)',
     check: (b) =>
       Array.isArray(b?.comets) &&
       b.comets.length > 0 &&
@@ -162,6 +164,12 @@ export const CHECKS = [
           typeof x?.m1 === 'number' &&
           typeof x?.k1 === 'number' &&
           (Array.isArray(x?.fine?.samples) || Array.isArray(x?.coarse?.samples)),
+      ) &&
+      Array.isArray(b?.asteroids) &&
+      b.asteroids.length > 0 &&
+      b.asteroids.every(
+        (x) =>
+          typeof x?.h === 'number' && typeof x?.g === 'number' && Array.isArray(x?.fine?.samples),
       ),
   },
   // On-demand lookup (#100): JPL through the jpl-queue Durable Object. A fixed span is

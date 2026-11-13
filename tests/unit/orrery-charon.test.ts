@@ -207,7 +207,7 @@ describe('dwarfMoonShown', () => {
 })
 
 describe('SmallBodyLayer with Charon', () => {
-  const ON = { comets: false, interstellar: false, dwarfs: true }
+  const ON = { comets: false, interstellar: false, asteroids: false, dwarfs: true }
   function layer() {
     const l = new SmallBodyLayer()
     l.set(entries)

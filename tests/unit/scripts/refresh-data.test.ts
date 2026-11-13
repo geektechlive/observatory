@@ -440,6 +440,7 @@ describe('refreshOrrerySmallBodies (#99)', () => {
     expect(entry.warning).toBe(true)
     expect(entry.detail).toMatch(/0 comets, 3 interstellar/)
     expect(entry.detail).toMatch(/missing jpl-sbdb-query/)
+    expect(entry.detail).toMatch(/0 asteroids/)
     expect(write.key).toBe(KEY_ORRERY_SMALLBODIES)
     expect(KEY_ORRERY_SMALLBODIES).toBe('horizons:smallbodies:v1')
     expect(write.metadata).toEqual({
@@ -447,14 +448,15 @@ describe('refreshOrrerySmallBodies (#99)', () => {
       comets: 0,
       interstellar: 3,
       placed: 3,
-      missing: 1,
+      // The comet query and the asteroid query.
+      missing: 2,
     })
   })
 
   it("also writes the Tonight panel's slice, cut from the same body under its own key (#135)", async () => {
     const { write, tonightWrite } = await refreshOrrerySmallBodies(null, deps())
     expect(tonightWrite.key).toBe(KEY_COMETS_TONIGHT)
-    expect(KEY_COMETS_TONIGHT).toBe('horizons:comets-tonight:v1')
+    expect(KEY_COMETS_TONIGHT).toBe('horizons:comets-tonight:v2')
     const tonight = JSON.parse(tonightWrite.value)
     const full = JSON.parse(write.value)
     expect(tonight.generatedAt).toBe(full.generatedAt)
@@ -469,6 +471,127 @@ describe('refreshOrrerySmallBodies (#99)', () => {
     expect(tonightWrite.metadata).toEqual({
       fetchedAt: new Date(NOW).toISOString(),
       comets: lawful.length,
+      asteroids: 0,
+    })
+    expect(tonight.asteroids).toEqual([])
+  })
+
+  it('puts the bright asteroids in the slice only, and counts them in the detail (#99 item 4)', async () => {
+    const sbdb = JSON.parse(
+      readFileSync(join(__dirname, '..', 'fixtures', 'tonight', 'sbdb-asteroids.json'), 'utf8'),
+    ) as { data: unknown[][] }
+    const names = new Map(sbdb.data.map((r) => [String(r[2]), String(r[0]).trim()]))
+    const base = deps()
+    const withAsteroids = deps({
+      fetchJplJson: (url: string) =>
+        new URL(url).searchParams.get('sb-kind') === 'a'
+          ? Promise.resolve(sbdb)
+          : Promise.reject(new Error('HTTP 503')),
+      fetchHorizonsText: (url: string) => {
+        const spkid = /DES=(\d+);/.exec(new URL(url).searchParams.get('COMMAND') ?? '')?.[1] ?? ''
+        const name = names.get(spkid)
+        if (!name) return base.fetchHorizonsText(url)
+        return base
+          .fetchHorizonsText(url)
+          .then((text: string) =>
+            text.replace(/^Target body name:.*$/m, `Target body name: ${name}   {source: JPL#1}`),
+          )
+      },
+    })
+    const { entry, write, tonightWrite } = await refreshOrrerySmallBodies(null, withAsteroids)
+    const tonight = JSON.parse(tonightWrite.value)
+    expect(tonight.asteroids.length).toBeGreaterThan(0)
+    expect(entry.detail).toMatch(new RegExp(`${String(tonight.asteroids.length)} asteroids`))
+    expect(tonightWrite.metadata.asteroids).toBe(tonight.asteroids.length)
+    expect(write.value).not.toContain('"asteroids"')
+    expect(write.metadata).not.toHaveProperty('asteroids')
+  })
+
+  describe('a run that loses its asteroids (#99 item 4)', () => {
+    const DAY_MS = 86_400_000
+    const jdNow = NOW / DAY_MS + 2440587.5
+    const rock = (coversDays: number) => ({
+      id: 'sb:20000004',
+      spkid: '20000004',
+      name: '4 Vesta',
+      h: 3.25,
+      g: 0.32,
+      gAssumed: false,
+      elements: { epochJd: null, e: 0.09, q: 2.15, tp: 2458247.8, om: 103.8, w: 150.8, i: 7.14 },
+      fine: {
+        start: jdNow - 1,
+        step: 1,
+        samples: Array.from({ length: coversDays + 1 }, () => [2, 0, 0, 0, 0.01, 0]).flat(),
+      },
+    })
+    /** The previous v2 slice as KV holds it. */
+    const previousSlice = (coversDays: number) =>
+      JSON.stringify({
+        generatedAt: new Date(NOW - 6 * HOUR).toISOString(),
+        comets: [],
+        asteroids: [rock(coversDays)],
+      })
+
+    it("carries the previous slice's asteroids forward while their samples still cover tonight", async () => {
+      const { tonightWrite, entry } = await refreshOrrerySmallBodies(null, {
+        ...deps(),
+        previousTonightText: previousSlice(7),
+      })
+      const tonight = JSON.parse(tonightWrite.value)
+      expect(tonight.asteroids.map((a: { id: string }) => a.id)).toEqual(['sb:20000004'])
+      expect(tonightWrite.metadata.asteroids).toBe(1)
+      expect(entry.warning).toBe(true)
+      expect(entry.detail).toMatch(/WARN.*1 asteroids? carried forward/)
+    })
+
+    it('writes the empty list when the previous samples no longer cover tonight', async () => {
+      const { tonightWrite, entry } = await refreshOrrerySmallBodies(null, {
+        ...deps(),
+        previousTonightText: previousSlice(1),
+      })
+      expect(JSON.parse(tonightWrite.value).asteroids).toEqual([])
+      expect(entry.detail).not.toMatch(/carried forward/)
+    })
+
+    it('writes the empty list when there is no previous slice, or it is not readable', async () => {
+      for (const previousTonightText of [null, 'not json']) {
+        const { tonightWrite } = await refreshOrrerySmallBodies(null, {
+          ...deps(),
+          previousTonightText,
+        })
+        expect(JSON.parse(tonightWrite.value).asteroids).toEqual([])
+      }
+    })
+
+    it('replaces the previous asteroids when the run placed new ones', async () => {
+      const sbdb = JSON.parse(
+        readFileSync(join(__dirname, '..', 'fixtures', 'tonight', 'sbdb-asteroids.json'), 'utf8'),
+      ) as { data: unknown[][] }
+      const names = new Map(sbdb.data.map((r) => [String(r[2]), String(r[0]).trim()]))
+      const base = deps()
+      const fresh = deps({
+        fetchJplJson: (url: string) =>
+          new URL(url).searchParams.get('sb-kind') === 'a'
+            ? Promise.resolve(sbdb)
+            : Promise.reject(new Error('HTTP 503')),
+        fetchHorizonsText: (url: string) => {
+          const spkid = /DES=(\d+);/.exec(new URL(url).searchParams.get('COMMAND') ?? '')?.[1] ?? ''
+          const name = names.get(spkid)
+          if (!name) return base.fetchHorizonsText(url)
+          return base
+            .fetchHorizonsText(url)
+            .then((t: string) =>
+              t.replace(/^Target body name:.*$/m, `Target body name: ${name}   {source: JPL#1}`),
+            )
+        },
+      })
+      const { tonightWrite, entry } = await refreshOrrerySmallBodies(null, {
+        ...fresh,
+        previousTonightText: previousSlice(7),
+      })
+      const ids = JSON.parse(tonightWrite.value).asteroids.map((a: { id: string }) => a.id)
+      expect(ids.length).toBeGreaterThan(1)
+      expect(entry.detail).not.toMatch(/carried forward/)
     })
   })
 

@@ -69,7 +69,7 @@ const entries: SmallBodyEntry[] = [
   { key: comet.id, label: comet.name, group: 'comets', body: comet },
   { key: visitor.id, label: visitor.name, group: 'interstellar', body: visitor },
 ]
-const BOTH = { comets: true, interstellar: true, dwarfs: false }
+const BOTH = { comets: true, interstellar: true, asteroids: false, dwarfs: false }
 
 function layer() {
   const l = new SmallBodyLayer()
@@ -106,7 +106,7 @@ describe('SmallBodyLayer (#99)', () => {
 
   it('switches each group on and off', () => {
     const l = layer()
-    l.setGroups({ comets: false, interstellar: true, dwarfs: false })
+    l.setGroups({ comets: false, interstellar: true, asteroids: false, dwarfs: false })
     l.place(START + 10, toScene, 'exaggerated')
     expect(l.position(comet.id)).toBeNull()
     expect(l.pathPoints(comet.id)).toBe(0)
@@ -161,7 +161,7 @@ describe('SmallBodyLayer (#99)', () => {
     } as unknown as OrreryDwarfs)
     const l = new SmallBodyLayer()
     l.set([...entries, ...ceres])
-    l.setGroups({ comets: false, interstellar: false, dwarfs: true })
+    l.setGroups({ comets: false, interstellar: false, asteroids: false, dwarfs: true })
     l.place(2451544.5 + 100, toScene, 'exaggerated')
     expect(l.drawn('sbc:20000001')).toBe(true)
     expect(l.visible().map((v) => [v.key, v.group])).toEqual([['sbc:20000001', 'dwarfs']])
@@ -174,7 +174,7 @@ describe('SmallBodyLayer (#99)', () => {
     expect(l.pathPoints('sbc:20000001')).toBe(361)
     expect(l.counts()).toEqual({ drawn: 0, paths: 1 })
     // Switched off: neither.
-    l.setGroups({ comets: false, interstellar: false, dwarfs: false })
+    l.setGroups({ comets: false, interstellar: false, asteroids: false, dwarfs: false })
     l.place(2451544.5 + 100, toScene, 'exaggerated')
     expect(l.counts()).toEqual({ drawn: 0, paths: 0 })
     l.dispose()

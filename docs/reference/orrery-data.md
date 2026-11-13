@@ -314,7 +314,7 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
     `scripts/comets-tonight.mjs` cuts it from the comet body in the same refresh step, so it costs
     no JPL request: only the bodies with a magnitude law, each span cut to a day before the refresh
     through a week after (bracketing samples kept; coarse samples only where the fine span does not
-    cover the week). KV `horizons:comets-tonight:v1`, written only with the body it came from;
+    cover the week). KV `horizons:comets-tonight:v2` (v1 before #99 item 4), written only with the body it came from;
     `functions/api/comets-tonight.ts` streams it through `_kvBody.ts`, degraded past 72 h. Health
     contract `comets-tonight` (a non-empty list, not a headline source) and a probe in
     `scripts/check-health.mjs`. Measured on the production payload of 2026-11-12: 12,690 bytes
@@ -339,6 +339,42 @@ after the close-approach step, through the same kind of paced JPL queue (1 s, 90
     1I has no magnitude law (only H) and is skipped.
   - On 2026-11-07 the brightest were C/2024 T5 (13.3) and C/2026 A2 (13.9), both 8-inch objects:
     a quiet month.
+
+## Bright asteroids (#99 item 4, [ADR 0032](../decisions/0032-bright-asteroids-ride-the-tonight-slice.md))
+
+The Tonight list is "Comets and asteroids tonight", and the orrery has a "Bright asteroids"
+switch (off at first). Owner's decisions, 2026-11-12: forecast V 11 or brighter, at most 10
+listed; nautical dark (Sun below -12°) for asteroids; no near-Earth flybys; the note says
+only that brightness is an estimate from JPL's H and G, with G = 0.15 where JPL has none.
+
+- **Job:** the last part of the comets step (`buildAsteroids` in `scripts/orrery-smallbodies.mjs`),
+  after 1I-3I in the same one-at-a-time JPL queue, so a spent budget cuts asteroids and never
+  comets. One SBDB query (`sb-kind=a`, `H<8`, `a<5.5`, 129 rows on 2026-11-12), ranked by the
+  H,G law (`asteroidMagnitude` in `smallBodies.ts`, IAU system, Bowell et al. 1989; matches
+  Horizons' APmag for Vesta, 6.927 on 2026-11-12, to 0.01), V 11.5 or brighter on the refresh
+  day, at most 14 (`MAX_ASTEROIDS`, all 14 were used). Each gets one Horizons request, daily
+  ±30 days with velocities, target name asserted (`4 Vesta (A807 FA)`). A failure of any kind
+  goes into `missing`; the step still ships.
+- **Where they live:** only in the Tonight slice, `asteroids` (id, SPK-ID, name, H, G,
+  `gAssumed`, elements, a week of fine samples). Not in `horizons:smallbodies:v1` (ADR 0023).
+  Health contract `comets-tonight` also needs a non-empty `asteroids`; so does the probe.
+- **Measured live, 2026-11-12:** 15 JPL requests (1 query, 14 Horizons) in about 22.5 s,
+  one at a time; the whole step 44.7 s (31 requests) with the interstellar long spans reused,
+  as in production. A cold dry run (no previous copy) took 49 s and 34 requests. KV writes:
+  still two a run (the same two keys). Slice 27,391 bytes, 11,138 gzip (asteroids 14,689 raw);
+  it was about 5 KB gzip. Entry gzip unchanged at 152.9 kB; `OrreryPage` 34.1 to 34.3 kB gzip.
+- **Panel:** `src/lib/sky/asteroidsTonight.ts`: 10-minute samples inside the nautical window;
+  "above 10° from X to Y" is the first and last sample of the stretch above 10° (refraction
+  ignored, no rise or set claimed); magnitude at the highest sample from H, G and the phase
+  angle (`topocentric` now returns `earthSun`). Point-source reach limits: 6.5, 10, 13. The
+  comets use the -18° window and the asteroids the -12° one, separately, so a night with no
+  astronomical dark still lists asteroids.
+- **Orrery:** group `asteroids` (orange, the thermal lane; the geophysical gold was too close to the close approaches' amber), keys `sbc:<SPK-ID>`, markers on
+  the slice's daily samples only (hidden outside the week), orbit line from the elements.
+  Ceres is left out of the group: the dwarf planets draw it under the same key. The inspector
+  adds H and, once the visitor has shared a real location in the Sky view, "From your location
+  tonight: above 10° 21:40–04:10, highest 52° S" (real time, not the orrery clock; no line if
+  the samples do not reach tonight).
 
 ## Dwarf planets (#99 item 8)
 

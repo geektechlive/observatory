@@ -215,7 +215,7 @@ describe('TonightPanel', () => {
     cleanup()
     useUiStore.setState({ observer: { lat: 39.1, lon: -94.6, isFallback: false } })
     render(<TonightPanel />)
-    expect(screen.getByText('Comets tonight')).toBeTruthy()
+    expect(screen.getByText('Comets and asteroids tonight')).toBeTruthy()
     expect(comets.useCometsTonight).toHaveBeenCalled()
   })
 

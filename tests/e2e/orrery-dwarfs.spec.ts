@@ -126,7 +126,7 @@ test.describe('The Tonight panel (#99 item 8)', () => {
     // The slice parsed: the list is no longer loading and did not fail.
     const list = page
       .locator('div')
-      .filter({ has: page.getByText('Comets tonight') })
+      .filter({ has: page.getByText('Comets and asteroids tonight') })
       .last()
     await expect(list).not.toContainText('Loading comets', { timeout: 10_000 })
     await expect(list).not.toContainText('unavailable')

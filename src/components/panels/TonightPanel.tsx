@@ -16,6 +16,7 @@ import {
   cloudCoverAt,
   type Darkness,
   darkWindow,
+  NAUTICAL_DARK,
   STRIP_HOURS,
   type TonightSlot,
   tonightStrip,
@@ -160,6 +161,7 @@ export function TonightPanel() {
     return {
       strip: tonightStrip(at, coords.lat, coords.lon),
       dark: darkWindow(at, coords.lat, coords.lon),
+      nautical: darkWindow(at, coords.lat, coords.lon, NAUTICAL_DARK),
     }
   }, [coords, hour])
 
@@ -254,7 +256,7 @@ export function TonightPanel() {
           </Label>
         )}
         {passes && tle && <IssPasses passes={passes} now={now} line1={tle.line1} />}
-        <CometsTonight coords={coords} dark={sky.dark} now={now} />
+        <CometsTonight coords={coords} dark={sky.dark} nautical={sky.nautical} now={now} />
         <Label>Your approximate location is sent to Open-Meteo for cloud cover.</Label>
         {clouds && (
           // Open-Meteo's CC BY 4.0 terms ask for this link next to its data (#179).

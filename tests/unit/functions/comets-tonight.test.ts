@@ -38,7 +38,7 @@ const meta = (hoursOld: number) => ({
 
 describe('/api/comets-tonight', () => {
   it('uses its own KV key', () => {
-    expect(KV_COMETS_TONIGHT_KEY).toBe('horizons:comets-tonight:v1')
+    expect(KV_COMETS_TONIGHT_KEY).toBe('horizons:comets-tonight:v2')
   })
 
   it('passes a fresh body through as is, with its age', async () => {

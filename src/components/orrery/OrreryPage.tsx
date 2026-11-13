@@ -173,6 +173,7 @@ const NO_NAMES: Readonly<Record<string, string>> = {}
 const LABEL_CLASS: Record<OrreryEntryGroup, string | undefined> = {
   comets: styles.cometLabel,
   interstellar: styles.interstellarLabel,
+  asteroids: styles.brightAsteroidLabel,
   dwarfs: styles.dwarfLabel,
 }
 const VOICE_EMPTY: VoiceInput = {
@@ -1053,6 +1054,7 @@ export function OrreryPage() {
               groups={small.groups}
               onGroups={small.setGroups}
               status={small.status}
+              asteroidStatus={small.asteroidStatus}
             />
           </>
         }
