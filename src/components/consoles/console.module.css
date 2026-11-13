@@ -56,7 +56,8 @@
 
 @media (width <= 899px) {
   .rest {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not 1fr (= minmax(auto, 1fr)): a wide table set the column (#226) */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .wide {
