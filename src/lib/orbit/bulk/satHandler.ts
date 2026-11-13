@@ -3,7 +3,7 @@
  * (sats.worker.ts) so it runs in tests. Holds the loaded groups; answers each frame
  * request with one SGP4 pass over all of them.
  */
-import type { SatGroupId, SatRow } from '../satCatalog'
+import { isSatRow, REENTRY_GROUP, type SatFieldGroup, type SatRow } from '../satCatalog'
 import {
   buildSatField,
   decodeSatGroup,
@@ -15,7 +15,9 @@ import {
 export type SatRequest =
   /** The /api/orrery-sats body as fetched, transferred undecoded. */
   | { type: 'load'; id: number; body: ArrayBuffer }
-  | { type: 'unload'; id: number; group: SatGroupId }
+  | { type: 'unload'; id: number; group: SatFieldGroup }
+  /** The re-entry objects' rows (#154), checked here; none empties the group. */
+  | { type: 'reentry'; id: number; rows: unknown[] }
   /** `reuse`: a frame the caller is done with, to be written in place. */
   | { type: 'propagate'; id: number; dateMs: number; reuse?: SatFrame }
 
@@ -44,13 +46,13 @@ export type SatReply =
   | {
       type: 'loaded'
       id: number
-      group: SatGroupId
+      group: SatFieldGroup
       count: number
       dropped: number
       ms: number
       field: SatFieldInfo
     }
-  | { type: 'unloaded'; id: number; group: SatGroupId; field: SatFieldInfo }
+  | { type: 'unloaded'; id: number; group: SatFieldGroup; field: SatFieldInfo }
   | {
       type: 'frame'
       id: number
@@ -67,12 +69,26 @@ export type SatReply =
   | { type: 'error'; id: number; message: string }
 
 export function createSatHandler() {
-  const loaded = new Map<SatGroupId, { rows: SatRow[]; supgp: Uint8Array }>()
+  const loaded = new Map<SatFieldGroup, { rows: SatRow[]; supgp: Uint8Array }>()
   let field: SatField = buildSatField([])
   let version = 0
 
   const rebuild = () => {
-    field = buildSatField([...loaded].map(([group, g]) => ({ group, ...g })))
+    // The re-entry objects come last, and an object a loaded group holds is drawn once,
+    // from that group (#154).
+    const held = new Set<string>()
+    for (const [group, g] of loaded)
+      if (group !== REENTRY_GROUP) for (const r of g.rows) held.add(r[1])
+    const parts = [...loaded]
+      .filter(([group]) => group !== REENTRY_GROUP)
+      .map(([group, g]) => ({ group, ...g }))
+    const reentry = loaded.get(REENTRY_GROUP)
+    if (reentry) {
+      const rows = reentry.rows.filter((r) => !held.has(r[1]))
+      if (rows.length > 0)
+        parts.push({ group: REENTRY_GROUP, rows, supgp: new Uint8Array(rows.length) })
+    }
+    field = buildSatField(parts)
     version += 1
   }
   const info = (): SatFieldInfo => ({
@@ -107,6 +123,25 @@ export function createSatHandler() {
             count: rows.length,
             dropped,
             ms,
+            field: info(),
+          },
+          transfer: [],
+        }
+      }
+      if (req.type === 'reentry') {
+        const began = performance.now()
+        const rows = req.rows.filter(isSatRow)
+        if (rows.length > 0) loaded.set(REENTRY_GROUP, { rows, supgp: new Uint8Array(rows.length) })
+        else loaded.delete(REENTRY_GROUP)
+        rebuild()
+        return {
+          reply: {
+            type: 'loaded',
+            id: req.id,
+            group: REENTRY_GROUP,
+            count: rows.length,
+            dropped: req.rows.length - rows.length,
+            ms: performance.now() - began,
             field: info(),
           },
           transfer: [],

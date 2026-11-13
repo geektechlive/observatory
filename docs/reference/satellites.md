@@ -248,6 +248,18 @@ They are read with the owner's accounts, in the refresh job only.
     `scripts/spacetrack.mjs` logs in once (`/ajaxauth/login`, a cookie session), asks 3 s apart
     inside a 90 s budget and the #128 deadline, then logs out.
   - TIP "1 / hour" at most: asked every run (`/DECAY_EPOCH/>now/INSERT_EPOCH/>now-14/`).
+  - **The elements of the TIP objects (#154):** right after TIP, in the same session, one GP list
+    query for the NORAD ids TIP listed (`gpListUrl`: `/class/gp/NORAD_CAT_ID/<id,id,…>/predicates/…`,
+    the ids checked to be digits). One request, not one per object, so `tip-elements` costs one of the
+    30 a minute and 300 an hour, four a day (a run every 6 h); none when TIP lists nothing. A run is
+    now at most 13 requests with login and logout (TIP, GP list, SATCAT, Box Score, decays, six
+    GP_HISTORY months), 39 s at 3 s apart, inside the 90 s budget. Rows go through `toRow` and
+    `rowCanPropagate` and are kept only for listed ids. A failed GP query lists `tip-elements` in
+    `missing` and keeps the earlier rows of objects still listed; a failed TIP keeps the whole
+    earlier TIP part, elements included. A GP outage longer than 3 days leaves carried rows past the
+    orrery's epoch window, and the health probe fails on purpose (`rowCanPropagate`). At most 200 ids
+    are asked, soonest-decaying first; the rest are named in `missing`. Not yet seen against the live service: see the dry-run note
+    at the end of this section.
   - SATCAT, Box Score and Decay: "Once per day after 1700 (UTC)" (`dailyDue`). Only the 18:17
     run asks them. Decay uses "/MSG_EPOCH/%3Enow-1/", as the guidelines say.
   - GP_HISTORY: "1 / lifetime … Once you download an object's history, you need to store it on
@@ -263,7 +275,8 @@ They are read with the owner's accounts, in the refresh job only.
     "Space-Track.org". The Box Score is a count of SATCAT, credited the same way.
   - A dry run, or a manual refresh, after 17:00 UTC counts as that day's SATCAT, Box Score and
     Decay download.
-- **Storage:** `spacetrack:catalog:v1` every run (TIP, 30 days of re-entries, Box Score, names),
+- **Storage:** `spacetrack:catalog:v1` every run (TIP with its objects' elements in `tip.elements`,
+  30 days of re-entries, Box Score, names; no new key, no extra write),
   16 `spacetrack:satcat:v1:<n>` shards by NORAD id once a day (about 150 KB, 25 KB gzip each),
   `spacetrack:history:v1` only when it gains months. About 20 KV writes a day.
 - **DISCOSweb** (`scripts/discos.mjs`, `src/lib/discos.ts`): JSON:API at
@@ -276,16 +289,43 @@ They are read with the owner's accounts, in the refresh job only.
 - **Endpoints:** `/api/spacetrack?part=catalog|satcat&shard=0..15|history` and `/api/discos`,
   streamed through `_kvBody.ts`. Fresh for 36 h (catalogue), 72 h (shards), forever (history), 14
   days (DISCOS). Health contracts and check-health probes for the catalogue (a TIP list, which may
-  be empty) and DISCOS (the craft).
+  be empty; `tip.elements` may be absent or empty, but each row must have 13 columns in `health.ts`
+  and propagate now in `check-health.mjs`, `rowCanPropagate`: neither job installs satellite.js) and
+  DISCOS (the craft).
 - **Showing it:** the ticker's RE-ENTRY lines for this week's predictions; in the orrery, the Box
-  Score and re-entry count under the Earth orbit switches, an amber ring on each predicted object
-  that is loaded (`data-orrery-sat-reentries`), and the satellite inspector's kind, catalogued
+  Score and re-entry count under the Earth orbit switches, an amber ring and a label (name, time,
+  window, "Space-Track.org") on each predicted object (`data-orrery-sat-reentries`) **whatever the
+  switches say** (#154, below), and the satellite inspector's kind, catalogued
   owner, launch, radar size (Space-Track's bands: "Small (< 0.1m), Medium (0.1m – 1m), & Large
   (>1m)") and DISCOS facts. Spacecraft get DISCOS's mass, size and operator.
 - **Catalogued owner (#157):** SATCAT's COUNTRY, "the nation or group that has responsibility for
   an object" (Space-Track's glossary), shown as Space-Track gives it. It belongs to the catalogued
   object, so the ISS (25544, 1998-067A, Zarya) is CIS. `ownerNote()` in `satcatWords.ts` adds a
   note by NORAD id where that misleads; never remap the code.
+- **Re-entry objects outside the switched-on groups (#154).** TIP carries no elements, and a
+  Starlink's are in a 477 kB group the Worker cannot filter in 10 ms (ADR 0002), so the refresh job
+  stores them. The path: `tip.elements` in the catalogue body, read by `useSpaceTrack` as `unknown`
+  (the first-load schema must not grow); the orrery page checks them with
+  `reentryElementRows` (`src/lib/orrery/reentryElements.ts`: well-formed rows of the listed ids
+  only, the same ids that are ringed) and gives them to `OrreryRenderer.setReentryElements`; the
+  `SatController` sends them to the worker as a `reentry` message once the Earth frame is open, with
+  every switch off if need be. The worker holds them as one more span of the field,
+  `REENTRY_GROUP`, always last, and **a row whose NORAD id a loaded group holds is dropped there**
+  (`rebuild` in `satHandler.ts`), so the object is drawn once and the loaded group wins, also
+  after a switch changes. `'reentry'` is in `SatFieldGroup`, not in `SAT_GROUPS`: no switch, no
+  body, no entry in the controls. The counts ("N satellites from CelesTrak", `data-orrery-sat-total`,
+  `-drawn`) leave the re-entry span out. Choosing one in the browser or by link turns no switch on
+  (`toggleForFieldGroup`). The satellite renderer still never imports `satField.ts` or the API
+  client: the rows come in through the page, as `satSource` does.
+  - **The label** is `ProjectedBody` kind `reentry`, keyed `reentry:<id>` (never `sat:<id>`, which
+    is the chosen satellite's), text from `reentryBrief` in `reentryElements.ts` ("14 Nov 23:52 UTC ±12 h"), amber, with
+    "Space-Track.org" in it. It ranks as a priority label and must show: its ring sits over Earth's
+    disc, where every ordinary slot is taken (found on a real GPU, 2026-11-12). It is skipped when
+    that object is the chosen satellite.
+  - **Interpolate only:** the worker's normal SGP4 pass at the sim time, hidden past 3 days from the
+    row's own epoch like every object.
+  - **First-load cost:** `entry-gzip` 152.8 to 152.9 kB (measured with `pnpm check:bundle`, 2026-11-12):
+    the `elements: z.unknown().optional()` line, and the `elementsShaped` health check (about 35 bytes gzip of `index`: 48,656 to 48,691 on main a7e6ac0). `reentryBrief` lives in the orrery chunk.
 - **The ticker costs the first load 0.9 kB gzip** (150.1 to 151.0 kB, still 4 chunks):
   `useSpaceTrack`, its schema and `spaceTrackText.ts`. A lazy import of the fetcher saved nothing
   and added a chunk.
@@ -297,6 +337,11 @@ They are read with the owner's accounts, in the refresh job only.
 - The first live dry run (2026-11-07 22:23 UTC, no KV write): Space-Track 7 requests in 23 s,
   SATCAT 35,526 objects, 5 TIP predictions; DISCOSweb 2 requests, all 15 craft matched.
   `tests/unit/fixtures/spacetrack` and `/discos` are its trimmed answers.
+- **The GP list query (#154) has not run against Space-Track yet.** It was built against
+  synthetic answers (no credentials were used). The first scheduled run after landing shows
+  whether the real `/class/gp/NORAD_CAT_ID/<ids>/predicates/…` answer parses: look for "N with
+  elements" in the refresh log line and no `tip-elements` in `missing`, then open the orrery with
+  Starlink off. Space-Track returns numbers as strings, which `toRow` accepts.
 
 ## satellite.js 7 (#97)
 

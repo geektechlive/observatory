@@ -1122,7 +1122,8 @@ export async function refreshSpaceTrack(config, deps = {}) {
     }
     const missing = catalog.missing.map((m) => `${m.id} (${m.reason})`)
     const detail =
-      `ok ${SPACETRACK_SIGNATURE} ${String(catalog.tip?.reentries.length ?? 0)} re-entries, ` +
+      `ok ${SPACETRACK_SIGNATURE} ${String(catalog.tip?.reentries.length ?? 0)} re-entries ` +
+      `(${String(catalog.tip?.elements?.length ?? 0)} with elements), ` +
       `SATCAT ${satcat ? `${String(satcat.length)} objects` : 'not due'}, ` +
       `history ${history ? 'updated' : 'unchanged'}, ${String(requests)} requests` +
       (missing.length ? `; WARN missing ${missing.join(', ')}` : '')

@@ -70,7 +70,7 @@ export function SatControls({
           {reentriesThisWeek === 1
             ? '1 object is predicted to re-enter in the next 7 days'
             : `${String(reentriesThisWeek)} objects are predicted to re-enter in the next 7 days`}
-          , ringed in amber when its group is on (Space-Track.org TIP messages).
+          , ringed in amber and named on the stage (Space-Track.org TIP messages).
         </p>
       )}
       {boxscore && <p className={styles.switchHint ?? ''}>{boxscoreLine(boxscore)}</p>}

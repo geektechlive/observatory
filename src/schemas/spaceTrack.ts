@@ -28,7 +28,17 @@ const DecaySchema = z.object({
 export const SpaceTrackSchema = z.object({
   generatedAt: z.string(),
   citation: z.string(),
-  tip: z.object({ fetchedAt: z.string(), reentries: z.array(ReentrySchema) }).nullable(),
+  tip: z
+    .object({
+      fetchedAt: z.string(),
+      reentries: z.array(ReentrySchema),
+      // The reentering objects' elements (#154), compact rows like /api/orrery-sats. Left
+      // unchecked on purpose: this schema is in the first load, and the orrery chunk
+      // checks each row (lib/orrery/reentryElements.ts). Absent before the first run
+      // that asked for them.
+      elements: z.unknown().optional(),
+    })
+    .nullable(),
   decays: z.object({ fetchedAt: z.string(), recent: z.array(DecaySchema) }).nullable(),
   boxscore: z
     .object({

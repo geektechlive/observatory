@@ -15,7 +15,10 @@ import { SAT_TOGGLES } from './satToggles'
 import { Term } from './Term'
 import type { SatInfo } from './three/OrreryRenderer'
 
-const GROUP_LABEL = new Map(SAT_TOGGLES.flatMap((t) => t.groups.map((g) => [g, t.label] as const)))
+const GROUP_LABEL = new Map<string, string>([
+  ...SAT_TOGGLES.flatMap((t) => t.groups.map((g) => [g, t.label] as const)),
+  ['reentry', 'Predicted re-entry (Space-Track.org)'],
+])
 const WINDOW_DAYS = EPOCH_WINDOW_MS / 86_400_000
 /** Starlink's elements where CelesTrak's supplemental GP has them (#209). */
 const SUPGP_SOURCE =

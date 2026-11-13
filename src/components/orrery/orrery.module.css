@@ -235,6 +235,17 @@
   color: var(--bone-faint);
 }
 
+/* An object Space-Track predicts will come down (#154): amber, like its ring. */
+.reentryLabel {
+  color: var(--amber);
+}
+
+/* On a small stage only the name fits (OrreryPage sets data-narrow); the rest is in the
+   inspector, one tap away. */
+.reentryLabel[data-narrow='true'] [data-wide] {
+  display: none;
+}
+
 /* A deep-space craft beyond the view, pinned to the rim with its true distance; the
    arrow points the way it lies. Top and bottom markers are centred on their point. */
 .craftLabel[data-rim='top'],

@@ -13,13 +13,21 @@ import { json2satrec, propagate, type SatRec } from 'satellite.js'
 import { OrrerySatsSchema } from '@/schemas/orrerySats'
 
 import { launchOrder, orbitClassOf } from '../orbitClass'
-import { EPOCH_WINDOW_MS, rowEpochMs, rowToOmm, type SatGroupId, type SatRow } from '../satCatalog'
+import {
+  EPOCH_WINDOW_MS,
+  isSatRow,
+  rowEpochMs,
+  rowToOmm,
+  type SatFieldGroup,
+  type SatGroupId,
+  type SatRow,
+} from '../satCatalog'
 import { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW } from './satStatus'
 
 export { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW }
 
 export interface SatGroupRows {
-  group: SatGroupId
+  group: SatFieldGroup
   rows: SatRow[]
   /** 1 where a row carries CelesTrak SupGP elements (#209), aligned with rows; absent = GP. */
   supgp?: Uint8Array | undefined
@@ -27,7 +35,7 @@ export interface SatGroupRows {
 
 export interface SatField {
   count: number
-  groups: { group: SatGroupId; start: number; count: number }[]
+  groups: { group: SatFieldGroup; start: number; count: number }[]
   /** NORAD ids in field order, for picking and the inspector. */
   ids: string[]
   names: string[]
@@ -46,18 +54,10 @@ export interface SatFrame {
   status: Uint8Array
 }
 
-function isSatRow(value: unknown): value is SatRow {
-  if (!Array.isArray(value) || value.length !== 13) return false
-  for (let i = 0; i < 4; i++) if (typeof value[i] !== 'string') return false
-  for (let i = 4; i < 13; i++)
-    if (typeof value[i] !== 'number' || !Number.isFinite(value[i])) return false
-  return Number.isFinite(rowEpochMs(value as SatRow))
-}
-
 /** A stored group's body (as fetched, undecoded) as rows; bad rows are dropped and counted. */
 export function decodeSatGroup(
   body: ArrayBuffer,
-): SatGroupRows & { supgp: Uint8Array; dropped: number } {
+): SatGroupRows & { group: SatGroupId; supgp: Uint8Array; dropped: number } {
   const parsed = OrrerySatsSchema.parse(JSON.parse(new TextDecoder().decode(body)))
   // The first supgpCount stored rows are SupGP (#209): flag them before any is dropped.
   const supgpCount = parsed.supgpCount ?? 0

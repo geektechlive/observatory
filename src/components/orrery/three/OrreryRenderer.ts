@@ -58,7 +58,7 @@ import {
 import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
-import { labelBehindEarth, ORBIT_PRESET_RADII } from '@/lib/orrery/satView'
+import { labelBehindEarth, ORBIT_PRESET_RADII, reentryKey } from '@/lib/orrery/satView'
 import { lookupTwinKey } from '@/lib/orrery/smallBodyView'
 import { SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
@@ -96,7 +96,7 @@ import {
   PX_CEILING,
   SMALL_BODY_MIN_PX,
 } from './pxClamp'
-import { isSatKey, type SatInfo, SatLayer, type SatViewState } from './satLayer'
+import { isSatKey, type SatInfo, satKey, SatLayer, type SatViewState } from './satLayer'
 import { satFacing, satModelPx, satRingPx, SceneModelCache, sunOnScreen } from './satModelFit'
 import { type SmallBodyGroups, SmallBodyLayer } from './smallBodyLayer'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
@@ -126,7 +126,8 @@ export interface ProjectedBody {
   /**
    * 'ring': the heliopause marker's label anchor (#93), not a body. 'asteroid': a close
    * approach (#92). 'marker': the L1 point on the Sun–Earth line (#92). 'satellite': the
-   * chosen satellite (#98); the others have no labels. 'lookup': an object looked up at
+   * chosen satellite (#98); the others have no labels. 'reentry': an object Space-Track
+   * predicts will come down, ringed in amber (#154), keyed `reentry:<NORAD id>`. 'lookup': an object looked up at
    * JPL and shown (#145). 'smallbody': a comet, interstellar object or dwarf planet
    * (#99), its group in `group`.
    */
@@ -138,6 +139,7 @@ export interface ProjectedBody {
     | 'asteroid'
     | 'marker'
     | 'satellite'
+    | 'reentry'
     | 'lookup'
     | 'smallbody'
   /** Screen position, px; may lie outside the canvas (rim markers use that). */
@@ -736,6 +738,16 @@ export class OrreryRenderer {
   /** The satellite groups switched on (#98); fetched once the Earth frame opens. */
   setSatGroups(groups: ReadonlySet<SatGroupId>): void {
     this.sats.setEnabled(groups)
+    this.markDirty()
+  }
+
+  /**
+   * Elements of the objects Space-Track predicts will re-enter (#154): the page hands over
+   * the rows, the worker propagates them whatever the switches say. The renderer never
+   * reads the API itself.
+   */
+  setReentryElements(rows: readonly unknown[]): void {
+    this.sats.setReentryRows(rows)
     this.markDirty()
   }
 
@@ -1706,6 +1718,16 @@ export class OrreryRenderer {
         label: sat.label,
         kind: 'satellite',
         ...this.projectOne(this.sats.marker),
+      })
+    }
+    // A ringed re-entry object carries a label too (#154), unless it is the chosen one.
+    for (const r of this.sats.reentryLabels()) {
+      if (satKey(r.noradId) === sat?.key) continue
+      out.push({
+        name: reentryKey(r.noradId),
+        label: r.name,
+        kind: 'reentry',
+        ...this.projectOne(r.ring),
       })
     }
   }

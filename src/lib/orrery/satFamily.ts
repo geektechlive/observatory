@@ -11,7 +11,7 @@
  *
  * No three.js and no catalogue code here: a type import only.
  */
-import type { SatGroupId } from '@/lib/orbit/satCatalog'
+import type { SatFieldGroup } from '@/lib/orbit/satCatalog'
 
 export type SatFamily = 'cubesat' | 'generic-bus'
 
@@ -24,7 +24,7 @@ const CUBESAT_NAME = /^(?:FLOCK |LEMUR-)/
  * (a small bus is wrong for a space station), and `starlink` (its flat-panel shape needs
  * its own model, which is not built yet).
  */
-const BUS_GROUPS: ReadonlySet<SatGroupId> = new Set(['gps-ops', 'weather', 'science', 'other'])
+const BUS_GROUPS: ReadonlySet<SatFieldGroup> = new Set(['gps-ops', 'weather', 'science', 'other'])
 
 /**
  * Passive spheres and laser reflectors in those groups: no bus, arrays or radio, so the
@@ -53,7 +53,7 @@ export const PASSIVE_SPHERES: ReadonlySet<string> = new Set([
 /** A satellite's stand-in family by name, group and NORAD id, or null when it gets none. */
 export function satFamily(
   name: string,
-  group: SatGroupId | undefined,
+  group: SatFieldGroup | undefined,
   noradId: string,
 ): SatFamily | null {
   if (group === undefined || !BUS_GROUPS.has(group)) return null

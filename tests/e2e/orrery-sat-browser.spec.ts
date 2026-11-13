@@ -30,6 +30,9 @@ async function openOrrery(page: Page, hash = '#orrery') {
 
 const canvas = (page: Page) => page.locator('canvas[data-orrery-webgl]')
 const browseBy = (page: Page) => page.getByRole('combobox', { name: 'Browse by' })
+// The browser's rows; a ringed re-entry object also has a button of its own on the stage (#154).
+const listed = (page: Page, name: RegExp) =>
+  page.getByRole('listitem').getByRole('button', { name })
 const openBrowser = (page: Page) => page.getByRole('button', { name: 'Browse satellites' }).click()
 
 test.describe('satellite browser (#158)', () => {
@@ -112,7 +115,7 @@ test.describe('satellite browser (#158)', () => {
     await expect.poll(() => canvas(page).getAttribute('data-orrery-sat-drawn')).toBe('55')
     await openBrowser(page)
     await browseBy(page).selectOption('radar')
-    await expect(page.getByRole('button', { name: /^ISS|^CSS/ })).toHaveCount(0)
+    await expect(listed(page, /^ISS|^CSS/)).toHaveCount(0)
     await page.getByRole('button', { name: /Load Space-Track/ }).click()
     // Large first (the ISS and Tiangong), then the medium GOES-2.
     const rows = page.getByRole('listitem')
@@ -120,8 +123,8 @@ test.describe('satellite browser (#158)', () => {
     await expect(rows).toHaveCount(3)
     await browseBy(page).selectOption('owner')
     await page.getByRole('combobox', { name: 'Owner' }).selectOption('PRC')
-    await expect(page.getByRole('button', { name: /CSS \(TIANHE\)/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /ISS \(ZARYA\)/ })).toHaveCount(0)
+    await expect(listed(page, /CSS \(TIANHE\)/)).toBeVisible()
+    await expect(listed(page, /ISS \(ZARYA\)/)).toHaveCount(0)
   })
 
   test('lists the predicted re-entry first, and chooses it', async ({ page }) => {
@@ -130,7 +133,7 @@ test.describe('satellite browser (#158)', () => {
     await expect.poll(() => canvas(page).getAttribute('data-orrery-sat-drawn')).toBe('55')
     await openBrowser(page)
     await browseBy(page).selectOption('reentry')
-    const tiangong = page.getByRole('button', { name: /CSS \(TIANHE\)/ })
+    const tiangong = listed(page, /CSS \(TIANHE\)/)
     await expect(tiangong).toBeVisible()
     await expect(tiangong).toContainText('down ')
     await tiangong.click()

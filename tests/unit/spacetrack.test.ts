@@ -10,6 +10,7 @@ import {
   dailyDue,
   decayUrl,
   gpHistoryUrl,
+  gpListUrl,
   HISTORY_OBJECTS,
   historyPlan,
   mergeDecays,
@@ -137,6 +138,18 @@ describe('query URLs', () => {
     expect(url).toContain('/class/gp_history/NORAD_CAT_ID/25544/')
     expect(url).toContain('/EPOCH/2026-09-01--2026-10-01/')
     expect(url).toMatch(/\/format\/json$/)
+  })
+
+  it('asks the current GP of the TIP objects in one list query (#154)', () => {
+    const url = gpListUrl(['53630', '45390'])
+    expect(url).toContain('/class/gp/NORAD_CAT_ID/53630,45390/')
+    expect(url).toContain('/predicates/OBJECT_NAME,OBJECT_ID,NORAD_CAT_ID,EPOCH,MEAN_MOTION,')
+    expect(url).toMatch(/\/format\/json$/)
+  })
+
+  it('refuses a GP list with an id that is not a catalogue number', () => {
+    expect(() => gpListUrl(['53630', '1/../x'])).toThrow(/NORAD/)
+    expect(() => gpListUrl([])).toThrow()
   })
 
   it('never puts anything but the query in the URL', () => {

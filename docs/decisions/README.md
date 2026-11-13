@@ -38,3 +38,4 @@ that makes the decision.
 | [0028](0028-stand-in-models-by-name-and-group.md)             | Satellites with no model get a labelled stand-in, picked by name and group                | #194           |
 | [0029](0029-jpl-feeds-built-by-the-job.md)                    | Planets, Sentry and fireball are built by the refresh job; visitors never call JPL        | #146           |
 | [0030](0030-chosen-satellite-model-in-the-scene.md)           | The chosen satellite draws as its model at a fixed on-screen size, labelled not to scale  | #194           |
+| [0031](0031-reentry-objects-elements-from-space-track.md)     | The elements of re-entry objects come from Space-Track, stored in the catalogue body      | #154           |

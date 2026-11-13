@@ -17,6 +17,8 @@ export interface SatWorker {
   /** Load (or replace) a group from its /api/orrery-sats body; the buffer is transferred. */
   load(body: ArrayBuffer): Promise<Loaded>
   unload(group: Extract<SatRequest, { type: 'unload' }>['group']): Promise<SatUnloaded>
+  /** Replace the re-entry objects' rows (#154); the worker checks each and drops the bad. */
+  loadReentry(rows: unknown[]): Promise<Loaded>
   propagate(date: Date): Promise<Frame>
   /** Hand back a frame's buffers once drawn, to be reused by the next pass. */
   release(frame: SatFrame): void
@@ -77,6 +79,9 @@ export function createSatWorker(onFail?: () => void): SatWorker {
     },
     load(body) {
       return send<Loaded>({ type: 'load', id: ++next, body }, [body])
+    },
+    loadReentry(rows) {
+      return send<Loaded>({ type: 'reentry', id: ++next, rows })
     },
     unload(group) {
       return send<SatUnloaded>({ type: 'unload', id: ++next, group })

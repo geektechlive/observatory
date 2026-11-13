@@ -11,19 +11,24 @@ import { satKey, SatLayer } from '@/components/orrery/three/satLayer'
 import { SAT_OK, SAT_OUT_OF_WINDOW } from '@/lib/orbit/bulk/satField'
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import type { SatFrameReply, SatWorker } from '@/lib/orbit/bulk/satsClient'
-import type { SatGroupId } from '@/lib/orbit/satCatalog'
+import type { SatFieldGroup, SatGroupId } from '@/lib/orbit/satCatalog'
 import { EARTH_RADIUS_KM } from '@/lib/orrery/earthFrame'
 
 const T0 = Date.parse('2026-11-07T12:00:00Z')
 const JD = 2_461_352
 const ISS_KM: [number, number, number] = [EARTH_RADIUS_KM + 420, 0, 0]
 
-function field(version: number, groups: SatGroupId[]): SatFieldInfo {
+const idOf = (g: SatFieldGroup) =>
+  g === 'stations' ? '25544' : g === 'reentry' ? '53630' : '44713'
+const nameOf = (g: SatFieldGroup) =>
+  g === 'stations' ? 'ISS (ZARYA)' : g === 'reentry' ? 'STARLINK-4598' : 'STARLINK-1007'
+
+function field(version: number, groups: SatFieldGroup[]): SatFieldInfo {
   return {
     version,
     groups: groups.map((group, i) => ({ group, start: i, count: 1 })),
-    ids: groups.map((g) => (g === 'stations' ? '25544' : '44713')),
-    names: groups.map((g) => (g === 'stations' ? 'ISS (ZARYA)' : 'STARLINK-1007')),
+    ids: groups.map(idOf),
+    names: groups.map(nameOf),
     epochMs: new Float64Array(groups.length).fill(T0 - 3_600_000),
     orbit: new Uint8Array(groups.length),
     launch: new Int32Array(groups.length),
@@ -33,10 +38,26 @@ function field(version: number, groups: SatGroupId[]): SatFieldInfo {
 }
 
 function fakeWorker(statuses: number[]) {
-  let loaded: SatGroupId[] = []
+  let loaded: SatFieldGroup[] = []
   let version = 0
   const worker: SatWorker = {
     failed: false,
+    loadReentry(rows) {
+      loaded = [
+        ...loaded.filter((g) => g !== 'reentry'),
+        ...(rows.length > 0 ? ['reentry' as const] : []),
+      ]
+      version += 1
+      return Promise.resolve({
+        type: 'loaded',
+        id: 0,
+        group: 'reentry',
+        count: rows.length,
+        dropped: 0,
+        ms: 1,
+        field: field(version, loaded),
+      })
+    },
     load(body) {
       loaded = [...loaded, new TextDecoder().decode(body) as SatGroupId]
       version += 1
@@ -198,6 +219,28 @@ describe('SatLayer (#98)', () => {
     expect(ring?.material.depthTest).toBe(false)
     expect(ring?.material.depthWrite).toBe(false)
     expect(ring?.renderOrder).toBeGreaterThan(0)
+  })
+
+  it('rings and names a re-entry object although no group is switched on (#154)', async () => {
+    const { layer, at } = await loadedLayer([])
+    layer.setReentryRows([['STARLINK-4598', '53630']])
+    layer.setFlagged(['53630', '99999'])
+    layer.place(at(20))
+    await flush()
+    layer.place(at(20))
+    await flush()
+    layer.place(at(20))
+    expect(layer.flagRings()).toHaveLength(1)
+    expect(layer.info(satKey('53630'))).toMatchObject({ name: 'STARLINK-4598', group: 'reentry' })
+    const [target] = layer.reentryLabels()
+    expect(target).toMatchObject({ noradId: '53630', name: 'STARLINK-4598' })
+    expect(
+      target?.ring.position.distanceTo(layer.positionOf('53630') ?? new Vector3()),
+    ).toBeLessThan(1e-9)
+    // Counts describe the switchable groups only.
+    expect(layer.snapshot().total).toBe(0)
+    layer.place(at(120))
+    expect(layer.reentryLabels()).toEqual([])
   })
 
   describe('rings for a satellite behind Earth are dimmed, not drawn as if in front', () => {

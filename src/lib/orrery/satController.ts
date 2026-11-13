@@ -9,12 +9,17 @@
  * A group is fetched only when it is switched on and the Earth frame is open, so a
  * visitor who never comes near Earth downloads nothing. Positions come from the worker,
  * never computed here: the main thread only swaps buffers.
+ *
+ * The objects Space-Track predicts will re-enter (#154) are the exception to "only when
+ * switched on": their few rows come with the Space-Track catalogue, are loaded as a group
+ * of their own (REENTRY_GROUP) once the Earth frame is open, and are left out of the
+ * counts, which describe the switchable groups.
  */
 import type { SatFrame } from '@/lib/orbit/bulk/satField'
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import type { SatWorker } from '@/lib/orbit/bulk/satsClient'
 import { SAT_FAILED, SAT_OK, SAT_OUT_OF_WINDOW } from '@/lib/orbit/bulk/satStatus'
-import { SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
+import { REENTRY_GROUP, SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
 
 export interface SatSource {
   fetchGroup: (
@@ -74,6 +79,10 @@ export class SatController {
   private info: SatFieldInfo | null = null
   private current: (SatFrame & { version: number }) | null = null
   private inFlight = false
+  /** The re-entry objects' rows (#154) and the form of them the worker holds, if any. */
+  private reentryRows: readonly unknown[] = []
+  private reentryKey = '[]'
+  private reentrySent: string | null = null
   /** The last tick: a field that changes after it is passed at its date (#206). */
   private lastTick: SatTick | null = null
   private lastPassWall = Number.NEGATIVE_INFINITY
@@ -100,6 +109,19 @@ export class SatController {
       if (!groups.has(g.id) && state.status !== 'off') this.groups.set(g.id, idle())
       if (groups.has(g.id) && state.status === 'off') this.set(g.id, { status: 'waiting' })
     }
+    this.onChange()
+  }
+
+  /**
+   * Elements of the objects predicted to re-enter (#154), as the page has them. Loaded
+   * with the next tick near Earth, whatever the switches say; the same rows twice change
+   * nothing.
+   */
+  setReentryRows(rows: readonly unknown[]): void {
+    const key = JSON.stringify(rows)
+    if (key === this.reentryKey) return
+    this.reentryRows = rows
+    this.reentryKey = key
     this.onChange()
   }
 
@@ -130,11 +152,17 @@ export class SatController {
   snapshot(): SatSnapshot {
     return {
       groups: Object.fromEntries(this.groups),
-      total: this.info?.ids.length ?? 0,
+      total: this.switchable(),
       ...this.counts,
       passMs: this.passMs,
       engine: this.engine,
     }
+  }
+
+  /** How many objects of the field belong to the switchable groups (re-entry ones come last). */
+  private switchable(): number {
+    const span = this.info?.groups.find((g) => g.group === REENTRY_GROUP)
+    return span ? span.start : (this.info?.ids.length ?? 0)
   }
 
   /** Read through a call: TypeScript would otherwise keep its narrowing across an await. */
@@ -163,6 +191,7 @@ export class SatController {
     this.info = null
     this.current = null
     this.inFlight = false
+    this.reentrySent = null
     for (const group of this.inWorker) {
       if (this.enabled.has(group)) this.set(group, { status: 'error' })
     }
@@ -191,12 +220,35 @@ export class SatController {
         .catch(() => undefined)
     }
     if (!near) return
+    this.syncReentry()
     for (const group of this.enabled) {
       if (this.inWorker.has(group) || this.groups.get(group)?.status === 'error') continue
       this.inWorker.add(group)
       this.set(group, { status: 'loading' })
       void this.load(group)
     }
+  }
+
+  /** Send the re-entry rows to the worker when it does not hold this form of them. */
+  private syncReentry(): void {
+    this.dropDeadWorker()
+    const want = this.reentryKey
+    if (this.reentrySent === want || (this.reentrySent === null && this.reentryRows.length === 0)) {
+      return
+    }
+    this.reentrySent = want
+    const rows = [...this.reentryRows]
+    void this.getWorker()
+      .then((w) => w.loadReentry(rows))
+      .then((reply) => {
+        if (this.alive()) this.setField(reply.field)
+      })
+      .catch(() => {
+        // A live worker that answered with an error holds none of these rows: ask again.
+        this.reentrySent = null
+        this.dropDeadWorker()
+        this.onChange()
+      })
   }
 
   private async load(group: SatGroupId): Promise<void> {
@@ -301,7 +353,9 @@ export class SatController {
     let drawn = 0
     let outOfWindow = 0
     let failed = 0
-    for (const s of status) {
+    const limit = this.switchable()
+    for (const [i, s] of status.entries()) {
+      if (i >= limit) break
       if (s === SAT_OK) drawn += 1
       else if (s === SAT_OUT_OF_WINDOW) outOfWindow += 1
       else if (s === SAT_FAILED) failed += 1

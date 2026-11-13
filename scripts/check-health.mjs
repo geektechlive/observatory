@@ -16,6 +16,9 @@ import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
+// Plain TypeScript with no imports, run by Node's type stripping like refresh-data.mjs.
+import { rowCanPropagate } from '../src/lib/orbit/satCatalog.ts'
+
 const DEFAULT_BASE_URL = 'https://observatory.geektechlive.com'
 const TIMEOUT_MS = 15_000
 const CONCURRENCY = 3
@@ -178,12 +181,19 @@ export const CHECKS = [
   // weeks nothing is predicted to re-enter, so an empty TIP list passes; no list fails.
   {
     path: '/api/spacetrack?part=catalog',
-    requires: 'a TIP re-entries list, each with its predicted time',
+    requires:
+      'a TIP re-entries list, each with its predicted time, and elements (none is fine) that each propagate now',
     check: (b) =>
       Array.isArray(b?.tip?.reentries) &&
       b.tip.reentries.every(
         (r) => typeof r?.noradId === 'string' && typeof r?.decayEpoch === 'string',
-      ),
+      ) &&
+      // The elements of the objects TIP lists (#154): none is fine (nothing is coming down,
+      // or the run that asked for them has not happened), but a row the orrery cannot
+      // propagate means a ring that never draws.
+      (b.tip.elements === undefined ||
+        (Array.isArray(b.tip.elements) &&
+          b.tip.elements.every((row) => rowCanPropagate(row, Date.now())))),
   },
   // ESA DISCOS (#101): KV-only, read by the refresh job with the owner's token.
   {

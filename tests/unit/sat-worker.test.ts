@@ -127,6 +127,56 @@ describe('createSatHandler (#98)', () => {
     expect(second.positions).toBe(first.positions)
   })
 
+  // #154: Space-Track's elements for the objects predicted to re-enter, loaded as an
+  // extra group whatever the switches say; an object a loaded group holds is drawn once.
+  it('loads re-entry rows as a group of their own, last, and drops what another group holds', async () => {
+    const handle = createSatHandler()
+    const stations = rowsOf('stations')
+    const gps = rowsOf('gps-ops')
+    const [iss] = stations
+    const [navstar] = gps
+    if (!iss || !navstar) throw new Error('fixture')
+    const first = expectType(
+      (await handle({ type: 'reentry', id: 1, rows: [iss, navstar] })).reply,
+      'loaded',
+    )
+    expect(first).toMatchObject({ group: 'reentry', count: 2, dropped: 0 })
+    expect(first.field.groups).toEqual([{ group: 'reentry', start: 0, count: 2 }])
+    // The ISS now arrives in a loaded group: it wins, and the re-entry copy goes.
+    const loaded = expectType(
+      (await handle({ type: 'load', id: 2, body: body('stations', stations) })).reply,
+      'loaded',
+    )
+    expect(loaded.field.groups).toEqual([
+      { group: 'stations', start: 0, count: stations.length },
+      { group: 'reentry', start: stations.length, count: 1 },
+    ])
+    expect(loaded.field.ids.filter((id) => id === iss[1])).toHaveLength(1)
+    const frame = expectType(
+      (await handle({ type: 'propagate', id: 3, dateMs: AT })).reply,
+      'frame',
+    )
+    expect(frame.positions).toHaveLength((stations.length + 1) * 3)
+    // Switched off again, the object comes back through the re-entry group.
+    const gone = expectType(
+      (await handle({ type: 'unload', id: 4, group: 'stations' })).reply,
+      'unloaded',
+    )
+    expect(gone.field.groups).toEqual([{ group: 'reentry', start: 0, count: 2 }])
+  })
+
+  it('drops re-entry rows that are not rows, and empties the group on no rows', async () => {
+    const handle = createSatHandler()
+    const [iss] = rowsOf('stations')
+    const reply = expectType(
+      (await handle({ type: 'reentry', id: 1, rows: [iss, ['x', 1], null, 'nope'] })).reply,
+      'loaded',
+    )
+    expect(reply).toMatchObject({ count: 1, dropped: 3 })
+    const none = expectType((await handle({ type: 'reentry', id: 2, rows: [] })).reply, 'loaded')
+    expect(none.field.groups).toEqual([])
+  })
+
   it('answers a bad body with an error naming the request, not a crash', async () => {
     const handle = createSatHandler()
     const reply = (

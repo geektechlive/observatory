@@ -4,7 +4,12 @@
  * than half the objects and a 480 kB download (gzip, measured 2026-11-12, #209), against
  * about 300 kB for everything else switched on; one tap adds it.
  */
-import { EPOCH_WINDOW_MS, type SatGroupId } from '@/lib/orbit/satCatalog'
+import {
+  EPOCH_WINDOW_MS,
+  REENTRY_GROUP,
+  type SatFieldGroup,
+  type SatGroupId,
+} from '@/lib/orbit/satCatalog'
 import type { SatSnapshot } from '@/lib/orrery/satController'
 
 export type SatToggleId =
@@ -81,6 +86,11 @@ const TOGGLE_OF_GROUP = new Map(SAT_TOGGLES.flatMap((t) => t.groups.map((g) => [
 /** The switch that turns a stored group on. */
 export function toggleForGroup(group: SatGroupId): SatToggleId {
   return TOGGLE_OF_GROUP.get(group) ?? 'other'
+}
+
+/** The switch for a loaded object's group; none for a re-entry object, which has no switch (#154). */
+export function toggleForFieldGroup(group: SatFieldGroup): SatToggleId | null {
+  return group === REENTRY_GROUP ? null : toggleForGroup(group)
 }
 
 /** A download in plain words: "about 0.5 MB", "about 140 kB". */

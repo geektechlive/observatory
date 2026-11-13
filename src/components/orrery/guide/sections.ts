@@ -141,7 +141,7 @@ export const SECTIONS: readonly Section[] = [
           {
             tone: 'amber',
             name: 'Amber',
-            text: 'An asteroid on a close pass, and also a notice or warning. On a small screen only the hazardous passes and the closest ones are named; every pass keeps its dot. On a satellite, an amber ring means Space-Track predicts it will re-enter the atmosphere soon.',
+            text: 'An asteroid on a close pass, and also a notice or warning. On a small screen only the hazardous passes and the closest ones are named; every pass keeps its dot. On a satellite, an amber ring means Space-Track predicts it will re-enter the atmosphere soon; it shows even when that satellite’s group is switched off, with a label giving the time.',
           },
           {
             tone: 'red',
@@ -284,7 +284,8 @@ export const DATA_SOURCES: readonly DataSource[] = [
     name: 'Space-Track.org',
     sourceId: 'space-track',
     url: 'https://www.space-track.org/documentation',
-    gives: 'Re-entry predictions, who owns a satellite, and when it launched.',
+    gives:
+      'Re-entry predictions with the orbit data of the objects listed, who owns a satellite, and when it launched.',
     fresh: 'Re-entry predictions every 6 hours. Catalogue entries and the Box Score daily.',
   },
   {

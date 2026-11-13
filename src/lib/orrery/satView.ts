@@ -47,6 +47,8 @@ export const SAT_DISTANCE = {
 export const SAT_KEY_PREFIX = 'sat:'
 export const satKey = (noradId: string) => `${SAT_KEY_PREFIX}${noradId}`
 export const isSatKey = (key: string) => key.startsWith(SAT_KEY_PREFIX)
+/** A ringed re-entry object's label in the scene (#154): `reentry:<NORAD id>`, apart from `sat:`. */
+export const reentryKey = (noradId: string) => `reentry:${noradId}`
 /** The ISS, always in search: choosing it opens the Earth orbit view and loads its group. */
 export const ISS_NORAD_ID = '25544'
 

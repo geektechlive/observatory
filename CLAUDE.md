@@ -47,7 +47,7 @@ Details: [docs/reference/data-feeds-and-monitoring.md](docs/reference/data-feeds
 - The refresh job has one 6-minute deadline inside the 10-minute workflow timeout (#128); new steps respect `stepBudget`/`beforeDeadline`.
 - Open-Meteo is called from the browser after the user shares a location; never proxy it (#79).
 - Credentials (Space-Track, DISCOSweb) live only in Actions secrets and the login form or `Authorization` header: **never in a URL, error, log line, payload or fixture** (ADR 0013). **Never delete `spacetrack:history:v1`** (GP_HISTORY is once per lifetime). Every surface showing Space-Track data credits "Space-Track.org".
-- Modules the Node refresh job imports (`src/lib/horizons.ts`, `src/lib/orrery/craft.ts`, `moons.ts`, `conic.ts`, `src/lib/orbit/satCatalog.ts`) **take no imports and use erasable syntax only.**
+- Modules the Node refresh job imports (`src/lib/horizons.ts`, `src/lib/orrery/craft.ts`, `moons.ts`, `conic.ts`, `src/lib/orbit/satCatalog.ts`) **take no imports and use erasable syntax only.** `scripts/check-health.mjs` imports `satCatalog.ts` too, and neither job runs `pnpm install`: no packages (satellite.js) there.
 - The orrery client **interpolates, never extrapolates** its samples.
 
 ## Bundle and loading rules

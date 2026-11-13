@@ -89,6 +89,13 @@ function fieldPresent(data: unknown, key: string): boolean {
   return value !== null && value !== undefined
 }
 
+/** `tip.elements` (#154): absent, or a list of 13-column rows. */
+function elementsShaped(tip: unknown): boolean {
+  if (!isRecord(tip) || tip['elements'] === undefined) return true
+  const rows = tip['elements']
+  return Array.isArray(rows) && rows.every((r) => Array.isArray(r) && r.length === 13)
+}
+
 function nonEmptyStringField(data: unknown, key: string): boolean {
   if (!isRecord(data)) return false
   const value = data[key]
@@ -340,7 +347,11 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     label: 'Space-Track',
     headline: false,
     maxAgeMs: 36 * HOUR,
-    required: (data) => isRecord(data) && fieldPresent(data['tip'], 'reentries'),
+    // The re-entry objects' elements (#154) may be absent or empty; a row has 13 columns.
+    // Whether each propagates is judged by scripts/check-health.mjs (this runs in the
+    // first load and cannot import the satellite code).
+    required: (data) =>
+      isRecord(data) && fieldPresent(data['tip'], 'reentries') && elementsShaped(data['tip']),
   },
   'sun-moon': { label: 'Sun & Moon', headline: false, maxAgeMs: DAY, required: hasContent },
   'swpc-alerts': {

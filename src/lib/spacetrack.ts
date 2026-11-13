@@ -129,6 +129,23 @@ export function tipUrl(): string {
   )
 }
 
+/**
+ * The current GP elements of a few objects in one list query (#154): the objects TIP
+ * says are coming down. One request, not one per object (Space-Track's guidelines rule
+ * out hundreds of single-object queries). Ids are checked to be catalogue numbers, since
+ * they go into the path.
+ */
+export function gpListUrl(noradIds: readonly string[]): string {
+  if (noradIds.length === 0) throw new Error('GP: no NORAD ids')
+  for (const id of noradIds) {
+    if (!/^\d{1,9}$/.test(id)) throw new Error('GP: not a NORAD catalogue number')
+  }
+  return (
+    `${QUERY}/gp/NORAD_CAT_ID/${noradIds.join(',')}` +
+    `/predicates/${GP_FIELDS.join(',')}/format/json`
+  )
+}
+
 export function decayUrl(): string {
   return `${QUERY}/decay/MSG_EPOCH/${enc('>now-1')}/orderby/${enc('DECAY_EPOCH desc')}/format/json`
 }

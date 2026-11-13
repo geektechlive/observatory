@@ -66,6 +66,15 @@ const gpRow = (epoch: string) => ({
   MEAN_MOTION_DDOT: '0',
 })
 
+/** A current GP row as /class/gp answers (numbers as strings, no zone on the epoch). */
+const currentGp = (id: string, name: string) => ({
+  ...gpRow('2026-11-08T11:00:00.000000'),
+  OBJECT_NAME: name,
+  OBJECT_ID: '2021-001A',
+  NORAD_CAT_ID: id,
+  MEAN_MOTION: '16.0',
+})
+
 interface Call {
   url: string
   method: string
@@ -76,7 +85,13 @@ interface Call {
 
 /** A fake Space-Track: one login, a session cookie, JSON answers per class. */
 function fakeSpaceTrack(
-  opts: { loginFails?: boolean; failClass?: string; clock?: () => number } = {},
+  opts: {
+    loginFails?: boolean
+    failClass?: string
+    clock?: () => number
+    tip?: unknown[]
+    gp?: unknown[]
+  } = {},
 ) {
   const calls: Call[] = []
   const clock = opts.clock ?? (() => 0)
@@ -106,7 +121,11 @@ function fakeSpaceTrack(
     const cls = /\/class\/([a-z_]+)\//.exec(url)?.[1] ?? ''
     if (cls === opts.failClass) return new Response('busy', { status: 500 })
     const answers: Record<string, unknown> = {
-      tip: [tipRow('45700', '2026-11-11 20:32:00'), tipRow('53740', '2026-11-09 18:29:00')],
+      tip: opts.tip ?? [
+        tipRow('45700', '2026-11-11 20:32:00'),
+        tipRow('53740', '2026-11-09 18:29:00'),
+      ],
+      gp: opts.gp ?? [currentGp('45700', 'STARLINK-1400'), currentGp('53740', 'STARLINK-4598')],
       decay: [
         decayRow('45700', 'STARLINK-1400', 'Prediction', '2026-11-11 20:32:00'),
         decayRow('46563', 'STARLINK-1730', 'Historical', '2026-11-07 0:00:00'),
@@ -137,6 +156,120 @@ describe('spaceTrackCredentials', () => {
     expect(spaceTrackCredentials({ SPACETRACK_USER: 'a' })).toBeNull()
     expect(spaceTrackCredentials({ SPACETRACK_USER: ' ', SPACETRACK_PASS: 'b' })).toBeNull()
     expect(spaceTrackCredentials({})).toBeNull()
+  })
+})
+
+describe('buildSpaceTrack: elements of the re-entry objects (#154)', () => {
+  const run = (
+    st: ReturnType<typeof fakeSpaceTrack>,
+    previous = { catalog: null, history: null },
+  ) =>
+    buildSpaceTrack({
+      now: BEFORE_17,
+      credentials: CREDS,
+      http: st.http,
+      previous,
+      pauseMs: 0,
+      historyPerRun: 0,
+    })
+  const gpCalls = (st: ReturnType<typeof fakeSpaceTrack>) =>
+    st.calls.filter((c) => /\/class\/gp\//.test(c.url))
+
+  it('asks GP once, right after TIP, for exactly the TIP ids, and stores the rows in the catalogue', async () => {
+    const st = fakeSpaceTrack()
+    const out = await run(st)
+    const classes = st.calls.map((c) => /class\/(\w+)/.exec(c.url)?.[1]).filter(Boolean)
+    expect(classes).toEqual(['tip', 'gp'])
+    expect(gpCalls(st)).toHaveLength(1)
+    expect(gpCalls(st)[0]?.url).toContain('/NORAD_CAT_ID/53740,45700/')
+    expect(out.catalog.tip.elements.map((r: string[]) => r[1])).toEqual(['45700', '53740'])
+    expect(out.catalog.tip.elements[0]).toHaveLength(13)
+    expect(out.catalog.tip.elements[0][4]).toBe(16)
+    // Nothing new to store: the rows ride in the existing catalogue body.
+    expect(Object.keys(out).sort()).toEqual(['catalog', 'history', 'requests', 'satcat'])
+    expect(out.requests).toBe(4) // login, TIP, GP, logout
+    expect(JSON.stringify(out.catalog)).not.toContain(SECRET_PASS)
+  })
+
+  it('asks nothing when no object is coming down', async () => {
+    const st = fakeSpaceTrack({ tip: [] })
+    const out = await run(st)
+    expect(gpCalls(st)).toHaveLength(0)
+    expect(out.catalog.tip.elements).toEqual([])
+  })
+
+  it('drops an answer row that cannot propagate, and an object TIP did not list', async () => {
+    const st = fakeSpaceTrack({
+      gp: [
+        currentGp('45700', 'STARLINK-1400'),
+        { ...currentGp('53740', 'STARLINK-4598'), MEAN_MOTION: null },
+        currentGp('99999', 'NOT LISTED'),
+      ],
+    })
+    const out = await run(st)
+    expect(out.catalog.tip.elements.map((r: string[]) => r[1])).toEqual(['45700'])
+  })
+
+  it('a failed GP query keeps TIP, lists the failure, and keeps the earlier rows of objects still listed', async () => {
+    const first = await run(fakeSpaceTrack())
+    const out = await run(
+      fakeSpaceTrack({ failClass: 'gp', tip: [tipRow('45700', '2026-11-11 20:32:00')] }),
+      {
+        catalog: first.catalog,
+        history: null,
+      },
+    )
+    expect(out.catalog.tip.reentries.map((r: { noradId: string }) => r.noradId)).toEqual(['45700'])
+    expect(out.catalog.tip.elements.map((r: string[]) => r[1])).toEqual(['45700'])
+    expect(out.catalog.missing.map((m: { id: string }) => m.id)).toEqual(['tip-elements'])
+  })
+
+  it('a step budget spent before the GP query keeps the earlier rows of the objects still listed', async () => {
+    const first = await run(fakeSpaceTrack())
+    let t = 0
+    const clock = () => t
+    const out = await buildSpaceTrack({
+      now: BEFORE_17,
+      credentials: CREDS,
+      http: fakeSpaceTrack({ clock }).http,
+      previous: { catalog: first.catalog, history: null },
+      pauseMs: 3000,
+      // Login at 0 and TIP at 3000 fit; the GP query at 6000 would not.
+      budgetMs: 4000,
+      historyPerRun: 0,
+      sleep: (ms: number) => {
+        t += ms
+        return Promise.resolve()
+      },
+      clock,
+    })
+    expect(out.catalog.missing.map((m: { id: string }) => m.id)).toEqual(['budget'])
+    expect(out.catalog.tip.reentries).toHaveLength(2)
+    expect(out.catalog.tip.elements).toEqual(first.catalog.tip.elements)
+  })
+
+  it('asks for at most 200 objects, the soonest-decaying first, and says how many it left out', async () => {
+    const many = Array.from({ length: 205 }, (_, i) =>
+      tipRow(String(60000 + i), `2026-11-${String(10 + (i % 15)).padStart(2, '0')} 20:00:00`),
+    )
+    const st = fakeSpaceTrack({ tip: many })
+    const out = await run(st)
+    const asked = /NORAD_CAT_ID\/([\d,]+)\//.exec(gpCalls(st)[0]?.url ?? '')?.[1]?.split(',') ?? []
+    expect(asked).toHaveLength(200)
+    const soonest = out.catalog.tip.reentries
+      .slice(0, 200)
+      .map((r: { noradId: string }) => r.noradId)
+    expect(asked).toEqual(soonest)
+    const warn = out.catalog.missing.find((m: { id: string }) => m.id === 'tip-elements')
+    expect(warn.reason).toMatch(/5 .*left out/)
+  })
+
+  it('a failed TIP carries over the whole earlier TIP part, elements included', async () => {
+    const first = await run(fakeSpaceTrack())
+    const st = fakeSpaceTrack({ failClass: 'tip' })
+    const out = await run(st, { catalog: first.catalog, history: null })
+    expect(gpCalls(st)).toHaveLength(0)
+    expect(out.catalog.tip).toEqual(first.catalog.tip)
   })
 })
 
@@ -195,7 +328,7 @@ describe('buildSpaceTrack', () => {
       historyPerRun: 0,
     })
     const classes = st.calls.map((c) => /class\/(\w+)/.exec(c.url)?.[1]).filter(Boolean)
-    expect(classes).toEqual(['tip'])
+    expect(classes).toEqual(['tip', 'gp'])
     expect(out.catalog.boxscore).toEqual(first.catalog.boxscore)
     expect(out.catalog.decays).toEqual(first.catalog.decays)
     expect(out.satcat).toBeNull()
@@ -292,7 +425,7 @@ describe('buildSpaceTrack', () => {
       http: st.http,
       previous: { catalog: null, history: null },
       pauseMs: 3000,
-      budgetMs: 7000,
+      budgetMs: 10_000,
       sleep: (ms: number) => {
         t += ms
         return Promise.resolve()
@@ -302,7 +435,7 @@ describe('buildSpaceTrack', () => {
     const kinds = st.calls.map((c) =>
       /ajaxauth\/(\w+)|class\/(\w+)/.exec(c.url)?.slice(1).find(Boolean),
     )
-    expect(kinds.slice(0, 3)).toEqual(['login', 'tip', 'satcat'])
+    expect(kinds.slice(0, 4)).toEqual(['login', 'tip', 'gp', 'satcat'])
     expect(kinds.at(-1)).toBe('logout')
     expect(kinds).not.toContain('gp_history')
     // The daily classes it never reached stay due for the next run.

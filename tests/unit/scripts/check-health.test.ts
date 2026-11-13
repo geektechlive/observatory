@@ -458,6 +458,28 @@ describe('probed endpoints (#42, #61)', () => {
     expect(st?.check({ tip: { reentries: [{ noradId: '1' }] } })).toBe(false)
   })
 
+  it('probes the re-entry elements: none is fine, each row must propagate now (#154)', () => {
+    const st = byPath('/api/spacetrack?part=catalog')
+    const now = Date.now()
+    const epoch = new Date(now - 3_600_000).toISOString().slice(0, 19)
+    const row = (over: Record<number, unknown> = {}) =>
+      Object.assign(
+        ['STARLINK-4598', '53630', '2021-001A', epoch, 16, 0.0002, 53, 1, 2, 3, 0.1, 0, 0],
+        over,
+      )
+    const reentry = { noradId: '53630', decayEpoch: '2026-11-11T20:32:00Z' }
+    const body = (elements?: unknown) => ({ tip: { reentries: [reentry], elements } })
+    expect(st?.check(body())).toBe(true)
+    expect(st?.check(body([]))).toBe(true)
+    expect(st?.check(body([row()]))).toBe(true)
+    // Not a mean motion SGP4 can use, an eccentricity of 1, an epoch past the 3-day window.
+    expect(st?.check(body([row({ 4: 0 })]))).toBe(false)
+    expect(st?.check(body([row({ 5: 1.2 })]))).toBe(false)
+    expect(st?.check(body([row({ 3: '2026-01-01T00:00:00' })]))).toBe(false)
+    expect(st?.check(body([row({ 4: null })]))).toBe(false)
+    expect(st?.check(body('rows'))).toBe(false)
+  })
+
   it('probes DISCOS: the craft, each with a name (#101)', () => {
     const d = byPath('/api/discos')
     expect(d).toBeDefined()

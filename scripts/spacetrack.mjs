@@ -1,23 +1,26 @@
 // Space-Track.org for scripts/refresh-data.mjs (#101): re-entry predictions (TIP), the
-// day's decay messages, the satellite catalogue (SATCAT), the Box Score, and the element
+// day's decay messages, the elements of the objects TIP lists (one GP list query, #154),
+// the satellite catalogue (SATCAT), the Box Score, and the element
 // history of a few famous objects (GP_HISTORY). Read with the owner's account, stored in
 // KV as finished bodies, and never called on the request path.
 //
 // Space-Track's "API Use Guidelines" (https://www.space-track.org/documentation, read
 // 2026-11-07) set the pace, see src/lib/spacetrack.ts:
 //   "Limit API queries to less than 30 requests per 1 minute(s) and 300 requests per
-//    1 hour(s)". One login, then at most a dozen requests a run, 3 s apart.
+//    1 hour(s)". One login, then at most 13 requests a run (TIP, its GP list, SATCAT,
+//   Box Score, decays, six GP_HISTORY months, logout), 3 s apart.
 //
 // The credentials go in the login form and nowhere else: not in a URL, an error, a log
 // line or the payload. The session is a cookie, sent with each query, then logged out.
 
-import { toRow } from '../src/lib/orbit/satCatalog.ts'
+import { rowCanPropagate, toRow } from '../src/lib/orbit/satCatalog.ts'
 import {
   boxscoreUrl,
   bucketHistory,
   dailyDue,
   decayUrl,
   gpHistoryUrl,
+  gpListUrl,
   HISTORY_OBJECTS,
   historyPlan,
   mergeDecays,
@@ -36,8 +39,10 @@ import {
 
 /** 3 s apart: at most 20 a minute, under Space-Track's 30. */
 export const DEFAULT_PAUSE_MS = 3000
-/** A dozen requests at 3 s, with room for slow answers. */
+/** 13 requests at 3 s (39 s), with room for slow answers. */
 export const DEFAULT_BUDGET_MS = 90_000
+/** The GP list asks for at most this many TIP objects (#154): a URL and a pace that stay small. */
+export const MAX_GP_IDS = 200
 /** GP_HISTORY months asked per run: the backfill takes about a fortnight, then stops. */
 export const HISTORY_PER_RUN = 6
 /** Fewer on-orbit objects than this means a broken answer, not a smaller sky. */
@@ -187,9 +192,42 @@ export async function buildSpaceTrack({
 
   await s.login(credentials)
   try {
+    let tipFresh = false
     await attempt('tip', async () => {
       tip = { fetchedAt: nowIso, reentries: parseTip(await s.ask(tipUrl())) }
+      tipFresh = true
     })
+    // The elements of what TIP lists, so the orrery can draw them whatever its switches
+    // say (#154). Only after a TIP answer of this run; a failed TIP keeps the old part whole.
+    if (tipFresh && tip) {
+      const listed = tip.reentries.map((r) => r.noradId)
+      // The earlier rows first: a GP query that fails, or a budget spent before it, leaves
+      // them in place (ADR 0031); a good answer overwrites them.
+      tip = {
+        ...tip,
+        elements: (prev?.tip?.elements ?? []).filter((r) => listed.includes(r[1])),
+      }
+      if (listed.length > 0) {
+        // TIP is soonest-first: a run with more than the cap asks for the ones coming down first.
+        const asked = listed.slice(0, MAX_GP_IDS)
+        if (listed.length > asked.length) {
+          missing.push({
+            id: 'tip-elements',
+            reason: `${String(listed.length - asked.length)} of ${String(listed.length)} listed objects left out of the GP query (cap ${String(MAX_GP_IDS)})`,
+          })
+        }
+        await attempt('tip-elements', async () => {
+          const json = await s.ask(gpListUrl(asked))
+          if (!Array.isArray(json)) throw new Error('GP: not a list')
+          const byId = new Map()
+          for (const o of json) {
+            const row = toRow(o)
+            if (row && asked.includes(row[1]) && rowCanPropagate(row, now)) byId.set(row[1], row)
+          }
+          tip = { ...tip, elements: [...byId.values()] }
+        })
+      }
+    }
     if (dailyDue(now, satcatAt)) {
       await attempt('satcat', async () => {
         const rows = parseSatcat(await s.ask(satcatUrl()))

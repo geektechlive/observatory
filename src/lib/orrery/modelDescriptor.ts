@@ -7,7 +7,7 @@
  *
  * No three.js here: this module is data and lookups only.
  */
-import type { SatGroupId } from '@/lib/orbit/satCatalog'
+import type { SatFieldGroup } from '@/lib/orbit/satCatalog'
 
 import { type Attitude, CRAFT_MODELS, type CraftModel, type StandInKey } from './craftModels'
 import { satFamily } from './satFamily'
@@ -427,7 +427,7 @@ export function sceneModel(model: ModelDescriptor | undefined): ModelDescriptor 
 export interface SatelliteFacts {
   readonly noradId: string
   readonly name?: string | undefined
-  readonly group?: SatGroupId | undefined
+  readonly group?: SatFieldGroup | undefined
 }
 
 const NAIF_KEY_PREFIX = 'naif:'

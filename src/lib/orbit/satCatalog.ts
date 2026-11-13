@@ -25,6 +25,17 @@ export type SatGroupId =
   | 'iridium-33-debris'
   | 'fengyun-1c-debris'
 
+/**
+ * The group of the objects Space-Track predicts will re-enter (#154): loaded into the
+ * field whatever the switches say, from rows the refresh job stored in the Space-Track
+ * catalogue, not from a CelesTrak group. Not in SAT_GROUPS: it has no switch, no body of
+ * its own and no place in the controls.
+ */
+export const REENTRY_GROUP = 'reentry'
+
+/** A span of the loaded field: one of the switchable groups, or the re-entry objects. */
+export type SatFieldGroup = SatGroupId | typeof REENTRY_GROUP
+
 export type SatCategory =
   'station' | 'starlink' | 'navigation' | 'weather' | 'science' | 'other' | 'debris'
 
@@ -194,6 +205,38 @@ export function rowToOmm(row: SatRow): {
 /** A row's element epoch, ms since 1970 (UTC). */
 export function rowEpochMs(row: SatRow): number {
   return Date.parse(epochText(row[3]))
+}
+
+/**
+ * Whether a value is a stored row: four strings, nine finite numbers, a readable epoch.
+ * Written by hand, with no schema library: rows arrive from KV and from Space-Track's
+ * catalogue, and a zod tuple per row costs too much across 11,000 Starlinks.
+ */
+export function isSatRow(value: unknown): value is SatRow {
+  if (!Array.isArray(value) || value.length !== 13) return false
+  for (let i = 0; i < 4; i++) if (typeof value[i] !== 'string') return false
+  for (let i = 4; i < 13; i++)
+    if (typeof value[i] !== 'number' || !Number.isFinite(value[i])) return false
+  return Number.isFinite(rowEpochMs(value as SatRow))
+}
+
+/**
+ * Whether SGP4 can take the row now: well-formed, a mean motion above zero, an
+ * eccentricity under one, an inclination a real angle, and an epoch within the window the
+ * orrery draws (EPOCH_WINDOW_MS) of `nowMs`. The refresh job's health probe uses it for
+ * the re-entry objects' rows (#154), where no satellite library is installed.
+ */
+export function rowCanPropagate(value: unknown, nowMs: number): boolean {
+  if (!isSatRow(value)) return false
+  const [, , , , meanMotion, eccentricity, inclination] = value
+  return (
+    meanMotion > 0 &&
+    eccentricity >= 0 &&
+    eccentricity < 1 &&
+    inclination >= 0 &&
+    inclination <= 180 &&
+    Math.abs(nowMs - rowEpochMs(value)) <= EPOCH_WINDOW_MS
+  )
 }
 
 /**

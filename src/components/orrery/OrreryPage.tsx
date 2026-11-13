@@ -30,7 +30,8 @@ import { dwarfNotice, type OrreryEntryGroup } from '@/lib/orrery/dwarfView'
 import { isLookupKey } from '@/lib/orrery/lookupTrack'
 import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import { moonBodies } from '@/lib/orrery/moonState'
-import { isSatKey } from '@/lib/orrery/satView'
+import { reentryBrief, reentryElementRows } from '@/lib/orrery/reentryElements'
+import { isSatKey, reentryKey, satKey } from '@/lib/orrery/satView'
 import { reentriesWithin } from '@/lib/spaceTrackText'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
 import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
@@ -57,6 +58,7 @@ import {
   layoutStage,
   panelInset,
   rimPoint,
+  SMALL_STAGE_PX,
 } from './labelLayout'
 import { useLookupStore } from './lookupStore'
 import { NeoControls } from './NeoControls'
@@ -69,7 +71,7 @@ import {
   satHiddenNotice,
   satStatusText,
   type SatToggles,
-  toggleForGroup,
+  toggleForFieldGroup,
   withToggleOn,
 } from './satToggles'
 import { SmallBodyControls } from './SmallBodyControls'
@@ -489,6 +491,17 @@ export function OrreryPage() {
     renderer?.setReentries(reentries.map((r) => r.noradId))
   }, [renderer, reentries])
 
+  // The listed objects' elements come with the Space-Track catalogue (#154), so they are
+  // drawn and labelled whatever the satellite switches say. Checked here, in the orrery
+  // chunk: the first-load schema lets the rows through unread.
+  const reentryRows = useMemo(
+    () => reentryElementRows(spaceTrack?.tip?.elements, new Set(reentries.map((r) => r.noradId))),
+    [spaceTrack, reentries],
+  )
+  useEffect(() => {
+    renderer?.setReentryElements(reentryRows)
+  }, [renderer, reentryRows])
+
   useEffect(() => {
     if (!renderer) return
     renderer.setOnSatState(setSatState)
@@ -627,7 +640,13 @@ export function OrreryPage() {
           // distance suffix in place of last frame's.
           const shownSuffix = node?.querySelector('[data-rim-distance]')?.textContent ?? ''
           const suffix = suffixes.get(i.name) ?? ''
-          const full = node?.textContent ?? i.label
+          // A re-entry label on a small stage is just the name: the rest does not fit beside
+          // a body in 390 px, and the inspector one tap away has it all (#154).
+          const core = node?.querySelector('[data-core]')
+          const full =
+            i.kind === 'reentry' && width < SMALL_STAGE_PX
+              ? (core?.textContent ?? i.label)
+              : (node?.textContent ?? i.label)
           const text = full.slice(0, full.length - shownSuffix.length) + suffix
           // Measured when shown last frame (the estimate runs ~8% short in this font),
           // adjusted by the suffix's change in characters.
@@ -643,8 +662,11 @@ export function OrreryPage() {
             x: i.x + bodyLabelReach(i.name, i.radiusPx),
             y: i.y,
             visible: inView(i) && (i.kind !== 'asteroid' || labelledAsteroids.has(i.name)),
+            // A predicted re-entry is what the ring is for: its label shows, over a dot or
+            // a crowded Earth if need be (#154).
+            priority:
+              i.name === 'Earth' || i.name === 'Sun' || i.name === rankKey || i.kind === 'reentry',
             mustShow: i.name === subjectNow,
-            priority: i.name === 'Earth' || i.name === 'Sun' || i.name === rankKey,
             // Planets, the focused planet's moons and the deep-space craft try farther rungs
             // before hiding (#131). Voyager 2's label at 390 px had only a slot over the time
             // bar until the bar became furniture (#130); its near slots meet the guide chip.
@@ -690,6 +712,10 @@ export function OrreryPage() {
         // it goes faint, as the chosen satellite's ring does. Written only when it changes.
         const occluded = item.behindEarth ? 'true' : ''
         if (node.dataset['occluded'] !== occluded) node.dataset['occluded'] = occluded
+        if (item.kind === 'reentry') {
+          const narrow = width < SMALL_STAGE_PX ? 'true' : ''
+          if (node.dataset['narrow'] !== narrow) node.dataset['narrow'] = narrow
+        }
         const distance = node.querySelector<HTMLElement>('[data-rim-distance]')
         const edge = rimEdges.get(item.name)
         const p = rimPlaces.get(item.name)
@@ -754,8 +780,8 @@ export function OrreryPage() {
       // ISS is listed before its group loads, so an unloaded one is a station.
       if (isSatKey(key)) {
         const group = renderer?.satellite(key)?.group
-        const toggle = group ? toggleForGroup(group) : 'stations'
-        setSatToggles((t) => withToggleOn(t, toggle))
+        const toggle = group ? toggleForFieldGroup(group) : 'stations'
+        if (toggle) setSatToggles((t) => withToggleOn(t, toggle))
       }
       // A comet or interstellar object chosen in search or by a link is drawn (#99).
       showSmallGroupOf(key)
@@ -851,7 +877,8 @@ export function OrreryPage() {
         widenedFrom.current = null
         if (!before) return
         const group = focus ? renderer?.satellite(focus)?.group : undefined
-        setSatToggles(group ? withToggleOn(before, toggleForGroup(group)) : before)
+        const toggle = group ? toggleForFieldGroup(group) : null
+        setSatToggles(toggle ? withToggleOn(before, toggle) : before)
       },
     }),
     [renderer, satState, satToggles, openOrbit],
@@ -1191,6 +1218,30 @@ export function OrreryPage() {
               {satellite.name}
             </button>
           )}
+          {reentries.map((r) => {
+            const key = reentryKey(r.noradId)
+            const name = spaceTrack?.names[r.noradId] ?? `NORAD ${r.noradId}`
+            return (
+              <button
+                key={key}
+                type="button"
+                hidden
+                data-kind="reentry"
+                ref={(el) => {
+                  if (el) labelNodes.current.set(key, el)
+                  else labelNodes.current.delete(key)
+                }}
+                title={`${name}: predicted down ${reentryBrief(r)} (Space-Track.org)`}
+                className={`${styles.label ?? ''} ${styles.reentryLabel ?? ''}`}
+                onClick={() => {
+                  select(satKey(r.noradId))
+                }}
+              >
+                <span data-core>{name}</span>
+                <span data-wide>{` · down ${reentryBrief(r)} · Space-Track.org`}</span>
+              </button>
+            )
+          })}
           {lookup.key && (
             <button
               key={lookup.key}

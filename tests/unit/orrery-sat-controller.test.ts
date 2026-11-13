@@ -8,12 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SAT_OK, SAT_OUT_OF_WINDOW } from '@/lib/orbit/bulk/satField'
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import type { SatFrameReply, SatLoaded, SatUnloaded, SatWorker } from '@/lib/orbit/bulk/satsClient'
-import type { SatGroupId } from '@/lib/orbit/satCatalog'
+import type { SatFieldGroup, SatGroupId } from '@/lib/orbit/satCatalog'
 import { SatController, type SatSource } from '@/lib/orrery/satController'
 
 const T0 = Date.parse('2026-11-07T12:00:00Z')
 
-function info(version: number, groups: { group: SatGroupId; count: number }[]): SatFieldInfo {
+function info(version: number, groups: { group: SatFieldGroup; count: number }[]): SatFieldInfo {
   let start = 0
   const spans = groups.map((g) => {
     const span = { group: g.group, start, count: g.count }
@@ -33,20 +33,41 @@ function info(version: number, groups: { group: SatGroupId; count: number }[]): 
 
 /** A fake worker that loads instantly and answers propagate when told to. */
 class FakeWorker implements SatWorker {
-  loaded: SatGroupId[] = []
+  loaded: SatFieldGroup[] = []
   version = 0
-  counts = new Map<SatGroupId, number>()
+  counts = new Map<SatFieldGroup, number>()
   propagations: { date: Date; resolve: (f: SatFrameReply) => void }[] = []
   released = 0
   failed = false
   private field(): SatFieldInfo {
     return info(
       this.version,
-      this.loaded.map((g) => ({ group: g, count: this.counts.get(g) ?? 1 })),
+      // Like the real worker: the re-entry objects come last.
+      [
+        ...this.loaded.filter((g) => g !== 'reentry'),
+        ...this.loaded.filter((g) => g === 'reentry'),
+      ].map((g) => ({ group: g, count: this.counts.get(g) ?? 1 })),
     )
   }
+  reentryLoads: unknown[][] = []
+  loadReentry(rows: unknown[]): Promise<SatLoaded> {
+    this.reentryLoads.push(rows)
+    this.counts.set('reentry', rows.length)
+    if (rows.length === 0) this.loaded = this.loaded.filter((g) => g !== 'reentry')
+    else if (!this.loaded.includes('reentry')) this.loaded.push('reentry')
+    this.version += 1
+    return Promise.resolve({
+      type: 'loaded',
+      id: 0,
+      group: 'reentry',
+      count: rows.length,
+      dropped: 0,
+      ms: 1,
+      field: this.field(),
+    })
+  }
   load(body: ArrayBuffer): Promise<SatLoaded> {
-    const group = new TextDecoder().decode(body) as SatGroupId
+    const group = new TextDecoder().decode(body) as SatFieldGroup
     if (!this.loaded.includes(group)) this.loaded.push(group)
     this.version += 1
     return Promise.resolve({
@@ -59,7 +80,7 @@ class FakeWorker implements SatWorker {
       field: this.field(),
     })
   }
-  unload(group: SatGroupId): Promise<SatUnloaded> {
+  unload(group: SatFieldGroup): Promise<SatUnloaded> {
     this.loaded = this.loaded.filter((g) => g !== group)
     this.version += 1
     return Promise.resolve({ type: 'unloaded', id: 0, group, field: this.field() })
@@ -112,6 +133,96 @@ function setup() {
 const flush = async () => {
   for (let i = 0; i < 5; i += 1) await Promise.resolve()
 }
+
+describe('SatController: re-entry objects (#154)', () => {
+  const ROWS = [
+    ['STARLINK-4598', '53630'],
+    ['CSS', '48274'],
+  ]
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('loads the re-entry rows once the Earth frame is open, with every switch off, and fetches no group', async () => {
+    const { ctl, worker, fetched } = setup()
+    ctl.setReentryRows(ROWS)
+    ctl.tick({ near: false, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    expect(worker.reentryLoads).toEqual([])
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    expect(worker.reentryLoads).toEqual([ROWS])
+    expect(fetched).toEqual([])
+    // Asked again with the same rows, nothing more is sent.
+    ctl.setReentryRows([...ROWS])
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 10 })
+    await flush()
+    expect(worker.reentryLoads).toHaveLength(1)
+  })
+
+  it('counts only the satellites of the switched-on groups, not the re-entry objects', async () => {
+    const { ctl, worker } = setup()
+    ctl.setEnabled(new Set<SatGroupId>(['stations']))
+    ctl.setReentryRows(ROWS)
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    worker.answer()
+    await flush()
+    expect(ctl.field()?.ids).toHaveLength(3)
+    expect(ctl.snapshot().total).toBe(1)
+    expect(ctl.snapshot().drawn).toBe(1)
+  })
+
+  it('replaces the rows when they change, and unloads them when there are none', async () => {
+    const { ctl, worker } = setup()
+    ctl.setReentryRows(ROWS)
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    ctl.setReentryRows(ROWS.slice(0, 1))
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 10 })
+    await flush()
+    expect(worker.reentryLoads.at(-1)).toEqual(ROWS.slice(0, 1))
+    ctl.setReentryRows([])
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 20 })
+    await flush()
+    expect(worker.loaded).toEqual([])
+  })
+
+  it('sends the rows again after the worker answered with an error but stayed alive', async () => {
+    const { ctl, worker } = setup()
+    const real = worker.loadReentry.bind(worker)
+    let calls = 0
+    worker.loadReentry = (rows) => {
+      calls += 1
+      return calls === 1 ? Promise.reject(new Error('bad rows')) : real(rows)
+    }
+    ctl.setReentryRows(ROWS)
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 10 })
+    await flush()
+    expect(calls).toBe(2)
+    expect(worker.reentryLoads).toEqual([ROWS])
+  })
+
+  it('sends the rows again to a new worker after the first one died', async () => {
+    const { ctl, worker } = setup()
+    ctl.setReentryRows(ROWS)
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    worker.failed = true
+    worker.reentryLoads = []
+    worker.loaded = []
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 10 })
+    await flush()
+    expect(worker.reentryLoads).toEqual([ROWS])
+  })
+})
 
 describe('SatController (#98)', () => {
   beforeEach(() => {

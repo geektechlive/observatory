@@ -8,7 +8,7 @@ import {
   ORBIT_MEO,
   type OrbitClassCode,
 } from '@/lib/orbit/orbitClass'
-import { SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
+import { REENTRY_GROUP, SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
 import {
   browse,
   type BrowseList,
@@ -138,7 +138,11 @@ function must<T>(found: T | undefined): T {
   return found
 }
 
-const GROUP_LABEL = new Map(SAT_GROUPS.map((g) => [g.id, g.label] as const))
+const GROUP_LABEL = new Map<string, string>([
+  ...SAT_GROUPS.map((g) => [g.id, g.label] as const),
+  // Objects loaded only because Space-Track predicts they will re-enter (#154).
+  [REENTRY_GROUP, 'Predicted re-entry'],
+])
 const toggleById = (id: SatToggleId): SatToggle => must(SAT_TOGGLES.find((t) => t.id === id))
 
 function whenDown(r: Reentry | undefined): string {

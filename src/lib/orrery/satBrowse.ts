@@ -8,7 +8,7 @@
  * and `browse` is one pass over the objects, then a sort of what matched.
  */
 import type { OrbitClassCode } from '@/lib/orbit/orbitClass'
-import type { SatGroupId } from '@/lib/orbit/satCatalog'
+import { REENTRY_GROUP, type SatFieldGroup, type SatGroupId } from '@/lib/orbit/satCatalog'
 
 import { satKey } from './satView'
 
@@ -17,7 +17,7 @@ export const DEFAULT_BROWSE_LIMIT = 100
 
 export interface BrowseField {
   version: number
-  groups: readonly { group: SatGroupId; start: number; count: number }[]
+  groups: readonly { group: SatFieldGroup; start: number; count: number }[]
   ids: readonly string[]
   names: readonly string[]
   orbit: Uint8Array
@@ -28,11 +28,11 @@ export interface BrowseIndex {
   field: BrowseField
   /** Lowercased names, built once per field version. */
   lower: readonly string[]
-  groupOf: readonly SatGroupId[]
+  groupOf: readonly SatFieldGroup[]
 }
 
 export function buildBrowseIndex(field: BrowseField): BrowseIndex {
-  const groupOf: SatGroupId[] = new Array<SatGroupId>(field.ids.length)
+  const groupOf: SatFieldGroup[] = new Array<SatFieldGroup>(field.ids.length)
   for (const span of field.groups) {
     for (let i = span.start; i < span.start + span.count; i += 1) groupOf[i] = span.group
   }
@@ -74,7 +74,7 @@ export interface BrowseRow {
   key: string
   id: string
   name: string
-  group: SatGroupId | null
+  group: SatFieldGroup | null
   /** In a group the orrery carries, so it can be shown. */
   drawn: boolean
   /** For a row that is not drawn: it may be in a group that is off, or is in none. */
@@ -105,7 +105,7 @@ function included(index: BrowseIndex, i: number, q: BrowseQuery): boolean {
       return true
     case 'group': {
       const g = index.groupOf[i]
-      return g !== undefined && l.groups.includes(g)
+      return g !== undefined && g !== REENTRY_GROUP && l.groups.includes(g)
     }
     case 'orbit':
       return index.field.orbit[i] === l.orbit
@@ -222,8 +222,8 @@ export function countryOptions(
 /** Objects per group, for the groups that have any. */
 export function groupCounts(
   field: Pick<BrowseField, 'groups'>,
-): Partial<Record<SatGroupId, number>> {
-  const out: Partial<Record<SatGroupId, number>> = {}
+): Partial<Record<SatFieldGroup, number>> {
+  const out: Partial<Record<SatFieldGroup, number>> = {}
   for (const span of field.groups) {
     if (span.count > 0) out[span.group] = (out[span.group] ?? 0) + span.count
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { reentryBrief } from '@/lib/orrery/reentryElements'
 import { boxscoreLine, discosSize, objectTypeText, ownerText, rcsText } from '@/lib/satcatWords'
 import { reentriesWithin, reentryTickerItems, reentryWhen } from '@/lib/spaceTrackText'
 
@@ -25,6 +26,13 @@ describe('reentryWhen', () => {
     expect(reentryWhen(reentry('1', '2026-11-11T20:32:00Z', 45))).toBe(
       '11 Nov 20:32 UTC, give or take 45 min',
     )
+  })
+})
+
+describe('reentryBrief (#154)', () => {
+  it('is the time and the window in the fewest characters, for a label on the stage', () => {
+    expect(reentryBrief(reentry('1', '2026-11-11T20:32:00Z', 780))).toBe('11 Nov 20:32 UTC ±13 h')
+    expect(reentryBrief(reentry('1', '2026-11-11T20:32:00Z', 45))).toBe('11 Nov 20:32 UTC ±45 min')
   })
 })
 

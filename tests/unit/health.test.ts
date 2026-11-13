@@ -102,6 +102,16 @@ describe('SOURCES', () => {
     expect(SOURCES.spacetrack.required({ tip: { reentries: [] } })).toBe(true)
   })
 
+  it('grades the re-entry elements by shape: absent or empty is fine, a ragged row is not (#154)', () => {
+    const row = ['A', '1', '2021-001A', '2026-11-12T10:00:00', 16, 0.0002, 53, 1, 2, 3, 0.1, 0, 0]
+    const tip = (elements?: unknown) => ({ tip: { reentries: [], elements } })
+    expect(SOURCES.spacetrack.required(tip())).toBe(true)
+    expect(SOURCES.spacetrack.required(tip([]))).toBe(true)
+    expect(SOURCES.spacetrack.required(tip([row]))).toBe(true)
+    expect(SOURCES.spacetrack.required(tip([row.slice(0, 5)]))).toBe(false)
+    expect(SOURCES.spacetrack.required(tip('rows'))).toBe(false)
+  })
+
   it('grades DISCOS by its craft, 14 days before degraded (#101)', () => {
     expect(SOURCES.discos.headline).toBe(false)
     expect(SOURCES.discos.maxAgeMs).toBe(14 * 24 * 3_600_000)

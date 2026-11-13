@@ -29,7 +29,12 @@ import {
 
 import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import { SAT_OK } from '@/lib/orbit/bulk/satStatus'
-import { SAT_GROUPS, type SatCategory, type SatGroupId } from '@/lib/orbit/satCatalog'
+import {
+  SAT_GROUPS,
+  type SatCategory,
+  type SatFieldGroup,
+  type SatGroupId,
+} from '@/lib/orbit/satCatalog'
 import { EARTH_FRAME_SPREAD, EARTH_RADIUS_KM, GEO_RADII } from '@/lib/orrery/earthFrame'
 import { SatController, type SatSnapshot, type SatSource } from '@/lib/orrery/satController'
 import {
@@ -87,7 +92,9 @@ const CATEGORIES: readonly SatCategory[] = [
   'debris',
 ]
 const CATEGORY_INDEX = new Map(CATEGORIES.map((c, i) => [c, i]))
-const GROUP_CATEGORY = new Map(SAT_GROUPS.map((g) => [g.id, g.category]))
+const GROUP_CATEGORY = new Map<SatFieldGroup, SatCategory>(
+  SAT_GROUPS.map((g) => [g.id, g.category]),
+)
 
 const VERTEX = /* glsl */ `
 uniform mat3 uTeme;
@@ -162,7 +169,7 @@ export interface SatInfo {
   key: string
   noradId: string
   name: string
-  group: SatGroupId
+  group: SatFieldGroup
   epochMs: number
   /** Its elements are CelesTrak SupGP, from SpaceX's ephemerides (#209); absent means GP. */
   supgp?: boolean
@@ -219,6 +226,8 @@ export class SatLayer {
   private selected: string | null = null
   /** Objects Space-Track predicts will re-enter soon (#101), ringed in amber. */
   private flagged: readonly string[] = []
+  /** The flagged objects ringed this frame (#154), for their labels. */
+  private ringed: { noradId: string; name: string; ring: Mesh }[] = []
   private readonly rings: Mesh<RingGeometry, MeshBasicMaterial>[] = []
   private readonly ringGeometry = new RingGeometry(0.78, 1, 32)
   private readonly ringMaterial = new MeshBasicMaterial({
@@ -291,6 +300,16 @@ export class SatLayer {
 
   setEnabled(groups: ReadonlySet<SatGroupId>): void {
     this.ctl.setEnabled(groups)
+  }
+
+  /** Elements of the objects predicted to re-enter, drawn whatever the switches say (#154). */
+  setReentryRows(rows: readonly unknown[]): void {
+    this.ctl.setReentryRows(rows)
+  }
+
+  /** The objects ringed this frame, where they are drawn and what they are called (#154). */
+  reentryLabels(): { noradId: string; name: string; ring: Mesh }[] {
+    return this.ringed
   }
 
   /** The objects to ring as predicted to re-enter soon, by NORAD id (#101). */
@@ -377,12 +396,14 @@ export class SatLayer {
   /** A ring, facing the camera, on each flagged object that is drawn as a point now. */
   private placeRings(p: SatPlace): void {
     let used = 0
+    this.ringed = []
     if (this.display.pointsAlpha > 0) {
       for (const id of this.flagged) {
         const at = this.positionOf(id)
         if (!at) continue
         const ring = this.ring(used)
         ring.position.copy(at)
+        this.ringed.push({ noradId: id, name: this.nameOf(id), ring })
         ring.lookAt(p.camera)
         ring.scale.setScalar(p.radius * RING_SHARE)
         ring.material = behindEarth(at, p.earth, p.radius, p.camera)
@@ -452,6 +473,11 @@ export class SatLayer {
     pos.needsUpdate = true
     status.needsUpdate = true
     this.attached = frame.positions
+  }
+
+  private nameOf(noradId: string): string {
+    const i = this.indexOf(noradId)
+    return (i >= 0 ? this.ctl.field()?.names[i] : undefined) ?? noradId
   }
 
   private indexOf(noradId: string): number {
