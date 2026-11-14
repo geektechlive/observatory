@@ -77,3 +77,12 @@ features, so it is kept short and not maintained further).
   `public/404.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`.
 - Tests: `tests/unit/view-route.test.ts`, `view-shells.test.ts`, `crawler-files.test.ts`,
   `hash-view.test.ts`; `tests/e2e/view-paths.spec.ts`.
+
+## Addendum, 2026-11-14 (#234): what the zone actually does with AI crawlers
+
+The decision above said AI crawlers are allowed and that `public/robots.txt` replaces Cloudflare's managed robots.txt. Measured after landing, that is not how the zone works, and the owner chose to leave the zone as it is:
+
+- **AI answer engines are allowed, and always were.** The zone's AI Search policy has no action and "AI user" blocks only on pages with ads (this site has none). OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot are in neither block list, so assistants can fetch and quote the site.
+- **AI training is blocked.** The zone's Training policy is Disallow with Bot Preference Sync on, which both prepends Disallow lines for GPTBot, ClaudeBot, Google-Extended, CCBot and others to every host's robots.txt and blocks those crawlers at the edge.
+- **These settings are zone-wide.** Cloudflare offers no per-hostname scope for the AI policies or the managed robots.txt, so they apply to every geektechlive.com site alike. Our `public/robots.txt` still serves, below Cloudflare's block.
+- Revisit by changing the zone's Training policy (one setting, every host) if the site should be used to train models.
