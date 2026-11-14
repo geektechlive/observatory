@@ -42,3 +42,4 @@ that makes the decision.
 | [0032](0032-bright-asteroids-ride-the-tonight-slice.md)       | The bright asteroids ride the Tonight slice (v2), and use nautical dark                   | #99            |
 | [0033](0033-sky-view-address-is-the-state.md)                 | The sky view's state is the address (`#sky?target=…&t=…`); it draws only Horizons samples | #99            |
 | [0034](0034-noaa-flares-and-donki-through-api-nasa-gov.md)    | Flares come from NOAA SWPC; CME, storms and SEPs from DONKI through api.nasa.gov          | #65            |
+| [0035](0035-close-passes-get-ten-minute-samples.md)           | Close passes get 10-minute samples, found from the daily samples themselves               | #230           |

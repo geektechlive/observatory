@@ -287,7 +287,8 @@ export function smallBodyFacts(body: OrrerySmallBody, simMs: number): SmallBodyF
     magnitude: body.magnitude,
     solution: body.solution,
     solutionAtDate: solutionAt(body.solution, simMs),
-    span: state?.resolution ?? null,
+    // Small bodies carry no close-pass spans (#230): only fine or coarse place them.
+    span: state ? (state.resolution === 'coarse' ? 'coarse' : 'fine') : null,
     sunAu: p ? Math.hypot(p.x, p.y, p.z) : null,
     position: p,
   }

@@ -8,6 +8,8 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { roughRuns } from '@/lib/orrery/encounters'
+import { MOONS } from '@/lib/orrery/moons'
 import { OrreryBodiesSchema } from '@/schemas/orreryBodies'
 
 import {
@@ -68,7 +70,35 @@ function fakeHorizons(answer: (call: Call) => string) {
 
 const jdOf = (s: string) => Number(s.replace(/^JD\s*/, ''))
 const stepDays = (s: string) =>
-  s.endsWith(' h') ? Number(s.slice(0, -2)) / 24 : Number(s.slice(0, -2))
+  s.endsWith(' m')
+    ? Number(s.slice(0, -2)) / 1440
+    : s.endsWith(' h')
+      ? Number(s.slice(0, -2)) / 24
+      : Number(s.slice(0, -2))
+
+/**
+ * As `anySpan`, but the 60-day fine span of each listed craft jumps 0.01 au at its middle
+ * sample: a close pass the daily samples can't follow (#230).
+ */
+function withPasses(...craft: string[]) {
+  return withKinks([30], ...craft)
+}
+
+/** As `withPasses`, with the jump at each of the given sample indices. */
+function withKinks(kinks: number[], ...craft: string[]) {
+  return (call: Call) => {
+    const start = jdOf(call.start)
+    const step = stepDays(call.step)
+    const n = Math.round((jdOf(call.stop) - start) / step) + 1
+    // The 60-day fine span: 61 daily samples, or Parker's 121 at 12 h.
+    if (!craft.includes(call.command) || (n !== 61 && n !== 121)) return anySpan(call)
+    const rows = Array.from({ length: n }, (_, i) => {
+      const x = 1 + i * 1e-3 + (kinks.includes(i) ? 0.01 : 0)
+      return `${String(start + i * step)}, A.D. x, ${String(x)}, 0.5, 0.01, 0.001, 0, 0,`
+    })
+    return `Target body name: Thing (${call.command})   {source: test}\n$$SOE\n${rows.join('\n')}\n$$EOE\n`
+  }
+}
 
 /** Answers any request with uniform synthetic samples over exactly the asked span. */
 function anySpan(call: Call) {
@@ -328,6 +358,87 @@ describe('buildOrreryBodies', () => {
     })
     expect(payload.missing.length).toBeGreaterThan(0)
     expect(payload.missing.every((m: { reason: string }) => /budget/.test(m.reason))).toBe(true)
+  })
+
+  it('asks for 10-minute samples over a close pass, after the moons, and ships them as dense (#230)', async () => {
+    const h = fakeHorizons(withPasses('-159'))
+    const { payload, requests } = await buildOrreryBodies({
+      now: NOW,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+    })
+    const parsed = OrreryBodiesSchema.parse(payload)
+    const denseCalls = h.calls.filter((c) => c.step === '10 m')
+    expect(denseCalls).toHaveLength(1)
+    expect(denseCalls[0]?.command).toBe('-159')
+    // After every moon: a slow pass never costs a moon its place in the budget.
+    const moonIds = new Set(MOONS.map((m) => m.naifId))
+    const lastMoon = Math.max(...h.calls.map((c, i) => (moonIds.has(c.command) ? i : -1)))
+    expect(lastMoon).toBeGreaterThan(0)
+    expect(h.calls.indexOf(denseCalls[0] as Call)).toBeGreaterThan(lastMoon)
+    const clipper = parsed.bodies.find((b) => b.naifId === '-159')
+    expect(clipper?.dense).toHaveLength(1)
+    // toSpan keeps the step to 1e-9 day: 0.016 s of drift over 433 samples.
+    expect((clipper?.dense?.[0]?.step ?? 0) * 1440).toBeCloseTo(10, 5)
+    expect(clipper?.dense?.[0]?.samples.length).toBe(433 * 6)
+    expect(parsed.bodies.filter((b) => b.dense !== undefined).map((b) => b.naifId)).toEqual([
+      '-159',
+    ])
+    expect(requests).toBe(h.calls.length)
+  })
+
+  it('keeps a body on its daily samples when its close-pass span fails, and does not list it missing', async () => {
+    const h = fakeHorizons((call) =>
+      call.step === '10 m' ? 'no $$SOE here' : withPasses('-159')(call),
+    )
+    const { payload, encounterFailures } = await buildOrreryBodies({
+      now: NOW,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+    })
+    const clipper = payload.bodies.find((b: { naifId: string }) => b.naifId === '-159')
+    expect(clipper?.fine).not.toBeNull()
+    expect(clipper?.dense).toBeUndefined()
+    expect(payload.missing).toEqual([])
+    expect(encounterFailures.map((f: { id: string }) => f.id)).toEqual(['naif:-159'])
+  })
+
+  it('asks once when one pass shows as two nearby runs (their windows overlap)', async () => {
+    // Parker at 12 h: jumps at samples 60 and 65 flag runs 58–62 and 63–67 (separate),
+    // whose 3-day windows (±3 samples around each jump) overlap by half a day.
+    const h = fakeHorizons(withKinks([60, 65], '-96'))
+    const { payload } = await buildOrreryBodies({ now: NOW, fetchText: h.fetchText, pauseMs: 0 })
+    const parker = payload.bodies.find((b: { naifId: string }) => b.naifId === '-96')
+    expect(roughRuns(parker.fine)).toHaveLength(2)
+    expect(h.calls.filter((c) => c.step === '10 m')).toHaveLength(1)
+  })
+
+  it("keeps the last run's close-pass span when this run's ask fails", async () => {
+    const first = fakeHorizons(withPasses('-159'))
+    const { payload: previous } = await buildOrreryBodies({
+      now: NOW,
+      fetchText: first.fetchText,
+      pauseMs: 0,
+    })
+    const h = fakeHorizons((call) =>
+      call.step === '10 m' ? 'no $$SOE here' : withPasses('-159')(call),
+    )
+    const { payload, encounterFailures } = await buildOrreryBodies({
+      now: NOW + 6 * 3_600_000,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      previous,
+    })
+    const was = previous.bodies.find((b: { naifId: string }) => b.naifId === '-159')
+    const clipper = payload.bodies.find((b: { naifId: string }) => b.naifId === '-159')
+    expect(clipper?.dense).toEqual(was?.dense)
+    expect(encounterFailures.map((f: { id: string }) => f.id)).toEqual(['naif:-159'])
+  })
+
+  it('asks for at most four close passes a run', async () => {
+    const h = fakeHorizons(withPasses('-31', '-32', '-98', '-61', '-159', '-255'))
+    await buildOrreryBodies({ now: NOW, fetchText: h.fetchText, pauseMs: 0 })
+    expect(h.calls.filter((c) => c.step === '10 m')).toHaveLength(4)
   })
 
   it('keeps the payload small: positions to 1e-8 au (1.5 km)', async () => {

@@ -14,8 +14,11 @@ export interface TrackState {
   position: Vec3
   /** au/day. From the Hermite velocities (fine) or the spline's slope (coarse). */
   velocity: Vec3
-  /** Which span answered: 'fine' (position and velocity sampled) or 'coarse'. */
-  resolution: 'fine' | 'coarse'
+  /**
+   * Which span answered: 'dense' (10-minute samples over a close pass, #230), 'fine'
+   * (position and velocity sampled) or 'coarse'.
+   */
+  resolution: 'dense' | 'fine' | 'coarse'
 }
 
 const SECONDS_PER_DAY = 86_400
@@ -115,12 +118,20 @@ function catmullRom(span: SampledSpan, jd: number): TrackState | null {
 /**
  * Where a tracked body is at a Julian date (TDB), or null when no data covers it. Moons
  * (#107) pass their planet-centred fine span with `coarse: null`; the answer is then
- * relative to the planet.
+ * relative to the planet. A close pass's 10-minute span (#230) answers first where it
+ * covers the date.
  */
 export function stateAt(
-  track: Pick<OrreryTrack, 'fine'> & { coarse: OrreryTrack['coarse'] },
+  track: Pick<OrreryTrack, 'fine'> & {
+    coarse: OrreryTrack['coarse']
+    dense?: OrreryTrack['dense']
+  },
   jd: number,
 ): TrackState | null {
+  for (const span of track.dense ?? []) {
+    const dense = hermite(span, jd)
+    if (dense) return { ...dense, resolution: 'dense' }
+  }
   if (track.fine) {
     const fine = hermite(track.fine, jd)
     if (fine) return fine

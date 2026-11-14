@@ -12,7 +12,8 @@ They come from JPL Horizons, sampled by the refresh job, never on the request pa
 
 - **The job:** `scripts/orrery-bodies.mjs`, called from `refresh-data.mjs`, asks Horizons for
   heliocentric ecliptic J2000 vectors, one request at a time with a 1 s pause and a 4-minute
-  budget. That's 44 requests and about 55 s.
+  budget. Measured 2026-11-14: 32 requests in about 40 s, or 58 on the run that refetches the
+  whole-mission spans.
   - It covers the 17 bodies in `src/lib/orrery/craft.ts`.
   - Each body gets a fine span, 30 days either side of now, position and velocity.
   - Each craft also gets a whole-mission span, positions only, refetched once a day. Fast
@@ -31,7 +32,8 @@ They come from JPL Horizons, sampled by the refresh job, never on the request pa
     incident line every run. The no-match fixture is the answer to a made-up `DES=2099 ZZ999;`. Every Horizons step (bodies, close approaches, comets, dwarf
     planets) goes through `fetchSpan`, so all get it.
 - **One KV write, value and metadata together** (`kvPutInit`'s multipart form): key
-  `horizons:bodies:v1`, about 240 KB (100 KB gzip), about 4 writes a day.
+  `horizons:bodies:v1`, 419 KB (160 KB gzip) on 2026-11-14 before close passes (+~35 KB each),
+  about 4 writes a day.
 - **The Function streams that body through without parsing it** (10 ms of CPU).
   `/api/orrery-bodies` gets its age from the metadata via `getWithMetadata`.
   - Up to 72 h old: fresh.
@@ -40,8 +42,25 @@ They come from JPL Horizons, sampled by the refresh job, never on the request pa
 - **`src/lib/horizons.ts` and `src/lib/orrery/craft.ts` have no imports and use erasable syntax
   only,** because the `.mjs` job imports them under Node's type stripping (Node 26). Keep them
   that way.
+- **Close passes get 10-minute samples (#230, ADR 0035).** A flyby or perijove lasts hours, and
+  Hermite on daily samples misses it by thousands of km: Europa Clipper's 3 Dec 2026 Earth flyby
+  drew ~660 km under the surface (Horizons: 9,609 km from the centre).
+  - `src/lib/orrery/encounters.ts` finds such stretches from the samples alone: rebuild each
+    sample from its two neighbours and compare. Cruising craft miss by under 80 km, passes by
+    80,000–400,000 km; above 1,000 km the stretch is rough.
+  - After every body and moon, the job asks for 3 days at 10 minutes (433 samples) around the
+    worst sample of each rough run of 10 days or less, at most 4 a run, and ships them as the
+    track's `dense` spans. Best-effort: a failure is logged ("close pass not sampled"), never
+    `missing`, and the previous run's span over the same pass is kept. Overlapping windows
+    from one pass (Parker at 12 h) are asked for once.
+  - A longer rough run is an orbiter circling its planet every few hours (BepiColombo at
+    Mercury): no dense span; the daily samples answer.
+  - `stateAt` tries the dense spans first. The inspector names the 10-minute samples, and where
+    only daily samples cover a rough run it drops confidence to medium and says the path may be
+    off by thousands of km.
 - **The client interpolates; it never extrapolates** (`src/lib/orrery/ephemeris.ts`).
-  - Hermite on the fine span reproduces Horizons' own 12 h samples to within 1–15 km.
+  - Hermite on the fine span reproduces Horizons' own 12 h samples to within 1–15 km, away from
+    close passes (above).
   - Catmull-Rom on the coarse span is marked coarse.
   - Outside both: "no data for this date". The craft is hidden but stays in search.
 - **Earth is drawn from the same Horizons answer when it covers the date,** so the L1 craft sit

@@ -7,6 +7,7 @@
  */
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 
+import { inRoughRun } from './encounters'
 import { rangeRateFromStates, stateAt, type TrackState } from './ephemeris'
 import { heliocentric } from './kepler'
 import type { OrbitalState } from './model'
@@ -58,6 +59,14 @@ export interface CraftDescription {
 
 const isoFromJd = (jd: number) => new Date((jd - JD_UNIX_EPOCH) * DAY_MS).toISOString()
 
+function accuracyText(resolution: TrackState['resolution'], roughPass: boolean): string {
+  if (resolution === 'dense') return 'Horizons ephemeris at 10-minute samples through a close pass'
+  if (resolution === 'coarse') return 'Horizons ephemeris, coarse samples: positions only'
+  return roughPass
+    ? 'Horizons ephemeris, daily samples through a close pass: may be off by thousands of km'
+    : 'Horizons ephemeris, interpolated: within a few km of its own samples'
+}
+
 /** A spacecraft's state and the facts the inspector shows, or null with no data then. */
 export function describeCraft(
   track: OrreryTrack,
@@ -87,11 +96,21 @@ export function describeCraft(
       `Within the tracked part of the trajectory (tracking through ${track.observedUntil}).`,
     )
   }
+  // Daily samples through a close pass (#230): the curve between them can miss by
+  // thousands of km, so the few-km claim and high confidence don't hold there.
+  const roughPass = s.resolution === 'fine' && track.fine !== null && inRoughRun(track.fine, jd)
   reasons.push(
-    s.resolution === 'fine'
-      ? 'Interpolated between JPL Horizons samples (position and velocity, cubic Hermite).'
-      : 'Interpolated between coarse whole-mission samples (positions only): good for the picture, rough for numbers.',
+    s.resolution === 'dense'
+      ? 'Interpolated between JPL Horizons samples 10 minutes apart, fetched for this close pass.'
+      : s.resolution === 'fine'
+        ? 'Interpolated between JPL Horizons samples (position and velocity, cubic Hermite).'
+        : 'Interpolated between coarse whole-mission samples (positions only): good for the picture, rough for numbers.',
   )
+  if (roughPass) {
+    reasons.push(
+      'A close pass between daily samples: the drawn path can be off by thousands of km until the 10-minute samples arrive.',
+    )
+  }
   if (earth.source === 'kepler') {
     reasons.push(
       'Earth here is from JPL’s approximate elements: the Horizons samples for Earth do not cover this date.',
@@ -116,11 +135,8 @@ export function describeCraft(
       sourceType: 'ephemeris',
       sourceProvider: 'JPL Horizons',
       ...(track.observedUntil ? { sourceEpochUTC: track.observedUntil } : {}),
-      accuracyDescription:
-        s.resolution === 'fine'
-          ? 'Horizons ephemeris, interpolated: within a few km of its own samples'
-          : 'Horizons ephemeris, coarse samples: positions only',
-      confidence: predicted || s.resolution === 'coarse' ? 'medium' : 'high',
+      accuracyDescription: accuracyText(s.resolution, roughPass),
+      confidence: predicted || roughPass || s.resolution === 'coarse' ? 'medium' : 'high',
       confidenceReasons: reasons,
     },
   }

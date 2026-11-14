@@ -735,7 +735,7 @@ export async function refreshOrreryBodies(config, deps = {}) {
   const previousText = deps.previousText ?? (await readKv(KEY_ORRERY_BODIES, config))
   const previous = parseJsonOrNull(previousText)
   try {
-    const { payload, requests } = await buildOrreryBodies({
+    const { payload, requests, encounterFailures = [] } = await buildOrreryBodies({
       now,
       fetchText: deps.fetchText ?? fetchHorizonsText,
       previous,
@@ -744,9 +744,15 @@ export async function refreshOrreryBodies(config, deps = {}) {
     })
     if (payload.bodies.length === 0) throw new Error('Horizons returned no bodies')
     const missing = payload.missing.map((m) => `${m.id} (${m.reason})`)
+    // Close passes (#230) are best-effort: an unsampled one is logged, not a warning, since
+    // the client falls back to the daily samples and says so.
+    const passes = payload.bodies.reduce((n, b) => n + (b.dense?.length ?? 0), 0)
+    const unsampled = encounterFailures.map((f) => `${f.id} (${f.reason})`)
     const detail =
       `ok ${ORRERY_SIGNATURE} ${String(payload.bodies.length)} bodies, ` +
-      `${String(payload.moons.length)} moons, ${String(requests)} requests` +
+      `${String(payload.moons.length)} moons, ${String(passes)} close passes, ` +
+      `${String(requests)} requests` +
+      (unsampled.length ? `; close pass not sampled: ${unsampled.join(', ')}` : '') +
       (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
     console.log(detail)
     const value = JSON.stringify(payload)

@@ -273,6 +273,31 @@ describe('refreshOrreryBodies (#93)', () => {
     expect(write.metadata.missing).toBe(1)
   })
 
+  it('logs an unsampled close pass without raising a warning (#230)', async () => {
+    // Clipper's 61-sample daily span jumps 0.01 au at its middle sample: a pass. Its
+    // 10-minute ask then fails.
+    const kinked = async (url: string) => {
+      const p = new URL(url).searchParams
+      if ((p.get('STEP_SIZE') ?? '') === "'10 m'") return 'no data'
+      const text = await anySpan(url)
+      const lines = text.split('\n')
+      // Header, $$SOE, 61 samples, $$EOE and a trailing empty line.
+      if (p.get('COMMAND') !== "'-159'" || lines.length !== 65) return text
+      lines[32] = (lines[32] ?? '').replace('A.D. x, 1,', 'A.D. x, 1.01,')
+      return lines.join('\n')
+    }
+    const { entry } = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: kinked,
+      previousText: null,
+      pauseMs: 0,
+    })
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(false)
+    expect(entry.detail).toMatch(/0 close passes/)
+    expect(entry.detail).toMatch(/close pass not sampled: naif:-159/)
+  })
+
   it('judges a total failure by the age of the copy it would replace', async () => {
     const fail = async () => {
       throw new Error('HTTP 503')

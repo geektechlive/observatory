@@ -39,6 +39,12 @@ export const OrreryTrackSchema = z.object({
   availableTo: z.string().nullable(),
   fine: SampledSpanSchema.nullable(),
   coarse: SampledSpanSchema.nullable(),
+  /**
+   * 10-minute spans (position and velocity, as `fine`) over close passes that daily
+   * samples can't follow (#230, src/lib/orrery/encounters.ts). Absent when there is none
+   * or the job couldn't fetch it; then the daily samples answer, at lower confidence.
+   */
+  dense: z.array(SampledSpanSchema).optional(),
 })
 
 /**

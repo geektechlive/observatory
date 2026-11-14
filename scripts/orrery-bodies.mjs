@@ -20,6 +20,11 @@ import {
   CRAFT,
   FINE_WINDOW_DAYS,
 } from '../src/lib/orrery/craft.ts'
+import {
+  ENCOUNTER_STEP_DAYS,
+  encounterWindow,
+  roughRuns,
+} from '../src/lib/orrery/encounters.ts'
 import { MOONS, moonStepDays, moonWindowDays } from '../src/lib/orrery/moons.ts'
 
 const HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
@@ -29,6 +34,11 @@ const JD_UNIX_EPOCH = 2440587.5
 const DEFAULT_PAUSE_MS = 1000
 /** The whole step stays well inside the workflow's 10-minute limit. */
 export const DEFAULT_BUDGET_MS = 4 * 60_000
+/**
+ * Close-pass spans asked for per run (#230): today Clipper, Juno and Parker at most, each
+ * one request of 433 samples (~35 KB in the payload).
+ */
+const MAX_ENCOUNTERS_PER_RUN = 4
 /** Reuse the whole-mission spans while they are younger than this. */
 const COARSE_MAX_AGE_MS = DAY_MS
 /** A span that hits an ephemeris limit is clamped and asked again, at most this often. */
@@ -261,6 +271,13 @@ export async function buildOrreryBodies({
     }
   }
 
+  const { bodies: withPasses, failures: encounterFailures } = await addClosePasses(
+    bodies,
+    ask,
+    now,
+    prevById,
+  )
+
   const coarseFetchedAt = reuseCoarse ? previous.coarseFetchedAt : new Date(now).toISOString()
   return {
     payload: {
@@ -272,12 +289,60 @@ export async function buildOrreryBodies({
       units: { position: 'au', velocity: 'au/day' },
       sourceType: 'ephemeris',
       provider: 'jpl-horizons',
-      bodies,
+      bodies: withPasses,
       moons,
       missing,
     },
     requests: asked,
+    encounterFailures,
   }
+}
+
+/**
+ * Close passes (#230): a 10-minute span over each short stretch a body's daily samples
+ * can't follow (src/lib/orrery/encounters.ts), at most MAX_ENCOUNTERS_PER_RUN a run.
+ * Asked after every body and moon, so a pass never costs a moon its place in the budget,
+ * and best-effort: a failure (or the budget running out) leaves the body on its daily
+ * samples, which the client then marks as rough. Failures are returned for the log line,
+ * never put in `missing`.
+ */
+async function addClosePasses(bodies, ask, now, prevById) {
+  const out = []
+  const failures = []
+  let asked = 0
+  const overlaps = (a, b) => a.start < b.stop && b.start < a.stop
+  for (const body of bodies) {
+    const dense = []
+    const windows = []
+    const before = prevById.get(body.id)?.dense ?? []
+    for (const run of body.fine ? roughRuns(body.fine) : []) {
+      const window = encounterWindow(run, body.fine)
+      // One pass can flag two nearby runs (Parker at 12 h): ask once for overlapping windows.
+      if (!window || windows.some((w) => overlaps(w, window))) continue
+      if (asked >= MAX_ENCOUNTERS_PER_RUN) continue
+      windows.push(window)
+      asked += 1
+      try {
+        const spec = { naifId: body.naifId }
+        const got = await fetchSpan(spec, window.start, window.stop, ENCOUNTER_STEP_DAYS, ask, now)
+        if (!got.samples) throw new Error('no samples in the close-pass window')
+        dense.push(toSpan(got.samples, true))
+      } catch (err) {
+        failures.push({ id: body.id, reason: err instanceof Error ? err.message : String(err) })
+        // Keep the last run's span over this pass rather than fall back to daily samples
+        // (a flyby would flip between runs). The pass is days long, so it still holds.
+        const kept = before.find((d) => run.worstJd >= d.start && run.worstJd <= spanEnd(d))
+        if (kept) dense.push(kept)
+      }
+    }
+    out.push(dense.length > 0 ? { ...body, dense } : body)
+  }
+  return { bodies: out, failures }
+}
+
+/** Julian date of a velocity span's last sample. */
+function spanEnd(span) {
+  return span.start + (span.samples.length / 6 - 1) * span.step
 }
 
 export { jdFromMs, msFromJd }
