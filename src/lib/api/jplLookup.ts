@@ -14,14 +14,21 @@ import { apiFetch } from './client'
 // reach JPL through the jpl-queue Durable Object. A failure is an answer the search box
 // shows ("not set up", "busy"), never a thrown error.
 
-export type Unavailable = 'not-set-up' | 'busy' | 'failed' | 'out-of-range' | 'not-found'
+/**
+ * Why there is no answer. `spent` is the queue's daily JPL allowance gone (#237): it comes
+ * back at midnight UTC, so it is said plainly and never retried, unlike `busy`.
+ */
+export type Unavailable = 'not-set-up' | 'busy' | 'spent' | 'failed' | 'out-of-range' | 'not-found'
+
+/** The words for `spent`, on the search card and the inspector alike (#237). */
+export const SPENT = 'Today’s JPL allowance is spent. Lookups start again at midnight UTC.'
 
 export type LookupState<T> =
   | { state: 'ok'; data: T }
   | {
       state: 'unavailable'
       reason: Unavailable
-      /** A busy queue's Retry-After, seconds (#145: the card says how long to wait). */
+      /** The queue's Retry-After, seconds (#145: the card says how long to wait). */
       retryAfterS?: number
     }
 
@@ -66,9 +73,11 @@ async function getLookupJson<T>(
       return { state: 'unavailable', reason: 'failed' }
     }
     const wait = retryAfter(res)
+    // The queue names its refusal (#237): a spent budget is not "busy".
+    const reason = res.headers.get('X-Queue') === 'budget' ? 'spent' : 'busy'
     return wait === null
-      ? { state: 'unavailable', reason: 'busy' }
-      : { state: 'unavailable', reason: 'busy', retryAfterS: wait }
+      ? { state: 'unavailable', reason }
+      : { state: 'unavailable', reason, retryAfterS: wait }
   }
   const data = read(await res.json().catch(() => null))
   // Parsed but empty (no samples, an empty list) is drift, not an answer (#148, ADR 0004).

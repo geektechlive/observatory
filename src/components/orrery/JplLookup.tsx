@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { useJplLookup, useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
-import { type LookupState, trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
+import { type LookupState, SPENT, trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
 import { lookupSpan } from '@/lib/orrery/lookupTrack'
 import type { LookupObject } from '@/schemas/jplLookup'
 
@@ -22,6 +22,7 @@ const MAX_MATCHES = 10
 const UNAVAILABLE: Record<Unavailable, string> = {
   'not-set-up': 'On-demand lookup isn’t available yet.',
   busy: 'JPL is busy right now. Try again in a minute.',
+  spent: SPENT,
   failed: 'The JPL lookup didn’t work this time.',
   'out-of-range': 'JPL positions are asked for 1900 to 2100 only.',
   'not-found': 'JPL has no object by that name or number.',

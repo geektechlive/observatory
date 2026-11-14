@@ -63,11 +63,15 @@ export async function askJpl(
     return { ok: false, response: upstreamError(0, 'JPL queue unreachable') }
   }
   if (res.status !== 200) {
-    const why = res.headers.get('X-Queue') === null ? 'JPL unavailable' : 'JPL is busy'
-    return {
-      ok: false,
-      response: upstreamError(Number(res.headers.get('X-Jpl-Status') ?? res.status), why),
-    }
+    const queue = res.headers.get('X-Queue')
+    const why = queue === null ? 'JPL unavailable' : 'JPL is busy'
+    const response = upstreamError(Number(res.headers.get('X-Jpl-Status') ?? res.status), why)
+    // The queue's own refusal says why and how long (#237): `full` (seconds) or `budget`
+    // (until midnight UTC). The visitor's card shows it, and doesn't retry a spent budget.
+    const retryAfter = res.headers.get('Retry-After')
+    if (queue !== null) response.headers.set('X-Queue', queue)
+    if (retryAfter !== null) response.headers.set('Retry-After', retryAfter)
+    return { ok: false, response }
   }
   return { ok: true, status: Number(res.headers.get('X-Jpl-Status')), text: await res.text() }
 }

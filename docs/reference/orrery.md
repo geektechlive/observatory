@@ -15,6 +15,15 @@ the orrery writes its own voice line inside its chunk, from the planet math.
 
 - **Its renderer** (`src/components/orrery/three/OrreryRenderer.ts`) has its own WebGL context,
   created once for the page's lifetime like the globe's. It draws on demand.
+  - **A lost context is recovered (#238).** Phones drop WebGL contexts in the background.
+    Before #238 one loss left the orrery dead until a reload, with a notice saying WebGL
+    "could not start", and the lost renderer's loop running on. Now the lost renderer is
+    disposed (canvas and all). The notice says the browser took the graphics back and offers
+    "Restart the 3D view", and the next visit to the tab starts a new one too: at most twice
+    for losses within 10 minutes of each other (`MAX_CONTEXT_RESTARTS`, `LOSS_WINDOW_MS`,
+    `OrreryPage.tsx`), then "Reload to try again", so a failing GPU can't loop while a long
+    session that backgrounds the tab now and then keeps recovering. WebGL that never
+    started stays a hard failure.
 - **`schedule()` is the only place a frame is requested, and the loop stops when nothing
   moves.** `frame()` once called `requestAnimationFrame` itself while OrbitControls' `change`
   event had already scheduled a frame. Every camera move doubled the loop, and a 1x clock kept

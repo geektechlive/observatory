@@ -277,6 +277,24 @@ describe('/api/trajectory (#100)', () => {
     expect(res.headers.get('X-Upstream-Status')).toBe('503')
   })
 
+  it("passes the queue's Retry-After and X-Queue to the visitor, first time and on replay (#237)", async () => {
+    const spent = fakeQueue(() => ({
+      status: 503,
+      body: { error: "Today's JPL budget is spent" },
+      headers: { 'X-Queue': 'budget', 'X-Queue-Share': 'trajectory', 'Retry-After': '3600' },
+    }))
+    const first = await run(trajectory, path, { JPL_QUEUE: spent.ns })
+    expect(first.res.status).toBe(503)
+    expect(first.res.headers.get('X-Queue')).toBe('budget')
+    expect(first.res.headers.get('Retry-After')).toBe('3600')
+    await first.settle()
+    // The negative entry replays for 60 s: it carries the same answer.
+    const again = await run(trajectory, path, { JPL_QUEUE: spent.ns })
+    expect(again.res.headers.get('X-Cache')).toBe('NEG')
+    expect(again.res.headers.get('X-Queue')).toBe('budget')
+    expect(again.res.headers.get('Retry-After')).toBe('3600')
+  })
+
   it('answers a share spent between the SBDB step and Horizons as a degraded 503 too (#223)', async () => {
     const spentAtHorizons = fakeQueue((url) =>
       url.includes('sbdb.api')

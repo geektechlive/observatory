@@ -86,3 +86,7 @@ empties the trajectory share cannot touch the 1,400 lookups rely on.
 ## Addendum, 2026-11-12 (#146)
 
 The line above about `/api/planets`, `/api/sentry` and `/api/fireball` calling JPL directly is out of date: [ADR 0029](0029-jpl-feeds-built-by-the-job.md) (#146) moved them into the refresh job, so no Function calls JPL.
+
+## Addendum, 2026-11-14 (#237)
+
+The queue's `Retry-After` (above, and the spent-share bullet) did not reach visitors until #237: `functions/api/_jpl.ts` built its 503 without it, and the 60 s negative cache rebuilt its headers without it. Both now pass `Retry-After` and `X-Queue` through, and the client reads `X-Queue: budget` as a spent allowance that resets at midnight UTC and is never retried.

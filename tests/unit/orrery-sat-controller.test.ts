@@ -470,6 +470,64 @@ describe('SatController (#98)', () => {
     expect(ctl.snapshot().groups.stations?.status).toBe('loaded')
   })
 
+  it('asks a failed group again after a pause, and loads it when the fetch works (#245)', async () => {
+    const worker = new FakeWorker()
+    let calls = 0
+    const ctl = new SatController(
+      {
+        fetchGroup: () => {
+          calls += 1
+          return calls === 1
+            ? Promise.reject(new Error('network blip'))
+            : Promise.resolve({ body: new ArrayBuffer(8), degraded: false, dataAgeSeconds: 0 })
+        },
+        worker: () => Promise.resolve(worker),
+      },
+      () => undefined,
+    )
+    ctl.setEnabled(new Set<SatGroupId>(['stations']))
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 0 })
+    await flush()
+    expect(ctl.snapshot().groups.stations?.status).toBe('error')
+    // The wait starts at the first tick after the failure, not when the fetch began (a
+    // fetch that hangs 30 s before failing must still wait its 15 s).
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 30_000 })
+    await flush()
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 40_000 })
+    await flush()
+    expect(calls).toBe(1) // not yet: 10 s of 15
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 46_000 })
+    await flush()
+    expect(calls).toBe(2)
+    expect(ctl.snapshot().groups.stations?.status).toBe('loaded')
+  })
+
+  it('gives up on a group after three retries, until it is switched off and on (#245)', async () => {
+    const worker = new FakeWorker()
+    let calls = 0
+    const ctl = new SatController(
+      {
+        fetchGroup: () => {
+          calls += 1
+          return Promise.reject(new Error('503'))
+        },
+        worker: () => Promise.resolve(worker),
+      },
+      () => undefined,
+    )
+    ctl.setEnabled(new Set<SatGroupId>(['stations']))
+    for (let i = 0; i < 20; i += 1) {
+      ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: i * 300_000 })
+      await flush()
+    }
+    expect(calls).toBe(4)
+    ctl.setEnabled(new Set<SatGroupId>())
+    ctl.setEnabled(new Set<SatGroupId>(['stations']))
+    ctl.tick({ near: true, cadenceMs: 1000, simMs: T0, wallMs: 7_000_000 })
+    await flush()
+    expect(calls).toBe(5)
+  })
+
   it('reports a failed fetch for that group and leaves the others', async () => {
     const worker = new FakeWorker()
     const ctl = new SatController(

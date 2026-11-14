@@ -137,6 +137,18 @@ describe('useLookupTrack (#145)', () => {
     expect(select).not.toHaveBeenCalled()
   })
 
+  it('says JPL is asked for 1900 to 2100 only at a date outside them, instead of loading forever (#244)', () => {
+    const { result } = setup(Date.parse('1850-01-01T00:00:00Z'))
+    act(() => {
+      useLookupStore.getState().request('20099942')
+    })
+    expect(result.current.loading).toBe(false)
+    expect(result.current.problem).toMatch(/1900 to 2100/)
+    // A final no, like JPL's: a link waiting on it moves on and writes the address again.
+    expect(result.current.failed).toBe(true)
+    expect(fetchSpan).not.toHaveBeenCalled()
+  })
+
   it('needs no new request while the clock stays inside the span; past it, one after a pause', async () => {
     fetchSpan.mockImplementation(async (_id, span) => ({ state: 'ok', data: answer(span) }))
     const { rerender } = setup()

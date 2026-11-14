@@ -68,11 +68,23 @@ const HAZE_REFRESH_WALL_MS = 5000
 
 const idle = (): SatGroupState => ({ status: 'off', count: 0, degraded: false, ageSeconds: null })
 
+/**
+ * Waits before asking a failed group again, wall ms (#245): a phone's network blip used to
+ * lose the group for the session. After the last, it stays failed until switched off and on.
+ */
+const GROUP_RETRY_MS = [15_000, 60_000, 240_000] as const
+
 export class SatController {
   private enabled: ReadonlySet<SatGroupId> = new Set()
   private readonly groups = new Map<SatGroupId, SatGroupState>()
   /** Groups the worker holds now (or is loading). */
   private readonly inWorker = new Set<SatGroupId>()
+  /**
+   * Failed groups: how many times, and the wall time they may be asked again (#245); `at`
+   * is null until the first tick after the failure stamps it, so a fetch that hung before
+   * failing still waits its full pause.
+   */
+  private readonly retries = new Map<SatGroupId, { failures: number; at: number | null }>()
   private worker: Promise<SatWorker> | null = null
   /** The worker once started: passes are asked synchronously, from tick. */
   private ready: SatWorker | null = null
@@ -106,7 +118,10 @@ export class SatController {
     this.enabled = groups
     for (const g of SAT_GROUPS) {
       const state = this.groups.get(g.id) ?? idle()
-      if (!groups.has(g.id) && state.status !== 'off') this.groups.set(g.id, idle())
+      if (!groups.has(g.id) && state.status !== 'off') {
+        this.groups.set(g.id, idle())
+        this.retries.delete(g.id)
+      }
       if (groups.has(g.id) && state.status === 'off') this.set(g.id, { status: 'waiting' })
     }
     this.onChange()
@@ -129,7 +144,7 @@ export class SatController {
   tick(t: SatTick): void {
     if (this.disposed) return
     this.lastTick = t
-    this.syncGroups(t.near)
+    this.syncGroups(t.near, t.wallMs)
     this.maybePass(t)
   }
 
@@ -208,7 +223,7 @@ export class SatController {
   }
 
   /** Fetch and load what is switched on (only while near); unload what was switched off. */
-  private syncGroups(near: boolean): void {
+  private syncGroups(near: boolean, wallMs: number): void {
     for (const group of [...this.inWorker]) {
       if (this.enabled.has(group)) continue
       this.inWorker.delete(group)
@@ -222,11 +237,23 @@ export class SatController {
     if (!near) return
     this.syncReentry()
     for (const group of this.enabled) {
-      if (this.inWorker.has(group) || this.groups.get(group)?.status === 'error') continue
+      if (this.inWorker.has(group)) continue
+      if (this.groups.get(group)?.status === 'error' && !this.retryDue(group, wallMs)) continue
       this.inWorker.add(group)
       this.set(group, { status: 'loading' })
       void this.load(group)
     }
+  }
+
+  /** A failed group may be asked again: its wait is over and retries are left (#245). */
+  private retryDue(group: SatGroupId, wallMs: number): boolean {
+    const r = this.retries.get(group)
+    if (r === undefined || r.failures > GROUP_RETRY_MS.length) return false
+    if (r.at === null) {
+      this.retries.set(group, { ...r, at: wallMs + (GROUP_RETRY_MS[r.failures - 1] ?? 0) })
+      return false
+    }
+    return wallMs >= r.at
   }
 
   /** Send the re-entry rows to the worker when it does not hold this form of them. */
@@ -268,11 +295,16 @@ export class SatController {
         degraded: fetched.degraded,
         ageSeconds: fetched.dataAgeSeconds,
       })
+      this.retries.delete(group)
       this.setField(reply.field)
     } catch {
       this.dropDeadWorker()
       this.inWorker.delete(group)
-      if (this.enabled.has(group)) this.set(group, { status: 'error' })
+      if (this.enabled.has(group)) {
+        this.set(group, { status: 'error' })
+        const failures = (this.retries.get(group)?.failures ?? 0) + 1
+        this.retries.set(group, { failures, at: null })
+      }
       this.onChange()
     }
   }

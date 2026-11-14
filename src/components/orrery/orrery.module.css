@@ -342,6 +342,11 @@
   font: 500 var(--text-xs) / 1.4 var(--font-mono);
 }
 
+/* A notice's own control (Restart the 3D view, #238) takes clicks through the layer. */
+.notice button {
+  pointer-events: auto;
+}
+
 .timeBar {
   position: absolute;
   left: var(--space-4);

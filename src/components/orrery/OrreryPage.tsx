@@ -105,10 +105,18 @@ const OrreryGuide = lazy(() =>
 /**
  * One renderer for the page's lifetime (the GlobeHost pattern, #46): leaving the tab
  * detaches its canvas, coming back re-attaches it. Rebuilding a WebGL context per visit
- * would churn GPU memory. Null after a context loss, so nothing retries in a loop.
+ * would churn GPU memory. `lost` is WebGL that never started (no retry). A context lost
+ * later (phones drop it in the background, #238) disposes that renderer; a new one starts
+ * on "Restart the 3D view" or the next visit, at most MAX_CONTEXT_RESTARTS times within
+ * LOSS_WINDOW_MS of each other, so a failing GPU cannot loop while a long session that
+ * backgrounds the tab now and then keeps recovering.
  */
 let shared: Promise<OrreryRenderer> | null = null
 let lost = false
+let contextLosses = 0
+let lastLossAt = Number.NEGATIVE_INFINITY
+const MAX_CONTEXT_RESTARTS = 2
+const LOSS_WINDOW_MS = 10 * 60_000
 
 /** The renderer reads the clock each frame through this, rather than importing the store. */
 const CLOCK_READER = {
@@ -130,10 +138,20 @@ const SAT_SOURCE = { fetchGroup: fetchOrrerySatsBody, worker: loadSatWorker }
 let pageOnLost: (() => void) | null = null
 
 function contextLost() {
-  lost = true
+  // Dispose the dead renderer: its loop, tick and GPU objects go, and its canvas with it.
+  const dying = shared
   shared = null
+  const now = Date.now()
+  contextLosses = now - lastLossAt > LOSS_WINDOW_MS ? 1 : contextLosses + 1
+  lastLossAt = now
+  void dying?.then((r) => {
+    r.dispose()
+  })
   pageOnLost?.()
 }
+
+/** Whether a lost context may be started again (#238). */
+const canRestart = () => contextLosses <= MAX_CONTEXT_RESTARTS
 
 function acquire(width: number, height: number, reducedMotion: boolean) {
   if (!shared) {
@@ -249,6 +267,11 @@ export function OrreryPage() {
   const reducedMotion = useReducedMotion()
   const [renderer, setRenderer] = useState<OrreryRenderer | null>(null)
   const [failed, setFailed] = useState(lost)
+  // A context lost after it started (#238): not `failed`, it can be started again.
+  const [contextGone, setContextGone] = useState(
+    () => shared === null && contextLosses > 0 && !canRestart(),
+  )
+  const [attempt, setAttempt] = useState(0)
   // The view's controls live in a store: they outlive the page like the renderer does (#189).
   const selected = useOrreryView((s) => s.selected)
   const scale = useOrreryView((s) => s.scale)
@@ -340,17 +363,23 @@ export function OrreryPage() {
 
   useEffect(() => {
     if (lost) return
+    // Past the restarts a lost context stays down until a reload (#238); `contextGone`
+    // started true for this case.
+    if (shared === null && !canRestart()) return
     let cancelled = false
     const el = host.current
     if (!el) return
     const onLost = () => {
-      setFailed(true)
+      setRenderer(null)
+      setContextGone(true)
     }
     pageOnLost = onLost
     acquire(el.clientWidth || 800, el.clientHeight || 600, reducedMotion)
       .then((r) => {
         if (cancelled || !host.current) return
         r.resize(host.current.clientWidth, host.current.clientHeight)
+        // A new renderer after a loss (a restart, or an effect re-run): the notice goes.
+        setContextGone(false)
         setRenderer(r)
       })
       .catch((error: unknown) => {
@@ -363,7 +392,12 @@ export function OrreryPage() {
       cancelled = true
       if (pageOnLost === onLost) pageOnLost = null
     }
-  }, [reducedMotion])
+  }, [reducedMotion, attempt])
+
+  const restart = useCallback(() => {
+    setContextGone(false)
+    setAttempt((n) => n + 1)
+  }, [])
 
   // The detail view (#203) has a canvas of its own, so the orrery steps aside while it is
   // open: detach() stops the loop, the tick and the Sun image and takes the canvas off the
@@ -1102,7 +1136,7 @@ export function OrreryPage() {
         <div
           ref={host}
           className={styles.canvasHost ?? ''}
-          data-orrery-mode={failed ? 'unavailable' : renderer ? 'webgl' : 'loading'}
+          data-orrery-mode={failed || contextGone ? 'unavailable' : renderer ? 'webgl' : 'loading'}
         />
         <div className={styles.labels ?? ''} aria-label="Bodies" role="group">
           <span
@@ -1310,6 +1344,19 @@ export function OrreryPage() {
           {failed && (
             <p className={styles.notice ?? ''} role="status">
               The 3D view needs WebGL, which this browser could not start. Reload to try again.
+            </p>
+          )}
+          {!failed && contextGone && (
+            <p className={styles.notice ?? ''} role="status">
+              The 3D view lost its graphics: the browser took them back, which phones do in the
+              background.{' '}
+              {canRestart() ? (
+                <button type="button" className={styles.chipBtn ?? ''} onClick={restart}>
+                  Restart the 3D view
+                </button>
+              ) : (
+                'It has lost them several times, so it stays off. Reload to try again.'
+              )}
             </p>
           )}
           {!failed && (outOfRange.outOfRange || outOfRange.table === 2) && (

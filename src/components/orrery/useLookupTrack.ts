@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { useLookupClosest, useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
-import type { LookupState, Unavailable } from '@/lib/api/jplLookup'
+import { type LookupState, SPENT, type Unavailable } from '@/lib/api/jplLookup'
 import { asteroidState, shortName } from '@/lib/orrery/asteroids'
 import { earthState } from '@/lib/orrery/craftState'
 import {
@@ -37,6 +37,7 @@ const GAVE_UP = 'JPL is still busy. Try again in a minute.'
 const PROBLEM: Record<Unavailable, string> = {
   'not-set-up': 'On-demand lookup isn’t available yet.',
   busy: 'JPL is busy right now. Trying again shortly.',
+  spent: SPENT,
   failed: 'JPL didn’t answer this time.',
   'out-of-range': 'JPL positions are asked for 1900 to 2100 only.',
   'not-found': 'JPL has no object with this id.',
@@ -143,7 +144,8 @@ export function useLookupTrack({
 }: Options): LookupView {
   const shown = useLookupStore((s) => s.shown)
   const spkid = shown?.spkid ?? null
-  const span = useSettledSpan(spkid ? lookupSpan(simMs) : null, spkid)
+  const liveSpan = spkid ? lookupSpan(simMs) : null
+  const span = useSettledSpan(liveSpan, spkid)
   // The search card asked for this same span (#152): drawing it costs no new request.
   // Keep drawing the last span while the next is asked for (checked per object below).
   const query = useLookupSpan(spkid, span, true)
@@ -190,17 +192,26 @@ export function useLookupTrack({
     renderer.focusOn(key)
   }, [renderer, key, focusOnLoad, covers, select])
 
-  const problem =
-    query.data?.state === 'unavailable' ? lookupProblem(query.data, query.gaveUp) : null
+  // Outside 1900–2100 nothing is asked (#244): say so, rather than "asking JPL…" for good.
+  const outOfRange = spkid !== null && liveSpan === null
+  const problem = outOfRange
+    ? PROBLEM['out-of-range']
+    : query.data?.state === 'unavailable'
+      ? lookupProblem(query.data, query.gaveUp)
+      : null
   const { refetch } = query
   const retry = useCallback(() => {
     void refetch()
   }, [refetch])
+  // A final no: a link waiting on the lookup moves on. Out of range (#244) and a spent
+  // allowance (#237, until midnight UTC) are final too.
   const failed =
-    query.data?.state === 'unavailable' &&
-    (query.data.reason === 'not-found' ||
-      query.data.reason === 'not-set-up' ||
-      query.data.reason === 'failed')
+    outOfRange ||
+    (query.data?.state === 'unavailable' &&
+      (query.data.reason === 'not-found' ||
+        query.data.reason === 'not-set-up' ||
+        query.data.reason === 'spent' ||
+        query.data.reason === 'failed'))
   // Stable between renders, so the page's search list is rebuilt only when it changes.
   const fullName = object?.name ?? label
   const item = useMemo<CatalogItem | null>(
@@ -224,7 +235,7 @@ export function useLookupTrack({
     trajectory,
     closest,
     item,
-    loading: spkid !== null && (span === null || query.isFetching),
+    loading: spkid !== null && !outOfRange && (span === null || query.isFetching),
     problem,
     failed,
     gaveUp: query.gaveUp,

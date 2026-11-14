@@ -638,8 +638,14 @@ request at a time, as JPL's Fair Use asks ("only one API request at a time"). `/
     covers the date.
   - A busy queue's `Retry-After` is said in words ("Trying again in 20 s.") and honoured, 5–120 s
     (`lookupRetryMs`). A 429 from the site's `/api/` rate limit is busy too (#141), and a busy
-    answer replayed from the 60 s negative cache (`X-Cache: NEG`, which carries no
-    `Retry-After`) waits 61 s, not the 15 s default, which only met the same replay again.
+    answer replayed from the 60 s negative cache (`X-Cache: NEG`) waits 61 s at least, not the
+    15 s default, which only met the same replay again.
+  - **The queue's own headers reach the visitor (#237).** Until then `askJpl` and the negative
+    cache dropped `Retry-After` and `X-Queue`, so the "honoured" wait above never arrived.
+    `askJpl` copies both onto its 503, and `storeNegative` keeps them for the replay.
+    `X-Queue: budget` reads as `spent`: "Today's JPL allowance is spent. Lookups start again
+    at midnight UTC." It is never retried (it used to retry 5 times, then say "try again in a
+    minute").
     Five retries at most per span (`LOOKUP_MAX_RETRIES`); then the card and the inspector say
     "JPL is still busy" and offer "Try again", so an open card never polls a busy JPL for good.
     Nothing else is retried. 404 reads "JPL has no object with this id".

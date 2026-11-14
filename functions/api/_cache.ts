@@ -189,6 +189,9 @@ async function replayNeg(negHit: Response): Promise<Response> {
  * minute instead of on every request. Stored at status 200 with the real status in
  * X-Neg-Status so the Cache API never rejects the entry.
  */
+/** A producer's error headers that its negative entry keeps. */
+const PASSED_ERROR_HEADERS = ['X-Upstream-Status', 'Retry-After', 'X-Queue'] as const
+
 function storeNegative(
   ctx: CacheCtx,
   cache: Cache,
@@ -196,7 +199,7 @@ function storeNegative(
   status: number,
   body: string,
   kind: ErrorKind,
-  upstreamStatus: string | null = null,
+  from: Headers | null = null,
 ): Response {
   const headers = new Headers({
     'Content-Type': 'application/json',
@@ -205,7 +208,12 @@ function storeNegative(
     'X-Neg-Status': String(status),
     [ERROR_KIND_HEADER]: kind,
   })
-  if (upstreamStatus !== null) headers.set('X-Upstream-Status', upstreamStatus)
+  // What the producer's error said about itself, kept for the replay too: the upstream's
+  // status, and a queue's refusal and wait (#237, functions/api/_jpl.ts).
+  for (const name of PASSED_ERROR_HEADERS) {
+    const value = from?.get(name) ?? null
+    if (value !== null) headers.set(name, value)
+  }
   ctx.waitUntil(cache.put(negReq, new Response(body, { status: 200, headers })))
 
   const out = new Headers(headers)
@@ -268,15 +276,7 @@ async function produceAndStore(
     if (result.ok) return result
     const kind = errorKindOf(result)
     const body = (await result.text()) || JSON.stringify({ error: 'Upstream error' })
-    return storeNegative(
-      ctx,
-      cache,
-      negReq,
-      statusFor(kind),
-      body,
-      kind,
-      result.headers.get('X-Upstream-Status'),
-    )
+    return storeNegative(ctx, cache, negReq, statusFor(kind), body, kind, result.headers)
   }
 
   const effectiveTtl = result.ttl ?? slot.ttlSeconds

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { ZodError } from 'zod'
 
+import { lookupProblem } from '@/components/orrery/useLookupTrack'
 import { LOOKUP_MAX_RETRIES, lookupRetryMs } from '@/hooks/useJplLookup'
 import { defaultRetry, defaultRetryDelay, RATE_LIMIT_RETRY_MS } from '@/hooks/useSourceQuery'
 import { HttpError } from '@/lib/api/client'
@@ -62,5 +63,19 @@ describe('the lookup track after a busy answer or a 429 (#141)', () => {
     expect(lookupRetryMs(undefined)).toBe(false)
     expect(lookupRetryMs({ state: 'unavailable', reason: 'failed' })).toBe(false)
     expect(lookupRetryMs({ state: 'unavailable', reason: 'not-found' })).toBe(false)
+  })
+})
+
+describe('a spent daily JPL budget (#237)', () => {
+  const spent = { state: 'unavailable', reason: 'spent', retryAfterS: 7200 } as const
+
+  it('is never retried: the allowance resets at midnight UTC, not in a minute', () => {
+    expect(lookupRetryMs(spent)).toBe(false)
+  })
+
+  it('says so, and when it comes back, on the inspector and the search card', () => {
+    expect(lookupProblem(spent)).toMatch(/allowance is spent/)
+    expect(lookupProblem(spent)).toMatch(/midnight UTC/)
+    expect(lookupProblem(spent)).not.toMatch(/busy/)
   })
 })
