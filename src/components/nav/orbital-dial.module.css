@@ -29,6 +29,7 @@
   border: none;
   cursor: pointer;
   color: var(--bone-dim);
+  text-decoration: none;
   transition: color var(--duration-fast) var(--ease-out-expo);
 }
 

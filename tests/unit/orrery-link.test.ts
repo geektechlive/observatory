@@ -64,19 +64,17 @@ describe('serialiseOrreryLink (#108)', () => {
   it('writes time, focus and preset in a fixed order', () => {
     expect(
       serialiseOrreryLink({ t: V1_HELIOPAUSE, focus: 'naif:-31', preset: null, detail: false }),
-    ).toBe('#orrery?t=2012-08-25T00:00:00Z&focus=naif:-31')
+    ).toBe('#t=2012-08-25T00:00:00Z&focus=naif:-31')
   })
 
-  it('writes a bare #orrery when there is nothing to say', () => {
-    expect(serialiseOrreryLink({ t: null, focus: null, preset: null, detail: false })).toBe(
-      '#orrery',
-    )
+  it('writes no hash when there is nothing to say', () => {
+    expect(serialiseOrreryLink({ t: null, focus: null, preset: null, detail: false })).toBe('')
   })
 
   it('keeps the colon readable and encodes the rest', () => {
     expect(
       serialiseOrreryLink({ t: null, focus: 'sb:2001 KF54', preset: null, detail: false }),
-    ).toBe('#orrery?focus=sb:2001%20KF54')
+    ).toBe('#focus=sb:2001%20KF54')
   })
 
   it('round-trips through the parser, dates BC included', () => {
@@ -92,14 +90,14 @@ describe('serialiseOrreryLink (#108)', () => {
   it('round-trips a looked-up object’s key (#145)', () => {
     const link = { t: null, focus: 'lookup:20099942', preset: null, detail: false }
     const hash = serialiseOrreryLink(link)
-    expect(hash).toBe('#orrery?focus=lookup:20099942')
+    expect(hash).toBe('#focus=lookup:20099942')
     expect(parseOrreryLink(hash)).toEqual(link)
   })
 
   it('writes whole seconds', () => {
     expect(
       serialiseOrreryLink({ t: V1_HELIOPAUSE + 999, focus: null, preset: null, detail: false }),
-    ).toBe('#orrery?t=2012-08-25T00:00:00Z')
+    ).toBe('#t=2012-08-25T00:00:00Z')
   })
 })
 
@@ -160,10 +158,8 @@ describe('the detail flag (#203)', () => {
 
   it('writes detail last, only when on', () => {
     const link = { t: null, focus: 'naif:-31', preset: 'earth' as const, detail: true }
-    expect(serialiseOrreryLink(link)).toBe('#orrery?focus=naif:-31&preset=earth&detail=1')
-    expect(serialiseOrreryLink({ ...link, detail: false })).toBe(
-      '#orrery?focus=naif:-31&preset=earth',
-    )
+    expect(serialiseOrreryLink(link)).toBe('#focus=naif:-31&preset=earth&detail=1')
+    expect(serialiseOrreryLink({ ...link, detail: false })).toBe('#focus=naif:-31&preset=earth')
   })
 
   it('round-trips with and without detail', () => {

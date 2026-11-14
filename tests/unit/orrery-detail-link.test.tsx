@@ -99,7 +99,7 @@ describe('the detail link (#203)', () => {
     })
     hook.rerender({ ...base, satFound: true, satSettled: true, satVersion: 1 })
     expect(detail()).toBe('sat:25544')
-    expect(window.location.hash).toBe('#orrery?focus=sat:25544&detail=1')
+    expect(window.location.hash).toBe('#focus=sat:25544&detail=1')
   })
 
   it('a visitor closing the detail while a link waits keeps it closed (B)', () => {
@@ -111,7 +111,7 @@ describe('the detail link (#203)', () => {
     })
     hook.rerender({ ...base, satFound: true, satSettled: true, satVersion: 1 })
     expect(detail()).toBeNull()
-    expect(window.location.hash).toBe('#orrery?focus=sat:25544')
+    expect(window.location.hash).toBe('#focus=sat:25544')
   })
 
   it('a cold load with detail and a focus that resolves at once opens the detail', () => {
@@ -119,7 +119,7 @@ describe('the detail link (#203)', () => {
     mount()
     expect(selected()).toBe('Mars')
     expect(detail()).toBe('Mars')
-    expect(window.location.hash).toBe('#orrery?focus=Mars&detail=1')
+    expect(window.location.hash).toBe('#focus=Mars&detail=1')
   })
 
   it('opens only after a late focus resolves (a satellite group still loading)', () => {
@@ -130,7 +130,7 @@ describe('the detail link (#203)', () => {
     hook.rerender({ ...base, satFound: true, satSettled: true, satVersion: 1 })
     expect(selected()).toBe('sat:25544')
     expect(detail()).toBe('sat:25544')
-    expect(window.location.hash).toBe('#orrery?focus=sat:25544&detail=1')
+    expect(window.location.hash).toBe('#focus=sat:25544&detail=1')
   })
 
   it('a focus that never resolves drops the detail from the address, with no new entry', () => {
@@ -149,7 +149,7 @@ describe('the detail link (#203)', () => {
     mount({ hasModel: () => false })
     expect(selected()).toBe('Mars')
     expect(detail()).toBeNull()
-    expect(window.location.hash).toBe('#orrery?focus=Mars')
+    expect(window.location.hash).toBe('#focus=Mars')
   })
 
   it('a detail with no focus is ignored and dropped', () => {
@@ -157,7 +157,7 @@ describe('the detail link (#203)', () => {
     mount()
     expect(selected()).toBeNull()
     expect(detail()).toBeNull()
-    expect(window.location.hash).toBe('#orrery')
+    expect(window.location.hash).toBe('')
   })
 
   it('opening writes detail into the address and closing clears it', () => {
@@ -166,13 +166,13 @@ describe('the detail link (#203)', () => {
     act(() => {
       useOrreryView.getState().openDetail('Mars')
     })
-    expect(window.location.hash).toBe('#orrery?focus=Mars&detail=1')
+    expect(window.location.hash).toBe('#focus=Mars&detail=1')
     act(() => {
       useOrreryView.getState().closeDetail()
     })
     expect(detail()).toBeNull()
     expect(selected()).toBe('Mars')
-    expect(window.location.hash).toBe('#orrery?focus=Mars')
+    expect(window.location.hash).toBe('#focus=Mars')
   })
 
   it('choosing another object closes the detail', () => {
@@ -182,7 +182,7 @@ describe('the detail link (#203)', () => {
       useOrreryView.getState().setSelected('naif:-31')
     })
     expect(detail()).toBeNull()
-    expect(window.location.hash).toBe('#orrery?focus=naif:-31')
+    expect(window.location.hash).toBe('#focus=naif:-31')
   })
 
   it('back and forward re-apply or close it', () => {

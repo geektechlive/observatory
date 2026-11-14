@@ -1,5 +1,6 @@
 /**
- * The orrery's shareable link (#108): `#orrery?t=<ISO UTC>&focus=<id>&preset=<id>`.
+ * The orrery's shareable link (#108): `/orrery/#t=<ISO UTC>&focus=<id>&preset=<id>` (the view
+ * is the path, ADR 0036; the old `#orrery?t=…` form still reads and is rewritten).
  *
  * - `t` is the simulated time, written to the second; a bare date means midnight UTC.
  *   It is clamped to the planet tables' range. A link with `t` opens paused there.
@@ -15,6 +16,7 @@
  *
  * Kept apart from the three.js layer, like defaultView.ts, so it costs the page nothing.
  */
+import { paramsOf } from '@/lib/viewRoute'
 import { type ClockAnchor, SIM_MAX_MS, SIM_MIN_MS, simTimeAt } from '@/store/orreryClock'
 
 import type { FocusPreset } from './three/framing'
@@ -63,10 +65,7 @@ function parseTime(raw: string): number | null {
 /** The link's values; null for each one that is missing or not understood. */
 export function parseOrreryLink(hash: string): OrreryLink {
   const out: OrreryLink = { t: null, focus: null, preset: null, detail: false }
-  const raw = hash.replace(/^#\/?/, '')
-  const [view = '', query] = raw.split('?')
-  if (view.toLowerCase() !== 'orrery' || query === undefined) return out
-  for (const part of query.split('&')) {
+  for (const part of paramsOf(hash, 'orrery').split('&')) {
     const eq = part.indexOf('=')
     if (eq < 0) continue
     const key = part.slice(0, eq)
@@ -89,13 +88,14 @@ function isoSeconds(ms: number): string {
   return new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z')
 }
 
+/** The hash for a link: `#t=…&focus=…`, or '' for the plain orrery. The path is `/orrery/`. */
 export function serialiseOrreryLink(link: OrreryLink): string {
   const parts: string[] = []
   if (link.t !== null) parts.push(`t=${isoSeconds(link.t)}`)
   if (link.focus !== null) parts.push(`focus=${encode(link.focus)}`)
   if (link.preset !== null) parts.push(`preset=${link.preset}`)
   if (link.detail) parts.push('detail=1')
-  return parts.length > 0 ? `#orrery?${parts.join('&')}` : '#orrery'
+  return parts.length > 0 ? `#${parts.join('&')}` : ''
 }
 
 const loose = (s: string) => s.toLowerCase().replace(/[-_\s]+/g, ' ')

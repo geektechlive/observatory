@@ -66,6 +66,7 @@ Details: [docs/reference/bundle-and-loading.md](docs/reference/bundle-and-loadin
 
 ## Gotchas
 
+- **Views are paths (ADR 0036):** `/`, `/orrery/`, `/sun/`, `/sky/`, `/orbit/`; a view's own state is the hash without the view name (`/orrery/#focus=Mars`). Read and write the address only through `src/lib/viewRoute.ts`. A new view needs a row in `src/lib/viewMeta.ts` (no imports; `scripts/view-shells.mjs` runs it in Node) and its copy in the script. The build writes `dist/<view>/index.html`; `public/404.html` turns off Pages' SPA fallback.
 - CSS modules use `localsConvention: 'camelCase'`: class names in `.module.css` must be camelCase.
 - `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`: CSS module lookups are `string | undefined`; use `?? ''` and `?: string | undefined` in props.
 - Stylelint disables `color-function-notation`, `property-no-vendor-prefix`, `selector-class-pattern` on purpose (see `stylelint.config.js`).

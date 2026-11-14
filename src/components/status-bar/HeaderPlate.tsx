@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { deriveLiveStatus, VIEW_HEADLINES } from '@/lib/health'
+import { VIEW_META } from '@/lib/viewMeta'
 import { useUiStore } from '@/store/ui'
 
 import { AboutPopover } from './AboutPopover'
@@ -27,7 +28,7 @@ export function HeaderPlate() {
     <header role="banner" className={styles.header ?? ''}>
       <div className={styles.ship ?? ''}>
         <h1 className={styles.name ?? ''}>Observatory</h1>
-        <p className={styles.subtitle ?? ''}>Earth watch, live NASA and NOAA feeds</p>
+        <p className={styles.subtitle ?? ''}>{VIEW_META[view].subtitle}</p>
       </div>
       <div className={styles.right ?? ''}>
         <DualClock />

@@ -1,0 +1,6 @@
+# Observatory serves public NASA and NOAA data and welcomes every crawler, AI assistants
+# included (ADR 0036). This file replaces the zone's managed robots.txt.
+User-agent: *
+Allow: /
+
+Sitemap: https://observatory.geektechlive.com/sitemap.xml

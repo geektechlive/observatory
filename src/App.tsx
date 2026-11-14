@@ -20,6 +20,7 @@ import { useGlobeData } from '@/hooks/useGlobeData'
 import { useHashView } from '@/hooks/useHashView'
 import { useLensExpand } from '@/hooks/useLensExpand'
 import { useLensSize } from '@/hooks/useLensSize'
+import { useViewTitle } from '@/hooks/useViewTitle'
 import { loadOrreryPage } from '@/lib/orreryPrefetch'
 import { type ConsoleColumnView, useUiStore } from '@/store/ui'
 
@@ -40,6 +41,7 @@ const OrreryPage = lazy(() => loadOrreryPage().then((m) => ({ default: m.OrreryP
  */
 export function App() {
   useHashView()
+  useViewTitle()
   const view = useUiStore((s) => s.view)
   const { expanded, toggle, buttonRef } = useLensExpand()
   const orrery = view === 'orrery'

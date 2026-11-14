@@ -2,7 +2,7 @@
  * Early loading of the orrery's code (#168).
  *
  * The orrery is a lazy page: OrreryPage, then (once it runs) OrreryRenderer and three.js.
- * Measured on production (2026-11-08, cold #orrery): the page started ~467 ms after boot
+ * Measured on production (2026-11-08, cold /orrery/): the page started ~467 ms after boot
  * and the renderer ~531 ms after that, so the first 3D frame came at ~1.0 s on a fast link
  * and 5.9 s on a throttled phone. Each hop is a round trip, and a round trip is what a
  * phone pays most for.
@@ -10,7 +10,7 @@
  * `prefetchOrrery` asks for the page and the renderer in the same breath. Vite wraps each
  * dynamic import with a preload of that chunk's own static imports, so three.js (the
  * renderer's) is requested together with the renderer, and nothing waits on a parent chunk.
- * It is called before React renders when the address is #orrery, when the visitor reaches
+ * It is called before React renders when the address is /orrery/, when the visitor reaches
  * for the Orrery dial tab, and when the browser is idle after the Earth page has loaded.
  *
  * Keep this file free of the orrery's own imports: it is in the first load, and
@@ -112,14 +112,8 @@ export function createOrreryLinkPreload({
   }
 }
 
-/** Hover, focus and idle use this; only a boot on #orrery really imports (`prefetchOrrery`). */
+/** Hover, focus and idle use this; only a boot on /orrery/ really imports (`prefetchOrrery`). */
 export const preloadOrreryLinks = createOrreryLinkPreload()
-
-/** `#orrery`, `#/orrery` and `#orrery?t=…`, the way useHashView reads the view. */
-export function isOrreryHash(hash: string): boolean {
-  const [view = ''] = hash.replace(/^#\/?/, '').split('?')
-  return view.toLowerCase() === 'orrery'
-}
 
 interface ConnectionHints {
   saveData?: boolean

@@ -43,3 +43,4 @@ that makes the decision.
 | [0033](0033-sky-view-address-is-the-state.md)                 | The sky view's state is the address (`#sky?target=…&t=…`); it draws only Horizons samples | #99            |
 | [0034](0034-noaa-flares-and-donki-through-api-nasa-gov.md)    | Flares come from NOAA SWPC; CME, storms and SEPs from DONKI through api.nasa.gov          | #65            |
 | [0035](0035-close-passes-get-ten-minute-samples.md)           | Close passes get 10-minute samples, found from the daily samples themselves               | #230           |
+| [0036](0036-views-are-paths.md)                               | Views are paths (`/orrery/`, …); a view’s own state stays in the hash                     | #232           |

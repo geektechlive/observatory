@@ -1,30 +1,24 @@
 import { useEffect, useRef } from 'react'
 
-import {
-  type ConsoleView,
-  LAYER_KEYS,
-  type LayerKey,
-  layersFromHash,
-  useUiStore,
-  viewFromHash,
-} from '@/store/ui'
+import { locationUrl, readLocation, subscribeLocation } from '@/lib/viewRoute'
+import { type ConsoleView, LAYER_KEYS, type LayerKey, layersFromHash, useUiStore } from '@/store/ui'
 
-interface HashState {
+interface RouteState {
   view: ConsoleView | null
   /** null when the URL says nothing about layers, so saved prefs win. */
   layers: Record<LayerKey, boolean> | null
 }
 
-function parseHash(): HashState {
-  const { hash } = window.location
-  return { view: viewFromHash(hash), layers: layersFromHash(hash) }
+function parseRoute(): RouteState {
+  const { view } = readLocation()
+  return { view, layers: layersFromHash(window.location.hash) }
 }
 
 /**
- * Puts the hash's view and layers in the store in one update, so persist saves once
- * (a write per layer was about 15). Nothing the hash doesn't change is written.
+ * Puts the address's view and layers in the store in one update, so persist saves once
+ * (a write per layer was about 15). Nothing the address doesn't change is written.
  */
-function applyHash({ view, layers }: HashState): void {
+function applyRoute({ view, layers }: RouteState): void {
   const viewChange = view && view !== useUiStore.getState().view ? { view } : null
   if (!viewChange && !layers) return
   useUiStore.setState({ ...viewChange, ...(layers ? { layers } : null) })
@@ -40,31 +34,40 @@ const OWN_PARAMS: Partial<Record<ConsoleView, ReadonlySet<string>>> = {
 }
 
 /**
- * A console's own params from a hash that is already on it, raw so their encoding stays
- * as written. Anything else (an Earth `layers=`, #109) is dropped.
+ * A console's own params from an address that is already on it, raw so their encoding
+ * stays as written. Anything else (an Earth `layers=`, #109) is dropped. The view is
+ * judged by the path: a hash carries no view name any more.
  */
-function ownQuery(view: ConsoleView, hash: string): string {
+function ownParams(
+  view: ConsoleView,
+  current: { view: ConsoleView | null; params: string },
+): string {
   const own = OWN_PARAMS[view]
-  const [viewPart = '', queryPart] = hash.replace(/^#\/?/, '').split('?')
-  if (!own || viewPart.toLowerCase() !== view || queryPart === undefined) return ''
-  const kept = queryPart.split('&').filter((p) => own.has(p.split('=')[0] ?? ''))
-  return kept.length > 0 ? `?${kept.join('&')}` : ''
+  if (!own || current.view !== view) return ''
+  return current.params
+    .split('&')
+    .filter((p) => own.has(p.split('=')[0] ?? ''))
+    .join('&')
 }
 
-export function buildHash(
+/** The path and hash that show a view with these layers; `current` is the address now. */
+export function buildUrl(
   view: ConsoleView,
   layers: Record<LayerKey, boolean>,
-  currentHash = '',
+  current: { view: ConsoleView | null; params: string } = { view: null, params: '' },
 ): string {
-  if (view === 'orrery' || view === 'sky') return `#${view}${ownQuery(view, currentHash)}`
-  if (!LAYER_VIEWS.has(view)) return `#${view}`
+  if (view === 'orrery' || view === 'sky') return locationUrl(view, ownParams(view, current))
+  if (!LAYER_VIEWS.has(view)) return locationUrl(view, '')
   const enabled = LAYER_KEYS.filter((k) => layers[k])
-  return enabled.length > 0 ? `#${view}?layers=${enabled.join(',')}` : `#${view}`
+  return locationUrl(view, enabled.length > 0 ? `layers=${enabled.join(',')}` : '')
 }
+
+/** Keeps the query string (`?utm_…`) of the address when the path and hash are rewritten. */
+const withSearch = (url: string): string => url.replace(/^([^#]*)/, `$1${window.location.search}`)
 
 /**
  * Syncs the active console and its enabled layers with the URL hash so a
- * configured view is shareable and bookmarkable (`#earth?layers=iss,quakes`).
+ * configured view is shareable and bookmarkable (`/#layers=iss,quakes`, `/orrery/`; ADR 0036).
  * Switching consoles pushes history (back returns to the previous console);
  * toggling layers replaces it, so a dozen checkbox clicks do not bury the back
  * button.
@@ -74,46 +77,52 @@ export function useHashView(): void {
   const layers = useUiStore((s) => s.layers)
   const previousViewRef = useRef<ConsoleView | null>(null)
 
-  // The store already starts on the hash's view and layers (#167, #176); this mount
+  // The store already starts on the address's view and layers (#167, #176); this mount
   // effect re-applies them, which saves a link's layers as the visitor's preferences,
-  // then canonicalizes the hash in place. Intentionally mount-only: rerunning on any
+  // then canonicalizes the address in place. Intentionally mount-only: rerunning on any
   // store change would re-apply a stale URL over live user input. Store access goes
   // through `getState()` so the empty deps list is honest and no eslint-disable is
   // needed.
   useEffect(() => {
-    applyHash(parseHash())
+    applyRoute(parseRoute())
     const state = useUiStore.getState()
     previousViewRef.current = state.view
-    window.history.replaceState(null, '', buildHash(state.view, state.layers, window.location.hash))
+    window.history.replaceState(
+      window.history.state,
+      '',
+      withSearch(buildUrl(state.view, state.layers, readLocation())),
+    )
   }, [])
 
-  // Respond to back/forward and manual hash edits.
-  useEffect(() => {
-    const onHashChange = () => {
-      applyHash(parseHash())
-    }
-    window.addEventListener('hashchange', onHashChange)
-    return () => {
-      window.removeEventListener('hashchange', onHashChange)
-    }
-  }, [])
+  // Respond to back/forward, `navigate` and manual hash edits. Back from /orrery/ to / is
+  // a path change, which raises `popstate` and no reliable `hashchange`.
+  useEffect(
+    () =>
+      subscribeLocation(() => {
+        applyRoute(parseRoute())
+      }),
+    [],
+  )
 
-  // Reflect store changes back into the hash. State is read live rather than
+  // Reflect store changes back into the address. State is read live rather than
   // from the render closure: on first mount this effect runs in the same commit
-  // as the initializer above, where the closure still holds pre-hash defaults
+  // as the initializer above, where the closure still holds pre-address defaults
   // and would push a bogus entry over the URL the user actually opened.
-  // `view`/`layers` are the change trigger only.
+  // `view`/`layers` are the change trigger only. This is the only place a view switch
+  // pushes history, so a dial click, an arrow key and a link each add one entry.
   useEffect(() => {
     const { view: currentView, layers: currentLayers } = useUiStore.getState()
-    const next = buildHash(currentView, currentLayers, window.location.hash)
-    if (window.location.hash === next) {
+    const next = buildUrl(currentView, currentLayers, readLocation())
+    const { pathname, hash } = window.location
+    if (pathname + hash === next) {
       previousViewRef.current = currentView
       return
     }
     const consoleChanged =
       previousViewRef.current !== null && previousViewRef.current !== currentView
     previousViewRef.current = currentView
-    if (consoleChanged) window.history.pushState(null, '', next)
-    else window.history.replaceState(null, '', next)
+    const url = withSearch(next)
+    if (consoleChanged) window.history.pushState(null, '', url)
+    else window.history.replaceState(window.history.state, '', url)
   }, [view, layers])
 }

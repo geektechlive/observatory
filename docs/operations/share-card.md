@@ -8,7 +8,7 @@ the globe or the header, and commit `public/og-image.png`.
   one Fraunces line and a credit line. Don't add chips, backdrops or markers back.
 - **The capture.** It screenshots the live site's globe in Chromium on the real GPU. It refuses to
   run if the globe draws `sprites` rather than `bloom`, so it needs a Mac, not SwiftShader.
-  - It loads `#earth?layers=terminator`. With `layers=` alone, the night side and its city lights
+  - It loads `/#layers=terminator`. With `layers=` alone, the night side and its city lights
     go as well.
   - It hides the bezel's minor ticks, numerals and census arc.
   - It waits for `data-globe-textures="4096"`. It polls from Node, because the site's CSP blocks

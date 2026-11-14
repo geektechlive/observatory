@@ -2,27 +2,20 @@ import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 
 import type { SourceName, SourceState } from '@/lib/health'
+import { CONSOLE_VIEWS, type ConsoleView, paramsOf, readLocation } from '@/lib/viewRoute'
 
-export type ConsoleView = 'earth' | 'orrery' | 'sun' | 'sky' | 'orbit'
-
-export const CONSOLE_VIEWS: ConsoleView[] = ['earth', 'orrery', 'sun', 'sky', 'orbit']
-
-/** The console a URL hash names (`#orrery?t=…`, `#/sun`), or null when it names none. */
-export function viewFromHash(hash: string): ConsoleView | null {
-  const [viewPart = ''] = hash.replace(/^#\/?/, '').split('?')
-  const candidate = viewPart.toLowerCase()
-  return (CONSOLE_VIEWS as string[]).includes(candidate) ? (candidate as ConsoleView) : null
-}
+export { CONSOLE_VIEWS, type ConsoleView }
 
 /**
- * The first view, read from the hash before anything renders (#167). Starting on
+ * The first view, read from the address before anything renders (#167). Starting on
  * 'earth' and fixing it in an effect mounted the Earth columns for one render on every
- * direct #orrery, #sun, #sky or #orbit load: their chunks and ten feeds were fetched
- * for a page that was never shown.
+ * direct /orrery/, /sun/, /sky/ or /orbit/ load: their chunks and ten feeds were fetched
+ * for a page that was never shown. The address reader also rewrites an old `#orrery?…`
+ * link, which is why it runs here and not only in main.tsx (ADR 0036).
  */
 function initialView(): ConsoleView {
   if (typeof window === 'undefined') return 'earth'
-  return viewFromHash(window.location.hash) ?? 'earth'
+  return readLocation().view ?? 'earth'
 }
 
 /** The views laid out as lens + console columns; the orrery takes the whole page (#91). */
@@ -78,13 +71,11 @@ export function isLayerKey(value: string): value is LayerKey {
 }
 
 /**
- * The layers a link names (`#earth?layers=iss,quakes`): those on, every other one off.
+ * The layers a link names (`/#layers=iss,quakes`, or the old `#earth?layers=…`): those on, every other one off.
  * Null when the hash says nothing about layers, so saved preferences stand.
  */
 export function layersFromHash(hash: string): Record<LayerKey, boolean> | null {
-  const queryPart = hash.replace(/^#\/?/, '').split('?')[1]
-  if (queryPart === undefined) return null
-  const param = new URLSearchParams(queryPart).get('layers')
+  const param = new URLSearchParams(paramsOf(hash)).get('layers')
   if (param === null) return null
   const named = new Set(param.split(',').map((s) => s.trim()))
   // A link that names no real layer (`layers=nope`) says nothing: turning every layer
@@ -96,10 +87,11 @@ export function layersFromHash(hash: string): Record<LayerKey, boolean> | null {
 /**
  * A layers link, read before anything renders (#176), as initialView does for the view.
  * Applied in an effect, the default layers mounted for one render first: on
- * `#orbit?layers=fires` that fetched the aurora feed for a layer the link turns off.
+ * `/orbit/#layers=fires` that fetched the aurora feed for a layer the link turns off.
  */
 function hashLayers(): Record<LayerKey, boolean> | null {
   if (typeof window === 'undefined') return null
+  readLocation()
   return layersFromHash(window.location.hash)
 }
 

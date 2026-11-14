@@ -39,7 +39,7 @@ describe('the link format for a satellite', () => {
       preset: 'orbit',
       detail: false,
     })
-    expect(hash).toBe('#orrery?focus=sat:44713&preset=orbit')
+    expect(hash).toBe('#focus=sat:44713&preset=orbit')
     expect(parseOrreryLink(hash)).toEqual({
       t: null,
       focus: 'sat:44713',

@@ -31,3 +31,8 @@ dropped.
 - #91, #167; commit d7b563c.
 - `src/components/orrery/OrreryPage.tsx`, `src/App.tsx`.
 - [reference/orrery.md](../reference/orrery.md).
+
+## Addendum 2026-11-14 (ADR 0036)
+
+The orrery's address is now `/orrery/`, not `#orrery`; "a direct `#orrery` load" above means a
+direct load of `/orrery/` (or an old `/#orrery` link, which is rewritten to it).

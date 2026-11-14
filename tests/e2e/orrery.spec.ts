@@ -130,7 +130,7 @@ test.describe('Orrery (#91)', () => {
     const tabs = page.getByRole('tab')
     await expect(tabs.nth(1)).toHaveAccessibleName(/ORRERY/)
     await tabs.nth(1).click()
-    await expect.poll(() => page.url()).toContain('#orrery')
+    await expect.poll(() => page.url()).toContain('/orrery/')
     await expect(stage(page)).toHaveAttribute('data-orrery-mode', 'webgl', { timeout: 20_000 })
     await expect(page.locator('canvas[data-orrery-webgl]')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Earth', exact: true })).toBeVisible()

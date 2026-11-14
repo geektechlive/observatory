@@ -41,7 +41,7 @@ async function openOrrery(page: Page) {
 }
 
 /** A `t=` parameter, not the tail of `preset=`. */
-const HAS_TIME = /[?&]t=/
+const HAS_TIME = /[#&]t=/
 const canvas = (page: Page) => page.locator('canvas[data-orrery-webgl]')
 const hash = (page: Page) => page.evaluate(() => window.location.hash)
 const drawer = (page: Page) => page.getByRole('complementary', { name: 'Guide', exact: true })

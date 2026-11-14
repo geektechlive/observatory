@@ -1,0 +1,15 @@
+# Observatory
+
+> A free, real-time space dashboard in the browser, built on public NASA, NOAA and JPL data: an ISS and satellite tracker, a 3D orrery of the solar system, space weather, tonight's sky and what is in orbit now. It is a TypeScript web port of cosmo-tui, open source at https://github.com/geektechlive/observatory.
+
+## Views
+
+- [Earth](https://observatory.geektechlive.com/): a 3D globe or flat map with the ISS live, earthquakes, fires, natural events, weather alerts and the aurora oval.
+- [Orrery](https://observatory.geektechlive.com/orrery/): a full-page 3D solar system with the planets, major moons, spacecraft, passing asteroids and tracked satellites, which you can run through time.
+- [Sun](https://observatory.geektechlive.com/sun/): the live Sun from NASA's Solar Dynamics Observatory and SOHO, with NOAA space weather.
+- [Sky](https://observatory.geektechlive.com/sky/): tonight's planets, Moon, comets and near-Earth asteroids.
+- [Orbit](https://observatory.geektechlive.com/orbit/): who is in space, the ISS, the Deep Space Network's live links and the next launches.
+
+## Data sources
+
+NASA (APOD, NeoWs, DONKI, EONET, EPIC, FIRMS, GIBS, Solar Dynamics Observatory, SOHO, Deep Space Network Now, 3D Resources), JPL (Horizons, Small-Body Database, close-approach data, Sentry, Scout, fireballs), NOAA (Space Weather Prediction Center, National Weather Service, buoys), USGS, ESA, CelesTrak, Space-Track.org (data provided by USSPACECOM), RocketLaunch.live, Open-Meteo. Every source is credited in full at https://github.com/geektechlive/observatory#data-sources-and-credits.

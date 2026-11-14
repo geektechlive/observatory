@@ -53,24 +53,24 @@ test.describe('Orrery shareable links (#108)', () => {
     const timeBar = page.getByRole('group', { name: 'Simulation time' })
     await expect(timeBar.locator('output')).toContainText('2012-08-25')
     await expect(timeBar.getByRole('button', { name: 'Play' })).toBeVisible()
-    await expect.poll(() => hash(page)).toBe('#orrery?t=2012-08-25T00:00:00Z&focus=naif:-31')
+    await expect.poll(() => hash(page)).toBe('#t=2012-08-25T00:00:00Z&focus=naif:-31')
 
     const before = await historyLength(page)
     await timeBar.getByRole('slider').focus()
     await page.keyboard.press('ArrowRight')
-    await expect.poll(() => hash(page)).toBe('#orrery?t=2012-08-26T00:00:00Z&focus=naif:-31')
+    await expect.poll(() => hash(page)).toBe('#t=2012-08-26T00:00:00Z&focus=naif:-31')
     expect(await historyLength(page)).toBe(before)
   })
 
   test('a name works as a focus, with or without a time', async ({ page }) => {
     await open(page, '#orrery?focus=voyager-1')
     await expect(page.getByRole('complementary', { name: 'Voyager 1' })).toBeVisible()
-    await expect.poll(() => hash(page)).toBe('#orrery?focus=naif:-31')
+    await expect.poll(() => hash(page)).toBe('#focus=naif:-31')
 
     await page.goto('about:blank')
     await open(page, '#orrery?t=2012-08-25&focus=voyager-1')
     await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'naif:-31')
-    await expect.poll(() => hash(page)).toBe('#orrery?t=2012-08-25T00:00:00Z&focus=naif:-31')
+    await expect.poll(() => hash(page)).toBe('#t=2012-08-25T00:00:00Z&focus=naif:-31')
   })
 
   test('a preset link opens that view; choosing a body swaps it for a focus', async ({ page }) => {
@@ -79,12 +79,12 @@ test.describe('Orrery shareable links (#108)', () => {
       'aria-pressed',
       'true',
     )
-    await expect.poll(() => hash(page)).toBe('#orrery?preset=outer')
+    await expect.poll(() => hash(page)).toBe('#preset=outer')
 
     const before = await historyLength(page)
     await page.getByRole('combobox', { name: /find/i }).fill('mars')
     await page.getByRole('option', { name: 'Mars' }).click()
-    await expect.poll(() => hash(page)).toBe('#orrery?focus=Mars')
+    await expect.poll(() => hash(page)).toBe('#focus=Mars')
     expect(await historyLength(page)).toBe(before)
   })
 
@@ -94,7 +94,7 @@ test.describe('Orrery shareable links (#108)', () => {
     await open(page, '#orrery?focus=Mars')
     await expect(page.getByRole('complementary', { name: 'Mars' })).toBeVisible()
     await page.getByRole('button', { name: 'Inner', exact: true }).click()
-    await expect.poll(() => hash(page)).toBe('#orrery?focus=Mars&preset=inner')
+    await expect.poll(() => hash(page)).toBe('#focus=Mars&preset=inner')
 
     await page.goto('about:blank')
     await open(page, '#orrery?focus=Mars&preset=inner')
@@ -103,7 +103,7 @@ test.describe('Orrery shareable links (#108)', () => {
       'aria-pressed',
       'true',
     )
-    await expect.poll(() => hash(page)).toBe('#orrery?focus=Mars&preset=inner')
+    await expect.poll(() => hash(page)).toBe('#focus=Mars&preset=inner')
   })
 
   test('an address edited by hand is followed', async ({ page }) => {
@@ -112,7 +112,7 @@ test.describe('Orrery shareable links (#108)', () => {
       window.location.hash = '#orrery?focus=Jupiter'
     })
     await expect(page.getByRole('complementary', { name: 'Jupiter' })).toBeVisible()
-    await expect.poll(() => hash(page)).toBe('#orrery?focus=Jupiter')
+    await expect.poll(() => hash(page)).toBe('#focus=Jupiter')
   })
 
   test('a link waits out a failed bodies fetch, and the visitor can still move on', async ({
@@ -132,10 +132,10 @@ test.describe('Orrery shareable links (#108)', () => {
     // The first try and three retries, about 7 s of backoff: then the query has failed.
     await expect.poll(() => tries, { timeout: 20_000 }).toBe(4)
     await page.waitForTimeout(1000)
-    expect(await hash(page)).toBe(link)
+    expect(await hash(page)).toBe(link.replace('#orrery?', '#'))
 
     await page.getByRole('button', { name: 'Outer', exact: true }).click()
-    await expect.poll(() => hash(page)).toBe('#orrery?t=2012-08-25T00:00:00Z&preset=outer')
+    await expect.poll(() => hash(page)).toBe('#t=2012-08-25T00:00:00Z&preset=outer')
   })
 
   test('the Earth–Moon view round-trips', async ({ page }) => {
@@ -144,12 +144,12 @@ test.describe('Orrery shareable links (#108)', () => {
       'aria-pressed',
       'true',
     )
-    await expect.poll(() => hash(page)).toBe('#orrery?preset=earth')
+    await expect.poll(() => hash(page)).toBe('#preset=earth')
   })
 
   test('an unknown focus and Earth layers are dropped from the address', async ({ page }) => {
     await open(page, '#orrery?focus=Pluto&layers=iss,quakes')
-    await expect.poll(() => hash(page), { timeout: 15_000 }).toBe('#orrery')
+    await expect.poll(() => hash(page), { timeout: 15_000 }).toBe('')
     await expect(page.getByRole('complementary')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Play' })).toHaveCount(0)
   })
@@ -157,10 +157,10 @@ test.describe('Orrery shareable links (#108)', () => {
   test("the Earth view's layer links still work, there and back", async ({ page }) => {
     await mockBodies(page)
     await page.goto('/#earth?layers=iss,quakes')
-    await expect.poll(() => hash(page)).toBe('#earth?layers=iss,quakes')
+    await expect.poll(() => hash(page)).toBe('#layers=iss,quakes')
     await page.getByRole('tab', { name: /ORRERY/ }).click()
-    await expect.poll(() => hash(page)).toBe('#orrery')
+    await expect.poll(() => hash(page)).toBe('')
     await page.getByRole('tab', { name: /EARTH/ }).click()
-    await expect.poll(() => hash(page)).toBe('#earth?layers=iss,quakes')
+    await expect.poll(() => hash(page)).toBe('#layers=iss,quakes')
   })
 })

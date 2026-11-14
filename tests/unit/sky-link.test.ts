@@ -42,11 +42,11 @@ describe('parseSkyLink', () => {
 
 describe('serialiseSkyLink', () => {
   it('writes #sky alone, a target alone, or both, the time to the second', () => {
-    expect(serialiseSkyLink({ target: null, t: null })).toBe('#sky')
-    expect(serialiseSkyLink({ target: 'sbc:20000004', t: null })).toBe('#sky?target=sbc:20000004')
+    expect(serialiseSkyLink({ target: null, t: null })).toBe('')
+    expect(serialiseSkyLink({ target: 'sbc:20000004', t: null })).toBe('#target=sbc:20000004')
     expect(
       serialiseSkyLink({ target: 'sbc:20000004', t: Date.parse('2026-11-14T22:00:00.789Z') }),
-    ).toBe('#sky?target=sbc:20000004&t=2026-11-14T22:00:00Z')
+    ).toBe('#target=sbc:20000004&t=2026-11-14T22:00:00Z')
   })
 
   it('round-trips', () => {
@@ -55,7 +55,7 @@ describe('serialiseSkyLink', () => {
   })
 
   it('drops a time that has no target to apply to', () => {
-    expect(serialiseSkyLink({ target: null, t: Date.parse('2026-11-14T22:00:00Z') })).toBe('#sky')
+    expect(serialiseSkyLink({ target: null, t: Date.parse('2026-11-14T22:00:00Z') })).toBe('')
   })
 })
 

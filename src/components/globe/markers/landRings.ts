@@ -7,7 +7,7 @@ export type Ring = [number, number][]
  * about 21 kB gzip of first-load JavaScript, for an SVG globe that WebGL replaces
  * moments later. The load starts on the first `landRings()` call, which the globe's
  * coastline layer makes as it mounts. It used to start at module import, and that
- * import is in the entry, so a direct #orrery load fetched the chunk for nothing (#167).
+ * import is in the entry, so a direct /orrery/ load fetched the chunk for nothing (#167).
  * GeoJSON is [lon, lat]; our project() takes (lat, lon) — swapped on import.
  */
 function loadLandRings(): Promise<Ring[]> {

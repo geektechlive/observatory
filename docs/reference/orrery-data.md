@@ -409,7 +409,7 @@ only that brightness is an estimate from JPL's H and G, with G = 0.15 where JPL 
 An alt-az dome for one comet or bright asteroid: `SkyViewPanel` at the top of `SkyConsoleRest`
 (below the fold, so in the lazy Sky chunk). It renders nothing until the address names a target.
 
-- **Link:** `#sky?target=sbc:<SPK-ID>[&t=<ISO UTC>]`, parsed and written by
+- **Link:** `/sky/#target=sbc:<SPK-ID>[&t=<ISO UTC>]` (ADR 0036; the old `#sky?target=…` is rewritten), parsed and written by
   `src/lib/sky/skyLink.ts`. `target` is the orrery's key (`sbc:`; the Tonight slice's own ids
   are `sb:<SPK-ID>`, and `sb:` in the orrery means a close approach). `t` is a moment; no `t`
   means live. `useHashView` keeps exactly these two params while the Sky console is open
@@ -705,7 +705,7 @@ request at a time, as JPL's Fair Use asks ("only one API request at a time"). `/
     once the samples cover the date. "Remove from orrery", on the card or in the inspector,
     clears it and closes its inspector.
   - Its key is `lookup:<SPK-ID>` in the scene, search ("Looked up at JPL") and links:
-    `#orrery?focus=lookup:20099942` asks JPL on load and applies once the samples cover the
+    `/orrery/#focus=lookup:20099942` asks JPL on load and applies once the samples cover the
     link's date (or JPL says no for good). The canvas's `data-orrery-lookup` and `-lookup-path`
     let e2e check it (`e2e/orrery-lookup.spec.ts`).
 - **No zod unions in client schemas.** `LookupResultSchema` is flat and narrowed by

@@ -8,7 +8,7 @@
     response cache, error kinds, stale-while-revalidate, the health check, incident issues, the
     KV refresh job, Cloudflare zone notes.
   - [bundle-and-loading.md](reference/bundle-and-loading.md): first-load budget, chunking,
-    orrery prefetch, the first view from the hash, Earth textures, layout shift, measurements.
+    orrery prefetch, the first view from the path (ADR 0036), Earth textures, layout shift, measurements.
   - [globe-and-design.md](reference/globe-and-design.md): colours, page layout, expand, the
     globe, the map, fonts.
   - [orrery.md](reference/orrery.md): the orrery page, renderer, presets, labels, playback,

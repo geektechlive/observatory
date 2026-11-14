@@ -1,5 +1,5 @@
 import { globeTextures } from '@/lib/globe3d'
-import { type ConsoleView, viewFromHash } from '@/store/ui'
+import type { ConsoleView } from '@/lib/viewRoute'
 
 /**
  * Screens that start the Earth textures at boot (#85): on a 4G phone the early 310 kB
@@ -15,12 +15,12 @@ export function isGlobeView(view: ConsoleView): boolean {
 /**
  * At boot, before React renders (#173): start the 2048 pair every globe tier draws first,
  * on desktop-size screens, for the views that draw the globe. This replaced static links in
- * index.html, which can't see the hash: a desktop #orrery, #sun or #sky downloaded 310 kB
- * of Earth for nothing. Measured locally (20 Mbps, 40 ms RTT, median of 5): #orrery's 3D
+ * index.html, which can't see the view: a desktop orrery, Sun or Sky page downloaded 310 kB
+ * of Earth for nothing. Measured locally (20 Mbps, 40 ms RTT, median of 5): the orrery's 3D
  * view 604 -> 538 ms; Earth's textured globe 609 -> 617 ms, as the entry now runs first.
  */
-export function preloadTexturesAtBoot(hash: string): void {
-  if (!isGlobeView(viewFromHash(hash) ?? 'earth')) return
+export function preloadTexturesAtBoot(view: ConsoleView): void {
+  if (!isGlobeView(view)) return
   if (!window.matchMedia(EARLY_TEXTURES_MEDIA).matches) return
   preloadTextures(globeTextures({ textureWidth: 2048 }).first)
 }

@@ -7,8 +7,9 @@ import { createRoot } from 'react-dom/client'
 import { defaultRetry, defaultRetryDelay } from '@/hooks/useSourceQuery'
 import { onRevalidating } from '@/lib/api/client'
 import { refetchOnceAfter, revalidateFeeds } from '@/lib/api/revalidate'
-import { isOrreryHash, prefetchOrrery, scheduleOrreryIdlePrefetch } from '@/lib/orreryPrefetch'
+import { prefetchOrrery, scheduleOrreryIdlePrefetch } from '@/lib/orreryPrefetch'
 import { preloadTexturesAtBoot } from '@/lib/texturePreload'
+import { currentView } from '@/lib/viewRoute'
 
 import { App } from './App'
 
@@ -38,13 +39,15 @@ onRevalidating(
 
 // The Earth textures every globe tier draws first (#85, #173), for the views that draw the
 // globe and on desktop-size screens only; a phone gets them from GlobeHost after first
-// paint (#87). Static links in index.html made a desktop #orrery, #sun or #sky fetch them.
-preloadTexturesAtBoot(window.location.hash)
+// paint (#87). Static links in index.html made a desktop /orrery/, /sun/ or /sky/ fetch them.
+// `currentView` also rewrites an old `#orrery?…` link to its path (ADR 0036).
+const bootView = currentView()
+preloadTexturesAtBoot(bootView)
 
-// The orrery's code arrived in two hops, each a round trip (#168). When the address is the
+// The orrery's code arrived in two hops, each a round trip (#168). When the page is the
 // orrery, ask for all of it now, before React renders; otherwise fetch it once the Earth
 // page has loaded and the browser is idle, so the Orrery tab opens without a wait.
-if (isOrreryHash(window.location.hash)) {
+if (bootView === 'orrery') {
   void prefetchOrrery()
 } else if (document.readyState === 'complete') {
   scheduleOrreryIdlePrefetch()

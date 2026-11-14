@@ -5,15 +5,15 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { skyViewHash } from '@/components/orrery/skyViewLink'
+import { skyViewUrl } from '@/components/orrery/skyViewLink'
 import { parseSkyLink } from '@/lib/sky/skyLink'
 
 const WALL = Date.parse('2026-11-13T12:00:00Z')
 
-describe('skyViewHash', () => {
+describe('skyViewUrl', () => {
   it('leaves out the time while the orrery clock runs at real time', () => {
     const live = { anchorSim: WALL - 30_000, anchorWall: WALL - 30_000, rate: 1, playing: true }
-    expect(skyViewHash('sbc:20000004', live, WALL)).toBe('#sky?target=sbc:20000004')
+    expect(skyViewUrl('sbc:20000004', live, WALL)).toBe('/sky/#target=sbc:20000004')
   })
 
   it('carries the clock’s time when it has been scrubbed', () => {
@@ -23,9 +23,9 @@ describe('skyViewHash', () => {
       rate: 1,
       playing: false,
     }
-    const hash = skyViewHash('sbc:20000004', scrubbed, WALL)
-    expect(hash).toBe('#sky?target=sbc:20000004&t=2026-11-16T03:00:00Z')
-    expect(parseSkyLink(hash)).toEqual({
+    const url = skyViewUrl('sbc:20000004', scrubbed, WALL)
+    expect(url).toBe('/sky/#target=sbc:20000004&t=2026-11-16T03:00:00Z')
+    expect(parseSkyLink(url.slice(url.indexOf('#')))).toEqual({
       target: 'sbc:20000004',
       t: Date.parse('2026-11-16T03:00:00Z'),
     })
@@ -38,8 +38,8 @@ describe('skyViewHash', () => {
       rate: 60,
       playing: true,
     }
-    expect(skyViewHash('sbc:1004083', fast, WALL)).toBe(
-      '#sky?target=sbc:1004083&t=2026-11-16T03:01:00Z',
+    expect(skyViewUrl('sbc:1004083', fast, WALL)).toBe(
+      '/sky/#target=sbc:1004083&t=2026-11-16T03:01:00Z',
     )
   })
 })

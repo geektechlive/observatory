@@ -78,7 +78,7 @@ describe('a link to a comet or interstellar object (#99)', () => {
     expect(selected()).toBeNull()
     view.rerender({ catalog: BASE_CATALOG, smallSettled: true })
     expect(selected()).toBeNull()
-    expect(window.location.hash).toBe('#orrery')
+    expect(window.location.hash).toBe('')
   })
 
   it('never fetches for a close approach key or a malformed id', () => {

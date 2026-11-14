@@ -17,7 +17,8 @@ import {
   type Reach,
   type TonightComet,
 } from '@/lib/sky/cometsTonight'
-import { serialiseSkyLink, targetOfTonightId } from '@/lib/sky/skyLink'
+import { skyUrl, targetOfTonightId } from '@/lib/sky/skyLink'
+import { isModifiedClick, navigate } from '@/lib/viewRoute'
 
 import styles from './tonight-panel.module.css'
 
@@ -38,10 +39,16 @@ const ASTEROID_REACH_WORDS: Record<AsteroidReach, string> = {
 function SkyLink({ id, name }: { id: string; name: string }) {
   const target = targetOfTonightId(id)
   if (target === null) return null
+  const href = skyUrl({ target, t: null })
   return (
     <a
       className={styles.skyLink ?? ''}
-      href={serialiseSkyLink({ target, t: null })}
+      href={href}
+      onClick={(e) => {
+        if (isModifiedClick(e)) return
+        e.preventDefault()
+        navigate(href)
+      }}
       aria-label={`Sky view of ${name}`}
     >
       Sky view

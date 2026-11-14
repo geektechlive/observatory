@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createOrreryLinkPreload,
   createOrreryPrefetch,
-  isOrreryHash,
   scheduleOrreryIdlePrefetch,
   shouldPrefetchOnIdle,
 } from '@/lib/orreryPrefetch'
@@ -11,20 +10,6 @@ import {
 // #168: the orrery's page and renderer (with three.js, which the renderer's own preload
 // list brings along) used to arrive in two hops, the second only once the first had run.
 // Starting both together, before React renders, leaves no chain.
-describe('isOrreryHash', () => {
-  it('reads the orrery address in the forms the app writes', () => {
-    for (const hash of ['#orrery', '#/orrery', '#ORRERY', '#orrery?t=2012-08-25&focus=naif:-31']) {
-      expect(isOrreryHash(hash)).toBe(true)
-    }
-  })
-
-  it('rejects every other address', () => {
-    for (const hash of ['', '#', '#earth', '#earth?layers=quakes', '#orreryx', '#sky?x=orrery']) {
-      expect(isOrreryHash(hash)).toBe(false)
-    }
-  })
-})
-
 describe('createOrreryPrefetch', () => {
   it('starts the page and the renderer together, before either has arrived', () => {
     const page = vi.fn(() => new Promise<unknown>(() => undefined))

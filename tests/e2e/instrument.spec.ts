@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('The Instrument', () => {
-  test('orbital dial switches console and updates the hash', async ({ page }) => {
+  test('orbital dial switches console and updates the path', async ({ page }) => {
     await page.goto('/')
     // default view is earth
-    await expect.poll(() => page.url()).toContain('#earth')
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/')
 
     await page.getByRole('tab', { name: /SUN/ }).click()
-    await expect.poll(() => page.url()).toContain('#sun')
+    await expect.poll(() => page.url()).toContain('/sun/')
     await expect(page.getByText('Heliophysics', { exact: false })).toBeVisible()
   })
 
-  test('deep-linking a hash boots the right console', async ({ page }) => {
+  test('deep-linking an old hash boots the right console', async ({ page }) => {
     await page.goto('/#sky')
     await expect(page.getByRole('tab', { name: /SKY/ })).toHaveAttribute('aria-selected', 'true')
   })

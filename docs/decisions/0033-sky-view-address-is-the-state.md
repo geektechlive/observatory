@@ -61,3 +61,10 @@ parameter on load.
   `orrery-sky-link.test.ts`, `orrery-sky-button.test.tsx`, `hash-view.test.ts`,
   `iss-passes.test.ts` (regression gate for the extracted loop).
 - Measurements: `docs/reference/orrery-data.md` ("Sky view for one object").
+
+## Addendum 2026-11-14 (ADR 0036)
+
+The view name moved from the hash to the path: the sky view's address is now
+`/sky/#target=sbc:<SPK-ID>[&t=<ISO UTC>]`. The state is still the address and the panel still only
+reads it (`useSkyLink`). The old `#sky?target=…` form is rewritten to the new one on read, and
+`useHashView.buildHash` is now `buildUrl`.

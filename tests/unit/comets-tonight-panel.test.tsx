@@ -225,7 +225,7 @@ describe('CometsTonight, sky view links (#99 item 5)', () => {
     const hrefs = screen
       .getAllByRole('link', { name: /sky view of/i })
       .map((a) => a.getAttribute('href'))
-    expect(hrefs).toContain('#sky?target=sbc:20000004')
-    expect(hrefs).toContain('#sky?target=sbc:1004035')
+    expect(hrefs).toContain('/sky/#target=sbc:20000004')
+    expect(hrefs).toContain('/sky/#target=sbc:1004035')
   })
 })

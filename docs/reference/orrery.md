@@ -159,7 +159,8 @@ year-a-second rate and a 10-second soak.
 
 ## Shareable links (#108)
 
-`#orrery?t=<ISO UTC>&focus=<key>&preset=<id>`. Same `?` form as `#earth?layers=`. The format
+`/orrery/#t=<ISO UTC>&focus=<key>&preset=<id>` (ADR 0036: the view is the path, the hash holds
+the params; the old `#orrery?t=…` form is rewritten on read). The format
 lives in `src/components/orrery/orreryLink.ts` (no three.js), and the hook in
 `useOrreryLink.ts`.
 
@@ -194,7 +195,7 @@ lives in `src/components/orrery/orreryLink.ts` (no three.js), and the hook in
   apply step clears the link before it selects.
 - Writes are `replaceState` only: on a selection or preset change, and 400 ms after the clock
   last changed, so a scrub writes once. Nothing is written while a link is still being applied.
-- **`buildHash` keeps the orrery's own params when the hash is already on the orrery** (raw, so
+- **`buildUrl` keeps the orrery's own params when the address is already on `/orrery/`** (raw, so
   the encoding stays) and drops everything else. Without that, `useHashView`'s mount
   canonicalisation wiped the link before the lazy page could read it. `layers=` never reaches the
   orrery (#109).

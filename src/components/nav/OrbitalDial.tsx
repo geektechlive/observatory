@@ -2,6 +2,7 @@ import { type ReactNode, useRef } from 'react'
 
 import { TickRing } from '@/components/ui/TickRing'
 import { preloadOrreryLinks } from '@/lib/orreryPrefetch'
+import { isModifiedClick, viewPath } from '@/lib/viewRoute'
 import { CONSOLE_VIEWS, type ConsoleView, useUiStore } from '@/store/ui'
 
 import styles from './orbital-dial.module.css'
@@ -99,7 +100,7 @@ const META: Record<ConsoleView, { label: string; sub: string; glyph: ReactNode }
 export function OrbitalDial() {
   const view = useUiStore((s) => s.view)
   const setView = useUiStore((s) => s.setView)
-  const tabRefs = useRef<Record<ConsoleView, HTMLButtonElement | null>>({
+  const tabRefs = useRef<Record<ConsoleView, HTMLAnchorElement | null>>({
     earth: null,
     orrery: null,
     sun: null,
@@ -112,7 +113,7 @@ export function OrbitalDial() {
     tabRefs.current[next]?.focus()
   }
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: React.KeyboardEvent, v: ConsoleView) => {
     const idx = CONSOLE_VIEWS.indexOf(view)
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault()
@@ -128,6 +129,10 @@ export function OrbitalDial() {
     } else if (e.key === 'End') {
       e.preventDefault()
       focusAndSetView(CONSOLE_VIEWS[CONSOLE_VIEWS.length - 1] as ConsoleView)
+    } else if (e.key === ' ') {
+      // A button activates on Space; a link would scroll the page. Keep the tab's behaviour.
+      e.preventDefault()
+      setView(v)
     }
   }
 
@@ -153,20 +158,25 @@ export function OrbitalDial() {
           const active = v === view
           const m = META[v]
           return (
-            <button
+            <a
               key={v}
               ref={(el) => {
                 tabRefs.current[v] = el
               }}
               id={`console-tab-${v}`}
-              type="button"
+              href={viewPath(v)}
               role="tab"
-              onKeyDown={onKeyDown}
+              onKeyDown={(e) => {
+                onKeyDown(e, v)
+              }}
               aria-selected={active}
               aria-controls="console-panel"
               tabIndex={active ? 0 : -1}
               className={`${styles.node ?? ''} ${active ? (styles.nodeActive ?? '') : ''}`}
-              onClick={() => {
+              onClick={(e) => {
+                // A plain click switches in the app; new-tab clicks stay the browser's (ADR 0036).
+                if (isModifiedClick(e)) return
+                e.preventDefault()
                 setView(v)
               }}
               // Reaching for the Orrery tab downloads its chunks without running them (#168).
@@ -184,7 +194,7 @@ export function OrbitalDial() {
               </span>
               <span className={styles.nodeLabel ?? ''}>{m.label}</span>
               <span className={styles.nodeSub ?? ''}>{m.sub}</span>
-            </button>
+            </a>
           )
         })}
       </div>

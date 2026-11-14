@@ -58,7 +58,7 @@ test.describe('Orrery tab round trip', () => {
     await expect(
       page.getByRole('group', { name: 'Focus' }).locator('button[aria-pressed="true"]'),
     ).toHaveCount(0)
-    await expect.poll(() => hash(page)).toBe('#orrery?focus=Jupiter')
+    await expect.poll(() => hash(page)).toBe('#focus=Jupiter')
   })
 
   test('a preset survives it: the same chip is pressed and the address names it (#189)', async ({
@@ -71,6 +71,6 @@ test.describe('Orrery tab round trip', () => {
     await expect(pressed).toHaveText('Inner')
     await roundTrip(page)
     await expect(pressed).toHaveText('Inner')
-    await expect.poll(() => hash(page)).toBe('#orrery?preset=inner')
+    await expect.poll(() => hash(page)).toBe('#preset=inner')
   })
 })

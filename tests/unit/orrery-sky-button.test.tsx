@@ -71,7 +71,7 @@ describe('SmallBodyFacts, sky view button', () => {
   it('leaves the time out when the clock is at real time', () => {
     render(<SmallBodyFacts entry={vestaEntry()} simMs={Date.now()} />)
     fireEvent.click(screen.getByRole('button', { name: /see it in your sky/i }))
-    expect(window.location.hash).toBe('#sky?target=sbc:20000004')
+    expect(window.location.hash).toBe('#target=sbc:20000004')
   })
 
   it('has no button, and says why, for an object that is not in the Tonight data', () => {

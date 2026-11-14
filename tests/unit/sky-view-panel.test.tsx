@@ -182,7 +182,7 @@ describe('SkyViewPanel', () => {
   it('"Now" drops the time from the link and keeps the target', () => {
     open(`#sky?target=sbc:20000004&t=${NIGHT_T}`)
     fireEvent.click(screen.getByRole('button', { name: /^now$/i }))
-    expect(window.location.hash).toBe('#sky?target=sbc:20000004')
+    expect(window.location.hash).toBe('#target=sbc:20000004')
   })
 
   it('has no Now button when it is already live', () => {
@@ -217,7 +217,7 @@ describe('SkyViewPanel', () => {
   it('closes back to a bare #sky', () => {
     open(`#sky?target=sbc:20000004&t=${NIGHT_T}`)
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
-    expect(window.location.hash).toBe('#sky')
+    expect(window.location.hash).toBe('')
   })
 
   it('keeps the twilight band in order, civil to dark', () => {

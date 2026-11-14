@@ -6,7 +6,7 @@ import { useCometsTonight } from '@/hooks/useCometsTonight'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { useNow } from '@/hooks/useNow'
 import { MIN_ALTITUDE } from '@/lib/sky/cometsTonight'
-import { serialiseSkyLink } from '@/lib/sky/skyLink'
+import { skyUrl } from '@/lib/sky/skyLink'
 import { findSkyTarget, type SkyTarget } from '@/lib/sky/tonightTarget'
 import {
   bodyRange,
@@ -17,6 +17,7 @@ import {
   skyTrack,
   twilightBand,
 } from '@/lib/sky/track'
+import { navigate } from '@/lib/viewRoute'
 
 import styles from './sky-view-panel.module.css'
 import { SkyDome } from './SkyDome'
@@ -43,7 +44,7 @@ const utcClock = (d: Date) => d.toISOString().slice(11, 16)
 type Source = 'live' | 'orrery' | 'link'
 
 /**
- * The sky view for one object (#99 item 5), opened by `#sky?target=sbc:<SPK-ID>[&t=…]`
+ * The sky view for one object (#99 item 5), opened by `/sky/#target=sbc:<SPK-ID>[&t=…]`
  * from a Tonight row or the orrery's inspector. Nothing shows without a target. It uses
  * the visitor's shared location (never the Greenwich stand-in) and sends it nowhere itself;
  * the Tonight panel beside it sends it to Open-Meteo for cloud cover. Its positions come
@@ -96,11 +97,11 @@ function SkyView({
       opener instanceof HTMLElement && opener.isConnected
         ? opener
         : document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-    window.location.hash = serialiseSkyLink({ target: null, t: null })
+    navigate(skyUrl({ target: null, t: null }))
     back?.focus()
   }
   const live = () => {
-    window.location.hash = serialiseSkyLink({ target, t: null })
+    navigate(skyUrl({ target, t: null }))
   }
 
   const found = useMemo(

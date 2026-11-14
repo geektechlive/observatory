@@ -1,5 +1,6 @@
 /**
- * The sky view's shareable link (#99 item 5): `#sky?target=sbc:<SPK-ID>&t=<ISO UTC>`.
+ * The sky view's shareable link (#99 item 5): `/sky/#target=sbc:<SPK-ID>&t=<ISO UTC>` (the view is
+ * the path, ADR 0036; the old `#sky?target=…` form still reads and is rewritten).
  *
  * - `target` is the orrery's key for a small body (`sbc:<SPK-ID>`: comets, interstellar
  *   objects, bright asteroids and Ceres). The Tonight slice names the same objects
@@ -12,6 +13,8 @@
  * The console owns the hash while the sky view is open (useHashView keeps these two params
  * and drops the rest). Lazy: nothing in the first load imports this.
  */
+
+import { paramsOf, viewPath } from '@/lib/viewRoute'
 
 export interface SkyLink {
   target: string | null
@@ -39,9 +42,7 @@ function parseTime(raw: string): number | null {
 /** The link's values; null for each one that is missing or not understood. */
 export function parseSkyLink(hash: string): SkyLink {
   const out: SkyLink = { target: null, t: null }
-  const [view = '', query] = hash.replace(/^#\/?/, '').split('?')
-  if (view.toLowerCase() !== 'sky' || query === undefined) return out
-  for (const part of query.split('&')) {
+  for (const part of paramsOf(hash, 'sky').split('&')) {
     const eq = part.indexOf('=')
     if (eq < 0) continue
     const value = decode(part.slice(eq + 1))?.trim()
@@ -56,16 +57,20 @@ export function parseSkyLink(hash: string): SkyLink {
 /** The colon stays readable (`sbc:20000004`). */
 const encode = (s: string) => encodeURIComponent(s).replaceAll('%3A', ':')
 
+/** The hash for a link: `#target=…&t=…`, or '' for the view with no target. */
 export function serialiseSkyLink(link: SkyLink): string {
-  if (link.target === null) return '#sky'
+  if (link.target === null) return ''
   const parts = [`target=${encode(link.target)}`]
   if (link.t !== null) {
     parts.push(
       `t=${new Date(Math.floor(link.t / 1000) * 1000).toISOString().replace('.000Z', 'Z')}`,
     )
   }
-  return `#sky?${parts.join('&')}`
+  return `#${parts.join('&')}`
 }
+
+/** The address of the sky view for a link: its path and hash, for an `href` or `navigate`. */
+export const skyUrl = (link: SkyLink): string => `${viewPath('sky')}${serialiseSkyLink(link)}`
 
 /** The link key for an object of the Tonight slice (`sb:<SPK-ID>` there, `sbc:` here). */
 export function targetOfTonightId(id: string): string | null {

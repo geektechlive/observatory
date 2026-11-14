@@ -70,33 +70,33 @@ describe('preloadTextures (#87)', () => {
   })
 })
 
-// #173: index.html can't see the hash, so its static links made a desktop #orrery, #sun
-// or #sky download 310 kB of Earth for nothing. main.tsx now asks at boot, by view.
+// #173: index.html can't see the view, so its static links made a desktop orrery, Sun
+// or Sky page download 310 kB of Earth for nothing. main.tsx now asks at boot, by view.
 describe('preloadTexturesAtBoot (#173)', () => {
   afterEach(() => {
     document.head.innerHTML = ''
     vi.unstubAllGlobals()
   })
 
-  it.each(['', '#earth', '#orbit'])('starts the 2048 pair on a wide screen for %j', (hash) => {
+  it.each(['earth', 'orbit'] as const)('starts the 2048 pair on a wide screen for %s', (view) => {
     stubScreen(true)
-    preloadTexturesAtBoot(hash)
+    preloadTexturesAtBoot(view)
     expect(links().map((l) => l.getAttribute('href'))).toEqual([pair.day, pair.night])
     for (const link of links()) expect(link.getAttribute('crossorigin')).toBe('anonymous')
   })
 
-  it.each(['#orrery', '#orrery?t=2026-11-12T00:00:00Z&focus=earth', '#/sun', '#sky'])(
+  it.each(['orrery', 'sun', 'sky'] as const)(
     'starts nothing for %s, which draws no globe',
-    (hash) => {
+    (view) => {
       stubScreen(true)
-      preloadTexturesAtBoot(hash)
+      preloadTexturesAtBoot(view)
       expect(links()).toEqual([])
     },
   )
 
   it('starts nothing on a phone: GlobeHost asks after first paint (#85, #87)', () => {
     stubScreen(false)
-    preloadTexturesAtBoot('#earth')
+    preloadTexturesAtBoot('earth')
     expect(links()).toEqual([])
   })
 })

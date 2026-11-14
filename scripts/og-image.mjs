@@ -6,7 +6,7 @@
  *
  * 1. Opens the live site in Chromium on the real GPU (Metal on macOS), so the globe draws
  *    the high tier: bloom, the 4096 textures, city lights. Every layer is off
- *    (`#earth?layers=`) and the bezel's minor ticks, numerals and census arc are hidden,
+ *    (`#layers=`) and the bezel's minor ticks, numerals and census arc are hidden,
  *    so the lens is the copper ring, its 12 major ticks, the reticle and the Earth.
  * 2. Renders scripts/og/template.html at 1200x630 (deviceScaleFactor 1) with that
  *    capture, the repo's tokens and self-hosted fonts.
@@ -141,7 +141,7 @@ async function captureGlobe(browser, dir) {
   await page.clock.setFixedTime(scene)
   // Only the day-night shading: every marker and the aurora stay off (useHashView). With
   // `layers=` alone the night side and its city lights go too.
-  await page.goto(`${BASE}/?globe=webgl#earth?layers=terminator`)
+  await page.goto(`${BASE}/?globe=webgl#layers=terminator`)
   const host = page.locator('[data-globe-mode="webgl"]')
   await host.waitFor({ timeout: 30_000 })
   const canvas = page.locator('canvas[data-globe-bloom]')

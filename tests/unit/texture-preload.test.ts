@@ -28,7 +28,7 @@ describe('Earth texture preload (#85, #173)', () => {
     expect(globeTextures({ textureWidth: 4096 }).first.width).toBe(2048)
   })
 
-  // A static link can't see the hash: a desktop #orrery, #sun or #sky downloaded 310 kB of
+  // A static link can't see the view: a desktop orrery, Sun or Sky page downloaded 310 kB of
   // Earth for nothing (#173). main.tsx's preloadTexturesAtBoot asks by view instead.
   it('preloads no texture from index.html', () => {
     expect(imagePreloads.map(href)).toEqual([])
@@ -41,7 +41,7 @@ describe('Earth texture preload (#85, #173)', () => {
 
   it('starts the boot preload from the entry, before React renders', () => {
     const main = readFileSync(join(ROOT, 'src', 'main.tsx'), 'utf8')
-    const boot = main.indexOf('preloadTexturesAtBoot(window.location.hash)')
+    const boot = main.indexOf('preloadTexturesAtBoot(bootView)')
     expect(boot).toBeGreaterThan(-1)
     expect(boot).toBeLessThan(main.indexOf('createRoot('))
   })

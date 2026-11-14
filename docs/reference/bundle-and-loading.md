@@ -45,7 +45,7 @@ files appeared (#158, #159). (`JplLookup` did not split it; why was not checked.
 
 `src/lib/orreryPrefetch.ts` has two paths.
 
-- **Boot on `#orrery`** (`main.tsx`, before React renders) really imports OrreryPage and
+- **Boot on `/orrery/`** (`main.tsx`, before React renders) really imports OrreryPage and
   OrreryRenderer in parallel (Vite's preload list for the renderer brings three.js along);
   App.tsx's lazy page uses the same loader.
 - **Pointer or focus on the Orrery dial tab, and 3 s after load once the browser is idle** (not
@@ -83,23 +83,32 @@ files appeared (#158, #159). (`JplLookup` did not split it; why was not checked.
   0.81 s (1.40 s that morning), throttled phone 4.75 s (5.86 s), Earth page about 0.4 s desktop
   and 1.8 s phone. First load: 3 files, about 151 kB gzip.
 
-## The first view comes from the hash before the first render (#167)
+## The first view comes from the address before the first render (#167)
 
-`useUiStore`'s initial `view` is `viewFromHash(location.hash)`. It used to start on `'earth'` and
-fix itself in `useHashView`'s mount effect, so every direct `#orrery`, `#sun`, `#sky` or `#orbit`
+Since ADR 0036 the view is the path (`/orrery/`, `/sun/`, `/sky/`, `/orbit/`; `/` is Earth) and
+the hash holds only a view's own state (`/orrery/#focus=Mars`, `/#layers=iss,quakes`); old
+`#orrery?…` links are rewritten in place. `src/lib/viewRoute.ts` is the one reader and writer; it
+has no imports beyond `viewMeta.ts` and is in the first load. Static shells
+(`scripts/view-shells.mjs`, run by `pnpm build` after `vite build`) serve `dist/<view>/index.html`
+from `dist/index.html`: the same bundle and preloads, so the first load is the same 3 files; only
+the head and the `<noscript>` differ. Entry gzip went from 153.1 to 153.8 kB for the router, the
+titles and the subtitles (descriptions and noscript text live in the script, not the bundle).
+
+`useUiStore`'s initial `view` is `readLocation().view`. It used to start on `'earth'` and
+fix itself in `useHashView`'s mount effect, so every direct `/orrery/`, `/sun/`, `/sky/` or `/orbit/`
 load mounted the Earth columns for a render: EarthConsoleRest, propagate, and nine Earth feeds
 were fetched for a page never shown. The globe's data hooks (`useGlobeData`) live in
 `EarthColumns` (App.tsx), not in `App`, and the coastline chunk (`landRings`) loads on its first
 call, not at module import, because that import sits in the entry.
 The initial `layers` come from `layersFromHash` the same way (#176), and persist's `merge` lets a
-`?layers=` link beat saved preferences: applied in the mount effect, the default layers mounted
-for one render, and `#orbit?layers=fires` fetched `/api/aurora` for a layer the link turns off
+`#layers=` link beat saved preferences: applied in the mount effect, the default layers mounted
+for one render, and `/orbit/#layers=fires` fetched `/api/aurora` for a layer the link turns off
 (`tests/e2e/hash-layers.spec.ts`). No painted frame showed the defaults, so CLS was not affected.
-`tests/e2e/orrery-lean-load.spec.ts` counts what a cold `#orrery` asks for. The orrery keeps
+`tests/e2e/orrery-lean-load.spec.ts` counts what a cold `/orrery/` asks for. The orrery keeps
 solar-wind, cme, dsn, spacetrack and discos (it shows them), and no Earth texture (#173,
 below).
 
-`#sun` and `#sky` draw no globe, so `useGlobeData` passes `enabled = false` to the globe's
+`/sun/` and `/sky/` draw no globe, so `useGlobeData` passes `enabled = false` to the globe's
 feeds there (#172): the hooks still run, so the stage never remounts, but they fetch nothing
 and `useIss` loads no SGP4 and runs no loop. Measured 2026-11-12 on a cold local build
 (`tests/e2e/sun-sky-lean-load.spec.ts`): `#sun` dropped from 17 to 13 API paths (no ISS TLE,
@@ -116,7 +125,7 @@ adds preload links for `day-2048.webp` and `night-2048.webp` when the view draws
 (Earth, Orbit). On a 4G phone the early 310 kB delayed the app's first paint by ~160 ms.
 
 - **Why not static links in `index.html` (#173).** They were there until 2026-11-12, but the HTML
-  can't see the hash, so a desktop `#orrery`, `#sun` or `#sky` downloaded 310 kB of Earth it
+  can't see the hash, so a desktop `/orrery/`, `/sun/` or `/sky/` downloaded 310 kB of Earth it
   never drew. A hash-checking inline script would need a CSP change (`script-src` allows no
   inline script). Measured locally (`vite preview`, 20 Mbps, 40 ms RTT, cache off, median of 5,
   tight runs): desktop `#orrery` to `data-orrery-mode="webgl"` 604 to 538 ms; desktop Earth to

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { isDwarfFocus } from '@/lib/orrery/dwarfs'
 import { lookupSpkid } from '@/lib/orrery/lookupTrack'
 import { isSmallBodyKey } from '@/lib/orrery/smallBodyView'
+import { readLocation, replaceHash, subscribeLocation } from '@/lib/viewRoute'
 import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 import { useOrreryView } from '@/store/orreryView'
 
@@ -81,7 +82,7 @@ export interface ApplyLinkOptions {
   fresh?: boolean
 }
 
-const onOrrery = () => /^#\/?orrery(\?|$)/i.test(window.location.hash)
+const onOrrery = () => readLocation().view === 'orrery'
 
 /** What a link asks for that has not been applied yet. */
 type Pending = Pick<OrreryLink, 'focus' | 'preset' | 'detail'> & { fresh: boolean }
@@ -120,7 +121,7 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
       // inspector open). The opening view needs no mention on its own.
       preset: view !== null && (focus !== null || view !== DEFAULT_PRESET) ? view : null,
     })
-    if (window.location.hash !== next) window.history.replaceState(window.history.state, '', next)
+    if (window.location.hash !== next) replaceHash(next)
   })
 
   // The one path a link takes into the scene: the address on load and on edit, and the
@@ -151,14 +152,11 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
       apply(parseOrreryLink(window.location.hash))
     }
     read()
-    window.addEventListener('hashchange', read)
-    return () => {
-      window.removeEventListener('hashchange', read)
-    }
+    return subscribeLocation(read)
   }, [apply])
 
   // Coming back to the tab (#189): the view kept in the store writes its link. The dial's
-  // own effect (useHashView) puts the bare `#orrery` in the same commit as this mounts, so
+  // own effect (useHashView) puts the bare `/orrery/` in the same commit as this mounts, so
   // the write waits until that has run.
   useEffect(() => {
     const timer = setTimeout(write.current, 0)
