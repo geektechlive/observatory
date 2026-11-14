@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { type KvStreamReader, serveKvBody } from './_kvBody'
+import { type KvCacheContext, type KvStreamReader, serveKv } from './_kvBody'
 
 // ESA DISCOSweb (#101): mass, size, shape and operator for the orrery's spacecraft and a
 // few dozen satellites, read by the refresh job (scripts/discos.mjs) with the owner's
@@ -13,8 +13,13 @@ interface Env {
   OBSERVATORY_CACHE: KvStreamReader
 }
 
-export function serveDiscos(kv: KvStreamReader, now = Date.now()): Promise<Response> {
-  return serveKvBody(
+export function serveDiscos(
+  kv: KvStreamReader,
+  now = Date.now(),
+  ctx?: KvCacheContext,
+): Promise<Response> {
+  return serveKv(
+    ctx,
     kv,
     {
       key: 'discos:objects:v1',
@@ -25,4 +30,5 @@ export function serveDiscos(kv: KvStreamReader, now = Date.now()): Promise<Respo
   )
 }
 
-export const onRequest: PagesFunction<Env> = (ctx) => serveDiscos(ctx.env.OBSERVATORY_CACHE)
+export const onRequest: PagesFunction<Env> = (ctx) =>
+  serveDiscos(ctx.env.OBSERVATORY_CACHE, Date.now(), ctx)

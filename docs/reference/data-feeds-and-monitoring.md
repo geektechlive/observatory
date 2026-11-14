@@ -329,7 +329,10 @@ Both data-refresh jobs write `incident-report.json`, and `scripts/report-inciden
   "observatory API rate limit" (50 requests per 10 s per `ip.src` + `cf.colo.id`, then a 10 s
   block, Cloudflare's default 429 page, which counts cache HITs too) and the Functions'
   `_middleware.ts` (60 a minute per isolate, JSON `{"error":"Rate limit exceeded"}` with
-  `Retry-After: 60`, seen only by requests that reach a Function). A cold orrery load sends
+  `Retry-After: 60`, seen only by requests that reach a Function). **Any host but the custom
+  domain gets 10 a minute, in its own bucket (#235):** the project's pages.dev host and its
+  previews sit outside the zone's rules, so the middleware is all that limits them, and the
+  host's name is public in every commit's Pages check run. A cold orrery load sends
   about 17 `/api/` requests, so five tabs at once from one address can trip either. Which one
   sent #141's 429s wasn't captured. The client waits out both: every query, the orrery bodies
   included, retries a 429 after 61 s (`defaultRetryDelay`, #218, which replaced #141's

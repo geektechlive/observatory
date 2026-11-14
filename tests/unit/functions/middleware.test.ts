@@ -104,12 +104,40 @@ describe('functions/_middleware onRequest', () => {
   })
 
   describe('rate limiting', () => {
+    const hit = (host: string, ip: string) => {
+      const request = new Request(`https://${host}/api/x`, { headers: { 'CF-Connecting-IP': ip } })
+      return onRequest(makeContext(request, okNext) as unknown as Parameters<typeof onRequest>[0])
+    }
+
+    it('allows only 10 a minute on any host but the custom domain: the pages.dev one is public (#235)', async () => {
+      const ip = nextTestIp()
+      for (let i = 0; i < 10; i += 1) {
+        expect((await hit('observatory-3qw.pages.dev', ip)).status).toBe(200)
+      }
+      const eleventh = await hit('observatory-3qw.pages.dev', ip)
+      expect(eleventh.status).toBe(429)
+      expect(eleventh.headers.get('Retry-After')).toBe('60')
+      // A preview deploy's host is limited the same way.
+      const other = nextTestIp()
+      for (let i = 0; i < 10; i += 1) await hit('dddceea6.observatory-3qw.pages.dev', other)
+      expect((await hit('dddceea6.observatory-3qw.pages.dev', other)).status).toBe(429)
+    })
+
+    it('keeps 60 a minute on the custom domain, in a bucket apart from pages.dev (#235)', async () => {
+      const ip = nextTestIp()
+      for (let i = 0; i < 11; i += 1) await hit('observatory-3qw.pages.dev', ip)
+      for (let i = 0; i < 60; i += 1) {
+        expect((await hit('observatory.geektechlive.com', ip)).status).toBe(200)
+      }
+      expect((await hit('observatory.geektechlive.com', ip)).status).toBe(429)
+    })
+
     it('returns 429 with security headers on the 61st request from one IPv4 within the window', async () => {
       const ip = nextTestIp()
       let response: Response | undefined
 
       for (let i = 0; i < 61; i += 1) {
-        const request = new Request('https://observatory.example/api/x', {
+        const request = new Request('https://observatory.geektechlive.com/api/x', {
           method: 'GET',
           headers: { 'CF-Connecting-IP': ip },
         })
@@ -131,7 +159,7 @@ describe('functions/_middleware onRequest', () => {
 
       // Exhaust the bucket using ipA.
       for (let i = 0; i < 60; i += 1) {
-        const request = new Request('https://observatory.example/api/x', {
+        const request = new Request('https://observatory.geektechlive.com/api/x', {
           method: 'GET',
           headers: { 'CF-Connecting-IP': ipA },
         })
@@ -141,7 +169,7 @@ describe('functions/_middleware onRequest', () => {
 
       // ipB shares the same first 4 hextets, so it should already be over
       // the limit and get a 429 on its very first request.
-      const request = new Request('https://observatory.example/api/x', {
+      const request = new Request('https://observatory.geektechlive.com/api/x', {
         method: 'GET',
         headers: { 'CF-Connecting-IP': ipB },
       })

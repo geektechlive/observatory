@@ -87,6 +87,27 @@ describe('/api/aftershocks', () => {
     expect(res.headers.get('X-Error-Kind')).toBe('upstream')
   })
 
+  it("fetches a quake's detail and forecast only from USGS's own host (#249)", async () => {
+    const foreign = 'https://evil.example/fdsnws/event/1/query?eventid=us6000u18k&format=geojson'
+    const tampered = {
+      ...SEARCH,
+      features: SEARCH.features.map((f, i) =>
+        i === 0 ? { ...f, properties: { ...f.properties, detail: foreign } } : f,
+      ),
+    }
+    serve({ [foreign]: json(DETAIL), [FORECAST_URL]: json(FORECAST) }, json(tampered))
+    const res = await call()
+    const asked = vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) =>
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      )
+    expect(asked.some((u) => u.startsWith('https://evil.example/'))).toBe(false)
+    // A foreign host is drift, not an outage: with nothing else readable it alerts as contract.
+    expect(res.status).toBe(500)
+    expect(res.headers.get('X-Error-Kind')).toBe('contract')
+  })
+
   it('answers an empty list, not an error, when no quake has a forecast', async () => {
     serve({}, json({ type: 'FeatureCollection', features: [] }))
     const res = await call()

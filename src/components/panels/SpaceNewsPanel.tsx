@@ -3,6 +3,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useSpaceNews } from '@/hooks/useSpaceNews'
 import { formatRelativeTime } from '@/lib/format'
+import { httpsHref } from '@/lib/httpsHref'
 import { panelView } from '@/lib/panelView'
 
 import styles from './space-news-panel.module.css'
@@ -35,7 +36,12 @@ export function SpaceNewsPanel() {
       <ol className={styles.list ?? ''}>
         {data.articles.slice(0, 7).map((a, i) => (
           <li key={`${a.url}-${i}`} className={styles.item ?? ''}>
-            <a href={a.url} target="_blank" rel="noopener noreferrer" className={styles.link ?? ''}>
+            <a
+              href={httpsHref(a.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.link ?? ''}
+            >
               <span className={styles.title ?? ''}>{a.title}</span>
               <span className={styles.meta ?? ''}>
                 {a.site}

@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { type KvStreamReader, serveKvBody } from './_kvBody'
+import { type KvCacheContext, type KvStreamReader, serveKv } from './_kvBody'
 
 // Space-Track.org (#101): re-entry predictions, recent decays and the Box Score
 // (`part=catalog`, the default), the satellite catalogue in 16 shards by NORAD id
@@ -32,11 +32,13 @@ export function serveSpaceTrack(
   requestUrl: string,
   kv: KvStreamReader,
   now = Date.now(),
+  ctx?: KvCacheContext,
 ): Promise<Response> {
   const params = new URL(requestUrl).searchParams
   const part = params.get('part') ?? 'catalog'
   if (part === 'catalog') {
-    return serveKvBody(
+    return serveKv(
+      ctx,
       kv,
       {
         key: 'spacetrack:catalog:v1',
@@ -47,7 +49,8 @@ export function serveSpaceTrack(
     )
   }
   if (part === 'history') {
-    return serveKvBody(
+    return serveKv(
+      ctx,
       kv,
       {
         key: 'spacetrack:history:v1',
@@ -64,7 +67,8 @@ export function serveSpaceTrack(
     if (!(shard >= 0 && shard < SHARDS)) {
       return Promise.resolve(badRequest(`shard must be 0 to ${String(SHARDS - 1)}`))
     }
-    return serveKvBody(
+    return serveKv(
+      ctx,
       kv,
       {
         key: `spacetrack:satcat:v1:${String(shard)}`,
@@ -78,4 +82,4 @@ export function serveSpaceTrack(
 }
 
 export const onRequest: PagesFunction<Env> = (ctx) =>
-  serveSpaceTrack(ctx.request.url, ctx.env.OBSERVATORY_CACHE)
+  serveSpaceTrack(ctx.request.url, ctx.env.OBSERVATORY_CACHE, Date.now(), ctx)

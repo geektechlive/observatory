@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { type KvStreamReader, serveKvBody } from './_kvBody'
+import { type KvCacheContext, type KvStreamReader, serveKv } from './_kvBody'
 
 // The orrery's craft, Earth and Moon (#93), sampled from JPL Horizons by
 // scripts/refresh-data.mjs every 6 h and stored in KV as the finished response body.
@@ -19,8 +19,13 @@ interface Env {
   OBSERVATORY_CACHE: KvStreamReader
 }
 
-export function serveOrreryBodies(kv: KvStreamReader, now = Date.now()): Promise<Response> {
-  return serveKvBody(
+export function serveOrreryBodies(
+  kv: KvStreamReader,
+  now = Date.now(),
+  ctx?: KvCacheContext,
+): Promise<Response> {
+  return serveKv(
+    ctx,
     kv,
     {
       key: KV_ORRERY_BODIES_KEY,
@@ -31,4 +36,5 @@ export function serveOrreryBodies(kv: KvStreamReader, now = Date.now()): Promise
   )
 }
 
-export const onRequest: PagesFunction<Env> = (ctx) => serveOrreryBodies(ctx.env.OBSERVATORY_CACHE)
+export const onRequest: PagesFunction<Env> = (ctx) =>
+  serveOrreryBodies(ctx.env.OBSERVATORY_CACHE, Date.now(), ctx)

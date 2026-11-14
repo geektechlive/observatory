@@ -7,6 +7,7 @@ import { Swatch } from '@/components/ui/Swatch'
 import { useAftershocks } from '@/hooks/useAftershocks'
 import { useNow } from '@/hooks/useNow'
 import { useQuakes } from '@/hooks/useQuakes'
+import { httpsHref } from '@/lib/httpsHref'
 import { LANES } from '@/lib/palette'
 import { panelView } from '@/lib/panelView'
 import { aftershockStatus, quakeStatus } from '@/lib/severity'
@@ -51,7 +52,12 @@ function AftershockOdds() {
           const tone = aftershockStatus(f.week)
           return (
             <li key={f.id} className={styles.oddsRow ?? ''}>
-              <a href={f.url} target="_blank" rel="noreferrer" className={styles.place ?? ''}>
+              <a
+                href={httpsHref(f.url)}
+                target="_blank"
+                rel="noreferrer"
+                className={styles.place ?? ''}
+              >
                 M{f.mag.toFixed(1)} {f.place}
               </a>
               <span className={styles.oddsPair ?? ''}>

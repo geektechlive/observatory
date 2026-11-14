@@ -48,7 +48,16 @@ export function issueTitle(signature) {
   return `[observatory] ${signature}`
 }
 
-const fence = (detail) => `\`\`\`\n${detail}\n\`\`\``
+/**
+ * Upstream text as one code block (#250). The fence is one backtick longer than the longest
+ * run inside it (CommonMark), so text holding ``` can't close it early and turn what
+ * follows, an @mention included, into live Markdown.
+ */
+export function fence(detail) {
+  const longest = Math.max(0, ...[...String(detail).matchAll(/`+/g)].map((m) => m[0].length))
+  const tick = '`'.repeat(Math.max(3, longest + 1))
+  return `${tick}\n${detail}\n${tick}`
+}
 
 /**
  * Pure: what makes two reports of one source "the same": the status (failing or

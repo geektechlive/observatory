@@ -82,10 +82,25 @@ async function fetchJson<T>(
   }
 }
 
+/**
+ * USGS's own host (#249): the detail and forecast URLs come from USGS's JSON, so a
+ * spoofed answer must not make this Function fetch anywhere else.
+ */
+function isUsgs(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' && u.hostname === 'earthquake.usgs.gov'
+  } catch {
+    return false
+  }
+}
+
 async function forecastFor(quake: Quake): Promise<Outcome> {
+  if (!isUsgs(quake.properties.detail)) return { failed: 'contract' }
   const detail = await fetchJson(quake.properties.detail, DetailSchema)
   if (typeof detail === 'string') return { failed: detail }
   const url = detail.properties.products.oaf[0]?.contents['forecast.json'].url ?? ''
+  if (!isUsgs(url)) return { failed: 'contract' }
   const forecast = await fetchJson(url, ForecastSchema)
   if (typeof forecast === 'string') return { failed: forecast }
   const day = window(forecast, '1 Day')

@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { type KvStreamReader, serveKvBody } from './_kvBody'
+import { type KvCacheContext, type KvStreamReader, serveKv } from './_kvBody'
 
 // The orrery's close approaches (#92): this fortnight's CAD objects placed with JPL
 // Horizons, JPL Scout's unconfirmed objects and ESA NEOCC's lists, built by
@@ -17,8 +17,13 @@ interface Env {
   OBSERVATORY_CACHE: KvStreamReader
 }
 
-export function serveOrreryNeo(kv: KvStreamReader, now = Date.now()): Promise<Response> {
-  return serveKvBody(
+export function serveOrreryNeo(
+  kv: KvStreamReader,
+  now = Date.now(),
+  ctx?: KvCacheContext,
+): Promise<Response> {
+  return serveKv(
+    ctx,
     kv,
     {
       key: KV_ORRERY_NEO_KEY,
@@ -29,4 +34,5 @@ export function serveOrreryNeo(kv: KvStreamReader, now = Date.now()): Promise<Re
   )
 }
 
-export const onRequest: PagesFunction<Env> = (ctx) => serveOrreryNeo(ctx.env.OBSERVATORY_CACHE)
+export const onRequest: PagesFunction<Env> = (ctx) =>
+  serveOrreryNeo(ctx.env.OBSERVATORY_CACHE, Date.now(), ctx)

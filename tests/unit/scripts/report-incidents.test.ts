@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   discordMessage,
+  fence,
   issueTitle,
   lastComment,
   nextStreaks,
@@ -275,5 +276,24 @@ describe('discordMessage', () => {
     expect(discordMessage({ type: 'close', signature: 'health:/api/eonet' }, url)).toMatch(
       /recovered/,
     )
+  })
+})
+
+describe('fence (#250)', () => {
+  it('stays one code block whatever backticks the upstream text holds', () => {
+    const out = fence('oops ``` @someone ```` end')
+    const open = out.split('\n')[0] ?? ''
+    // The fence is longer than any run of backticks inside, so none can close it early.
+    expect(open).toBe('`````')
+    expect(out.endsWith('\n`````')).toBe(true)
+    expect(
+      String(out)
+        .split('\n')
+        .filter((l: string) => /^`{3,}$/.test(l)),
+    ).toHaveLength(2)
+  })
+
+  it('keeps the usual three backticks for plain text', () => {
+    expect(fence('FAIL 503')).toBe('```\nFAIL 503\n```')
   })
 })

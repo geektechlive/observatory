@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { SAT_GROUPS } from '../../src/lib/orbit/satCatalog'
-import { type KvStreamReader, serveKvBody } from './_kvBody'
+import { type KvCacheContext, type KvStreamReader, serveKv } from './_kvBody'
 
 // The orrery's satellites (#98): one CelesTrak group per request, as compact OMM rows
 // the refresh job (celestrak-groups.mjs) stored in KV every 6 h. CelesTrak refuses
@@ -28,12 +28,14 @@ export function serveOrrerySats(
   requestUrl: string,
   kv: KvStreamReader,
   now = Date.now(),
+  ctx?: KvCacheContext,
 ): Promise<Response> {
   const group = new URL(requestUrl).searchParams.get('group') ?? ''
   // An allow-list, not a pattern: the group names a KV key.
   if (!GROUP_IDS.has(group))
     return Promise.resolve(badRequest(`Unknown group; one of: ${[...GROUP_IDS].join(', ')}`))
-  return serveKvBody(
+  return serveKv(
+    ctx,
     kv,
     {
       key: `celestrak:gp:${group}:v1`,
@@ -45,4 +47,4 @@ export function serveOrrerySats(
 }
 
 export const onRequest: PagesFunction<Env> = (ctx) =>
-  serveOrrerySats(ctx.request.url, ctx.env.OBSERVATORY_CACHE)
+  serveOrrerySats(ctx.request.url, ctx.env.OBSERVATORY_CACHE, Date.now(), ctx)

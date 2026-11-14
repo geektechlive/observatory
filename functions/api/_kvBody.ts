@@ -72,6 +72,20 @@ export interface KvCacheContext {
  * KV" 503 is seen again at once and the first refresh run shows without a purge. The key
  * is on the request's own origin, or `put` is a silent no-op (_cache.ts).
  */
+/**
+ * `serveKvBodyCached` when there is a request context (a live request), `serveKvBody`
+ * otherwise (a caller without one, such as a unit test). The orrery's KV endpoints use it
+ * (#247): keyed by the KV key, a cache-busting query string no longer reaches KV.
+ */
+export function serveKv(
+  ctx: KvCacheContext | undefined,
+  kv: KvStreamReader,
+  spec: KvBodySpec,
+  now = Date.now(),
+): Promise<Response> {
+  return ctx ? serveKvBodyCached(ctx, kv, spec, now) : serveKvBody(kv, spec, now)
+}
+
 export async function serveKvBodyCached(
   ctx: KvCacheContext,
   kv: KvStreamReader,

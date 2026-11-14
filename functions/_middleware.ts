@@ -2,6 +2,14 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 
 const RATE_LIMIT_MAX = 60
 const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute in ms
+/**
+ * Any other host (the project's pages.dev one and its preview hosts) sits outside the
+ * zone's rate-limit and cache rules, and its name is public in every commit's Pages check
+ * run (#235): only this per-isolate limit stands there, so it is tighter.
+ */
+const OTHER_HOST_RATE_LIMIT_MAX = 10
+/** Hosts the zone's rules cover, plus local development. */
+const ZONE_HOSTS = new Set(['observatory.geektechlive.com', 'localhost', '127.0.0.1'])
 const ALLOWED_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
 interface RateLimitEntry {
@@ -29,7 +37,7 @@ function rateLimitKey(ip: string): string {
   return ip
 }
 
-function isRateLimited(key: string, now: number): boolean {
+function isRateLimited(key: string, now: number, max: number): boolean {
   const entry = buckets.get(key)
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
     // Drop entries whose window has lapsed so the Map can't grow unbounded across
@@ -43,7 +51,7 @@ function isRateLimited(key: string, now: number): boolean {
     return false
   }
   entry.count++
-  return entry.count > RATE_LIMIT_MAX
+  return entry.count > max
 }
 
 function withSecurityHeaders(response: Response): Response {
@@ -75,8 +83,9 @@ function jsonResponse(
 
 export const onRequest: PagesFunction = async (context) => {
   const { request, next } = context
-  const pathname = new URL(request.url).pathname
+  const { pathname, hostname } = new URL(request.url)
   const isApiPath = pathname.startsWith('/api/')
+  const zoneHost = ZONE_HOSTS.has(hostname)
 
   if (isApiPath && !ALLOWED_METHODS.includes(request.method)) {
     return withSecurityHeaders(
@@ -86,8 +95,10 @@ export const onRequest: PagesFunction = async (context) => {
 
   if (isApiPath) {
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-    const key = rateLimitKey(ip)
-    if (isRateLimited(key, Date.now())) {
+    // Separate buckets, so a pages.dev script can't spend a visitor's custom-domain budget.
+    const key = `${zoneHost ? 'zone' : 'other'}|${rateLimitKey(ip)}`
+    const max = zoneHost ? RATE_LIMIT_MAX : OTHER_HOST_RATE_LIMIT_MAX
+    if (isRateLimited(key, Date.now(), max)) {
       return withSecurityHeaders(
         jsonResponse(429, { error: 'Rate limit exceeded' }, { 'Retry-After': '60' }),
       )
