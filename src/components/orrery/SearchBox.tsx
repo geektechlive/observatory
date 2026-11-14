@@ -37,6 +37,8 @@ export function SearchBox({ items = PLANETS_ONLY, onSelect }: SearchBoxProps) {
   const parsed = parseLookupQuery(query)
   const jplQuery = matches.length === 0 && parsed.ok ? parsed.q : null
   const showList = open && (matches.length > 0 || jplQuery !== null)
+  // Nothing matches and JPL wouldn't take it either: say why, rather than nothing (#239).
+  const why = open && q !== '' && matches.length === 0 && !parsed.ok ? parsed.reason : null
 
   const pick = (item: CatalogItem) => {
     onSelect(item.key)
@@ -62,7 +64,7 @@ export function SearchBox({ items = PLANETS_ONLY, onSelect }: SearchBoxProps) {
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={showList && active >= 0 ? `${listId}-${String(active)}` : undefined}
-        placeholder="Find a planet or spacecraft…"
+        placeholder="Find a planet, spacecraft, or any asteroid or comet…"
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)
@@ -139,6 +141,10 @@ export function SearchBox({ items = PLANETS_ONLY, onSelect }: SearchBoxProps) {
           )}
         </ul>
       )}
+      {/* Always mounted, so a screen reader announces the reason when it appears. */}
+      <p role="status" className={styles.searchStatus ?? ''}>
+        {why ?? ''}
+      </p>
       {lookup !== null && !showList && (
         <Suspense fallback={null}>
           <JplLookup

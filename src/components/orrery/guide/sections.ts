@@ -35,7 +35,7 @@ export const SECTIONS: readonly Section[] = [
           // three.js OrbitControls defaults, which the renderer does not change.
           'Mouse: drag to turn the view, scroll to zoom, and drag with the right button to slide it sideways.',
           'Touch: drag with one finger to turn, pinch to zoom, and drag with two fingers to slide.',
-          'Keyboard: Tab moves between the labels on the stage and the controls, and Enter picks one. On the time slider the arrow keys step a day, and Shift with an arrow steps a week.',
+          'Keyboard: Tab moves between the labels on the stage and the controls, and Enter picks one. On the time slider the arrow keys step a day, and Shift with an arrow steps a week. Space plays and pauses the clock.',
           'Click or tap a body, craft or label to open its inspector and fly the camera there. Esc closes this guide, or the close-up of a model when one is open.',
         ],
       },

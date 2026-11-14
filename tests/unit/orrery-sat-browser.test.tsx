@@ -138,10 +138,12 @@ describe('<SatBrowser> (#158)', () => {
     expect(within(off).getByRole('button', { name: /Turn on Starlink/ })).toBeTruthy()
   })
 
-  it('asks the visitor to open the Earth orbit view when nothing is loaded yet', () => {
+  it('asks the visitor to move to the Earth orbit preset when nothing is loaded yet (#251)', () => {
     const onOpenOrbit = vi.fn()
     show(props({ field: null, onOpenOrbit }))
-    fireEvent.click(screen.getByRole('button', { name: /Open the Earth orbit view/ }))
+    // A preset, not the dial's Orbit view: the words must not send anyone there (#251).
+    expect(screen.queryByText(/Earth orbit view/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Move to Earth orbit/ }))
     expect(onOpenOrbit).toHaveBeenCalled()
   })
 

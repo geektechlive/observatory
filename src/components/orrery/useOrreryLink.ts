@@ -20,6 +20,8 @@ import type { FocusPreset, OrreryRenderer, SceneKey } from './three/OrreryRender
 
 /** A scrub is many clock changes in a row; the address is written once it settles. */
 const CLOCK_SETTLE_MS = 400
+/** How often the address follows a playing clock (#246). */
+const PLAYING_WRITE_MS = 5000
 
 interface LinkOptions {
   renderer: OrreryRenderer | null
@@ -262,5 +264,18 @@ export function useOrreryLink(o: LinkOptions): (link: OrreryLink, opts?: ApplyLi
       unsubscribe()
     }
   }, [selected, preset, detail])
+
+  // While the clock plays the store doesn't change, so the address would keep the moment
+  // Play was pressed (#246): rewrite it every few seconds (replaceState, never per frame).
+  const playing = useOrreryClock((s) => s.playing)
+  useEffect(() => {
+    if (!playing) return
+    const id = setInterval(() => {
+      write.current()
+    }, PLAYING_WRITE_MS)
+    return () => {
+      clearInterval(id)
+    }
+  }, [playing])
   return apply
 }

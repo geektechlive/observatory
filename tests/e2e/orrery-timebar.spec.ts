@@ -56,3 +56,22 @@ test('on a phone every rate is reachable and the bar fits the screen (#117)', as
     await expect(rate).toBeInViewport()
   }
 })
+
+test('on a phone "Go to date" is in the Controls sheet and moves the clock (#242)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openOrrery(page)
+  await page.getByRole('button', { name: /^Controls/ }).click()
+  const date = page.getByRole('textbox', { name: /Go to date/ })
+  await expect(date).toBeVisible()
+  await date.fill('2026-12-03')
+  await date.press('Enter')
+  await expect(
+    page
+      .locator('output')
+      .filter({ hasText: /2026-12-03/ })
+      .first(),
+  ).toBeAttached()
+  await expect(bar(page).getByText(/2026-12-03/)).toBeVisible()
+})

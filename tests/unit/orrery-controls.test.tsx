@@ -39,6 +39,32 @@ describe('TimeBar (#91)', () => {
     expect(sim()).toBe(T0 + DAY - 7 * DAY)
   })
 
+  it('Space plays and pauses, except while typing or on a control (#251)', () => {
+    render(<TimeBar now={() => T0} />)
+    fireEvent.keyDown(document.body, { key: ' ' })
+    expect(useOrreryClock.getState().playing).toBe(true)
+    fireEvent.keyDown(document.body, { key: ' ' })
+    expect(useOrreryClock.getState().playing).toBe(false)
+    // Typing a date, or Space on a button (which presses it), leaves the clock alone.
+    fireEvent.keyDown(screen.getByRole('textbox', { name: /go to date/i }), { key: ' ' })
+    fireEvent.keyDown(screen.getByRole('button', { name: /1 day\/s/i }), { key: ' ' })
+    expect(useOrreryClock.getState().playing).toBe(false)
+    // Nor with a modifier.
+    fireEvent.keyDown(document.body, { key: ' ', ctrlKey: true })
+    expect(useOrreryClock.getState().playing).toBe(false)
+    // Nor inside the guide drawer or the detail view, which sit over the orrery.
+    for (const attr of ['data-space-owner']) {
+      const surface = document.createElement('div')
+      surface.setAttribute(attr, '')
+      const text = document.createElement('p')
+      surface.append(text)
+      document.body.append(surface)
+      fireEvent.keyDown(text, { key: ' ' })
+      surface.remove()
+    }
+    expect(useOrreryClock.getState().playing).toBe(false)
+  })
+
   it('plays and pauses, and picks a playback rate', () => {
     render(<TimeBar now={() => T0} />)
     fireEvent.click(screen.getByRole('button', { name: /play/i }))

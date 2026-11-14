@@ -47,7 +47,7 @@ export interface SatBrowserProps {
   /** Space-Track's catalogue answered (re-entry predictions can be listed). */
   reentriesAvailable: boolean
   onChoose: (key: string) => void
-  /** Opens the Earth orbit view, where the satellites load. */
+  /** Moves the orrery to its Earth orbit preset, where the satellites load. */
   onOpenOrbit: () => void
 }
 
@@ -364,10 +364,10 @@ export function SatBrowser(p: SatBrowserProps) {
           <p className={styles.switchHint ?? ''} role="status">
             {loading
               ? 'Loading satellites…'
-              : 'Satellites load once you are in the Earth orbit view.'}
+              : 'Satellites load once the orrery is on its Earth orbit preset.'}
           </p>
           <button type="button" className={styles.chipBtn ?? ''} onClick={p.onOpenOrbit}>
-            Open the Earth orbit view
+            Move to Earth orbit
           </button>
         </div>
       )}

@@ -245,6 +245,7 @@ export function DetailView({
       id={DETAIL_VIEW_ID}
       className={styles.detailView ?? ''}
       data-detail-view=""
+      data-space-owner=""
       data-detail-status={status}
       role="region"
       aria-label={`Close-up of ${title}`}

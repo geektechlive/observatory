@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from 'react'
 import { SOURCES } from '@/lib/orrery/sources'
 
 import type { CatalogItem } from './catalog'
+import { GoToDate } from './GoToDate'
 import styles from './orrery.module.css'
 import { SearchBox } from './SearchBox'
 import { Switch } from './Switch'
@@ -112,6 +113,17 @@ export function ControlRail({
           Find
         </h2>
         <SearchBox items={items} onSelect={onSelect} />
+      </section>
+
+      {/* On a phone the time bar has no room for it (#242); wide screens keep it there. */}
+      <section
+        className={`${styles.group ?? ''} ${styles.phoneOnly ?? ''}`}
+        aria-labelledby="orrery-time"
+      >
+        <h2 id="orrery-time" className={styles.groupTitle ?? ''}>
+          Time
+        </h2>
+        <GoToDate className={styles.dateField} />
       </section>
 
       <section className={styles.group ?? ''} aria-labelledby="orrery-solar">

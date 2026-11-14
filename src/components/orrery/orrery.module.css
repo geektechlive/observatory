@@ -396,6 +396,11 @@
   gap: var(--space-2);
 }
 
+/* The Controls sheet's Time group (#242): phones only; wide screens use the time bar's. */
+.phoneOnly {
+  display: none;
+}
+
 .dateField input {
   width: 12ch;
   min-height: 28px;
@@ -468,6 +473,17 @@
 .optionNote {
   color: var(--bone-faint);
   font: 500 var(--text-xs) / 1.2 var(--font-mono);
+}
+
+/* Why a search was refused (#239): always in the page, so it is announced; empty, no gap. */
+.searchStatus {
+  margin: var(--space-2) 0 0;
+  color: var(--bone-faint);
+  font: 500 var(--text-xs) / 1.2 var(--font-mono);
+}
+
+.searchStatus:empty {
+  margin: 0;
 }
 
 .inspector {
@@ -765,8 +781,13 @@
     padding-inline: var(--space-2);
   }
 
-  .dateField {
+  /* The bar has no room for it on a phone; the Controls sheet's Time group has it (#242). */
+  .timeBar .dateField {
     display: none;
+  }
+
+  .phoneOnly {
+    display: grid;
   }
 
   .inspector {

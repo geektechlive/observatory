@@ -191,7 +191,8 @@ export default function JplLookup({ query, onClose }: { query: string; onClose: 
           Close
         </button>
       </header>
-      {body}
+      {/* Read out as it changes: asking, the answer, or why not (WCAG 4.1.3, #240). */}
+      <div aria-live="polite">{body}</div>
       <p className={styles.source ?? ''}>JPL Small-Body Database and Horizons, asked on demand</p>
     </section>
   )

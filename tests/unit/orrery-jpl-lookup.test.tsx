@@ -96,6 +96,40 @@ describe('SearchBox: JPL fallback (#100)', () => {
     expect(screen.queryByRole('option', { name: /search jpl/i })).toBeNull()
   })
 
+  it('says why when a search matches nothing and JPL would not take it (#239)', () => {
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    searchFor('a*b')
+    expect(screen.getByRole('status').textContent).toMatch(/A \* may only end the search/)
+    searchFor('<x>')
+    expect(screen.getByRole('status').textContent).toMatch(/Unexpected characters/)
+    // A match, or nothing typed, says nothing.
+    // Always mounted, so screen readers announce changes; empty when there is nothing to say.
+    searchFor('mars')
+    expect(screen.getByRole('status').textContent).toBe('')
+    searchFor('')
+    expect(screen.getByRole('status').textContent).toBe('')
+  })
+
+  it('says the box also finds asteroids and comets at JPL (#251)', () => {
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    const box = screen.getByRole('combobox', { name: /find/i })
+    expect(box.getAttribute('placeholder')).toMatch(/asteroid|comet/i)
+  })
+
+  it('announces the lookup to screen readers while it asks and when it answers (#240)', async () => {
+    stubApi({
+      '/api/lookup': () => json(lookupBody(apophis, 'apophis')),
+      '/api/trajectory': () => json(trajectory),
+    })
+    wrap(<SearchBox onSelect={vi.fn()} />)
+    fireEvent.keyDown(searchFor('apophis'), { key: 'Enter' })
+    const card = await screen.findByRole('region', { name: /jpl lookup/i })
+    const live = card.querySelector('[aria-live="polite"]')
+    expect(live).not.toBeNull()
+    expect(await screen.findByText('99942 Apophis (2004 MN4)')).toBeDefined()
+    expect(live?.textContent).toContain('99942 Apophis (2004 MN4)')
+  })
+
   it('looks the name up and shows what JPL says, with where it is', async () => {
     const fetch = stubApi({
       '/api/lookup': () => json(lookupBody(apophis, 'apophis')),

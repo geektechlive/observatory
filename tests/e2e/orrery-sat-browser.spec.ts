@@ -44,7 +44,7 @@ test.describe('satellite browser (#158)', () => {
     await openOrrery(page)
     await openBrowser(page)
     // Far from Earth nothing is loaded: the panel says so and offers the view.
-    await page.getByRole('button', { name: 'Open the Earth orbit view' }).click()
+    await page.getByRole('button', { name: 'Move to Earth orbit' }).click()
     await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'orbit')
     await browseBy(page).selectOption('orbit')
     await page.getByRole('combobox', { name: 'Orbit' }).selectOption('geo')

@@ -207,6 +207,7 @@ export function OrreryGuide({
         aria-labelledby="orrery-guide-title"
         hidden={mode !== 'open'}
         data-guide-drawer=""
+        data-space-owner=""
       >
         <div className={styles.head ?? ''}>
           <h2 id="orrery-guide-title" ref={heading} tabIndex={-1} className={styles.title ?? ''}>

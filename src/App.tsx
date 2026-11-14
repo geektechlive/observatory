@@ -9,6 +9,7 @@ import { ExpandButton } from '@/components/lens/ExpandButton'
 import { IssPlate, type MapMode } from '@/components/lens/IssPlate'
 import { SubsolarPlate, type SubsolarPlateHandle } from '@/components/lens/SubsolarPlate'
 import { OrbitalDial } from '@/components/nav/OrbitalDial'
+import { ViewHeading } from '@/components/nav/ViewHeading'
 import { SkyStage } from '@/components/stage/SkyStage'
 import { SunStage } from '@/components/stage/SunStage'
 import { StarField } from '@/components/starfield/StarField'
@@ -61,6 +62,7 @@ export function App() {
 
         {orrery ? (
           <main id="main-content" className={styles.mainOrrery ?? ''}>
+            <ViewHeading view={view} />
             <div className={styles.dial ?? ''}>
               <OrbitalDial />
             </div>
@@ -123,6 +125,7 @@ function EarthColumns({ view, expanded, onToggle, buttonRef }: EarthColumnsProps
   const parts = CONSOLE_PARTS[view]
   return (
     <main id="main-content" className={styles.main ?? ''}>
+      <ViewHeading view={view} />
       <div className={styles.dial ?? ''} inert={expanded}>
         <OrbitalDial />
       </div>
