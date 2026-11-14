@@ -78,3 +78,58 @@ for (const width of WIDTHS) {
     }
   })
 }
+
+test.describe('Close Approaches scroll cue at 390 px (#227)', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('the wrapper is a focusable region and its fade shows until the scroll end', async ({
+    page,
+  }) => {
+    await serveNeoFeed(page)
+    await page.goto('/#sky')
+    const region = page.getByRole('region', { name: 'Close approaches table' })
+    await expect(region.getByRole('table')).toBeVisible({ timeout: 20_000 })
+
+    const maskOf = () => region.evaluate((el) => getComputedStyle(el).maskImage)
+    await expect(region).toHaveAttribute('data-more', 'true')
+    expect(await maskOf()).not.toBe('none')
+
+    await region.focus()
+    await expect(region).toBeFocused()
+
+    // The ring must not be faded by the mask while the region has keyboard focus.
+    expect(await region.evaluate((el) => el.matches(':focus-visible'))).toBe(true)
+    expect(await maskOf()).toBe('none')
+    // The site's focus ring (2px, the signal colour), not a faint 1px border line.
+    const ring = await region.evaluate((el) => {
+      const s = getComputedStyle(el)
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--signal)'
+      document.body.append(probe)
+      const signal = getComputedStyle(probe).color
+      probe.remove()
+      return { width: s.outlineWidth, style: s.outlineStyle, color: s.outlineColor, signal }
+    })
+    expect(ring.width).toBe('2px')
+    expect(ring.style).toBe('solid')
+    expect(ring.color).toBe(ring.signal)
+    await region.blur()
+    await expect(region).toHaveAttribute('data-more', 'true')
+    expect(await maskOf()).not.toBe('none')
+
+    await region.evaluate((el) => {
+      el.scrollLeft = el.scrollWidth
+    })
+    await expect(region).toHaveAttribute('data-more', 'false')
+    expect(await maskOf()).toBe('none')
+  })
+
+  test('nothing to scroll on a wide screen: no fade', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await serveNeoFeed(page)
+    await page.goto('/#sky')
+    const region = page.getByRole('region', { name: 'Close approaches table' })
+    await expect(region.getByRole('table')).toBeVisible({ timeout: 20_000 })
+    await expect(region).toHaveAttribute('data-more', 'false')
+  })
+})

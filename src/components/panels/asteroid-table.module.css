@@ -3,6 +3,25 @@
   overflow-x: auto;
 }
 
+/* More columns to the right (#227): the last 32px fade out, so the cut-off reads as
+   "keeps going". Set by useScrollMore; gone at the scroll end and where nothing overflows. */
+.asteroidTable[data-more='true'] {
+  -webkit-mask-image: linear-gradient(to right, var(--void) calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, var(--void) calc(100% - 32px), transparent);
+}
+
+/* The mask would fade the focus ring; a focused region shows whole (arrow keys scroll it). */
+.asteroidTable[data-more='true']:focus-visible {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* The site's ring (global.css), drawn inside so the panel can't clip it, as the launch panel does. */
+.asteroidTable:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

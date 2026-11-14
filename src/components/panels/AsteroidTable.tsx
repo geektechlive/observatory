@@ -4,6 +4,7 @@ import { DataAge } from '@/components/ui/DataAge'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { PanelState } from '@/components/ui/PanelState'
 import { useNeo } from '@/hooks/useNeo'
+import { useScrollMore } from '@/hooks/useScrollMore'
 import { formatDiameter, formatKm, formatLunarDistance, formatVelocity } from '@/lib/format'
 import { STATUS_HEX } from '@/lib/palette'
 import { panelView } from '@/lib/panelView'
@@ -160,6 +161,7 @@ export function AsteroidTable() {
   const view = panelView(useNeo(), 'neo')
   const [sortKey, setSortKey] = useState<SortKey>('missKm')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [scrollRef, hasMore, onScroll] = useScrollMore<HTMLDivElement>(view.kind)
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -274,7 +276,19 @@ export function AsteroidTable() {
   return (
     <GlassPanel variant="panel" label="Close Approaches · 7 days" breathe>
       {view.kind === 'ready' && <DataAge {...view.age} />}
-      <div className={styles.asteroidTable ?? ''}>{renderContent()}</div>
+      <div
+        ref={scrollRef}
+        className={styles.asteroidTable ?? ''}
+        role="region"
+        aria-label="Close approaches table"
+        // A sideways-scrolling region must be reachable by keyboard (#227).
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be keyboard-reachable
+        tabIndex={0}
+        data-more={hasMore ? 'true' : 'false'}
+        onScroll={onScroll}
+      >
+        {renderContent()}
+      </div>
     </GlassPanel>
   )
 }
