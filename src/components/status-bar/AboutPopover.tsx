@@ -11,7 +11,8 @@ const DATA_SOURCES = [
   { label: 'NeoWs (asteroids)', href: 'https://api.nasa.gov' },
   { label: 'JPL Sentry (impact risk)', href: 'https://ssd-api.jpl.nasa.gov/sentry.api' },
   { label: 'JPL Fireball', href: 'https://ssd-api.jpl.nasa.gov/fireball.api' },
-  { label: 'DONKI (space weather)', href: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI' },
+  { label: 'NASA CCMC DONKI (space weather)', href: 'https://ccmc.gsfc.nasa.gov/tools/DONKI/' },
+  { label: 'NOAA SWPC (flares, solar wind)', href: 'https://www.swpc.noaa.gov/' },
   { label: 'APOD', href: 'https://science.nasa.gov/apod/' },
   { label: 'CelesTrak (ISS TLE)', href: 'https://celestrak.org' },
 ]

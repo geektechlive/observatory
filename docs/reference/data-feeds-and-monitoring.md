@@ -52,6 +52,15 @@ mean day to day:
   rejects the placeholder as a contract failure, then the older KV copy degraded. If the refresh
   starts failing `refresh:apod`, NASA has redesigned the page again: fix `parseApodArticle` in
   `scripts/refresh-data.mjs` against a fresh copy.
+- **DONKI moved to CCMC, which does not answer Workers (2026-09-30; #65, [ADR 0034](../decisions/0034-noaa-flares-and-donki-through-api-nasa-gov.md)).**
+  CCMC's new base is `ccmc.gsfc.nasa.gov/DONKI-API/get/`; a preview call from Workers timed out
+  on every feed while a laptop got 0.14 s. So `/api/donki` takes **flares from NOAA SWPC's 7-day
+  list** (~43 KB; no DONKI FLR request, and NOAA alone is not degraded) and **CME, GST and SEP
+  from `api.nasa.gov/DONKI/*`** with the key, which still proxies those three but 404s FLR. CME
+  rows carry no top-level `speed` or `type`: the handler lifts them from the `cmeAnalyses` entry
+  with `isMostAccurate` (else the last). Never call `ccmc.gsfc.nasa.gov` from a Function. If
+  `api.nasa.gov` stops too, the next step is the refresh job (KV-first), after proving Actions
+  can reach CCMC.
 - **JPL Horizons answers 503 to overlapping requests from one address (#88, measured
   2026-11-06).** Nine parallel calls got two answers; the same nine one at a time all answered in
   ~140 ms each. Any new Horizons caller must ask one at a time, and visitors never call it: the

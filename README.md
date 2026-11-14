@@ -84,7 +84,8 @@ wording its terms ask for, where they give one.
   Science, with the [NASA APOD API](https://api.nasa.gov/) as a fallback.
 - **[NeoWs](https://api.nasa.gov/)**: near-Earth asteroids this week.
 - **[DONKI](https://ccmc.gsfc.nasa.gov/tools/DONKI/)**: space weather events, from the
-  Community Coordinated Modeling Center.
+  Community Coordinated Modeling Center. Solar flares
+  come from [NOAA SWPC](https://www.swpc.noaa.gov/)'s GOES list.
 - **[EONET](https://eonet.gsfc.nasa.gov/)**: natural events (storms, volcanoes, wildfires, ice).
 - **[EPIC](https://epic.gsfc.nasa.gov/)**: full-disc Earth images from DSCOVR.
 - **[FIRMS](https://firms.modaps.eosdis.nasa.gov/)**: active fires from MODIS and VIIRS.
