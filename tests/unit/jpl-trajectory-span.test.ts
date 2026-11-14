@@ -58,24 +58,36 @@ describe('/api/trajectory accepts only the orrery’s own spans (#223)', () => {
     expect(accepts('2100-12-23', '2100-12-27', '10m')).toBe(true)
   })
 
-  it('bounds the keys one object can make: 608 grid spans and 37,059 dense ones', () => {
-    // Before #223 any start, end (≤ 600 samples) and step ≥ 10 m was a new key: with whole
-    // days alone, 73,414 starts × up to 599 ends is over 40 million. Now the shapes are
-    // exact: every other start in 1900–2100 is refused for both shapes.
-    let gridKeys = 0
-    let denseKeys = 0
-    for (let t = FIRST; t <= LAST; t += DAY_MS) {
-      const start = iso(t)
-      if (accepts(start, iso(t + 730 * DAY_MS), '2d')) gridKeys += 1
-      const isDense = accepts(start, iso(t + 4 * DAY_MS), '10m')
-      if (isDense) denseKeys += 1
-      expect(isDense, start).toBe(dense.has(t / DAY_MS))
-    }
-    expect(gridKeys).toBe(grid.length)
-    expect(gridKeys).toBe(608)
-    expect(denseKeys).toBe(dense.size)
-    expect(denseKeys).toBe(37_059)
-  })
+  // The full enumeration is the point: it proves the bound for every start day, not a
+  // sample. It takes ~2.5 s on an idle machine and ran past 8 s under a loaded gate (#228),
+  // so this one test gets its own timeout rather than raising the global one.
+  const ENUMERATION_TIMEOUT_MS = 30_000
+
+  it(
+    'bounds the keys one object can make: 608 grid spans and 37,059 dense ones',
+    () => {
+      // Before #223 any start, end (≤ 600 samples) and step ≥ 10 m was a new key: with whole
+      // days alone, 73,414 starts × up to 599 ends is over 40 million. Now the shapes are
+      // exact: every other start in 1900–2100 is refused for both shapes.
+      let gridKeys = 0
+      let denseKeys = 0
+      // Collected and asserted once: 73,414 expect() calls cost more than the checks (#228).
+      const wrong: string[] = []
+      for (let t = FIRST; t <= LAST; t += DAY_MS) {
+        const start = iso(t)
+        if (accepts(start, iso(t + 730 * DAY_MS), '2d')) gridKeys += 1
+        const isDense = accepts(start, iso(t + 4 * DAY_MS), '10m')
+        if (isDense) denseKeys += 1
+        if (isDense !== dense.has(t / DAY_MS)) wrong.push(start)
+      }
+      expect(wrong).toEqual([])
+      expect(gridKeys).toBe(grid.length)
+      expect(gridKeys).toBe(608)
+      expect(denseKeys).toBe(dense.size)
+      expect(denseKeys).toBe(37_059)
+    },
+    ENUMERATION_TIMEOUT_MS,
+  )
 
   it('refuses spans the orrery never asks for', () => {
     const g = lookupSpan(Date.parse('2026-11-01T00:00:00Z'))

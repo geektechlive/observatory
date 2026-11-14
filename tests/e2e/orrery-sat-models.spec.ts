@@ -83,8 +83,10 @@ test('a Starlink satellite has no Look closer button', async ({ page }) => {
  */
 const canvas = (page: Page) => page.locator('canvas[data-orrery-webgl]')
 const satModel = (page: Page) => canvas(page).getAttribute('data-orrery-sat-model')
+// `||`, not `??`: the test opts in with an empty attribute, and JSON.parse('') throws
+// inside expect.poll before the renderer's first write (#229).
 const px = async (page: Page) =>
-  JSON.parse((await canvas(page).getAttribute('data-orrery-px')) ?? '{}') as Record<
+  JSON.parse((await canvas(page).getAttribute('data-orrery-px')) || '{}') as Record<
     string,
     number | null
   >
