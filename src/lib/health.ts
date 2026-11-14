@@ -108,6 +108,13 @@ function nonEmptyArrayField(data: unknown, key: string): boolean {
   return Array.isArray(value) && value.length > 0
 }
 
+/** Every one of `ids` is the `id` of an entry in `data.bodies`. */
+function hasBodies(data: unknown, ids: readonly string[]): boolean {
+  if (!isRecord(data) || !Array.isArray(data['bodies'])) return false
+  const have = new Set(data['bodies'].map((b: unknown) => (isRecord(b) ? b['id'] : undefined)))
+  return ids.every((id) => have.has(id))
+}
+
 /** A satellite group's optional SupGP count (#209) is a whole number within its rows. */
 function supgpCountFits(data: unknown): boolean {
   if (!isRecord(data) || data['supgpCount'] === undefined) return true
@@ -228,7 +235,10 @@ export const SOURCES: Record<SourceName, SourceContract> = {
     label: 'Orrery Bodies',
     headline: true,
     maxAgeMs: 72 * HOUR,
-    required: (data) => nonEmptyArrayField(data, 'bodies'),
+    // Earth and the Moon too (#231): without Earth the Earth frame never opens, and the
+    // Moon, L1, close approaches and every satellite go with it.
+    required: (data) =>
+      nonEmptyArrayField(data, 'bodies') && hasBodies(data, ['naif:399', 'naif:301']),
   },
   'orrery-dwarfs': {
     // Not headline: fetched only when the Dwarf planets switch or a link asks (#99 item 8),

@@ -21,8 +21,17 @@ They come from JPL Horizons, sampled by the refresh job, never on the request pa
     drew as a jagged polygon at 25-day steps.
   - A span past the ephemeris is clamped to Horizons' "No ephemeris … after/prior to" limit and
     asked again.
-  - A reply naming the wrong target is rejected, and a failed object goes into `missing` while
-    the rest still ship.
+  - A reply naming the wrong target is rejected. **A body or moon that fails keeps the last
+    payload's copy while its fine or coarse samples still cover now (#231)**: it is listed in
+    `carried` with the days since its last good fetch (a server-side field; the client schema
+    drops it), and the step is a warning. One with nothing to carry goes into `missing`, and
+    one carried over 2 days (`CARRY_ALERT_DAYS`) is failing for good: either fails the step as
+    `upstream`, so an incident opens after `UPSTREAM_THRESHOLD` runs in a row (about 3 days
+    into a lasting failure), and the rest still ship. Before #231 a slow Horizons run dropped the body outright, and losing Earth
+    closed the Earth frame (the Moon, L1, close approaches and every satellite) with health
+    green.
+  - The content contract (`src/lib/health.ts`, `scripts/check-health.mjs`) requires Earth and
+    the Moon among the bodies.
   - **A reply with no data and no limit keeps Horizons' message as its reason (#150).**
     `horizonsReason` (`orrery-bodies.mjs`) drops the asterisk banners and a header line stamped
     with the answer's time, joins the rest into one line and caps it at 400 characters, keeping

@@ -377,6 +377,16 @@ describe('probed endpoints (#42, #61)', () => {
     expect(donki?.check({ flares: [] })).toBe(false)
   })
 
+  it('probes orrery bodies: spans on every body, and Earth and the Moon present (#231)', () => {
+    const bodies = byPath('/api/orrery-bodies')
+    const body = (id: string) => ({ id, fine: null, coarse: null })
+    expect(bodies?.check({ bodies: [body('naif:-31'), body('naif:399'), body('naif:301')] })).toBe(
+      true,
+    )
+    expect(bodies?.check({ bodies: [body('naif:-31'), body('naif:301')] })).toBe(false)
+    expect(bodies?.check({ bodies: [body('naif:-31'), body('naif:399')] })).toBe(false)
+  })
+
   it('probes orrery close approaches: a non-empty list, each with its CAD row (#92)', () => {
     const neo = byPath('/api/orrery-neo')
     expect(neo).toBeDefined()

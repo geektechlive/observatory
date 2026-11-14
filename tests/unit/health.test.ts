@@ -44,7 +44,19 @@ describe('SOURCES', () => {
     expect(SOURCES['orrery-bodies'].headline).toBe(true)
     expect(SOURCES['orrery-bodies'].maxAgeMs).toBe(72 * 3_600_000)
     expect(SOURCES['orrery-bodies'].required({ bodies: [] })).toBe(false)
-    expect(SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }] })).toBe(true)
+    const earthAndMoon = [{ id: 'naif:399' }, { id: 'naif:301' }]
+    expect(
+      SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }, ...earthAndMoon] }),
+    ).toBe(true)
+  })
+
+  it('requires Earth and the Moon among the orrery bodies: without Earth the Earth frame never opens (#231)', () => {
+    expect(
+      SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }, { id: 'naif:301' }] }),
+    ).toBe(false)
+    expect(
+      SOURCES['orrery-bodies'].required({ bodies: [{ id: 'naif:-31' }, { id: 'naif:399' }] }),
+    ).toBe(false)
   })
 
   it('grades orrery close approaches by a non-empty approach list, 36 h before degraded (#92)', () => {

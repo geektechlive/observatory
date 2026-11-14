@@ -98,11 +98,13 @@ export const CHECKS = [
   // The orrery's craft, Earth and Moon (#93): KV-only, written by the refresh job.
   {
     path: '/api/orrery-bodies',
-    requires: 'non-empty bodies array with sampled spans',
+    requires: 'non-empty bodies array with sampled spans, Earth and the Moon among them',
+    // Earth and the Moon (#231): without Earth the orrery's Earth frame never opens.
     check: (b) =>
       Array.isArray(b?.bodies) &&
       b.bodies.length > 0 &&
-      b.bodies.every((x) => x?.fine !== undefined && x?.coarse !== undefined),
+      b.bodies.every((x) => x?.fine !== undefined && x?.coarse !== undefined) &&
+      ['naif:399', 'naif:301'].every((id) => b.bodies.some((x) => x?.id === id)),
   },
   // The orrery's close approaches, Scout and NEOCC (#92): KV-only, written by the refresh job.
   {

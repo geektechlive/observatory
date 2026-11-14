@@ -47,6 +47,8 @@ jobs:
           node-version: '26'
 
       # Fails only when a source's KV copy is past its max age, not on one missed fetch.
+      # Orrery bodies apply that per body (#231): a failed body is carried forward, and the
+      # step fails only when one has nothing to carry or has been carried over 2 days.
       - name: Refresh KV snapshots
         id: check
         run: node scripts/refresh-data.mjs

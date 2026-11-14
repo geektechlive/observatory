@@ -101,6 +101,11 @@ const KEY_APOD = 'apod:science:v1'
 /** The orrery's craft, Earth and Moon (#93): a finished body, with metadata. */
 export const KEY_ORRERY_BODIES = 'horizons:bodies:v1'
 const ORRERY_SIGNATURE = 'refresh:orrery-bodies'
+/**
+ * A body carried forward longer than this is failing for good (#231): the step fails as
+ * upstream, so with UPSTREAM_THRESHOLD runs on top an incident opens about 3 days in.
+ */
+const CARRY_ALERT_DAYS = 2
 /** /api/orrery-bodies serves a copy up to 72 h old before calling it degraded. */
 const ORRERY_MAX_AGE_MS = 72 * 3_600_000
 /** The orrery's close approaches, Scout and NEOCC (#92): a finished body, with metadata. */
@@ -748,16 +753,32 @@ export async function refreshOrreryBodies(config, deps = {}) {
     // the client falls back to the daily samples and says so.
     const passes = payload.bodies.reduce((n, b) => n + (b.dense?.length ?? 0), 0)
     const unsampled = encounterFailures.map((f) => `${f.id} (${f.reason})`)
+    const carried = (payload.carried ?? []).map(
+      (c) => `${c.id} (${String(c.days)} d: ${c.reason})`,
+    )
+    // #231: a body that failed but whose last samples still cover now is carried forward,
+    // a warning. One with nothing to carry is gone from the orrery, and one carried longer
+    // than CARRY_ALERT_DAYS is failing for good: either fails, marked upstream, so a
+    // Horizons blip holds quietly and only a lasting gap opens an incident
+    // (UPSTREAM_THRESHOLD runs in a row). The partial payload is still written.
+    const stale = (payload.carried ?? []).some((c) => c.days > CARRY_ALERT_DAYS)
+    const dropped = missing.length > 0 || stale
     const detail =
-      `ok ${ORRERY_SIGNATURE} ${String(payload.bodies.length)} bodies, ` +
+      `${dropped ? 'FAIL' : 'ok'} ${ORRERY_SIGNATURE} ${String(payload.bodies.length)} bodies, ` +
       `${String(payload.moons.length)} moons, ${String(passes)} close passes, ` +
       `${String(requests)} requests` +
       (unsampled.length ? `; close pass not sampled: ${unsampled.join(', ')}` : '') +
-      (missing.length ? `; WARN missing ${missing.join(', ')}` : '')
-    console.log(detail)
+      (carried.length ? `; WARN carried forward ${carried.join(', ')}` : '') +
+      (dropped ? `; missing ${missing.join(', ')}` : '')
+    ;(dropped ? console.error : console.log)(detail)
     const value = JSON.stringify(payload)
     return {
-      entry: { signature: ORRERY_SIGNATURE, ok: true, warning: missing.length > 0, detail },
+      entry: {
+        signature: ORRERY_SIGNATURE,
+        ok: !dropped,
+        ...(dropped ? { upstream: true } : { warning: carried.length > 0 }),
+        detail,
+      },
       write: {
         key: KEY_ORRERY_BODIES,
         value,

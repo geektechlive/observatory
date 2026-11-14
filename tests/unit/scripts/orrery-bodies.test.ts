@@ -454,6 +454,107 @@ describe('buildOrreryBodies', () => {
   })
 })
 
+describe('a body that fails keeps its last span while it covers now (#231)', () => {
+  const failing = (...ids: string[]) =>
+    fakeHorizons((call) => (ids.includes(call.command) ? 'no $$SOE here' : anySpan(call)))
+
+  async function previousRun(at: number) {
+    const h = fakeHorizons(anySpan)
+    const { payload } = await buildOrreryBodies({ now: at, fetchText: h.fetchText, pauseMs: 0 })
+    return payload
+  }
+
+  it('carries Earth forward from the last payload, not missing but listed as carried', async () => {
+    const previous = await previousRun(NOW)
+    const h = failing('399')
+    const { payload } = await buildOrreryBodies({
+      now: NOW + 6 * 3_600_000,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      previous,
+    })
+    const earth = payload.bodies.find((b: { naifId: string }) => b.naifId === '399')
+    const was = previous.bodies.find((b: { naifId: string }) => b.naifId === '399')
+    expect(earth).toEqual(was)
+    expect(payload.missing).toEqual([])
+    expect(payload.carried.map((c: { id: string }) => c.id)).toEqual(['naif:399'])
+    expect(OrreryBodiesSchema.safeParse(payload).success).toBe(true)
+  })
+
+  it('carries a moon forward the same way', async () => {
+    const previous = await previousRun(NOW)
+    const h = failing('501')
+    const { payload } = await buildOrreryBodies({
+      now: NOW + 6 * 3_600_000,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      previous,
+    })
+    const io = payload.moons.find((m: { naifId: string }) => m.naifId === '501')
+    expect(io).toEqual(previous.moons.find((m: { naifId: string }) => m.naifId === '501'))
+    expect(payload.carried.map((c: { id: string }) => c.id)).toEqual(['naif:501'])
+  })
+
+  it('keeps a carried craft’s close-pass spans and says how long it has been carried', async () => {
+    const withDense = await previousRun(NOW)
+    const clipper = withDense.bodies.find((b: { naifId: string }) => b.naifId === '-159') as {
+      fine: { start: number }
+    }
+    const dense = [
+      {
+        start: clipper.fine.start + 10,
+        step: 10 / 1440,
+        samples: [0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+      },
+    ]
+    const previous = {
+      ...withDense,
+      bodies: withDense.bodies.map((b: { naifId: string }) =>
+        b.naifId === '-159' ? { ...b, dense } : b,
+      ),
+    }
+    const h = failing('-159')
+    const { payload } = await buildOrreryBodies({
+      now: NOW + 3 * DAY,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      previous,
+    })
+    const carriedClipper = payload.bodies.find((b: { naifId: string }) => b.naifId === '-159')
+    expect(carriedClipper?.dense).toEqual(dense)
+    const entry = payload.carried.find((c: { id: string }) => c.id === 'naif:-159')
+    expect(entry?.days).toBeCloseTo(3, 0)
+  })
+
+  it('carries on the coarse span when the fine one has run out', async () => {
+    const previous = await previousRun(NOW - 40 * DAY)
+    const h = failing('-31')
+    const { payload } = await buildOrreryBodies({
+      now: NOW,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      previous,
+    })
+    // Voyager 1's whole-mission span runs five years ahead, so it still covers now.
+    expect(payload.carried.map((c: { id: string }) => c.id)).toEqual(['naif:-31'])
+    expect(payload.missing).toEqual([])
+  })
+
+  it('drops it as missing once the last span no longer covers now', async () => {
+    const previous = await previousRun(NOW - 40 * DAY)
+    const h = failing('399')
+    const { payload } = await buildOrreryBodies({
+      now: NOW,
+      fetchText: h.fetchText,
+      pauseMs: 0,
+      previous,
+    })
+    expect(payload.bodies.some((b: { naifId: string }) => b.naifId === '399')).toBe(false)
+    expect(payload.missing.map((m: { id: string }) => m.id)).toEqual(['naif:399'])
+    expect(payload.carried).toEqual([])
+  })
+})
+
 describe('the reason a span failed (#150)', () => {
   // Horizons' answer to `DES=2099 ZZ999;`, recorded live 2026-11-12 (the `result` string).
   const noMatches = fixture('no-matches')

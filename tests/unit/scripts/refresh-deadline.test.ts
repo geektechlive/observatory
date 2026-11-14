@@ -105,11 +105,45 @@ describe('JPL steps under the job deadline (#128)', () => {
       budgetMs: 90_000,
       clock: clock.now,
     })
-    expect(entry.ok).toBe(true)
-    expect(entry.warning).toBe(true)
+    // No previous payload to carry the rest forward from (#231): they are dropped, so the
+    // step fails as upstream, and the partial payload is still written.
+    expect(entry.ok).toBe(false)
+    expect(entry.upstream).toBe(true)
     expect(entry.detail).toMatch(/time budget spent/)
     const payload = JSON.parse(write.value)
     expect(payload.bodies.length).toBeGreaterThan(0)
     expect(payload.missing.length).toBeGreaterThan(0)
+  })
+
+  it('carries what the budget left out forward from the last payload, as a warning (#231)', async () => {
+    const answer = (url: string) => {
+      const p = new URL(url).searchParams
+      const id = (p.get('COMMAND') ?? '').replace(/'/g, '')
+      const start = Number((p.get('START_TIME') ?? '').replace(/'|JD/g, ''))
+      const stop = Number((p.get('STOP_TIME') ?? '').replace(/'|JD/g, ''))
+      return `Target body name: X (${id})\n$$SOE\n${String(start)}, A.D. x, 1, 0.5, 0, 0, 0.017, 0,\n${String(stop)}, A.D. x, 1, 0.5, 0, 0, 0.017, 0,\n$$EOE\n`
+    }
+    const first = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: async (url: string) => answer(url),
+      previousText: null,
+      pauseMs: 0,
+    })
+    const clock = manualClock()
+    const { entry, write } = await refreshOrreryBodies(null, {
+      now: NOW + 6 * 3_600_000,
+      fetchText: async (url: string) => {
+        clock.advance(30_000)
+        return answer(url)
+      },
+      previousText: first.write.value,
+      pauseMs: 0,
+      budgetMs: 90_000,
+      clock: clock.now,
+    })
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(true)
+    expect(entry.detail).toMatch(/carried forward/)
+    expect(JSON.parse(write.value).missing).toEqual([])
   })
 })

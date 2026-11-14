@@ -193,6 +193,8 @@ export async function buildOrreryBodies({
   const prevAt = previous?.coarseFetchedAt ? Date.parse(previous.coarseFetchedAt) : Number.NaN
   const reuseCoarse = Number.isFinite(prevAt) && now - prevAt < COARSE_MAX_AGE_MS
   const prevById = new Map((previous?.bodies ?? []).map((b) => [b.id, b]))
+  const prevMoonById = new Map((previous?.moons ?? []).map((m) => [m.id, m]))
+  const nowJd = jdFromMs(now)
 
   const fineStart = jdFromMs(Math.floor((now - FINE_WINDOW_DAYS * DAY_MS) / DAY_MS) * DAY_MS)
   const fineStop = fineStart + 2 * FINE_WINDOW_DAYS
@@ -201,6 +203,8 @@ export async function buildOrreryBodies({
 
   const bodies = []
   const missing = []
+  /** Failed this run but kept from the last payload, whose samples still cover now (#231). */
+  const carried = []
   for (const spec of CRAFT) {
     if (only && !only.includes(spec.naifId)) continue
     const id = `naif:${spec.naifId}`
@@ -236,7 +240,15 @@ export async function buildOrreryBodies({
       })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
-      missing.push({ id, reason })
+      // Keep the last payload's copy while its samples still cover now (#231): a slow
+      // Horizons run must not drop Earth, and the Earth frame with it.
+      const prev = prevById.get(id)
+      if (prev && coversNow(prev, nowJd)) {
+        bodies.push(prev)
+        carried.push({ id, reason, days: carriedDays(previous, id, now) })
+      } else {
+        missing.push({ id, reason })
+      }
     }
   }
 
@@ -267,7 +279,13 @@ export async function buildOrreryBodies({
       })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
-      missing.push({ id, reason })
+      const prev = prevMoonById.get(id)
+      if (prev && coversNow(prev, nowJd)) {
+        moons.push(prev)
+        carried.push({ id, reason, days: carriedDays(previous, id, now) })
+      } else {
+        missing.push({ id, reason })
+      }
     }
   }
 
@@ -292,6 +310,7 @@ export async function buildOrreryBodies({
       bodies: withPasses,
       moons,
       missing,
+      carried,
     },
     requests: asked,
     encounterFailures,
@@ -340,9 +359,25 @@ async function addClosePasses(bodies, ask, now, prevById) {
   return { bodies: out, failures }
 }
 
-/** Julian date of a velocity span's last sample. */
-function spanEnd(span) {
-  return span.start + (span.samples.length / 6 - 1) * span.step
+/** Julian date of a span's last sample: six numbers a sample with velocity, else three. */
+function spanEnd(span, stride = 6) {
+  return span.start + (span.samples.length / stride - 1) * span.step
+}
+
+/** Whether a body's (or moon's) samples cover `jd`: its fine span, or else its coarse one. */
+function coversNow(track, jd) {
+  const inSpan = (span, stride) => Boolean(span) && jd >= span.start && jd <= spanEnd(span, stride)
+  return inSpan(track.fine, 6) || inSpan(track.coarse, 3)
+}
+
+/**
+ * Days since a carried object was last fetched (#231): the previous payload's age, plus how
+ * long that payload had itself been carrying it.
+ */
+function carriedDays(previous, id, nowMs) {
+  const since = Date.parse(previous.generatedAt)
+  const before = (previous.carried ?? []).find((c) => c.id === id)?.days ?? 0
+  return Number.isFinite(since) ? round(before + (nowMs - since) / DAY_MS, 2) : before
 }
 
 export { jdFromMs, msFromJd }

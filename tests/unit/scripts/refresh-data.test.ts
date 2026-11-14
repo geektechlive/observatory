@@ -258,7 +258,8 @@ describe('refreshOrreryBodies (#93)', () => {
     expect(JSON.parse(write.value).bodies.length).toBe(write.metadata.bodies)
   })
 
-  it('ships a partial refresh, with the missing objects as a warning', async () => {
+  it('ships a partial refresh, but a dropped body fails as upstream so a lasting gap opens an incident (#231)', async () => {
+    // No previous payload to carry Lucy forward from: she is dropped.
     const fetchText = async (url: string) =>
       new URL(url).searchParams.get('COMMAND') === "'-49'" ? 'no data' : anySpan(url)
     const { entry, write } = await refreshOrreryBodies(null, {
@@ -267,10 +268,56 @@ describe('refreshOrreryBodies (#93)', () => {
       previousText: null,
       pauseMs: 0,
     })
-    expect(entry.ok).toBe(true)
-    expect(entry.warning).toBe(true)
+    expect(entry.ok).toBe(false)
+    expect(entry.upstream).toBe(true)
     expect(entry.detail).toMatch(/missing naif:-49/)
     expect(write.metadata.missing).toBe(1)
+  })
+
+  it('carries a failed body forward as a warning while its last span covers now (#231)', async () => {
+    const first = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: anySpan,
+      previousText: null,
+      pauseMs: 0,
+    })
+    const fetchText = async (url: string) =>
+      new URL(url).searchParams.get('COMMAND') === "'-49'" ? 'no data' : anySpan(url)
+    const { entry, write } = await refreshOrreryBodies(null, {
+      now: NOW + 6 * HOUR,
+      fetchText,
+      previousText: first.write.value,
+      pauseMs: 0,
+    })
+    expect(entry.ok).toBe(true)
+    expect(entry.warning).toBe(true)
+    expect(entry.detail).toMatch(/carried forward naif:-49/)
+    expect(JSON.parse(write.value).bodies.some((b: { naifId: string }) => b.naifId === '-49')).toBe(
+      true,
+    )
+  })
+
+  it('fails as upstream once a body has been carried for more than two days (#231)', async () => {
+    const first = await refreshOrreryBodies(null, {
+      now: NOW,
+      fetchText: anySpan,
+      previousText: null,
+      pauseMs: 0,
+    })
+    const fetchText = async (url: string) =>
+      new URL(url).searchParams.get('COMMAND') === "'-49'" ? 'no data' : anySpan(url)
+    const { entry, write } = await refreshOrreryBodies(null, {
+      now: NOW + 3 * 24 * HOUR,
+      fetchText,
+      previousText: first.write.value,
+      pauseMs: 0,
+    })
+    expect(entry.ok).toBe(false)
+    expect(entry.upstream).toBe(true)
+    expect(entry.detail).toMatch(/carried forward naif:-49 \(3 d/)
+    expect(JSON.parse(write.value).bodies.some((b: { naifId: string }) => b.naifId === '-49')).toBe(
+      true,
+    )
   })
 
   it('logs an unsampled close pass without raising a warning (#230)', async () => {
