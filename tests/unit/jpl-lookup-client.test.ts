@@ -66,6 +66,24 @@ describe('fetchLookup', () => {
     })
   })
 
+  it("reads the queue's per-visitor cap as 'limited', with its wait (#236)", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('{"error":"JPL is busy"}', {
+            status: 503,
+            headers: { 'X-Queue': 'client', 'Retry-After': '1500' },
+          }),
+      ),
+    )
+    expect(await fetchLookup('eros')).toEqual({
+      state: 'unavailable',
+      reason: 'limited',
+      retryAfterS: 1500,
+    })
+  })
+
   it('reads a 429 from the /api rate limit as busy, with its Retry-After (#141)', async () => {
     const answer = (headers: Record<string, string>) =>
       vi.fn(async () => new Response('{"error":"Rate limit exceeded"}', { status: 429, headers }))

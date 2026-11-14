@@ -1,4 +1,5 @@
 import { type DailyBudget, isJplShare, type JplShare } from './budget'
+import { type ClientLimit, isClientId } from './clientLimit'
 import { isJplUrl, type JplAnswer, JplFetchError } from './jplFetch'
 import { QueueFullError, type SerialQueue } from './queue'
 
@@ -12,6 +13,8 @@ export interface QueueDeps {
   /** One budget per share (#223); the sum of their limits is the day's whole allowance. */
   budgets: Record<JplShare, DailyBudget>
   fetchJpl: (url: string) => Promise<JplAnswer>
+  /** Uncached asks per visitor (#236); absent in tests that don't exercise it. */
+  clients?: ClientLimit
 }
 
 function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
@@ -31,6 +34,8 @@ const queueFull = (retryAfterSeconds: number) =>
 interface Ask {
   url: string
   share: JplShare
+  /** A hash of the visitor's address (#236), or null from a Function deployed before it. */
+  client: string | null
 }
 
 /**
@@ -49,7 +54,9 @@ async function readAsk(req: Request): Promise<Ask | null> {
   const url = body.url
   if (typeof url !== 'string' || !isJplUrl(url)) return null
   const share = 'share' in body ? body.share : 'lookup'
-  return isJplShare(share) ? { url, share } : null
+  const client = 'client' in body ? body.client : null
+  if (client !== null && !isClientId(client)) return null
+  return isJplShare(share) ? { url, share, client } : null
 }
 
 export async function handleQueueRequest(req: Request, deps: QueueDeps): Promise<Response> {
@@ -57,13 +64,25 @@ export async function handleQueueRequest(req: Request, deps: QueueDeps): Promise
   const ask = await readAsk(req)
   if (!ask) {
     return json(400, {
-      error: 'Body must be {"url": <a JPL API URL>, "share"?: "lookup" | "trajectory"}',
+      error:
+        'Body must be {"url": <a JPL API URL>, "share"?: "lookup" | "trajectory", "client"?: <sha-256 hex>}',
     })
   }
-  const { url, share } = ask
+  const { url, share, client } = ask
 
   // A full queue refuses before spending budget, so refusals cost JPL nothing.
   if (deps.queue.isFull()) return queueFull(deps.queue.retryAfterSeconds())
+  // So does a visitor past its hourly cap (#236).
+  if (client !== null && deps.clients) {
+    const mine = deps.clients.take(client)
+    if (!mine.ok) {
+      return json(
+        503,
+        { error: 'Too many JPL asks from this visitor this hour' },
+        { 'Retry-After': String(mine.retryAfterSeconds), 'X-Queue': 'client' },
+      )
+    }
+  }
   const budget = await deps.budgets[share].take()
   if (!budget.ok) {
     return json(

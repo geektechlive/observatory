@@ -1,5 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { visitorKey } from './api/_ip'
+
 const RATE_LIMIT_MAX = 60
 const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute in ms
 /**
@@ -26,16 +28,6 @@ interface RateLimitEntry {
 // scoped to /api/* at the zone/account level; this in-memory limiter is
 // defense-in-depth only and should not be relied on as the primary control.
 const buckets = new Map<string, RateLimitEntry>()
-
-function rateLimitKey(ip: string): string {
-  if (ip.includes(':')) {
-    // IPv6: collapse to the first 4 hextets (a /64 prefix) so a single
-    // client rotating addresses within its assigned /64 still shares a bucket.
-    const hextets = ip.split(':').slice(0, 4)
-    return hextets.join(':')
-  }
-  return ip
-}
 
 function isRateLimited(key: string, now: number, max: number): boolean {
   const entry = buckets.get(key)
@@ -96,7 +88,7 @@ export const onRequest: PagesFunction = async (context) => {
   if (isApiPath) {
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
     // Separate buckets, so a pages.dev script can't spend a visitor's custom-domain budget.
-    const key = `${zoneHost ? 'zone' : 'other'}|${rateLimitKey(ip)}`
+    const key = `${zoneHost ? 'zone' : 'other'}|${visitorKey(ip)}`
     const max = zoneHost ? RATE_LIMIT_MAX : OTHER_HOST_RATE_LIMIT_MAX
     if (isRateLimited(key, Date.now(), max)) {
       return withSecurityHeaders(

@@ -3,7 +3,7 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 import { parseLookupQuery, parseSbdbLookup, sbdbLookupUrl } from '../../src/lib/orrery/jplLookup'
 import type { LookupResponse } from '../../src/schemas/jplLookup'
 import { cachedJson, contractError, upstreamError } from './_cache'
-import { askJpl, badRequest, type JplEnv, notConfigured } from './_jpl'
+import { askJpl, badRequest, clientId, type JplEnv, notConfigured } from './_jpl'
 
 // GET /api/lookup?q= (#100): find any asteroid or comet in JPL's Small-Body Database,
 // on demand, through the jpl-queue Durable Object. The normalised search string is the
@@ -19,7 +19,7 @@ export const onRequest: PagesFunction<JplEnv> = (ctx) => {
   const { q } = parsed
 
   return cachedJson(ctx, `jpl:lookup:v1:${q}`, LOOKUP_TTL_SECONDS, async () => {
-    const reply = await askJpl(ns, sbdbLookupUrl(q), 'lookup')
+    const reply = await askJpl(ns, sbdbLookupUrl(q), 'lookup', await clientId(ctx.request))
     if (!reply.ok) return reply.response
     // 300 is SBDB's "matched more than one object", with the list.
     if (reply.status !== 200 && reply.status !== 300) {

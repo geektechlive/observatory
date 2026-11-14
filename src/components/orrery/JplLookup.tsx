@@ -1,7 +1,13 @@
 import { useState } from 'react'
 
 import { useJplLookup, useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
-import { type LookupState, SPENT, trajectoryFacts, type Unavailable } from '@/lib/api/jplLookup'
+import {
+  limitedText,
+  type LookupState,
+  SPENT,
+  trajectoryFacts,
+  type Unavailable,
+} from '@/lib/api/jplLookup'
 import { lookupSpan } from '@/lib/orrery/lookupTrack'
 import type { LookupObject } from '@/schemas/jplLookup'
 
@@ -23,6 +29,7 @@ const UNAVAILABLE: Record<Unavailable, string> = {
   'not-set-up': 'On-demand lookup isn’t available yet.',
   busy: 'JPL is busy right now. Try again in a minute.',
   spent: SPENT,
+  limited: limitedText(undefined),
   failed: 'The JPL lookup didn’t work this time.',
   'out-of-range': 'JPL positions are asked for 1900 to 2100 only.',
   'not-found': 'JPL has no object by that name or number.',
@@ -30,6 +37,9 @@ const UNAVAILABLE: Record<Unavailable, string> = {
 
 /** A failed answer in words; a busy queue's own wait when it sent one (#145). */
 function unavailable(answer: LookupState<unknown> | undefined): string {
+  if (answer?.state === 'unavailable' && answer.reason === 'limited') {
+    return limitedText(answer.retryAfterS)
+  }
   if (
     answer?.state === 'unavailable' &&
     answer.reason === 'busy' &&

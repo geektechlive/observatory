@@ -90,3 +90,7 @@ The line above about `/api/planets`, `/api/sentry` and `/api/fireball` calling J
 ## Addendum, 2026-11-14 (#237)
 
 The queue's `Retry-After` (above, and the spent-share bullet) did not reach visitors until #237: `functions/api/_jpl.ts` built its 503 without it, and the 60 s negative cache rebuilt its headers without it. Both now pass `Retry-After` and `X-Queue` through, and the client reads `X-Queue: budget` as a spent allowance that resets at midnight UTC and is never retried.
+
+## Addendum, 2026-11-14 (#236): a per-visitor cap
+
+The residual above (one script can spend a share) is now bounded per visitor. The Pages Function sends the queue a client id: a SHA-256 of the visitor's address (an IPv6 address by its /64) with the UTC date, so the queue never sees an address. The queue allows each id 60 uncached asks an hour (`ClientLimit`, `workers/jpl-queue/src/clientLimit.ts`), in memory only, with no storage writes, and refuses past that with 503, `X-Queue: client` and `Retry-After`, before spending budget. The client says "You've asked JPL many times this hour" with the wait, and doesn't retry. Draining the 1,400 lookups now takes about two dozen addresses, not one. **It is a mitigation, not a hard bound:** a visitor is one IPv4 address or one IPv6 /64 (functions/api/_ip.ts), and a home IPv6 /56 alone holds 256 /64s; VPN and Tor exits reach further. An evicted Durable Object forgets the counts, which only makes the cap more lenient for a while.

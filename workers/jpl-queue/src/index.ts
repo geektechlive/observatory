@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 
 import { DailyBudget, LOOKUP_DAILY_LIMIT, TRAJECTORY_DAILY_LIMIT } from './budget'
+import { ClientLimit } from './clientLimit'
 import { handleQueueRequest, type QueueDeps } from './handler'
 import { fetchJpl } from './jplFetch'
 import { SerialQueue } from './queue'
@@ -43,6 +44,8 @@ export class JplQueue extends DurableObject {
         trajectory: new DailyBudget(store, TRAJECTORY_DAILY_LIMIT, Date.now, 'budget:trajectory'),
       },
       fetchJpl: (url) => fetchJpl(url, { fetch: (u, init) => fetch(u, init), sleep }),
+      // Per-visitor cap on uncached asks (#236), in memory only.
+      clients: new ClientLimit(),
     }
   }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { useLookupClosest, useLookupSpan, useSettledSpan } from '@/hooks/useJplLookup'
-import { type LookupState, SPENT, type Unavailable } from '@/lib/api/jplLookup'
+import { limitedText, type LookupState, SPENT, type Unavailable } from '@/lib/api/jplLookup'
 import { asteroidState, shortName } from '@/lib/orrery/asteroids'
 import { earthState } from '@/lib/orrery/craftState'
 import {
@@ -38,6 +38,7 @@ const PROBLEM: Record<Unavailable, string> = {
   'not-set-up': 'On-demand lookup isn’t available yet.',
   busy: 'JPL is busy right now. Trying again shortly.',
   spent: SPENT,
+  limited: limitedText(undefined),
   failed: 'JPL didn’t answer this time.',
   'out-of-range': 'JPL positions are asked for 1900 to 2100 only.',
   'not-found': 'JPL has no object with this id.',
@@ -48,6 +49,7 @@ export function lookupProblem(a: LookupState<unknown> | undefined, gaveUp = fals
   if (!a || a.state === 'ok') return null
   // Five retries spent (#141 review): the visitor asks again.
   if (gaveUp) return GAVE_UP
+  if (a.reason === 'limited') return limitedText(a.retryAfterS)
   if (a.reason === 'busy' && a.retryAfterS !== undefined) {
     return `JPL is busy right now. Trying again in ${String(Math.round(a.retryAfterS))} s.`
   }
@@ -211,6 +213,7 @@ export function useLookupTrack({
       (query.data.reason === 'not-found' ||
         query.data.reason === 'not-set-up' ||
         query.data.reason === 'spent' ||
+        query.data.reason === 'limited' ||
         query.data.reason === 'failed'))
   // Stable between renders, so the page's search list is rebuilt only when it changes.
   const fullName = object?.name ?? label

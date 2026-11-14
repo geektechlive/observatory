@@ -7,6 +7,7 @@ import {
   TOTAL_DAILY_LIMIT,
   TRAJECTORY_DAILY_LIMIT,
 } from '../../../workers/jpl-queue/src/budget'
+import { ClientLimit } from '../../../workers/jpl-queue/src/clientLimit'
 import { handleQueueRequest, type QueueDeps } from '../../../workers/jpl-queue/src/handler'
 import { fetchJpl, isJplUrl, JplFetchError } from '../../../workers/jpl-queue/src/jplFetch'
 import { QueueFullError, SerialQueue } from '../../../workers/jpl-queue/src/queue'
@@ -423,5 +424,78 @@ describe('handleQueueRequest', () => {
     const res = await handleQueueRequest(ask({ url: jplUrl }), d)
     expect(res.status).toBe(503)
     expect(res.headers.get('X-Jpl-Status')).toBe('0')
+  })
+})
+
+describe('ClientLimit: one visitor cannot spend the day (#236)', () => {
+  const ask = (body: unknown) =>
+    new Request('https://jpl-queue/ask', { method: 'POST', body: JSON.stringify(body) })
+  const jplUrl = 'https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=eros'
+  const client = 'a'.repeat(64)
+  const other = 'b'.repeat(64)
+
+  function deps(now: () => number, limit = 3) {
+    const store = memoryStore()
+    return {
+      store,
+      d: {
+        queue: new SerialQueue({ maxPending: 4, minGapMs: 0 }),
+        budgets: budgetsOf(store, 100, 100),
+        fetchJpl: vi.fn().mockResolvedValue({
+          status: 200,
+          body: '{}',
+          contentType: 'application/json',
+          attempts: 1,
+        }),
+        clients: new ClientLimit(limit, 3_600_000, now),
+      } satisfies QueueDeps,
+    }
+  }
+
+  it('refuses a visitor past the cap with 503, X-Queue: client and the wait, before spending budget', async () => {
+    let t = 0
+    const { d, store } = deps(() => t)
+    for (let i = 0; i < 3; i += 1) {
+      expect((await handleQueueRequest(ask({ url: jplUrl, client }), d)).status).toBe(200)
+    }
+    const spentBefore = [...store.data.values()].reduce((a, b) => a + b, 0)
+    t = 600_000
+    const refused = await handleQueueRequest(ask({ url: jplUrl, client }), d)
+    expect(refused.status).toBe(503)
+    expect(refused.headers.get('X-Queue')).toBe('client')
+    expect(Number(refused.headers.get('Retry-After'))).toBe(3000)
+    expect([...store.data.values()].reduce((a, b) => a + b, 0)).toBe(spentBefore)
+    expect(d.fetchJpl).toHaveBeenCalledTimes(3)
+  })
+
+  it('counts each visitor apart, and lets one back in when the hour has passed', async () => {
+    let t = 0
+    const { d } = deps(() => t)
+    for (let i = 0; i < 3; i += 1) await handleQueueRequest(ask({ url: jplUrl, client }), d)
+    expect((await handleQueueRequest(ask({ url: jplUrl, client: other }), d)).status).toBe(200)
+    t = 3_600_001
+    expect((await handleQueueRequest(ask({ url: jplUrl, client }), d)).status).toBe(200)
+  })
+
+  it('caps nothing for a caller that names no client (a Function deployed before #236)', async () => {
+    const { d } = deps(() => 0)
+    for (let i = 0; i < 5; i += 1) {
+      expect((await handleQueueRequest(ask({ url: jplUrl }), d)).status).toBe(200)
+    }
+  })
+
+  it('refuses a malformed client id as a bad request', async () => {
+    const { d } = deps(() => 0)
+    expect((await handleQueueRequest(ask({ url: jplUrl, client: 'not-hex!' }), d)).status).toBe(400)
+  })
+
+  it('keeps its memory bounded: entries whose hour has passed are dropped', () => {
+    let t = 0
+    const limit = new ClientLimit(3, 1000, () => t)
+    for (let i = 0; i < 50; i += 1) limit.take(i.toString(16).padStart(64, '0'))
+    // Swept at most once a minute (#236 review): past that, the stale entries go.
+    t = 61_000
+    limit.take(client)
+    expect(limit.size).toBe(1)
   })
 })

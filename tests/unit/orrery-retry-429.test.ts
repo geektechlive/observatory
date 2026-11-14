@@ -79,3 +79,13 @@ describe('a spent daily JPL budget (#237)', () => {
     expect(lookupProblem(spent)).not.toMatch(/busy/)
   })
 })
+
+describe('a visitor past the JPL cap (#236)', () => {
+  const limited = { state: 'unavailable', reason: 'limited', retryAfterS: 1500 } as const
+
+  it('is not retried, and says how long to wait in minutes', () => {
+    expect(lookupRetryMs(limited)).toBe(false)
+    expect(lookupProblem(limited)).toMatch(/this hour/)
+    expect(lookupProblem(limited)).toMatch(/25 min/)
+  })
+})

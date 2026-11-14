@@ -1,4 +1,5 @@
 import { upstreamError } from './_cache'
+import { visitorKey } from './_ip'
 
 // The way to JPL for on-demand requests (#100): every one goes through the jpl-queue
 // Worker's Durable Object, which runs them one at a time (JPL Fair Use: "only one API
@@ -44,11 +45,29 @@ export type JplReply =
  */
 export type JplShare = 'lookup' | 'trajectory'
 
+/**
+ * The visitor the queue caps by (#236): a SHA-256 of the address (an IPv6 address by its
+ * /64, as the middleware's rate limit does) with the UTC date, so the queue never sees an
+ * address and an id lasts a day. Null when the request carries no address.
+ */
+export async function clientId(request: { headers: { get(name: string): string | null } }) {
+  const ip = request.headers.get('CF-Connecting-IP')
+  if (!ip) return null
+  const key = visitorKey(ip)
+  const day = new Date().toISOString().slice(0, 10)
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`observatory-jpl|${day}|${key}`),
+  )
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** Ask JPL through the queue. JPL's own status comes back as `status`. */
 export async function askJpl(
   ns: JplQueueNamespace,
   url: string,
   share: JplShare,
+  client: string | null = null,
 ): Promise<JplReply> {
   let res: Response
   try {
@@ -56,7 +75,7 @@ export async function askJpl(
     res = await stub.fetch('https://jpl-queue/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, share }),
+      body: JSON.stringify(client === null ? { url, share } : { url, share, client }),
     })
   } catch (err) {
     console.warn('[jpl] queue unreachable:', err)

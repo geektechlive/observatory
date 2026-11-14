@@ -16,12 +16,23 @@ import { apiFetch } from './client'
 
 /**
  * Why there is no answer. `spent` is the queue's daily JPL allowance gone (#237): it comes
- * back at midnight UTC, so it is said plainly and never retried, unlike `busy`.
+ * back at midnight UTC, so it is said plainly and never retried, unlike `busy`. `limited` is
+ * this visitor past the queue's hourly cap (#236): also said, with the wait, and not retried.
  */
-export type Unavailable = 'not-set-up' | 'busy' | 'spent' | 'failed' | 'out-of-range' | 'not-found'
+export type Unavailable =
+  'not-set-up' | 'busy' | 'spent' | 'limited' | 'failed' | 'out-of-range' | 'not-found'
 
 /** The words for `spent`, on the search card and the inspector alike (#237). */
 export const SPENT = 'Today’s JPL allowance is spent. Lookups start again at midnight UTC.'
+
+/** The words for `limited` (#236), with the wait in minutes when the queue gave one. */
+export function limitedText(retryAfterS: number | undefined): string {
+  const wait =
+    retryAfterS === undefined
+      ? 'later'
+      : `in ${String(Math.max(1, Math.ceil(retryAfterS / 60)))} min`
+  return `You’ve asked JPL many times this hour. Try again ${wait}.`
+}
 
 export type LookupState<T> =
   | { state: 'ok'; data: T }
@@ -74,7 +85,8 @@ async function getLookupJson<T>(
     }
     const wait = retryAfter(res)
     // The queue names its refusal (#237): a spent budget is not "busy".
-    const reason = res.headers.get('X-Queue') === 'budget' ? 'spent' : 'busy'
+    const queue = res.headers.get('X-Queue')
+    const reason = queue === 'budget' ? 'spent' : queue === 'client' ? 'limited' : 'busy'
     return wait === null
       ? { state: 'unavailable', reason }
       : { state: 'unavailable', reason, retryAfterS: wait }

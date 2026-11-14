@@ -14,7 +14,14 @@ import {
 } from '../../src/lib/orrery/jplLookup'
 import { readLookupResult, type TrajectoryResponse } from '../../src/schemas/jplLookup'
 import { cachedJson, contractError, upstreamError } from './_cache'
-import { askJpl, badRequest, type JplEnv, type JplQueueNamespace, notConfigured } from './_jpl'
+import {
+  askJpl,
+  badRequest,
+  clientId,
+  type JplEnv,
+  type JplQueueNamespace,
+  notConfigured,
+} from './_jpl'
 
 // GET /api/trajectory?id=sb:<SPK-ID>&start=&end=&step= (#100): Horizons vectors for any
 // small body over a span, on demand, through the jpl-queue Durable Object. The object is
@@ -34,7 +41,7 @@ function objectAnswer(ctx: Ctx, ns: JplQueueNamespace, spkid: string): Promise<R
     `jpl:sbdb-spk:v1:${spkid}`,
     OBJECT_TTL_SECONDS,
     async () => {
-      const reply = await askJpl(ns, sbdbSpkUrl(spkid), 'trajectory')
+      const reply = await askJpl(ns, sbdbSpkUrl(spkid), 'trajectory', await clientId(ctx.request))
       if (!reply.ok) return reply.response
       if (reply.status !== 200) return upstreamError(reply.status, 'JPL SBDB unavailable')
       const result = parseSbdbLookup(JSON.parse(reply.text))
@@ -77,8 +84,10 @@ async function produceTrajectory(
   ns: JplQueueNamespace,
   object: LookupObject,
   req: TrajectoryRequest,
+  client: string | null,
 ) {
-  const reply = await askJpl(ns, horizonsTrajectoryUrl(lookupCommand(object), req), 'trajectory')
+  const url = horizonsTrajectoryUrl(lookupCommand(object), req)
+  const reply = await askJpl(ns, url, 'trajectory', client)
   if (!reply.ok) return reply.response
   if (reply.status !== 200) return upstreamError(reply.status, 'JPL Horizons unavailable')
   const raw: unknown = JSON.parse(reply.text)
@@ -136,5 +145,7 @@ export const onRequest: PagesFunction<JplEnv> = async (ctx) => {
   const object = lookup.object
 
   const key = `jpl:traj:v1:${req.spkid}:${req.start}:${req.end}:${String(req.stepMinutes)}`
-  return cachedJson(ctx, key, TRAJECTORY_TTL_SECONDS, () => produceTrajectory(ns, object, req))
+  return cachedJson(ctx, key, TRAJECTORY_TTL_SECONDS, async () =>
+    produceTrajectory(ns, object, req, await clientId(ctx.request)),
+  )
 }

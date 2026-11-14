@@ -26,11 +26,19 @@ interface Reply {
 function fakeQueue(replies: (url: string) => Reply) {
   const asked: string[] = []
   const shares: unknown[] = []
+  const clients: unknown[] = []
+  const bodies: string[] = []
   const stub = {
     fetch: vi.fn(async (_url: string, init: RequestInit) => {
-      const { url, share } = JSON.parse(init.body as string) as { url: string; share?: unknown }
+      bodies.push(init.body as string)
+      const { url, share, client } = JSON.parse(init.body as string) as {
+        url: string
+        share?: unknown
+        client?: unknown
+      }
       asked.push(url)
       shares.push(share)
+      clients.push(client)
       const r = replies(url)
       return new Response(typeof r.body === 'string' ? r.body : JSON.stringify(r.body), {
         status: r.status ?? 200,
@@ -45,17 +53,18 @@ function fakeQueue(replies: (url: string) => Reply) {
     idFromName: vi.fn(() => 'the-one-id'),
     get: vi.fn(() => stub),
   }
-  return { ns, asked, shares }
+  return { ns, asked, shares, clients, bodies }
 }
 
 function run(
   handler: typeof lookup,
   path: string,
   env: Record<string, unknown>,
+  headers: Record<string, string> = {},
 ): Promise<{ res: Response; settle: () => Promise<void> }> {
   const pending: Promise<unknown>[] = []
   const ctx = {
-    request: new Request(`https://observatory.test${path}`),
+    request: new Request(`https://observatory.test${path}`, { headers }),
     env,
     waitUntil: (p: Promise<unknown>) => pending.push(p),
   }
@@ -352,5 +361,34 @@ describe('the client health contracts agree with these Functions (#148)', () => 
         'Target body name: 433 Eros (A898 PA)\nNo ephemeris for target "433 Eros (A898 PA)" after A.D. 2100-JAN-01 00:00:00.0000 TDB\n',
     }
     expect(required(await answer(refused))).toBe(true)
+  })
+})
+
+describe('the visitor id the queue caps by (#236)', () => {
+  const ip = (addr: string) => ({ 'CF-Connecting-IP': addr })
+
+  it('sends a hash of the address, never the address, and the same one for the same visitor', async () => {
+    const q = fakeQueue(() => ({ jplStatus: 200, body: apophis }))
+    await run(lookup, '/api/lookup?q=apophis', { JPL_QUEUE: q.ns }, ip('203.0.113.7'))
+    await run(lookup, '/api/lookup?q=ceres', { JPL_QUEUE: q.ns }, ip('203.0.113.7'))
+    await run(lookup, '/api/lookup?q=vesta', { JPL_QUEUE: q.ns }, ip('198.51.100.9'))
+    const [a, b, c] = q.clients
+    expect(a).toMatch(/^[0-9a-f]{64}$/)
+    expect(b).toBe(a)
+    expect(c).not.toBe(a)
+    expect(q.bodies.some((body) => body.includes('203.0.113.7'))).toBe(false)
+  })
+
+  it('counts one IPv6 /64 as one visitor, as the middleware does', async () => {
+    const q = fakeQueue(() => ({ jplStatus: 200, body: apophis }))
+    await run(lookup, '/api/lookup?q=apophis', { JPL_QUEUE: q.ns }, ip('2001:db8:1:2:aaaa::1'))
+    await run(lookup, '/api/lookup?q=ceres', { JPL_QUEUE: q.ns }, ip('2001:db8:1:2:ffff::9'))
+    expect(q.clients[1]).toBe(q.clients[0])
+  })
+
+  it('sends no id when the request carries no address', async () => {
+    const q = fakeQueue(() => ({ jplStatus: 200, body: apophis }))
+    await run(lookup, '/api/lookup?q=apophis', { JPL_QUEUE: q.ns })
+    expect(q.clients[0]).toBeUndefined()
   })
 })
