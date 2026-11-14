@@ -23,6 +23,8 @@ export interface BudgetStore {
   get(key: string): Promise<number | undefined>
   put(key: string, value: number): Promise<void>
   delete(key: string): Promise<unknown>
+  /** Every stored key that starts with `prefix`. */
+  list(prefix: string): Promise<string[]>
 }
 
 export type BudgetDecision = { ok: true } | { ok: false; retryAfterSeconds: number }
@@ -34,6 +36,7 @@ const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 export class DailyBudget {
   private day: string | null = null
   private used = 0
+  private pruned = false
   private readonly store: BudgetStore
   private readonly limit: number
   private readonly now: () => number
@@ -51,6 +54,12 @@ export class DailyBudget {
   async take(): Promise<BudgetDecision> {
     const now = this.now()
     const key = `${this.prefix}:${dayOf(now)}`
+    if (!this.pruned) {
+      // Housekeeping only: a storage error here must not cost a visitor the request, and it
+      // is not retried until the next instance (an orphan row is tiny).
+      this.pruned = true
+      await this.pruneEarlierDays(key).catch(() => undefined)
+    }
     if (key !== this.day) {
       if (this.day) await this.store.delete(this.day)
       this.used = (await this.store.get(key)) ?? 0
@@ -64,4 +73,19 @@ export class DailyBudget {
     await this.store.put(key, this.used)
     return { ok: true }
   }
+
+  /**
+   * Delete this share's rows for days before today. `this.day` is null after an eviction or
+   * restart, so the in-memory delete in take() never sees yesterday's row (#225). Once per
+   * instance. The lookup prefix `budget:` also matches `budget:trajectory:<day>`, so a key
+   * counts as this share's only when it is exactly `<prefix>:<YYYY-MM-DD>`.
+   */
+  private async pruneEarlierDays(todayKey: string): Promise<void> {
+    const keys = await this.store.list(`${this.prefix}:`)
+    const stale = keys.filter((key) => isDayRow(key, this.prefix) && key < todayKey)
+    await Promise.all(stale.map((key) => this.store.delete(key)))
+  }
 }
+
+const isDayRow = (key: string, prefix: string) =>
+  key.startsWith(`${prefix}:`) && /^\d{4}-\d{2}-\d{2}$/.test(key.slice(prefix.length + 1))

@@ -33,6 +33,7 @@ export class JplQueue extends DurableObject {
       get: (key: string) => storage.get<number>(key),
       put: (key: string, value: number) => storage.put(key, value),
       delete: (key: string) => storage.delete(key),
+      list: async (prefix: string) => [...(await storage.list<number>({ prefix })).keys()],
     }
     this.deps = {
       queue: new SerialQueue({ maxPending: MAX_PENDING, minGapMs: MIN_GAP_MS }),

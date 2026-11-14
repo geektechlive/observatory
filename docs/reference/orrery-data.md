@@ -547,8 +547,10 @@ request at a time, as JPL's Fair Use asks ("only one API request at a time"). `/
   request while one awaits its fetch. 1 s between starts, 8 waiting at most (then 503 with
   `Retry-After`, `X-Queue: full`), 2,000 JPL requests a UTC day in two shares, 1,400 for lookups
   and 600 for trajectories (`budget.ts`, one storage row a UTC day per share, the lookup row
-  `budget:<day>` and the trajectory row `budget:trajectory:<day>`; a spent share is 503 until
-  midnight with `X-Queue: budget` and `X-Queue-Share`). `fetchJpl` allows only `ssd.jpl.nasa.gov` and
+  `budget:<day>` and the trajectory row `budget:trajectory:<day>`. The first take after a start
+  lists the share's rows and deletes every earlier day, since an eviction forgets yesterday's key
+  (#225); this is best-effort, so a storage error there never fails the request. A spent share
+  is 503 until midnight with `X-Queue: budget` and `X-Queue-Share`). `fetchJpl` allows only `ssd.jpl.nasa.gov` and
   `ssd-api.jpl.nasa.gov`, gives each attempt 15 s, and retries 503/429 twice (2 s, 5 s, or a
   `Retry-After` up to 10 s). `workers_dev` and preview URLs are off: only a binding reaches it.
   The DO answers 200 with JPL's status in `X-Jpl-Status`.

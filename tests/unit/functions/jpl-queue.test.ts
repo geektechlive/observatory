@@ -199,6 +199,7 @@ function memoryStore(): BudgetStore & { data: Map<string, number> } {
       data.delete(key)
       return Promise.resolve()
     },
+    list: (prefix) => Promise.resolve([...data.keys()].filter((k) => k.startsWith(prefix))),
   }
 }
 
@@ -226,6 +227,53 @@ describe('DailyBudget', () => {
     expect(await budget.take()).toEqual({ ok: true })
     expect(store.data.has('budget:2026-11-07')).toBe(false)
     expect(store.data.get('budget:2026-11-08')).toBe(1)
+  })
+
+  it('drops every earlier day on the first take after a restart, for both shares (#225)', async () => {
+    const store = memoryStore()
+    store.data.set('budget:2026-11-05', 3)
+    store.data.set('budget:2026-11-07', 9)
+    store.data.set('budget:trajectory:2026-11-05', 4)
+    store.data.set('budget:trajectory:2026-11-07', 6)
+    const now = () => Date.parse('2026-11-08T00:00:01Z')
+    // Fresh instances over the same storage: what a Durable Object eviction leaves.
+    await new DailyBudget(store, 5, now).take()
+    await new DailyBudget(store, 5, now, 'budget:trajectory').take()
+    expect([...store.data.keys()].sort()).toEqual([
+      'budget:2026-11-08',
+      'budget:trajectory:2026-11-08',
+    ])
+  })
+
+  it('does not touch the other share, today, or later rows when pruning', async () => {
+    const store = memoryStore()
+    store.data.set('budget:trajectory:2026-11-08', 2)
+    store.data.set('budget:trajectory:2026-11-09', 1)
+    store.data.set('budget:2026-11-08', 5)
+    const now = () => Date.parse('2026-11-08T12:00:00Z')
+    await new DailyBudget(store, 9, now).take()
+    expect(store.data.get('budget:trajectory:2026-11-08')).toBe(2)
+    expect(store.data.get('budget:trajectory:2026-11-09')).toBe(1)
+    expect(store.data.get('budget:2026-11-08')).toBe(6)
+  })
+
+  it('lists storage once per instance, not per call', async () => {
+    const store = memoryStore()
+    const list = vi.spyOn(store, 'list')
+    const budget = new DailyBudget(store, 9, () => Date.parse('2026-11-08T12:00:00Z'))
+    await budget.take()
+    await budget.take()
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('still answers when pruning fails, and does not retry it on every call', async () => {
+    const store = memoryStore()
+    const list = vi.spyOn(store, 'list').mockRejectedValue(new Error('storage unavailable'))
+    const budget = new DailyBudget(store, 9, () => Date.parse('2026-11-08T12:00:00Z'))
+    expect(await budget.take()).toEqual({ ok: true })
+    expect(await budget.take()).toEqual({ ok: true })
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(store.data.get('budget:2026-11-08')).toBe(2)
   })
 })
 
