@@ -313,8 +313,15 @@ Real maps on the planets, the live Sun from GOES SUVI.
   - That image reaches past the sphere (the corona) and, being lifted, projects larger close up,
     so the projection reports the Sun's drawn radius (`sunDrawnReach`, #253): its label goes past
     the corona, and other labels keep off it. Before, the Sun preset's label sat on the limb.
-  - The sprite blends additively but leaves the canvas's alpha alone. Plain `AdditiveBlending`
-    wrote an opaque black square into the transparent canvas.
+  - The sprite adds colour and alpha (`SUN_GLOW_BLEND`), and each pixel's alpha is its brightest
+    channel (`glowAlpha`), as the globe's bloom does. The frame's black corners carry alpha 0, so
+    they paint no square (plain `AdditiveBlending` wrote an opaque black one). The pixels are
+    uploaded as a `DataTexture`, since a 2D canvas would premultiply and darken them.
+  - Before #256 the sprite left the canvas's alpha at 0. Colour over alpha 0 is not a valid
+    premultiplied pixel: headless Chromium showed it, but Safari and desktop Chrome composited it
+    as transparent, and the Sun drew as a black disc (the depth-only sphere) with glow only where
+    an orbit line had written alpha. `pnpm verify` runs headless Chromium, so check a change to
+    this blend in Safari or Playwright's WebKit.
 - **Orrery e2e answer NOAA themselves** (`tests/e2e/swpc.ts`), so they never wait on it.
 - **The chosen satellite with a model of its own is drawn as that model too (#194, ADR 0030).**
   A second `CraftModelLayer` (`satModels` in `OrreryRenderer`) resolves `modelForKey` for the chosen

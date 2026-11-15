@@ -1,7 +1,13 @@
-import { Color, Mesh, MeshBasicMaterial, SphereGeometry, Texture, Vector3 } from 'three'
+import { Color, Mesh, MeshBasicMaterial, OneFactor, SphereGeometry, Texture, Vector3 } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { BodySkins, fadeCorona, SKIN_MIN_PX } from '@/components/orrery/three/bodySkins'
+import {
+  BodySkins,
+  fadeCorona,
+  glowAlpha,
+  SKIN_MIN_PX,
+  SUN_GLOW_BLEND,
+} from '@/components/orrery/three/bodySkins'
 import type { BodyName } from '@/lib/orrery/bodies'
 import { type PlanetName, PLANETS } from '@/lib/orrery/elements'
 import { poleEcliptic } from '@/lib/orrery/imagery'
@@ -36,6 +42,23 @@ describe('fadeCorona (#105)', () => {
     expect(at(0, 0)).toBe(0)
     expect(at(99, 50)).toBeLessThan(10)
     expect(px[(50 * size + 0) * 4 + 3]).toBe(200)
+  })
+})
+
+describe("the live Sun's alpha (#256)", () => {
+  // The glow wrote colour over alpha 0. That is no valid premultiplied pixel, and Safari and
+  // desktop Chrome composite it as transparent: the Sun drew as a black disc.
+  it('gives each pixel the alpha of its brightest channel, so black stays clear', () => {
+    const px = new Uint8ClampedArray([200, 120, 0, 255, 0, 0, 0, 255, 10, 40, 30, 255])
+    glowAlpha(px)
+    expect([...px]).toEqual([200, 120, 0, 200, 0, 0, 0, 0, 10, 40, 30, 40])
+  })
+
+  it('adds alpha as well as colour, so the canvas holds what it shows', () => {
+    expect(SUN_GLOW_BLEND.blendSrc).toBe(OneFactor)
+    expect(SUN_GLOW_BLEND.blendDst).toBe(OneFactor)
+    expect(SUN_GLOW_BLEND.blendSrcAlpha).toBe(OneFactor)
+    expect(SUN_GLOW_BLEND.blendDstAlpha).toBe(OneFactor)
   })
 })
 

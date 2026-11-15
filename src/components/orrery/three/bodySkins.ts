@@ -7,17 +7,20 @@
  */
 import {
   AddEquation,
-  CanvasTexture,
   Color,
   CustomBlending,
+  DataTexture,
   DoubleSide,
   Float32BufferAttribute,
+  LinearFilter,
+  LinearMipmapLinearFilter,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
   OneFactor,
   Quaternion,
+  RGBAFormat,
   RingGeometry,
   SphereGeometry,
   Sprite,
@@ -25,7 +28,6 @@ import {
   SRGBColorSpace,
   type Texture,
   Vector3,
-  ZeroFactor,
 } from 'three'
 
 import { type BodyName } from '@/lib/orrery/bodies'
@@ -72,6 +74,32 @@ export function fadeCorona(data: Uint8ClampedArray, size: number): void {
     }
   }
 }
+
+/**
+ * Give each pixel of the Sun's frame the alpha of its brightest channel (#256). The glow is
+ * blended additively, and before, it left the canvas's alpha at 0: colour over alpha 0 is
+ * no valid premultiplied pixel, and Safari and desktop Chrome composite it as transparent,
+ * so the Sun drew as a black disc. With alpha = brightness the pixel is valid (no channel
+ * exceeds its alpha) and the frame's black corners stay clear, painting no square.
+ */
+export function glowAlpha(data: Uint8ClampedArray): void {
+  for (let i = 0; i < data.length; i += 4) {
+    data[i + 3] = Math.max(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0)
+  }
+}
+
+/**
+ * The Sun's blend: colour and alpha both add (#256), so the canvas holds valid
+ * premultiplied pixels and every browser composites the glow the same way.
+ */
+export const SUN_GLOW_BLEND = {
+  blending: CustomBlending,
+  blendEquation: AddEquation,
+  blendSrc: OneFactor,
+  blendDst: OneFactor,
+  blendSrcAlpha: OneFactor,
+  blendDstAlpha: OneFactor,
+} as const
 
 export class BodySkins {
   private readonly skins = new Map<PlanetName, Skin>()
@@ -234,20 +262,26 @@ export class BodySkins {
     ctx.drawImage(image, from, from, crop * 2, crop * 2, 0, 0, SUN_TEXTURE_PX, SUN_TEXTURE_PX)
     const pixels = ctx.getImageData(0, 0, SUN_TEXTURE_PX, SUN_TEXTURE_PX)
     fadeCorona(pixels.data, SUN_TEXTURE_PX)
-    ctx.putImageData(pixels, 0, 0)
-    const texture = new CanvasTexture(canvas)
+    glowAlpha(pixels.data)
+    // Uploaded as pixels, not through the canvas: a 2D canvas stores premultiplied colour,
+    // and a round-trip would darken every pixel by its own alpha.
+    const texture = new DataTexture(
+      new Uint8Array(pixels.data.buffer),
+      SUN_TEXTURE_PX,
+      SUN_TEXTURE_PX,
+      RGBAFormat,
+    )
     texture.colorSpace = SRGBColorSpace
+    texture.flipY = true
+    texture.magFilter = LinearFilter
+    texture.minFilter = LinearMipmapLinearFilter
+    texture.generateMipmaps = true
+    texture.needsUpdate = true
     if (!this.sun || !this.sunMaterial) {
-      // Additive colour, but the canvas's alpha is left alone: the page composites the
-      // transparent canvas premultiplied, so the frame's black adds nothing over the
-      // stage instead of painting an opaque square (seen on the first real-GPU shot).
+      // Additive, colour and alpha both (#256): the frame's black corners carry alpha 0,
+      // so they add nothing over the stage and paint no opaque square.
       this.sunMaterial = new SpriteMaterial({
-        blending: CustomBlending,
-        blendEquation: AddEquation,
-        blendSrc: OneFactor,
-        blendDst: OneFactor,
-        blendSrcAlpha: ZeroFactor,
-        blendDstAlpha: OneFactor,
+        ...SUN_GLOW_BLEND,
         depthWrite: false,
         transparent: true,
       })
