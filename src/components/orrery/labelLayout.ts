@@ -304,10 +304,15 @@ function placeRim(
   taken: readonly Box[],
   fromDepth: number,
   toDepth: number,
+  /** Kept off as well: bodies' discs (#254). */
+  discs: readonly Box[] = [],
 ): RimPlace | undefined {
   const step = m.alongX ? rimWidth(m) + 4 : RIM_HEIGHT_PX + 2
   const start = rimClamp(m, span, m)
-  const free = (at: { x: number; y: number }) => !taken.some((p) => overlaps(rimBox(m, at), p))
+  const free = (at: { x: number; y: number }) => {
+    const box = rimBox(m, at)
+    return !taken.some((p) => overlaps(box, p)) && !discs.some((d) => overlaps(box, d))
+  }
   // Inward, away from the rim: only when the rim itself is full (a phone's top row is
   // Controls, Guide and the badge).
   const inward = {
@@ -471,6 +476,12 @@ export function panelInset(
  *    A label beside its body wins over a marker that had to leave its rim (on a phone
  *    with Jupiter's sheet open, the stepped-in markers had pushed the moons' labels
  *    out); a marker with no room left is not shown (absent from `rim`).
+ * Markers keep off bodies' discs too (#254: Voyager 2's stepped in onto the Sun at
+ * 390 px). Only when a disc leaves no spot at all (a close-up planet filling the stage)
+ * does a marker sit on its rim over the disc, as before.
+ * 4. The heliopause note (`note`, #254: it ran through Jupiter's and Juno's labels at
+ *    768 px), last: it moves round everything above, and hides when it finds no room.
+ *    Its placement is returned in `labels` under its key.
  */
 export function layoutStage(input: {
   rim: readonly RimMarker[]
@@ -481,24 +492,41 @@ export function layoutStage(input: {
   bounds: { readonly width: number; readonly height: number }
   /** Last frame's label placements: each label holds its slot while it is free. */
   previous?: ReadonlyMap<string, LabelPlacement> | undefined
+  /** An annotation placed after everything else, beside its point (the heliopause's). */
+  note?:
+    { key: string; text: string; x: number; y: number; widthPx?: number | undefined } | undefined
 }): { rim: Map<string, RimPlace>; labels: Map<string, LabelPlacement> } {
   const onRim = new Map<string, RimPlace>()
+  const discs = input.discs.map(discBox)
   // One list of what is taken, grown as markers land (this runs every drawn frame).
   const taken: Box[] = [...input.furniture]
-  for (const m of input.rim) {
-    const p = placeRim(m, input.rimSpan, taken, 0, 0)
-    if (!p) continue
-    onRim.set(m.key, p)
+  const land = (key: string, p: RimPlace | undefined) => {
+    if (!p) return
+    onRim.set(key, p)
     taken.push(p.box)
   }
+  for (const m of input.rim) land(m.key, placeRim(m, input.rimSpan, taken, 0, 0, discs))
   const labels = placeLabels(input.labels, input.discs, taken, input.bounds, input.previous)
   taken.push(...labels.boxes)
   for (const m of input.rim) {
     if (onRim.has(m.key)) continue
-    const p = placeRim(m, input.rimSpan, taken, 1, RIM_STEPS_IN)
-    if (!p) continue
-    onRim.set(m.key, p)
-    taken.push(p.box)
+    land(
+      m.key,
+      placeRim(m, input.rimSpan, taken, 1, RIM_STEPS_IN, discs) ??
+        // A disc covers every spot (a close-up): the rim itself, over the disc.
+        (discs.length > 0 ? placeRim(m, input.rimSpan, taken, 0, 0) : undefined),
+    )
   }
-  return { rim: onRim, labels: labels.shown }
+  const shown = labels.shown
+  if (input.note) {
+    const note = placeLabels(
+      [{ ...input.note, visible: true }],
+      input.discs,
+      taken,
+      input.bounds,
+      input.previous,
+    ).shown.get(input.note.key)
+    if (note) shown.set(input.note.key, note)
+  }
+  return { rim: onRim, labels: shown }
 }

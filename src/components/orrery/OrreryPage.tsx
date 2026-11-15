@@ -717,6 +717,19 @@ export function OrreryPage() {
         furniture,
         bounds: { width, height },
         previous,
+        // The heliopause note goes last, round everything else (#254). On a phone-width
+        // stage it would run across the planets: the ring stays, its note goes.
+        note:
+          ring && width >= RING_LABEL_MIN_WIDTH
+            ? {
+                key: ring.name,
+                text: HELIOPAUSE_LABEL,
+                x: ring.x,
+                y: ring.y,
+                // Measured when shown last frame; hidden, it reads 0 and the estimate is used.
+                widthPx: ringLabel.current?.offsetWidth || undefined,
+              }
+            : undefined,
       })
       const rimPlaces = placed.rim
       const shown = placed.labels
@@ -724,12 +737,11 @@ export function OrreryPage() {
       // Writes from here on.
       const ringNode = ringLabel.current
       if (ringNode) {
-        // On a phone-width stage the label would run across the planets: the ring stays,
-        // its label goes.
-        ringNode.hidden = !ring || width < RING_LABEL_MIN_WIDTH
-        if (ring) {
-          ringNode.style.left = `${String(ring.x)}px`
-          ringNode.style.top = `${String(ring.y)}px`
+        const note = ring ? shown.get(ring.name) : undefined
+        ringNode.hidden = !ring || !note
+        if (ring && note) {
+          ringNode.style.left = `${String(ring.x + (note.dx ?? 0))}px`
+          ringNode.style.top = `${String(ring.y + note.dy)}px`
         }
       }
       const seen = new Set<SceneKey>()

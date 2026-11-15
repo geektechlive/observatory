@@ -16,6 +16,31 @@ export const SUVI_REFRESH_MS = 10 * 60 * 1000
  */
 export const SUVI_FRAME = { size: 1280, discRadius: 390, crop: 560 } as const
 
+/** The corona fades out between these fractions of the crop's half-width (disc: 0.70). */
+export const SUN_CORONA_FADE = { from: 0.8, to: 0.98 } as const
+
+/** The Sun's sprite sits this many Sun radii toward the camera (just past the surface). */
+export const SUN_SPRITE_LIFT = 1.05
+
+/**
+ * What the live Sun draws (#253): the radius its disc and corona reach, to the middle of
+ * the corona's fade, in the units of `sphereRadius`, and the depth the sprite sits at
+ * (lifted toward the camera, so close up it projects larger than the sphere would). The
+ * Sun's label goes past this, not past the sphere, or it sits on the bright limb.
+ */
+export function sunDrawnReach(
+  sphereRadius: number,
+  depth: number,
+): { radius: number; depth: number } {
+  const halfWidth = (SUVI_FRAME.crop / SUVI_FRAME.discRadius) * sphereRadius
+  const corona = (SUN_CORONA_FADE.from + SUN_CORONA_FADE.to) / 2
+  return {
+    radius: halfWidth * corona,
+    // Never at or behind the camera, however close it is.
+    depth: Math.max(depth - SUN_SPRITE_LIFT * sphereRadius, depth * 0.1),
+  }
+}
+
 export interface SuviFrame {
   readonly url: string
   /** The composite's exposure window, UTC. */

@@ -86,3 +86,7 @@ The decision above said AI crawlers are allowed and that `public/robots.txt` rep
 - **AI training is blocked.** The zone's Training policy is Disallow with Bot Preference Sync on, which both prepends Disallow lines for GPTBot, ClaudeBot, Google-Extended, CCBot and others to every host's robots.txt and blocks those crawlers at the edge.
 - **These settings are zone-wide.** Cloudflare offers no per-hostname scope for the AI policies or the managed robots.txt, so they apply to every geektechlive.com site alike. Our `public/robots.txt` still serves, below Cloudflare's block.
 - Revisit by changing the zone's Training policy (one setting, every host) if the site should be used to train models.
+
+## Addendum, 2026-11-15 (#255): the orrery's share card
+
+The orrery card the decision left out now exists. `/orrery/` shares `og-orrery.png` (the inner solar system from above, with the live Sun) and its own alt text. The other shells keep the home card. `scripts/og-image.mjs` builds both cards, and `scripts/view-shells.mjs` sets the image per view (`SHELL_COPY[view].image`).

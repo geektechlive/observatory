@@ -1,7 +1,17 @@
-# The share card (#110)
+# The share cards (#110, #255)
 
-The card is generated: `node scripts/og-image.mjs [baseURL]`. Re-run it after a visual change to
-the globe or the header, and commit `public/og-image.png`.
+The cards are generated: `node scripts/og-image.mjs [baseURL] [earth|orrery]` (both when no card
+is named). Re-run it after a visual change to the globe, the orrery or the header, and commit the
+PNG it wrote.
+
+- `public/og-image.png`, the globe: the home page and every view's shell but the orrery's.
+- `public/og-orrery.png`, the orrery (#255): the `/orrery/` shell, set in `scripts/view-shells.mjs`
+  (`SHELL_COPY.orrery.image`, with its alt text). It captures `/orrery/#preset=inner` once the live
+  Sun is on and the camera has settled, with the labels, markers and time bar hidden, cropped to
+  80% of the stage's short side. The orrery has no bezel, so the template draws a thin copper rim
+  on its lens (`.lens.rim`).
+
+The globe card:
 
 - **The design is "one lens, one line"**, after the owner called a busier first version "a bit
   busy and kind of not professional looking". It has the copper globe on void, the painted name,

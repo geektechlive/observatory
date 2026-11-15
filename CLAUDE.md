@@ -19,7 +19,7 @@ Vite 8 + React 19 + TypeScript 7 strict (6 for lint only, ADR 0006) · Cloudflar
 - `pnpm typecheck`: `tsc` (TS 7).
 - **Tests run one at a time on this machine (ADR 0027).** `verify`, `test:unit`, `test:coverage` and `test:e2e` share a lock across all worktrees, with a cool-down after long runs; the runners refuse to start outside it. Run single files as `pnpm test:unit <file>` / `pnpm test:e2e <spec>`, never `pnpm exec vitest|playwright`.
 - `pnpm verify`: **the gate before every merge to `main`**: lint, typecheck, unit tests with coverage thresholds, build with `check-bundle`, e2e, `pnpm audit --audit-level=high`. There is no CI (ADR 0001).
-- `node scripts/og-image.mjs [baseURL]`: regenerate the share card ([docs/operations/share-card.md](docs/operations/share-card.md)).
+- `node scripts/og-image.mjs [baseURL] [earth|orrery]`: regenerate the share cards ([docs/operations/share-card.md](docs/operations/share-card.md)).
 - More: [docs/operations/local-dev.md](docs/operations/local-dev.md) (secrets, JPL queue locally, real-GPU Playwright).
 
 ## Free-plan rules (hard constraint, ADR 0002)

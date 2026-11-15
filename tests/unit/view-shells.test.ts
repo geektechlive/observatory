@@ -104,6 +104,37 @@ describe.each(shellViews)('the %s shell', (view) => {
     expect(html.match(/rel="canonical"/g)).toHaveLength(1)
     expect(html).not.toContain('id="ld-website"')
   })
+
+  it('keeps its share image and alt text in step across og and twitter', () => {
+    expect(meta(html, 'name', 'twitter:image')).toBe(meta(html, 'property', 'og:image'))
+    expect(meta(html, 'name', 'twitter:image:alt')).toBe(meta(html, 'property', 'og:image:alt'))
+  })
+})
+
+describe('the orrery shell’s share card (#255)', () => {
+  const html = shell('orrery')
+
+  it('previews as the orrery, not the Earth globe', () => {
+    expect(meta(html, 'property', 'og:image')).toBe(`${SITE_ORIGIN}/og-orrery.png`)
+    expect(meta(html, 'property', 'og:image:alt')).toMatch(/orrery/i)
+    expect(meta(html, 'property', 'og:image:alt')).not.toMatch(/globe/i)
+  })
+
+  it('is a real 1200x630 PNG under 300 KB', () => {
+    const png = readFileSync(join(ROOT, 'public', 'og-orrery.png'))
+    expect(png.subarray(1, 4).toString('ascii')).toBe('PNG')
+    expect(png.readUInt32BE(16)).toBe(1200)
+    expect(png.readUInt32BE(20)).toBe(630)
+    expect(png.length).toBeLessThan(300 * 1024)
+  })
+
+  it('leaves the other shells on the home card', () => {
+    for (const view of shellViews.filter((v) => v !== 'orrery')) {
+      expect(meta(shell(view), 'property', 'og:image')).toBe(
+        meta(indexHtml, 'property', 'og:image'),
+      )
+    }
+  })
 })
 
 describe('the home page (index.html)', () => {

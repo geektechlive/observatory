@@ -1,7 +1,8 @@
 <!doctype html>
-<!-- The 1200x630 share card (#110), rendered by scripts/og-image.mjs. "One lens, one
-     line": the copper globe on void, the painted ship name, one sentence and a credit.
-     {{ROOT}} and {{GLOBE}} are file URLs filled in by the script. Colours come from
+<!-- The 1200x630 share cards (#110, #255), rendered by scripts/og-image.mjs. "One lens,
+     one line": the copper globe (or the orrery) on void, the painted ship name, one sentence
+     and a credit. {{ROOT}} and {{LENS}} are file URLs and {{VOICE}} the sentence, filled in
+     by the script. Colours come from
      tokens.css; type follows roci-retrofit-v2 section 3. -->
 <html lang="en">
   <head>
@@ -43,16 +44,25 @@
         background: radial-gradient(circle 460px at 912px 315px, oklch(0.13 0.02 55), var(--void));
       }
 
-      /* The lens: globe and bezel as captured, centred on (912, 315). closest-side keeps
-         the outer lip whole. */
+      /* The lens: globe and bezel (or the orrery) as captured, centred on (912, 315).
+         closest-side keeps the outer lip whole. */
       .lens {
         position: absolute;
         left: 672px;
         top: 75px;
         width: 480px;
         height: 480px;
-        background: url('{{GLOBE}}') center / contain no-repeat;
+        background: url('{{LENS}}') center / contain no-repeat;
         mask-image: radial-gradient(circle closest-side, #000 99%, transparent 100%);
+      }
+
+      /* The orrery has no bezel of its own: a thin copper rim stands in for the globe's. */
+      .lens.rim::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border: 2px solid var(--copper-2);
+        border-radius: 50%;
       }
 
       .name,
@@ -106,9 +116,9 @@
   </head>
   <body>
     <div class="card">
-      <div class="lens"></div>
+      <div class="lens {{LENS_CLASS}}"></div>
       <h1 class="name">Observatory</h1>
-      <p class="voice">From Earth to the heliopause, live.</p>
+      <p class="voice">{{VOICE}}</p>
       <div class="rule"></div>
       <p class="credit">NASA · NOAA · JPL Horizons</p>
     </div>

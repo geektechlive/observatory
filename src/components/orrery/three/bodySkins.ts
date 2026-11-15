@@ -32,7 +32,7 @@ import { type BodyName } from '@/lib/orrery/bodies'
 import { type PlanetName, PLANETS } from '@/lib/orrery/elements'
 import { BODY_IMAGERY, poleEcliptic, SATURN_RINGS, spinAngle } from '@/lib/orrery/imagery'
 import { earthSkinToScene } from '@/lib/orrery/satView'
-import { SUVI_FRAME } from '@/lib/orrery/suvi'
+import { SUN_CORONA_FADE, SUN_SPRITE_LIFT, SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 
 /** A body draws its map once its radius on screen reaches this, px. */
@@ -40,8 +40,6 @@ export const SKIN_MIN_PX = 6
 /** The live Sun is drawn at this size, px; it replaces the canvas it was cropped into. */
 const SUN_TEXTURE_PX = 512
 const UP = new Vector3(0, 1, 0)
-/** The Sun's sprite sits this many Sun radii toward the camera (just past the surface). */
-const SUN_SPRITE_LIFT = 1.05
 
 interface Skin {
   readonly mesh: Mesh<SphereGeometry, MeshLambertMaterial>
@@ -52,9 +50,8 @@ interface Skin {
   rings?: Mesh<RingGeometry, MeshBasicMaterial>
 }
 
-/** The corona fades out between these fractions of the crop's half-width (disc: 0.70). */
-const FADE_FROM = 0.8
-const FADE_TO = 0.98
+const FADE_FROM = SUN_CORONA_FADE.from
+const FADE_TO = SUN_CORONA_FADE.to
 
 /**
  * Darken a square RGBA frame toward its edge, so the cropped corona ends in a soft circle
@@ -89,6 +86,11 @@ export class BodySkins {
   private readonly loadTexture: (url: string) => Promise<Texture>
   /** A map arrived: the renderer draws once more. */
   private readonly onReady: () => void
+
+  /** Whether the Sun draws its live image (wider than the sphere: sunDrawnReach, #253). */
+  get hasSunImage(): boolean {
+    return this.sun !== null
+  }
 
   constructor(loadTexture: (url: string) => Promise<Texture>, onReady: () => void) {
     this.loadTexture = loadTexture

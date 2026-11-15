@@ -24,6 +24,6 @@
   - [landing.md](operations/landing.md): issue to production, the gate.
   - [local-dev.md](operations/local-dev.md): commands, secrets, the JPL queue locally, a real GPU
     in Playwright, test conventions.
-  - [share-card.md](operations/share-card.md): regenerating `public/og-image.png`.
+  - [share-card.md](operations/share-card.md): regenerating the share cards (`public/og-image.png`, `public/og-orrery.png`).
 - [history.md](history.md): the phases, oldest first.
 - [design-history/](design-history/): the ROCI v2 spec, audit and prototypes.

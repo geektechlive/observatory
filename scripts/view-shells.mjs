@@ -26,6 +26,11 @@ export const SHELL_COPY = {
       'A full-page 3D solar system you can drag, zoom and run through time: the planets, their major moons, spacecraft such as Voyager 1 and 2 and New Horizons, near-Earth asteroids and tracked satellites around Earth.',
     sources:
       "JPL Horizons and JPL's close-approach data, JPL's approximate planet positions, CelesTrak and Space-Track.org for satellites, NASA 3D Resources for spacecraft models.",
+    // Its own share card (#255), built by scripts/og-image.mjs; the other shells keep the home one.
+    image: {
+      path: '/og-orrery.png',
+      alt: "Observatory's orrery: the live Sun and the inner planets' orbits seen from above",
+    },
   },
   sun: {
     name: 'Sun',
@@ -168,6 +173,14 @@ export function renderShell(indexHtml, view) {
     ['property', 'og:url', url],
     ['name', 'twitter:title', meta.title],
     ['name', 'twitter:description', copy.description],
+    ...(copy.image
+      ? [
+          ['property', 'og:image', `${SITE_ORIGIN}${copy.image.path}`],
+          ['property', 'og:image:alt', copy.image.alt],
+          ['name', 'twitter:image', `${SITE_ORIGIN}${copy.image.path}`],
+          ['name', 'twitter:image:alt', copy.image.alt],
+        ]
+      : []),
   ]
   for (const [attr, key, value] of metas) {
     html = replaceOnce(

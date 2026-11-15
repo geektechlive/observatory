@@ -120,6 +120,13 @@ the orrery writes its own voice line inside its chunk, from the planet math.
   - `rimBox` is the box the page draws: a left-rim marker is anchored at its left end, a
     right-rim one at its right end, top and bottom ones centred. It uses the marker's measured
     width when that is wider than the estimate.
+  - Since #254 markers keep off bodies' discs too: at 390 px in the Sun preset, Voyager 2's
+    marker stepped in from a full bottom rim onto the Sun. Only when a disc leaves no spot at
+    all (a close-up planet filling the stage) does a marker sit on its rim over the disc.
+- **The heliopause note** ("Heliopause ≈ 122 au · approx.") is placed last in `layoutStage`
+  (`note`, #254): beside the ring's leftmost point, moved round the labels, markers, discs and
+  furniture, and hidden when it finds no room. At 768 px it ran through Jupiter's and Juno's
+  labels. Below 600 px (`RING_LABEL_MIN_WIDTH`) it is never shown; the ring stays.
 - **The inspector's footprint** is passed to `setViewInset`, which shifts the projection window
   so the focused body sits in the free part of the stage.
   - **A close approach, L1 or an L1/L2 craft is framed with Earth (#133, `nearFocusView` in
@@ -303,6 +310,9 @@ Real maps on the planets, the live Sun from GOES SUVI.
     `live` or `fallback`.
   - The frame is cropped to a square with the caption dropped, and its corona fades to black in a
     circle (`fadeCorona`). It is drawn on a sprite lifted just in front of a depth-only sphere.
+  - That image reaches past the sphere (the corona) and, being lifted, projects larger close up,
+    so the projection reports the Sun's drawn radius (`sunDrawnReach`, #253): its label goes past
+    the corona, and other labels keep off it. Before, the Sun preset's label sat on the limb.
   - The sprite blends additively but leaves the canvas's alpha alone. Plain `AdditiveBlending`
     wrote an opaque black square into the transparent canvas.
 - **Orrery e2e answer NOAA themselves** (`tests/e2e/swpc.ts`), so they never wait on it.

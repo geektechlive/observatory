@@ -60,7 +60,7 @@ import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
 import { labelBehindEarth, ORBIT_PRESET_RADII, reentryKey } from '@/lib/orrery/satView'
 import { lookupTwinKey } from '@/lib/orrery/smallBodyView'
-import { SUVI_FRAME } from '@/lib/orrery/suvi'
+import { sunDrawnReach, SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryApproach } from '@/schemas/orreryNeo'
@@ -1627,7 +1627,15 @@ export class OrreryRenderer {
     const out: ProjectedBody[] = []
     if (this.visibility.planets) {
       for (const [name, mesh] of this.bodies) {
-        out.push({ name, label: name, kind: 'body', ...this.projectOne(mesh) })
+        const p = this.projectOne(mesh)
+        // The live Sun draws its corona past the sphere, nearer the camera: its label and
+        // the disc other labels keep off are what is drawn (#253).
+        const drawn =
+          name === 'Sun' && this.skins.hasSunImage && p.depth > 0
+            ? sunDrawnReach(mesh.scale.x, p.depth)
+            : null
+        const radiusPx = drawn ? drawn.radius / this.unitsPerPx(drawn.depth) : p.radiusPx
+        out.push({ name, label: name, kind: 'body', ...p, radiusPx })
       }
       for (const m of this.moons.visible()) {
         out.push({

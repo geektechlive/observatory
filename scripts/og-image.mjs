@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
- * Builds public/og-image.png, the 1200x630 link preview (#110): "one lens, one line".
+ * Builds the 1200x630 link previews: "one lens, one line".
  *
- *   node scripts/og-image.mjs [baseURL]     (default https://observatory.geektechlive.com)
+ *   node scripts/og-image.mjs [baseURL] [earth|orrery]
+ *     (default https://observatory.geektechlive.com, both cards)
+ *
+ * - earth: public/og-image.png (#110), the home page's and every shell's but the orrery's.
+ * - orrery: public/og-orrery.png (#255), the /orrery/ shell's: the inner solar system from
+ *   above, with the live Sun, in the same lens (captureOrrery below).
  *
  * 1. Opens the live site in Chromium on the real GPU (Metal on macOS), so the globe draws
  *    the high tier: bloom, the 4096 textures, city lights. Every layer is off
@@ -26,7 +31,6 @@ import sharp from 'sharp'
 
 const ROOT = join(import.meta.dirname, '..')
 const BASE = (process.argv[2] ?? 'https://observatory.geektechlive.com').replace(/\/$/, '')
-const OUT = join(ROOT, 'public', 'og-image.png')
 const MAX_BYTES = 300 * 1024
 const WIDTH = 1200
 const HEIGHT = 630
@@ -165,12 +169,80 @@ async function captureGlobe(browser, dir) {
   return path
 }
 
-async function compose(browser, captures) {
+/** The orrery's overlays (labels, rim markers, the badge, the time bar): the card is the canvas. */
+const HIDE_ORRERY_OVERLAYS = `
+  section[aria-label="Orrery"] > :not(:has(canvas[data-orrery-webgl])) { visibility: hidden !important; }
+`
+
+/**
+ * The orrery from above (#255): the Inner preset, centred on the Sun, once the live SUVI
+ * image is on it and the camera has settled. Overlays are hidden; the capture is the
+ * largest square of the stage around its centre.
+ */
+async function captureOrrery(browser, dir) {
+  const page = await browser.newPage({
+    viewport: { width: 1600, height: 1100 },
+    deviceScaleFactor: 2,
+  })
+  await page.goto(`${BASE}/orrery/#preset=inner`)
+  const canvas = page.locator('canvas[data-orrery-webgl]')
+  await canvas.waitFor({ timeout: 30_000 })
+  // Polled from Node: the site's CSP forbids the eval a string waitForFunction needs.
+  const by = Date.now() + 60_000
+  const ready = async () =>
+    (await canvas.getAttribute('data-orrery-sun')) === 'live' &&
+    (await canvas.getAttribute('data-orrery-animating')) === 'false'
+  while (!(await ready())) {
+    if (Date.now() > by) throw new Error('the orrery never settled with the live Sun')
+    await page.waitForTimeout(250)
+  }
+  await page.addStyleTag({ content: HIDE_ORRERY_OVERLAYS })
+  await page.waitForTimeout(500)
+  const box = await canvas.boundingBox()
+  if (!box) throw new Error('the orrery canvas has no box')
+  // Tighter than the stage, so Mars's orbit nearly meets the rim and the Sun reads at
+  // thumbnail size.
+  const side = Math.min(box.width, box.height) * ORRERY_CROP
+  const path = join(dir, 'orrery.png')
+  await page.screenshot({
+    path,
+    clip: {
+      x: box.x + (box.width - side) / 2,
+      y: box.y + (box.height - side) / 2,
+      width: side,
+      height: side,
+    },
+  })
+  await page.close()
+  return path
+}
+
+/** The share of the stage's short side the orrery card keeps. */
+const ORRERY_CROP = 0.8
+
+const CARDS = {
+  earth: {
+    out: join(ROOT, 'public', 'og-image.png'),
+    capture: captureGlobe,
+    voice: 'From Earth to the heliopause, live.',
+    lensClass: '',
+  },
+  orrery: {
+    out: join(ROOT, 'public', 'og-orrery.png'),
+    capture: captureOrrery,
+    voice: 'The solar system, live in 3D.',
+    lensClass: 'rim',
+  },
+}
+
+async function compose(browser, card, captures) {
   const template = readFileSync(join(import.meta.dirname, 'og', 'template.html'), 'utf8')
   const html = template
     .replaceAll('{{ROOT}}', pathToFileURL(ROOT).href)
-    .replaceAll('{{GLOBE}}', pathToFileURL(captures.globe).href)
-  const file = join(captures.dir, 'card.html')
+    .replaceAll('{{LENS}}', pathToFileURL(captures.lens).href)
+    .replaceAll('{{VOICE}}', card.voice)
+    .replaceAll('{{LENS_CLASS}}', card.lensClass)
+  const file = join(captures.dir, `${captures.name}.html`)
   writeFileSync(file, html)
   const page = await browser.newPage({
     viewport: { width: WIDTH, height: HEIGHT },
@@ -184,17 +256,24 @@ async function compose(browser, captures) {
   return raw
 }
 
+const only = process.argv[3]
+if (only !== undefined && !(only in CARDS)) {
+  throw new Error(`unknown card "${only}": ${Object.keys(CARDS).join(' or ')}`)
+}
 const browser = await chromium.launch({ args: GPU_ARGS })
 try {
   const dir = mkdtempSync(join(tmpdir(), 'og-'))
-  const globe = await captureGlobe(browser, dir)
-  const raw = await compose(browser, { dir, globe })
-  const png = await sharp(raw).png({ palette: true, quality: 90, effort: 10 }).toBuffer()
-  if (png.length >= MAX_BYTES) {
-    throw new Error(`og-image is ${String(png.length)} bytes, over ${String(MAX_BYTES)}`)
+  for (const [name, card] of Object.entries(CARDS)) {
+    if (only !== undefined && name !== only) continue
+    const lens = await card.capture(browser, dir)
+    const raw = await compose(browser, card, { dir, lens, name })
+    const png = await sharp(raw).png({ palette: true, quality: 90, effort: 10 }).toBuffer()
+    if (png.length >= MAX_BYTES) {
+      throw new Error(`${name} card is ${String(png.length)} bytes, over ${String(MAX_BYTES)}`)
+    }
+    writeFileSync(card.out, png)
+    console.log(`wrote ${card.out} (${String(png.length)} bytes); captures in ${dir}`)
   }
-  writeFileSync(OUT, png)
-  console.log(`wrote ${OUT} (${String(png.length)} bytes); captures in ${dir}`)
 } finally {
   await browser.close()
 }
