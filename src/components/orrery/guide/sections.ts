@@ -36,7 +36,7 @@ export const SECTIONS: readonly Section[] = [
           'Mouse: drag to turn the view, scroll to zoom, and drag with the right button to slide it sideways.',
           'Touch: drag with one finger to turn, pinch to zoom, and drag with two fingers to slide.',
           'Keyboard: Tab moves between the labels on the stage and the controls, and Enter picks one. On the time slider the arrow keys step a day, and Shift with an arrow steps a week. Space plays and pauses the clock.',
-          'Click or tap a body, craft or label to open its inspector and fly the camera there. Esc closes this guide, or the close-up of a model when one is open.',
+          'Click or tap a body, craft or label to open its inspector and fly the camera there. The camera then follows it as the clock runs, until you slide the view; choose it again to follow it again. Esc closes this guide, or the close-up of a model when one is open.',
         ],
       },
       {
@@ -51,7 +51,7 @@ export const SECTIONS: readonly Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: 'The bar along the bottom is the clock, in UTC. Now returns to the present at real speed. The slider covers a year either side of its centre. The centre stays put until the clock leaves that year, then jumps to the clock. On wider screens the Go to date box takes YYYY-MM-DD, and a minus sign means BC.',
+        text: 'The bar along the bottom is the clock, in UTC. Now returns to the present at real speed. The slider covers a year either side of its centre. The centre stays put until the clock leaves that year, then jumps to the clock. The Go to date box (on a phone, in the Controls sheet) takes YYYY-MM-DD, and a minus sign means BC.',
       },
       {
         kind: 'p',

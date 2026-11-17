@@ -135,6 +135,17 @@ the orrery writes its own voice line inside its chunk, from the planet math.
   (`note`, #254): beside the ring's leftmost point, moved round the labels, markers, discs and
   furniture, and hidden when it finds no room. At 768 px it ran through Jupiter's and Juno's
   labels. Below 600 px (`RING_LABEL_MIN_WIDTH`) it is never shown; the ring stays.
+- **The camera follows the focus until the visitor pans (#259).** `followFocus` puts the
+  controls' target back on the focus every frame, so before #259 a pan was undone on the next
+  frame, and closing the inspector didn't help: only a preset cleared the focus. Now a slide
+  of more than 10 px net in one gesture sets `following` false (`PanTracker` in
+  `followShift.ts`). It listens to the controls' `change` event, not the frame loop: with
+  damping off (reduced motion) the pointer handler applies the whole pan in its own
+  `update()` before any frame, and a frame-loop check (the first try) never saw it. Net, so a
+  pinch's wobbling midpoint (touch is dolly plus pan) doesn't count; only between the
+  controls' `start` and `end`, so leftover damping can't release a focus chosen just after;
+  the follow's own moves are excluded. The focus stays chosen and drawn; choosing it again or
+  a preset follows again. e2e: `orrery-pan-focus.spec.ts` (damped and reduced motion).
 - **The inspector's footprint** is passed to `setViewInset`, which shifts the projection window
   so the focused body sits in the free part of the stage.
   - **A close approach, L1 or an L1/L2 craft is framed with Earth (#133, `nearFocusView` in

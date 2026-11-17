@@ -73,7 +73,7 @@ import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
 import { EarthNeighbourhood } from './earthNeighbourhood'
-import { followShift } from './followShift'
+import { followShift, PanTracker } from './followShift'
 import {
   earthPresetView,
   type FocusPreset,
@@ -366,6 +366,11 @@ export class OrreryRenderer {
   private readonly onContextLost: () => void
   private readonly clock: ClockReader
   private readonly scratch = new Vector3()
+  /**
+   * Whether the camera follows the focus (#259). A pan lets go: the focus stays chosen and
+   * drawn, and the view stays where the pan left it. Choosing a focus again follows it.
+   */
+  private following = true
   /** The focused craft model's drawn radius, px, this frame (null when none is drawn). */
   private modelPx: number | null = null
   /** The chosen satellite model's drawn radius, px, this frame (null when none is drawn). */
@@ -415,7 +420,9 @@ export class OrreryRenderer {
     this.controls.minDistance = cameraMinDistance(Number.POSITIVE_INFINITY)
     this.controls.maxDistance = 120_000
     this.controls.addEventListener('change', this.markDirty)
+    this.controls.addEventListener('change', this.onControlsChange)
     this.controls.addEventListener('start', this.onUserCamera)
+    this.controls.addEventListener('end', this.onUserCameraEnd)
 
     this.buildScene()
     this.applyPreset(DEFAULT_PRESET, true)
@@ -1325,6 +1332,7 @@ export class OrreryRenderer {
     this.preset = preset
     this.presetPristine = true
     this.focusBody = 'Earth'
+    this.following = true
     this.models.show(null, null)
     this.canvas.dataset['orreryFocus'] = preset
     this.updateBodies(true)
@@ -1409,6 +1417,7 @@ export class OrreryRenderer {
       return
     }
     this.focusBody = name
+    this.following = true
     this.preset = null
     this.canvas.dataset['orreryFocus'] = name
     // A focused craft draws as its 3D model (#115); anything else drops the model.
@@ -1572,7 +1581,28 @@ export class OrreryRenderer {
     this.flight = null
     this.presetPristine = false
     this.focusFramed = false
+    this.pan.begin(this.controls.target)
   }
+
+  private readonly onUserCameraEnd = () => {
+    this.pan.end()
+  }
+
+  /**
+   * A slide lets go of the followed focus (#259): followFocus put the target back every
+   * frame, so the view could never be panned. Checked on the controls' own change event,
+   * which also fires inside the update() their pointer handler runs when damping is off
+   * (reduced motion), before any frame.
+   */
+  private readonly onControlsChange = () => {
+    this.pan.note(this.controls.target)
+    if (!this.focusBody || !this.following) return
+    const depth = this.camera.position.distanceTo(this.controls.target)
+    if (this.pan.released(this.unitsPerPx(depth))) this.following = false
+  }
+
+  /** The visitor's slide in the current gesture (#259). */
+  private readonly pan = new PanTracker()
 
   /** Nearest body or craft to a canvas point within `radius` px, or null. */
   pick(x: number, y: number, radius = 12): SceneKey | null {
@@ -1805,13 +1835,14 @@ export class OrreryRenderer {
    * as the Earth frame opens or closes with the camera's distance (#92).
    */
   private followFocus(): void {
-    if (!this.focusBody || this.flight) return
+    if (!this.focusBody || !this.following || this.flight) return
     const target = this.drawnPosition(this.focusBody)
     // Not drawn (hidden, or past its samples): hold the camera, not pull it to the Sun (#186).
     const shift = followShift(target, this.controls.target)
     if (!target || !shift) return
     this.camera.position.add(shift)
     this.controls.target.copy(target)
+    this.pan.moved(target)
   }
 
   /**
