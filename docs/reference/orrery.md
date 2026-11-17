@@ -350,7 +350,7 @@ Real maps on the planets, the live Sun from GOES SUVI.
   The marker mesh stops drawing (`SatLayer.setMarkerDrawn`) but keeps its place and size: the label
   anchors to it and it is the model's floor.
   - **Size is fixed, not true** (`three/satModelFit.ts`, ADR 0030): with the Sun on screen
-    `craftModelPx(sunPx)`, the focused craft's rule (9 px radius at the Sun's 10 px floor); with it off
+    `sunShareModelPx(sunPx)`, the craft models' rule until #260 (9 px radius at the Sun's 10 px floor); with it off
     screen 20 px radius (about 40 px across). Either way at most a quarter of Earth's drawn radius
     (so 14 px at the default Earth-orbit view, where Earth is 56 px; the full 20 needs Earth at
     80 px) and never under the marker. "On screen" is `sunOnScreen`: the projected Sun in front of
@@ -398,12 +398,13 @@ A silhouette at a distance, a 3D model when focused.
   (GLTFLoader is its own chunk), disposed when the focus moves, sized by its body, not its booms
   (`craftModelFit.ts`), and seen three-quarter on (`threeQuarterView`). The canvas's
   `data-orrery-model` reads `loading:`, `model:`, `simplified:` or `failed:<naif>`.
-- **The model is never bigger on screen than the Sun (#204).** Its radius is
-  `craftModelPx(sunPx)` (`three/pxClamp.ts`): 0.9 of the Sun's drawn radius, held between the
-  craft icon's radius (9 px) and 100 px. The renderer takes the Sun's projected radius each
-  frame, on screen or not, and passes it to `CraftModelLayer.place`. The test probe
+- **The model is icon-sized: the craft icon's 9 px radius at any zoom (#260,
+  `CRAFT_MODEL_PX` in `three/pxClamp.ts`).** #204 drew it at 0.9 of the Sun's drawn radius (up to
+  100 px) so it could never outgrow the Sun, but near the Sun that made it the Sun's twin: the
+  owner saw Parker drawn the Sun's size (2026-11-17). Now it reads like the Voyagers' icons in
+  Heliosphere, and seeing a craft up close is the close-up's job. The test probe
   `data-orrery-px` reports it as `model` (px, or null when none is drawn). Look closer shows the
-  model full size, unaffected by this rule.
+  model full size.
 - **`check-bundle` rules:** `craft-model-bytes` (850 kB each), `craft-model-total` (8.5 MB, sized for all of tier A; see satellite-models.md),
   `entry-has-no-craft-models`, `gltf-loader-gzip` (30 kB; 13.5 kB measured).
 

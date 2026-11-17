@@ -7,7 +7,7 @@ import { Vector3 } from 'three'
 import type { Attitude } from '@/lib/orrery/craftModels'
 import type { ModelDescriptor } from '@/lib/orrery/modelDescriptor'
 
-import { craftModelPx, PX_CEILING } from './pxClamp'
+import { PX_CEILING, sunShareModelPx } from './pxClamp'
 
 /** The model's radius is at most this share of Earth's drawn radius, so it never swallows Earth. */
 const MODEL_EARTH_SHARE = 0.25
@@ -54,12 +54,13 @@ export interface SatModelSizeInput {
 /**
  * The chosen satellite's model radius, px (ADR 0030). A fixed, readable size and not a true
  * one; it does not follow the satellite's real size or height. With the Sun on screen it is the
- * focused craft's rule (`craftModelPx`, #204): 0.9 of the Sun's drawn radius, 9 px at its floor.
+ * Sun-share rule (`sunShareModelPx`, #204; the craft models' rule until #260): 0.9 of the Sun's
+ * drawn radius, 9 px at its floor.
  * With the Sun off screen it is `SAT_MODEL_OFFSCREEN_PX`. Either way kept to a quarter of
  * Earth's drawn radius so it never swallows a far-off Earth, and never under the marker.
  */
 export function satModelPx({ earthPx, markerPx, sunPx, sunVisible }: SatModelSizeInput): number {
-  const size = sunVisible ? craftModelPx(sunPx) : SAT_MODEL_OFFSCREEN_PX
+  const size = sunVisible ? sunShareModelPx(sunPx) : SAT_MODEL_OFFSCREEN_PX
   return Math.max(markerPx, Math.min(size, earthPx * MODEL_EARTH_SHARE))
 }
 

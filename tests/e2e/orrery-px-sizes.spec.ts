@@ -124,7 +124,7 @@ test.describe('marker sizes against the Sun (#195, #196)', () => {
     ['Proportional', 'Inner'],
     ['Big bodies', 'Heliosphere'],
   ] as const) {
-    test(`${scale}, ${view}: the focused craft's model is no bigger than the Sun (#204)`, async ({
+    test(`${scale}, ${view}: the focused craft's model is icon-sized, never bigger than the Sun (#204, #260)`, async ({
       page,
     }) => {
       await openOrrery(page, true)
@@ -140,6 +140,8 @@ test.describe('marker sizes against the Sun (#195, #196)', () => {
         const px = await readPx(page)
         expect(px.sun, 'the Sun is measured').not.toBeNull()
         expect(px.model ?? Infinity, 'model px against the Sun').toBeLessThanOrEqual(px.sun ?? 0)
+        // Icon-sized at any zoom (#260): the craft icon's 9 px radius, never the Sun's size.
+        expect(px.model, 'model px').toBe(9)
       }
       await bounded()
       await zoomIn(page)

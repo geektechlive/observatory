@@ -20,7 +20,7 @@ models. The owner chose (b) on 2026-11-12.
   choice never clear each other. Only the chosen one loads, and it is disposed when the choice
   moves.
 - **Size: two cases, by whether the Sun is on screen (owner, 2026-11-12, after seeing 9 px).**
-  - **Sun on screen:** the focused craft's rule, `craftModelPx(sunPx)` (#204): 0.9 of the Sun's drawn
+  - **Sun on screen:** the Sun-share rule, `sunShareModelPx(sunPx)` (#204; named `craftModelPx` until #260): 0.9 of the Sun's drawn
     radius, 9 px at its floor, 18 px across. The Sun rule (#195, #204: nothing near Earth outgrows
     the Sun) keeps its meaning where the Sun can be compared with the model.
   - **Sun off screen (the usual Earth-orbit view):** 20 px radius, about 40 px across.
@@ -40,6 +40,10 @@ models. The owner chose (b) on 2026-11-12.
   to read the note at that size, which implies a shape we do not have.
 - Facing: the descriptor's `attitude` is read in scene space (`earth` is nadir, `sun` points at
   the Sun). Roll about the axis is free.
+
+Note, 2026-11-17 (#260): the focused spacecraft's model no longer uses this Sun-share rule; it
+is icon-sized (9 px radius) at any zoom. The satellite models keep the rule as written above,
+under its new name `sunShareModelPx`, so this decision is unchanged.
 
 ## Consequences
 

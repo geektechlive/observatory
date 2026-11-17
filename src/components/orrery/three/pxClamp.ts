@@ -50,17 +50,25 @@ export const SMALL_BODY_MIN_PX = 3
 /** A dwarf planet (#99 item 8) never draws smaller than this, px; its ceiling is `PX_CEILING.dwarf`. */
 export const DWARF_MIN_PX = 4
 
-/** The focused craft's model: never bigger than this share of the Sun's drawn radius. */
+/**
+ * The focused craft's model radius in the orrery, px (#260): the craft icon's, at any zoom,
+ * like the Voyagers' icons in Heliosphere. #204 drew it at 0.9 of the Sun's drawn radius,
+ * which near the Sun made it the Sun's twin; seeing a craft up close is the close-up's job.
+ */
+export const CRAFT_MODEL_PX = CRAFT_ICON_PX / 2
+
+/** A satellite model with the Sun on screen: never bigger than this share of the Sun's radius. */
 const MODEL_SUN_SHARE = 0.9
-/** The most a craft's model draws at, px in radius, however big the Sun is. */
-export const CRAFT_MODEL_MAX_PX = 100
+/** The most a satellite model draws at, px in radius, however big the Sun is. */
+const SUN_SHARE_MAX_PX = 100
 
 /**
- * The focused craft's model radius, px (#204): 0.9 of the Sun's drawn radius, held between
- * the craft icon's radius and 100 px. A Sun radius that is not a number gives the floor.
+ * A satellite model's radius with the Sun on screen, px (#204, ADR 0030): 0.9 of the Sun's
+ * drawn radius, held between the craft icon's radius and 100 px. A Sun radius that is not a
+ * number gives the floor. (The craft models used this rule until #260.)
  */
-export function craftModelPx(sunPx: number): number {
+export function sunShareModelPx(sunPx: number): number {
   const floor = CRAFT_ICON_PX / 2
   if (Number.isNaN(sunPx)) return floor
-  return Math.min(CRAFT_MODEL_MAX_PX, Math.max(floor, sunPx * MODEL_SUN_SHARE))
+  return Math.min(SUN_SHARE_MAX_PX, Math.max(floor, sunPx * MODEL_SUN_SHARE))
 }

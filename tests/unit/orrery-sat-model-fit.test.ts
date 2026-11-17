@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { craftModelPx, PX_CEILING } from '@/components/orrery/three/pxClamp'
+import { PX_CEILING, sunShareModelPx } from '@/components/orrery/three/pxClamp'
 import {
   SAT_MODEL_OFFSCREEN_PX,
   satFacing,
@@ -43,9 +43,9 @@ describe('satModelPx (#194, ADR 0030)', () => {
   const base = { earthPx: 300, markerPx: 4, sunPx: 10, sunVisible: true }
 
   it('with the Sun on screen is the focused craft model size: 0.9 of the Sun, 9 px at its floor', () => {
-    expect(satModelPx(base)).toBe(craftModelPx(10))
+    expect(satModelPx(base)).toBe(sunShareModelPx(10))
     expect(satModelPx(base)).toBe(9)
-    expect(satModelPx({ ...base, sunPx: 20 })).toBe(craftModelPx(20))
+    expect(satModelPx({ ...base, sunPx: 20 })).toBe(sunShareModelPx(20))
   })
 
   it('with the Sun on screen stays under it as drawn', () => {

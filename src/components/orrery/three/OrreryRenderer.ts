@@ -90,7 +90,7 @@ import { MoonLayer } from './moonLayer'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
 import {
   clampRadius,
-  craftModelPx,
+  CRAFT_MODEL_PX,
   DWARF_MIN_PX,
   DWARF_MOON_MIN_PX,
   PX_CEILING,
@@ -795,9 +795,8 @@ export class OrreryRenderer {
     const at = this.craft.position(key)
     const facing = this.craftFacing(key)
     if (!at || !facing) return
-    // Never bigger than the Sun as drawn, on screen or off it (#204).
-    const sun = this.bodies.get('Sun')
-    this.modelPx = craftModelPx(sun ? this.drawnPx(sun) : NaN)
+    // Icon-sized at any zoom (#260), like the Voyagers' icons; never the Sun's twin.
+    this.modelPx = CRAFT_MODEL_PX
     this.models.place(
       at,
       this.unitsPerPx(at.distanceTo(this.camera.position)),
