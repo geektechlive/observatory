@@ -61,6 +61,7 @@ import type { SatSource } from '@/lib/orrery/satController'
 import { labelBehindEarth, ORBIT_PRESET_RADII, reentryKey } from '@/lib/orrery/satView'
 import { lookupTwinKey } from '@/lib/orrery/smallBodyView'
 import { sunDrawnReach, SUVI_FRAME } from '@/lib/orrery/suvi'
+import { BODY_RADIUS_KM } from '@/lib/orrery/trueScale'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { OrreryApproach } from '@/schemas/orreryNeo'
@@ -228,18 +229,8 @@ const EXAGGERATED_RADIUS: Record<BodyName, number> = {
   Uranus: 0.075,
   Neptune: 0.075,
 }
-/** Real radii, km, for the proportional mode. */
-const TRUE_RADIUS_KM: Record<BodyName, number> = {
-  Sun: 695_700,
-  Mercury: 2_440,
-  Venus: 6_052,
-  Earth: 6_371,
-  Mars: 3_390,
-  Jupiter: 69_911,
-  Saturn: 58_232,
-  Uranus: 25_362,
-  Neptune: 24_622,
-}
+/** Real radii, km, for the proportional mode: the fly-in's table (#261). */
+const TRUE_RADIUS_KM = BODY_RADIUS_KM
 /** A focused body: the camera sits this many of its radii away (at least FOCUS_MIN_DISTANCE). */
 const FOCUS_RADII = 30
 const FOCUS_MIN_DISTANCE = 1.2
@@ -768,6 +759,15 @@ export class OrreryRenderer {
   setOnSatState(cb: ((s: SatViewState) => void) | null): void {
     this.onSatState = cb
     cb?.(this.satState())
+  }
+
+  /**
+   * Which way the camera looks at its target from, a unit vector in scene axes: the fly-in
+   * (#261) comes in on this side, so the close-up continues the view the visitor had.
+   */
+  viewFrom(): { x: number; y: number; z: number } {
+    const d = this.camera.position.clone().sub(this.controls.target).normalize()
+    return { x: d.x, y: d.y, z: d.z }
   }
 
   /** A satellite's details for the inspector (#98), or null when it is not loaded. */

@@ -58,8 +58,9 @@ export const BUDGETS = {
   // the inspector's term buttons.
   orreryGuideGzip: 12_000,
   // The "Look closer" view (#203): its own canvas, scene and chrome, fetched on the first
-  // open. It shares three.js and GLTFLoader with the orrery, so the chunk is small.
-  detailViewGzip: 8_000,
+  // open. It shares three.js and GLTFLoader with the orrery, so the chunk is small. The
+  // fly-in (#261) adds its sky, flight and 287 bright stars: 4.4 kB to about 10.6 kB.
+  detailViewGzip: 12_000,
 }
 
 const THREE_MARKER = 'WebGLRenderer'

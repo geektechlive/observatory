@@ -8,19 +8,49 @@
 import {
   AmbientLight,
   DirectionalLight,
+  Group,
   MathUtils,
   PerspectiveCamera,
+  Quaternion,
   Scene,
   Spherical,
+  TextureLoader,
   Vector3,
   WebGLRenderer,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 import { type OutlineFraming, outlineFraming } from '@/lib/orrery/detailFraming'
+import type { Surroundings } from '@/lib/orrery/surroundings'
+import {
+  type CraftSize,
+  flightStart,
+  framingApproach,
+  type Km3,
+  modelMetresPerUnit,
+} from '@/lib/orrery/trueScale'
 
 import { positionsOf, type PreparedModel, texturesOf } from './craftModelLoad'
+import { type Flight, FLIGHT_START_KM, flightAt } from './flight'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
+import { toScene, TrueSky } from './trueSky'
+
+/**
+ * The fly-in (#261): the craft at its true size among the true Sun, planets, moons and stars,
+ * reached by a flight in. Without it the scene is the plain "Look closer" studio.
+ */
+export interface TrueScaleOptions {
+  /** The craft's real size (ESA DISCOS): the scene scales the loaded model to it. */
+  readonly size: CraftSize
+  /** The surroundings at the orrery's clock now, or null outside the craft's data. */
+  readonly surroundings: () => Surroundings | null
+  /** Ecliptic direction from the craft the visitor was looking from: the flight comes in there. */
+  readonly approach: Km3
+  /** Ecliptic direction the model's `axis` points at (its attitude), or null to leave it. */
+  readonly facing: (s: Surroundings) => Km3 | null
+  /** The model's own axis that `facing` points (craftModels' `axis`). */
+  readonly axis: readonly [number, number, number]
+}
 
 /** Which part of the scene the view is drawing, for the leak test. */
 export interface DetailStats {
@@ -47,6 +77,8 @@ export interface DetailSceneOptions {
   readonly reducedMotion: boolean
   /** The WebGL context was lost. Not called for the loss the scene causes on dispose. */
   readonly onContextLost: () => void
+  /** The fly-in (#261); without it, the studio view. */
+  readonly trueScale?: TrueScaleOptions | undefined
 }
 
 export interface DetailSceneHandle {
@@ -81,6 +113,24 @@ const NEAR_SHARE = 0.05
 /** Keep the camera off the poles, where the turn flips. */
 const POLE_MARGIN = 0.05
 const START_DIRECTION = new Vector3(0.55, 0.32, 0.77).normalize()
+/** The fly-in's far plane: past the stars' sphere (trueSky's STAR_SPHERE), units. */
+const STAR_FAR = 1e15
+/** The fly-in redraws this often while open, ms, so the bodies keep up with the clock. */
+const CLOCK_REDRAW_MS = 1_000
+const IDENTITY = new Quaternion()
+
+/**
+ * The model's turn in the fly-in: its `axis` onto the direction its attitude names (the Sun,
+ * Earth), as the orrery turns it. No surroundings or no direction: unturned.
+ */
+function attitude(truth: TrueScaleOptions): Quaternion {
+  const s = truth.surroundings()
+  const dir = s ? truth.facing(s) : null
+  if (!dir) return IDENTITY.clone()
+  const to = toScene(dir, 1).normalize()
+  const from = new Vector3(...truth.axis).normalize()
+  return new Quaternion().setFromUnitVectors(from, to)
+}
 
 export const createDetailScene: CreateDetailScene = (host, options) => {
   const canvas = document.createElement('canvas')
@@ -89,17 +139,35 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   canvas.setAttribute('aria-label', 'The model. Drag to turn it, scroll or pinch to zoom.')
   host.append(canvas)
 
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true })
-  renderer.setClearColor(0x000000, 0)
+  const truth = options.trueScale
+  // True km from metres to light-hours in one view: a logarithmic depth buffer keeps the
+  // depth order right across that range (#261).
+  const renderer = new WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: true,
+    logarithmicDepthBuffer: Boolean(truth),
+  })
+  // The fly-in is space itself, black with only the real stars; the studio lets the page show.
+  renderer.setClearColor(0x000000, truth ? 1 : 0)
   const scene = new Scene()
   const camera = new PerspectiveCamera(FOV, 1, 0.05, 100)
   camera.position.copy(START_DIRECTION).multiplyScalar(START_DISTANCE)
-  scene.add(new AmbientLight(0xffffff, 1.1))
-  const key = new DirectionalLight(0xffffff, 2.6)
-  key.position.set(3, 4, 5)
-  const fill = new DirectionalLight(0xbfd4ff, 0.7)
-  fill.position.set(-4, -1, -3)
-  scene.add(key, fill)
+  /** The fly-in's surroundings, built once the model's size in metres is known (setModel). */
+  let sky: TrueSky | null = null
+  /** One scene unit in metres, once the model is in (the fly-in only). */
+  let metresPerUnit = 1
+  if (!truth) {
+    scene.add(new AmbientLight(0xffffff, 1.1))
+    const key = new DirectionalLight(0xffffff, 2.6)
+    key.position.set(3, 4, 5)
+    const fill = new DirectionalLight(0xbfd4ff, 0.7)
+    fill.position.set(-4, -1, -3)
+    scene.add(key, fill)
+  }
+  /** The flight start's distance, scene units: the farthest the camera may zoom out to. */
+  let farthest = MAX_DISTANCE
+  let flight: Flight | null = null
 
   const controls = new OrbitControls(camera, canvas)
   controls.enableDamping = !options.reducedMotion
@@ -107,6 +175,10 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   controls.enablePan = false
   controls.minDistance = MIN_DISTANCE
   controls.maxDistance = MAX_DISTANCE
+  // A drag or zoom during the flight takes over from it.
+  controls.addEventListener('start', () => {
+    flight = null
+  })
 
   let model: PreparedModel | null = null
   /** Every vertex in scene space (x, y, z flat), or null with no model. */
@@ -115,12 +187,26 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   let framing: OutlineFraming | null = null
   let frameId = 0
   let disposed = false
+  /** Carries the model, turned to its attitude in the fly-in and centred. */
+  const holder = new Group()
+  // The fly-in's bodies move with the orrery's clock: draw now and then while it is open.
+  const clockTimer = truth
+    ? setInterval(() => {
+        request()
+      }, CLOCK_REDRAW_MS)
+    : undefined
 
   const draw = () => {
     frameId = 0
     if (disposed) return
+    const flying = stepFlight(performance.now())
     // update() is true while damping still moves the camera: keep going until it settles.
-    const moving = controls.update()
+    const moving = controls.update() || flying
+    if (sky && truth) {
+      const s = truth.surroundings()
+      if (s) sky.update(s)
+      sky.followCamera(camera)
+    }
     renderer.render(scene, camera)
     reportCamera()
     reportFit()
@@ -187,6 +273,67 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
     if (disposed || frameId !== 0) return
     frameId = requestAnimationFrame(draw)
   }
+
+  /** Move the camera along the flight; true while it is still flying. */
+  function stepFlight(now: number): boolean {
+    if (!flight) return false
+    const { distance, done } = flightAt(flight, now)
+    const [x, y, z] = flight.direction
+    camera.position.set(x * distance, y * distance, z * distance).add(controls.target)
+    camera.lookAt(controls.target)
+    if (done) flight = null
+    return !done
+  }
+
+  /**
+   * The fly-in's scale (#261): the model's farthest vertex sets how its DISCOS span maps to
+   * scene units (modelMetresPerUnit); the surroundings are built at that scale, and the camera
+   * may zoom out to the flight's start.
+   */
+  function placeInTrueSky(vertices: Float32Array): void {
+    if (!truth || sky) return
+    let full = 0
+    for (let i = 0; i < vertices.length; i += 3) {
+      full = Math.max(
+        full,
+        Math.hypot(vertices[i] ?? 0, vertices[i + 1] ?? 0, vertices[i + 2] ?? 0),
+      )
+    }
+    metresPerUnit = modelMetresPerUnit(truth.size, Math.max(full, 1))
+    farthest = (FLIGHT_START_KM * 1000) / metresPerUnit
+    sky = new TrueSky({
+      metresPerUnit,
+      loadTexture: (url) => new TextureLoader().loadAsync(url),
+      onReady: () => {
+        request()
+      },
+    })
+    scene.add(sky.group)
+    // Test probe: the model's size as drawn, metres per unit.
+    canvas.dataset['detailMetresPerUnit'] = metresPerUnit.toFixed(4)
+  }
+
+  /**
+   * Fly in to the arrival distance (#261): from FLIGHT_START_KM out, on the side that puts the
+   * biggest-looking body (the Sun near Parker, Jupiter near Juno) beside the craft in the frame,
+   * moved off any body that would be in the way, straight in. With reduced motion, the camera
+   * is put at the arrival at once.
+   */
+  function startFlight(arrival: number): void {
+    if (!truth) return
+    const s = truth.surroundings()
+    const obstacles = (s?.bodies ?? []).map((b) => ({ center: b.relKm, radiusKm: b.radiusKm }))
+    const approach = framingApproach(s?.bodies ?? [], truth.approach)
+    const start = flightStart(approach, FLIGHT_START_KM, obstacles)
+    const dir = toScene(start, metresPerUnit).normalize()
+    const direction = [dir.x, dir.y, dir.z] as const
+    if (options.reducedMotion) {
+      camera.position.copy(dir.multiplyScalar(arrival)).add(controls.target)
+      camera.lookAt(controls.target)
+      return
+    }
+    flight = { direction, from: farthest, to: arrival, startMs: performance.now() }
+  }
   controls.addEventListener('change', request)
 
   /**
@@ -195,15 +342,16 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
    * phone turned, the inspector opened) keeps the model in view. `reset` puts the camera at
    * the fitting distance on the start side, for a new model.
    */
-  const refit = (reset: boolean) => {
-    if (!points) return
+  const refit = (reset: boolean): OutlineFraming | null => {
+    if (!points) return null
     const next = outlineFraming(points, START_DIRECTION, FOV, camera.aspect, FRAME_MARGIN)
     controls.minDistance = next.minDistance
-    controls.maxDistance = next.maxDistance
+    controls.maxDistance = truth ? farthest : next.maxDistance
     // The closest approach keeps the whole model at least 0.1 radius in front of the camera, so
     // half of that is a near plane that never clips it, and far / near stays a few hundred.
     camera.near = next.radius * NEAR_SHARE
-    camera.far = next.maxDistance + next.radius * 2
+    // The fly-in reaches the stars' sphere; its logarithmic depth buffer covers the range.
+    camera.far = truth ? STAR_FAR : next.maxDistance + next.radius * 2
     if (reset) {
       camera.position.copy(START_DIRECTION).multiplyScalar(next.distance).add(controls.target)
     } else if (framing) {
@@ -215,6 +363,7 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
     camera.updateProjectionMatrix()
     camera.lookAt(controls.target)
     controls.update()
+    return next
   }
 
   const resize = () => {
@@ -245,7 +394,8 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   const dropModel = () => {
     if (!model) return
     const textures = texturesOf(model.object)
-    scene.remove(model.object)
+    model.object.removeFromParent()
+    holder.removeFromParent()
     model.dispose()
     model = null
     points = null
@@ -267,14 +417,18 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       dropModel()
       model = next
       counts.models += 1
-      scene.add(next.object)
-      next.object.updateMatrixWorld(true)
+      // The fly-in turns the model to its real attitude (#261): a holder carries that turn.
+      holder.add(next.object)
+      holder.position.set(0, 0, 0)
+      holder.quaternion.copy(truth ? attitude(truth) : IDENTITY)
+      scene.add(holder)
+      holder.updateMatrixWorld(true)
       // Centre on the middle of the outline as first seen (the fit centred on the body), so the
       // model sits in the middle of the canvas and the camera turns about the middle of it.
       const all = Float32Array.from(positionsOf(next.object))
       const { centre } = outlineFraming(all, START_DIRECTION, FOV, camera.aspect, FRAME_MARGIN)
-      next.object.position.set(-centre.x, -centre.y, -centre.z)
-      next.object.updateMatrixWorld(true)
+      holder.position.set(-centre.x, -centre.y, -centre.z)
+      holder.updateMatrixWorld(true)
       const shifted = new Float32Array(all.length)
       for (let i = 0; i < all.length; i += 3) {
         shifted[i] = (all[i] ?? 0) - centre.x
@@ -283,7 +437,9 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       }
       points = shifted
       framing = null
-      refit(true)
+      if (truth) placeInTrueSky(shifted)
+      const fitted = refit(true)
+      if (fitted) startFlight(fitted.distance)
       request()
     },
     rotate(dAzimuth, dPolar) {
@@ -316,6 +472,12 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       stopPixelWatch()
       controls.removeEventListener('change', request)
       controls.dispose()
+      clearInterval(clockTimer)
+      // The sky first: dropModel counts every geometry still registered as the model's leak.
+      if (sky) {
+        sky.group.removeFromParent()
+        sky.dispose()
+      }
       dropModel()
       renderer.dispose()
       renderer.forceContextLoss()

@@ -11,6 +11,7 @@ import {
   type DetailSceneHandle,
   type DetailStats,
   detailStats,
+  type TrueScaleOptions,
 } from './three/DetailScene'
 import { loadGltfScene } from './three/gltfLoad'
 
@@ -26,6 +27,8 @@ interface DetailViewProps {
   /** Swapped for a fake in tests (no WebGL). */
   createScene?: CreateDetailScene | undefined
   load?: ModelLoader | undefined
+  /** A spacecraft's fly-in (#261): true size among its true surroundings; absent, the studio. */
+  trueScale?: TrueScaleOptions | undefined
 }
 
 export type DetailCloseCause = 'user' | 'lost'
@@ -123,19 +126,24 @@ export function DetailView({
   onStats,
   createScene = createDetailScene,
   load = loadGltfScene,
+  trueScale: offered,
 }: DetailViewProps) {
   const host = useRef<HTMLDivElement>(null)
   const backButton = useRef<HTMLButtonElement>(null)
   const scene = useRef<DetailSceneHandle | null>(null)
-  const latest = useRef({ onClose, onStats, reducedMotion, descriptor })
+  // The fly-in or the studio is chosen once, at open: the scene and its caption must agree (#261).
+  const [trueScale] = useState(() => offered)
+  const latest = useRef({ onClose, onStats, reducedMotion, descriptor, trueScale })
   const [attempt, setAttempt] = useState(0)
+  // The moons near the craft that have no data for the date, read once when the view opens.
+  const [omitted] = useState(() => trueScale?.surroundings()?.omittedNear ?? [])
   const [outcome, setOutcome] = useState<{ attempt: number; ok: boolean } | null>(null)
   // The file or stand-in, not the descriptor object: a new object for the same model
   // (the page rebuilds it when satellites load) must not reload it.
   const descriptorKey = descriptor.kind === 'file' ? descriptor.file : descriptor.standIn
 
   useEffect(() => {
-    latest.current = { onClose, onStats, reducedMotion, descriptor }
+    latest.current = { onClose, onStats, reducedMotion, descriptor, trueScale }
   })
 
   // The scene: made once on open, disposed on close. It owns its canvas, so React never
@@ -150,6 +158,7 @@ export function DetailView({
         onContextLost: () => {
           latest.current.onClose('lost')
         },
+        trueScale: latest.current.trueScale,
       })
     } catch (error) {
       console.warn('[orrery] The model view could not start WebGL:', error)
@@ -327,6 +336,15 @@ export function DetailView({
       )}
       <div className={styles.detailCredit ?? ''} data-detail-credit="">
         {note && <p>{note}</p>}
+        {trueScale && (
+          <p data-detail-true-scale="">
+            True size and distance, seen from beside the craft. Its place is from JPL Horizons, the
+            planets&rsquo; from JPL&rsquo;s orbital elements, its size from ESA DISCOS, and the
+            stars from the Yale Bright Star Catalogue.
+            {omitted.length > 0 &&
+              ` No data for ${omitted.join(', ')} on this date, so ${omitted.length === 1 ? 'it is' : 'they are'} left out.`}
+          </p>
+        )}
         <ModelCredit descriptor={descriptor} />
       </div>
     </div>

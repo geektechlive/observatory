@@ -45,6 +45,7 @@ import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DetailLoading } from './DetailLoading'
 import { DETAIL_VIEW_ID } from './detailViewId'
 import { DwarfControls } from './DwarfControls'
+import { flyInOptions, orreryJdNow } from './flyIn'
 import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
 import {
@@ -409,6 +410,22 @@ export function OrreryPage() {
     [detail, renderer, satState],
   )
   const detailOpen = detail !== null && detailDescriptor !== undefined
+  // A spacecraft's close-up is the fly-in (#261): true size among its true surroundings. Read
+  // the camera's side while the orrery is still attached (this runs before the detach effect).
+  const flyIn = useMemo(
+    () =>
+      detail
+        ? flyInOptions({
+            key: detail,
+            tracks,
+            moons,
+            discos,
+            viewFrom: renderer?.viewFrom() ?? null,
+            jdNow: orreryJdNow,
+          })
+        : undefined,
+    [detail, tracks, moons, discos, renderer],
+  )
   // On a phone the sheet folds to its header row while the view is open and "Facts" opens it
   // (#205). It opens folded each time the view opens: reset when `detailOpen` changes.
   const [factsOpen, setFactsOpen] = useState(false)
@@ -1438,10 +1455,12 @@ export function OrreryPage() {
           (DetailViewComponent ? (
             // eslint-disable-next-line react-hooks/static-components -- see above
             <DetailViewComponent
-              key={detail}
+              // Remounted when the fly-in becomes possible (DISCOS arriving after a cold link, #261).
+              key={`${detail}:${flyIn ? 'fly-in' : 'studio'}`}
               descriptor={detailDescriptor}
               title={detailTitle}
               reducedMotion={reducedMotion}
+              trueScale={flyIn}
               onClose={(cause) => {
                 if (cause === 'user') backToOrrery()
                 else closeDetail()

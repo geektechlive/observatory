@@ -413,6 +413,29 @@ A silhouette at a distance, a 3D model when focused.
 A button in the inspector, for a spacecraft or satellite with a model, opens the model close up
 (ADR 0021).
 
+- **For a spacecraft with ESA DISCOS sizes it is the fly-in (#261, ADR 0037).**
+  `flyIn.ts` builds `TrueScaleOptions` from the page's tracks, moons, DISCOS and clock.
+  `DetailScene` then switches to the fly-in:
+  - a logarithmic depth buffer and an opaque black background;
+  - `TrueSky` in place of the studio lights: the Sun, the planets and the moons at true km from
+    the craft, one point light at the Sun, a faint ambient fill, and 287 Yale Bright Star
+    Catalogue stars on a sphere that follows the camera;
+  - the model scaled by `modelMetresPerUnit`: to DISCOS's span where that is at least 1.5 times
+    the body, else body to body;
+  - the model turned to its attitude;
+  - a 4 s flight (`flight.ts`) from 1,000,000 km. The flight comes in opposite the
+    biggest-looking body, 12° off (`framingApproach`), and is moved off any body in the way
+    (`flightStart`).
+  - Reduced motion cuts to arrival, and a drag takes over the flight.
+  - The canvas reports `data-detail-metres-per-unit`.
+  - Measured 2026-11-17: Parker on 2 Dec 2026 (9.85 R☉) flies in against an 11.6° Sun, and Juno
+    shows Jupiter's phase. Every model matched DISCOS's span or body within 0.1 m.
+  - The caption names the sources, and any moon left out near the craft (`omittedNear`, its
+    planet within 0.2 au, no samples for the date).
+  - e2e: `orrery-fly-in.spec.ts`.
+  - **A look in WebKit is needed for depth-buffer changes**, because `pnpm verify` draws only in
+    headless Chromium.
+
 - **Its own canvas and renderer.** `DetailView.tsx` (a lazy chunk, `DetailView-*.js`) mounts only
   while `detail` is set in `store/orreryView.ts`. `three/DetailScene.ts` makes the canvas, a
   `WebGLRenderer`, two lights and an `OrbitControls` (damping, no panning). Frames are on demand: a camera change, damping still settling, a resize or

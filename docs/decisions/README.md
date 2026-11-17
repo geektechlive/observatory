@@ -44,3 +44,4 @@ that makes the decision.
 | [0034](0034-noaa-flares-and-donki-through-api-nasa-gov.md)    | Flares come from NOAA SWPC; CME, storms and SEPs from DONKI through api.nasa.gov          | #65            |
 | [0035](0035-close-passes-get-ten-minute-samples.md)           | Close passes get 10-minute samples, found from the daily samples themselves               | #230           |
 | [0036](0036-views-are-paths.md)                               | Views are paths (`/orrery/`, …); a view’s own state stays in the hash                     | #232           |
+| [0037](0037-spacecraft-close-up-is-a-true-scale-fly-in.md)    | A spacecraft's close-up is a true-scale fly-in; the orrery keeps exaggerated sizes        | #260, #261     |

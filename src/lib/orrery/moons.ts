@@ -24,6 +24,8 @@ export interface MoonSpec {
   readonly parent: MoonParent
   readonly periodDays: number
   readonly semiMajorAxisKm: number
+  /** Mean radius, km (JPL Planetary Satellite Physical Parameters, read 2026-11-17; #261). */
+  readonly radiusKm: number
   readonly source: string
 }
 
@@ -44,6 +46,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: MARS,
     periodDays: 0.319,
     semiMajorAxisKm: 9_377.2,
+    radiusKm: 11.08,
     source: HORIZONS,
   },
   {
@@ -52,6 +55,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: MARS,
     periodDays: 1.263,
     semiMajorAxisKm: 23_463.2,
+    radiusKm: 6.2,
     source: HORIZONS,
   },
   {
@@ -60,6 +64,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: JUPITER,
     periodDays: 1.77,
     semiMajorAxisKm: 422_000,
+    radiusKm: 1_821.49,
     source: HORIZONS,
   },
   {
@@ -68,6 +73,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: JUPITER,
     periodDays: 3.55,
     semiMajorAxisKm: 671_000,
+    radiusKm: 1_560.8,
     source: HORIZONS,
   },
   {
@@ -76,6 +82,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: JUPITER,
     periodDays: 7.155,
     semiMajorAxisKm: 1_070_000,
+    radiusKm: 2_631.2,
     source: HORIZONS,
   },
   {
@@ -84,6 +91,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: JUPITER,
     periodDays: 16.691,
     semiMajorAxisKm: 1_883_000,
+    radiusKm: 2_410.3,
     source: HORIZONS,
   },
   {
@@ -92,6 +100,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: SATURN,
     periodDays: 1.370218,
     semiMajorAxisKm: 238_040,
+    radiusKm: 252.1,
     source: HORIZONS,
   },
   {
@@ -100,6 +109,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: SATURN,
     periodDays: 4.518,
     semiMajorAxisKm: 527_070,
+    radiusKm: 763.5,
     source: HORIZONS,
   },
   {
@@ -108,6 +118,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: SATURN,
     periodDays: 15.945421,
     semiMajorAxisKm: 1_221_870,
+    radiusKm: 2_574.76,
     source: HORIZONS,
   },
   {
@@ -116,6 +127,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: SATURN,
     periodDays: 79.33,
     semiMajorAxisKm: 3_560_840,
+    radiusKm: 734.3,
     source: HORIZONS,
   },
   {
@@ -124,6 +136,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: URANUS,
     periodDays: 1.413,
     semiMajorAxisKm: 129_800,
+    radiusKm: 235.8,
     source: HORIZONS,
   },
   {
@@ -132,6 +145,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: URANUS,
     periodDays: 8.706,
     semiMajorAxisKm: 435_800,
+    radiusKm: 788.9,
     source: HORIZONS,
   },
   {
@@ -140,6 +154,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: URANUS,
     periodDays: 13.463,
     semiMajorAxisKm: 582_600,
+    radiusKm: 761.4,
     source: HORIZONS,
   },
   {
@@ -148,6 +163,7 @@ export const MOONS: readonly MoonSpec[] = [
     parent: NEPTUNE,
     periodDays: 5.876994,
     semiMajorAxisKm: 354_800,
+    radiusKm: 1_352.6,
     source: HORIZONS,
   },
 ]
