@@ -31,6 +31,15 @@ The owner: "don't keep a pin just to keep a pin… I don't want to keep building
 - This is a standing rule; revisit only if an upgrade breaks production in a way the gate could
   not catch.
 
+## Note, 2026-11-17: an accepted advisory is a hold too (#258)
+
+`pnpm audit` began failing every landing on picomatch's ReDoS advisory GHSA-fc5q-39xc-vjpf. It
+flags every version up to 4.0.7, the latest, so there was nothing to upgrade to. The owner chose
+to accept that one advisory in `audit.ignore` (`pnpm-workspace.yaml`) and not hold every landing.
+It reaches only build and test tooling, never the site or the Functions. An ignored advisory follows
+this ADR's rule for holds: its entry states why it can't be fixed, why it doesn't reach us, and
+when to look again, and it goes once a fixed version ships.
+
 ## Evidence
 
 - #96, #97, #103; commits ff5c25f, 8b90757.

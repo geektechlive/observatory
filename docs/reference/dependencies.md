@@ -35,8 +35,9 @@ This is Microsoft's documented side-by-side setup from the TypeScript 7.0 announ
 - `three` and `@types/three` are exact pins because three.js doesn't use semver: every release
   (r187 = 0.187.0) can break. Bump them together and read the wiki Migration Guide section for
   that release.
-- `pnpm-workspace.yaml` holds the accepted advisory list (`auditConfig.ignoreGhsas`, empty since
-  #97) plus any `overrides`. Each entry carries why it can't be fixed and when to look again.
+- `pnpm-workspace.yaml` holds the accepted advisory list (`audit.ignore`, pnpm 12's name for
+  `auditConfig.ignoreGhsas`; since #258 it holds picomatch's GHSA-fc5q-39xc-vjpf, which has no fixed
+  version and reaches only build tooling) plus any `overrides`. Each entry carries why it can't be fixed and when to look again.
 - `@types/node` follows the Node the scripts run on in GitHub Actions (`node-version` in
   `data-refresh.yml`, currently 26, the active LTS). Bump the two together.
 - satellite.js 7 needs a stub for its multi-thread WASM build:

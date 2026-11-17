@@ -6,6 +6,7 @@
  */
 import { expect, type Page, test } from '@playwright/test'
 
+import { serveMoons } from './moonPayload'
 import { offlineSun } from './swpc'
 
 test.beforeEach(async ({ page }) => {
@@ -74,4 +75,51 @@ test('on a phone "Go to date" is in the Controls sheet and moves the clock (#242
       .first(),
   ).toBeAttached()
   await expect(bar(page).getByText(/2026-12-03/)).toBeVisible()
+})
+
+test.describe('phone touch targets (#243)', () => {
+  test.use({ viewport: { width: 375, height: 760 } })
+
+  test('the bar buttons are at least 40 px each way, on three rows, under the chip', async ({
+    page,
+  }) => {
+    await openOrrery(page)
+    const boxes = await bar(page).evaluate((el) =>
+      [...el.querySelectorAll('button')]
+        .map((b) => ({
+          name: b.getAttribute('aria-label') ?? b.textContent,
+          r: b.getBoundingClientRect(),
+        }))
+        .filter(({ r }) => r.width > 0)
+        .map(({ name, r }) => ({ name, w: r.width, h: r.height })),
+    )
+    expect(boxes.length).toBeGreaterThanOrEqual(9)
+    for (const b of boxes) {
+      expect(b.h, b.name).toBeGreaterThanOrEqual(40)
+      expect(b.w, b.name).toBeGreaterThanOrEqual(40)
+    }
+    expect(await rows(page)).toBe(3)
+    // The first-visit chip sits above the bar, not over it.
+    const chip = await page.getByRole('note').filter({ hasText: 'New here?' }).boundingBox()
+    const barBox = await bar(page).boundingBox()
+    expect(chip).not.toBeNull()
+    expect((chip?.y ?? 0) + (chip?.height ?? 0)).toBeLessThanOrEqual(barBox?.y ?? 0)
+  })
+
+  test('the Earth orbit preset still opens the Earth frame under the taller bar', async ({
+    page,
+  }) => {
+    // Horizons' Earth for the date: without it the frame stays closed.
+    await serveMoons(page)
+    await openOrrery(page)
+    const controls = page.getByRole('button', { name: 'Controls', exact: true })
+    await controls.click()
+    await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()
+    const canvas = page.locator('canvas[data-orrery-webgl]')
+    await expect
+      .poll(async () => (await canvas.getAttribute('data-orrery-earth-frame')) ?? '', {
+        timeout: 15_000,
+      })
+      .toBe('1.00')
+  })
 })

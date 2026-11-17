@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
-import { coveredPoints } from './mapCredit'
+import { coveredPoints, serveCartoStyle } from './mapCredit'
 
 // More NASA GIBS layers on the map (#211). Tiles come straight from GIBS in the browser, and
 // each layer carries GIBS's requested acknowledgment, which is a licence term (#179). GIBS is
@@ -25,7 +25,10 @@ async function stubGibs(page: Page): Promise<string[]> {
 const ACK =
   "We acknowledge the use of imagery provided by services from NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science Data and Information System (ESDIS)."
 
+// CARTO's style is stubbed too (#257): fetched live, it could take longer than 5 s under a
+// full verify, and the credit line stays empty until the map's style has loaded.
 async function openMap(page: Page, viewport = { width: 1440, height: 900 }) {
+  await serveCartoStyle(page)
   await page.setViewportSize(viewport)
   await page.goto('/')
   await page.getByRole('button', { name: 'Map', exact: true }).click()
@@ -95,10 +98,11 @@ for (const { width, height, expand } of [
     await page.getByRole('button', { name: /Layers/ }).click()
     if (expand) await page.getByRole('button', { name: 'Expand view' }).click()
     const credits = page.locator('.maplibregl-ctrl-attrib-inner')
+    // The basemap's credit first: it shows once the style has loaded.
+    await expect(credits).toContainText('CARTO', { timeout: 15_000 })
     await expect(credits).toContainText('Black Marble 2016')
     await expect(credits).toContainText('GPM IMERG')
     await expect(credits).toContainText('MODIS')
-    await expect(credits).toContainText('CARTO', { timeout: 15_000 })
     const text = await credits.innerText()
     expect(text.split('Global Imagery Browse Services').length - 1).toBe(1)
     expect(await coveredPoints(page)).toEqual([])

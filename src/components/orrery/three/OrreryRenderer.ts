@@ -1345,6 +1345,11 @@ export class OrreryRenderer {
       this.width / Math.max(1, this.height),
       extent,
       (2 * this.reserveBottomPx) / Math.max(1, this.height),
+      // Inside the open frame, whatever the time bar covers (#243); the proportional mode
+      // has no Earth frame to stay inside.
+      this.mode === 'proportional'
+        ? Infinity
+        : EARTH_FRAME_UNIT * EARTH_FRAME_OPEN_CAMERA.open * NEAR_OPEN_MARGIN,
     )
   }
 

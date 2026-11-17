@@ -45,6 +45,14 @@ the orrery writes its own voice line inside its chunk, from the planet math.
     Inner view could not hold Mars without Jupiter crossing the stage's corners.
   - `orrery-framing.test.ts` checks what each preset shows. The canvas's `data-orrery-onscreen`
     lets e2e check it in a browser.
+  - The Earth presets (Earth–Moon, Earth orbit) never fit farther than 95% of the Earth
+    frame's open distance (#243). The fit keeps the ring above the time bar, and on a 375 x 760
+    phone the stage is 360 px tall: once the bar covered about 130 px of it, the bisection ran
+    away (118 frame units at a 140 px bar, 1,440 at 160 px, against 110 for an open frame), so
+    the frame never opened and no satellites loaded. Capped, the ring may dip under a tall bar
+    on a short stage instead.
+  - The phone time bar's buttons are 40 px tall (Now and Play/Pause at least 44 wide, rates
+    at least 40) since #243, on three rows: Now shares the readout's row.
 - **Bodies have a minimum on-screen size** (`MIN_PX`), so the scene radii stay small and inside
   their orbits.
 - **Labels** follow `labelOrder`: selected body, then the voice line's subject, then Sun, then

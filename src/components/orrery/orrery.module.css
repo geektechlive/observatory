@@ -766,9 +766,27 @@
     padding: var(--space-2);
   }
 
+  /* Now shares the readout's row (three rows, not four), so the taller buttons below
+     leave the bar about as tall as it was (#243). */
   .utc {
     min-width: 0;
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+  }
+
+  /* Touch targets (#243): 40 px tall; the rates share the row's width, at least 40 px
+     each (about 46 px at 375 px; at 320 px the row scrolls a few px, as #114 allows). */
+  .timeBar .chipBtn,
+  .rates .rateBtn {
+    min-height: 40px;
+    justify-content: center;
+  }
+
+  .timeBar .chipBtn {
+    min-width: 44px;
+  }
+
+  .scrub {
+    min-height: 40px;
   }
 
   /* The rate row takes its own line and scrolls sideways if it must (#114). */
@@ -778,6 +796,8 @@
   }
 
   .rates .rateBtn {
+    flex: 1 0 auto;
+    min-width: 40px;
     padding-inline: var(--space-2);
   }
 
@@ -921,8 +941,9 @@
     display: none;
   }
 
+  /* Clear of the time bar, which is taller with #243's touch targets. */
   .guideChip {
-    bottom: 132px;
+    bottom: 148px;
     left: var(--space-3);
   }
 

@@ -250,7 +250,9 @@ export const EARTH_PRESET_ELEVATION_DEG = 25
 /**
  * The Earth–Moon/L1 preset (#92): aimed at Earth, from beside the Sun–Earth line so L1
  * (sunward) and L2 sit to either side, at the distance where a ring of `extent` around
- * Earth fills FILL of the view above the time bar.
+ * Earth fills FILL of the view above the time bar. Never farther than `maxDistance`: on a
+ * short phone stage a tall time bar leaves almost no room, and the fit ran away out of the
+ * open Earth frame, so the satellites never showed (#243).
  */
 export function earthPresetView(
   earth: Vector3,
@@ -258,6 +260,7 @@ export function earthPresetView(
   aspect: number,
   extent: number,
   bottomReserveNdc = 0,
+  maxDistance = Infinity,
 ): FrameView {
   const toSun = sun.clone().sub(earth)
   toSun.y = 0
@@ -273,7 +276,10 @@ export function earthPresetView(
   })
   const camera = new PerspectiveCamera(FOV, Math.max(0.1, aspect), 0.0001, 1e7)
   camera.updateProjectionMatrix()
-  const distance = bisectDistance(camera, earth, dir, ring, bottomReserveNdc, extent)
+  const distance = Math.min(
+    maxDistance,
+    bisectDistance(camera, earth, dir, ring, bottomReserveNdc, extent),
+  )
   return { position: earth.clone().addScaledVector(dir, distance), target: earth.clone() }
 }
 

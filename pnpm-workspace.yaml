@@ -19,7 +19,14 @@ allowBuilds:
   sharp: true
   workerd: true
 
-# Advisories accepted on purpose go under `auditConfig.ignoreGhsas`. Each entry
-# needs: why it cannot be fixed, why it does not reach us, and when to look again.
-# None today: #97's stylelint 18 dropped micromatch (and with it braces,
-# GHSA-vfj7-8cjw-p6xm, the last entry).
+# Advisories accepted on purpose go under `audit.ignore` (pnpm 12's name for
+# `auditConfig.ignoreGhsas`). Each entry needs: why it cannot be fixed, why it
+# does not reach us, and when to look again (ADR 0007).
+audit:
+  ignore:
+    # picomatch ReDoS GHSA-fc5q-39xc-vjpf (#258): flags every version up to 4.0.7,
+    # the latest on 2026-11-17, so there is no fix to take. Only build and test
+    # tooling uses it (vite, vitest, tinyglobby; `pnpm why picomatch --prod` is
+    # empty), matching globs from our own config, never a visitor's. Drop this
+    # once picomatch publishes a version above 4.0.7 or the advisory names a fix.
+    - GHSA-fc5q-39xc-vjpf
