@@ -1,5 +1,6 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
+import { formatRange, targetLook } from '@/lib/orrery/flightTarget'
 import type { ModelDescriptor } from '@/lib/orrery/modelDescriptor'
 
 import styles from './detail-view.module.css'
@@ -11,6 +12,7 @@ import {
   type DetailSceneHandle,
   type DetailStats,
   detailStats,
+  type FlightTarget,
   type TrueScaleOptions,
 } from './three/DetailScene'
 import { loadGltfScene } from './three/gltfLoad'
@@ -130,6 +132,9 @@ export function DetailView({
 }: DetailViewProps) {
   const host = useRef<HTMLDivElement>(null)
   const backButton = useRef<HTMLButtonElement>(null)
+  /** The fly-in's target bracket and its range readout, moved each frame without a render. */
+  const target = useRef<HTMLDivElement>(null)
+  const targetRange = useRef<HTMLSpanElement>(null)
   const scene = useRef<DetailSceneHandle | null>(null)
   // The fly-in or the studio is chosen once, at open: the scene and its caption must agree (#261).
   const [trueScale] = useState(() => offered)
@@ -151,6 +156,9 @@ export function DetailView({
   useEffect(() => {
     const el = host.current
     if (!el) return
+    // The fly-in's bracket (rendered with the host, so it exists by now), cleared on cleanup.
+    const bracket = target.current
+    const bracketRange = targetRange.current
     let made: DetailSceneHandle
     try {
       made = createScene(el, {
@@ -159,6 +167,23 @@ export function DetailView({
           latest.current.onClose('lost')
         },
         trueScale: latest.current.trueScale,
+        onTarget: (t: FlightTarget) => {
+          const el = target.current
+          const label = targetRange.current
+          if (!el || !label) return
+          const look = targetLook(t.radiusPx)
+          // Every frame calls this; write only what changed (the settled view redraws on
+          // the clock too).
+          const size = `${look.sizePx.toFixed(1)}px`
+          const opacity = look.opacity.toFixed(3)
+          const range = look.opacity > 0 ? formatRange(t.rangeKm) : ''
+          if (el.style.getPropertyValue('--target-size') !== size) {
+            el.style.setProperty('--target-size', size)
+          }
+          if (el.style.opacity !== opacity) el.style.opacity = opacity
+          el.dataset['detailTargetRadius'] = t.radiusPx.toFixed(2)
+          if (label.textContent !== range) label.textContent = range
+        },
       })
     } catch (error) {
       console.warn('[orrery] The model view could not start WebGL:', error)
@@ -170,6 +195,9 @@ export function DetailView({
     return () => {
       scene.current = null
       made.dispose()
+      // A new scene starts with the bracket hidden, not showing the last one's range.
+      bracket?.style.removeProperty('opacity')
+      if (bracketRange) bracketRange.textContent = ''
       latest.current.onStats?.(detailStats())
     }
   }, [createScene])
@@ -309,7 +337,22 @@ export function DetailView({
         aria-label={`Model of ${title}. Arrow keys turn it, plus and minus zoom.`}
         aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown + -"
         onKeyDown={onModelKey}
-      />
+      >
+        {/* The fly-in's target bracket (#261): the craft is under a pixel until about a km
+            out, so a camera ship's bracket and range mark it from the first frame, then fade
+            as the model itself grows. It sits over the canvas the scene adds here, at its
+            centre, where the camera always looks. Decorative: the range is not announced. */}
+        {trueScale && (
+          <div
+            ref={target}
+            className={styles.flightTarget ?? ''}
+            data-detail-target=""
+            aria-hidden="true"
+          >
+            <span ref={targetRange} className={styles.flightRange ?? ''} />
+          </div>
+        )}
+      </div>
       <p className={styles.srOnly ?? ''} role="status" data-detail-announce="">
         {ANNOUNCE[status]}
       </p>

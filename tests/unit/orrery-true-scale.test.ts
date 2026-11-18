@@ -150,15 +150,23 @@ describe('flightDistanceKm', () => {
     expect(flightDistanceKm(0, 1e6, 0.03)).toBeCloseTo(1e6, 3)
     expect(flightDistanceKm(1, 1e6, 0.03)).toBeCloseTo(0.03, 9)
     const half = flightDistanceKm(0.5, 1e6, 0.03)
-    // Halfway in time is about halfway in log distance: ~170 km, not 500,000.
-    expect(half).toBeGreaterThan(30)
-    expect(half).toBeLessThan(1_000)
+    // Halfway in time is well past halfway in log distance: tens of km, not 500,000.
+    expect(half).toBeGreaterThan(3)
+    expect(half).toBeLessThan(100)
     let last = Infinity
     for (let s = 0; s <= 1; s += 0.05) {
       const d = flightDistanceKm(s, 1e6, 0.03)
       expect(d).toBeLessThanOrEqual(last)
       last = d
     }
+  })
+
+  it('gives the last 10 km, where the craft grows from a dot to arrival, half the flight', () => {
+    // The owner saw the craft "wink into existence" (#261): with equal time per decade the
+    // stretch where it resolves took under a fifth of the flight.
+    let s = 0
+    while (flightDistanceKm(s, 1e6, 0.03) > 10) s += 0.001
+    expect(1 - s).toBeGreaterThanOrEqual(0.45)
   })
 
   it('clamps outside 0 to 1', () => {

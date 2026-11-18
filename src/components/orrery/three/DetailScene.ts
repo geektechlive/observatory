@@ -79,6 +79,16 @@ export interface DetailSceneOptions {
   readonly onContextLost: () => void
   /** The fly-in (#261); without it, the studio view. */
   readonly trueScale?: TrueScaleOptions | undefined
+  /**
+   * The fly-in only, each frame: the model's drawn radius, CSS px, and the camera's range to
+   * it, km, for the target marker (#261).
+   */
+  readonly onTarget?: ((target: FlightTarget) => void) | undefined
+}
+
+export interface FlightTarget {
+  readonly radiusPx: number
+  readonly rangeKm: number
 }
 
 export interface DetailSceneHandle {
@@ -157,6 +167,8 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
   let sky: TrueSky | null = null
   /** One scene unit in metres, once the model is in (the fly-in only). */
   let metresPerUnit = 1
+  /** The model's farthest vertex from its centre, scene units (the fly-in only). */
+  let modelRadius = 1
   if (!truth) {
     scene.add(new AmbientLight(0xffffff, 1.1))
     const key = new DirectionalLight(0xffffff, 2.6)
@@ -208,12 +220,24 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
       sky.followCamera(camera)
     }
     renderer.render(scene, camera)
+    reportTarget()
     reportCamera()
     reportFit()
     // Test probe: what the renderer holds now (renderer.info.memory).
     canvas.dataset['detailGeometries'] = String(renderer.info.memory.geometries)
     canvas.dataset['detailTextures'] = String(renderer.info.memory.textures)
     if (moving) request()
+  }
+  /** The fly-in's target marker: how big the model is drawn and how far away it is. */
+  const halfFovTan = Math.tan(((FOV / 2) * Math.PI) / 180)
+  function reportTarget(): void {
+    if (!sky || !options.onTarget) return
+    const range = camera.position.distanceTo(controls.target)
+    if (!(range > 0)) return
+    options.onTarget({
+      radiusPx: (modelRadius / (range * halfFovTan)) * (host.clientHeight / 2),
+      rangeKm: (range * metresPerUnit) / 1000,
+    })
   }
   // Test probe: where the camera is, as azimuth, polar angle and distance.
   const spherical = new Spherical()
@@ -299,6 +323,7 @@ export const createDetailScene: CreateDetailScene = (host, options) => {
         Math.hypot(vertices[i] ?? 0, vertices[i + 1] ?? 0, vertices[i + 2] ?? 0),
       )
     }
+    modelRadius = Math.max(full, 1e-6)
     metresPerUnit = modelMetresPerUnit(truth.size, Math.max(full, 1))
     farthest = (FLIGHT_START_KM * 1000) / metresPerUnit
     sky = new TrueSky({

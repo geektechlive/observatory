@@ -82,3 +82,7 @@ flying in while in a spacecraft with a camera attached to it".
 - JPL Planetary Satellite Physical Parameters (moon radii, read 2026-11-17); Yale Bright Star
   Catalogue, 5th revised edition (CDS V/50).
 - [ADR 0021](0021-the-detail-view-has-its-own-canvas.md), [docs/reference/orrery.md](../reference/orrery.md).
+
+## Addendum 2026-11-17: a target bracket
+
+The owner saw the probe "wink into existence" at the end of the flight: at its true size a craft stays under a pixel until about 300 m out. The fly-in adds a target bracket and range readout, as a camera ship would show, from the first frame, fading once the model itself is plain to see; the model and the scene are unchanged. The flight is re-timed so the last 10 km take about half of it. Details: [reference/orrery.md](../reference/orrery.md).

@@ -118,6 +118,20 @@ test('Parker flies in from far out to arrival, at its real size', async ({ page 
   await expect.poll(() => distance(page), { timeout: 8_000 }).toBeLessThan(20)
 })
 
+test('a target bracket and range mark the craft while it is too small to see (#261)', async ({
+  page,
+}) => {
+  await open(page, '-96')
+  const target = page.locator('[data-detail-target]')
+  // Far out the craft is under a pixel: the bracket is at full strength with a km range.
+  await expect(target).toHaveCSS('opacity', '1')
+  await expect(target).toContainText(/km$/)
+  // At arrival the model fills the view and the bracket has faded out.
+  await expect.poll(() => distance(page), { timeout: 8_000 }).toBeLessThan(20)
+  await expect(target).toHaveCSS('opacity', '0')
+  expect(Number(await target.getAttribute('data-detail-target-radius'))).toBeGreaterThan(40)
+})
+
 test('with reduced motion there is no flight: the camera starts at arrival', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await open(page, '-96')
@@ -148,4 +162,6 @@ test('a craft without DISCOS sizes keeps the studio close-up', async ({ page }) 
   await open(page, '-31')
   expect(await detailCanvas(page).getAttribute('data-detail-metres-per-unit')).toBeNull()
   expect(await distance(page)).toBeLessThan(20)
+  // The studio has no flight, so no target bracket.
+  await expect(page.locator('[data-detail-target]')).toHaveCount(0)
 })

@@ -427,6 +427,15 @@ A button in the inspector, for a spacecraft or satellite with a model, opens the
     biggest-looking body, 12° off (`framingApproach`), and is moved off any body in the way
     (`flightStart`).
   - Reduced motion cuts to arrival, and a drag takes over the flight.
+  - **A target bracket and range** (`flightTarget.ts`, cyan as telemetry) mark the craft from
+    the first frame. The owner saw the probe "wink into existence": at true size it stays
+    under a pixel, dark, until about 300 m out. The bracket grows round the model and fades
+    between 12 and 40 px of model radius, so it returns when you zoom back out. The scene
+    reports the radius and range through `onTarget`.
+  - The flight's log-distance ease is `smoothstep^0.6`, so the last 10 km get about half the 4 s.
+    Measured on the preview: the bracket is on from 272,000 km, the model shows inside it at
+    about 350 m, and it grows from 1 px to filling the view over about 1.5 s, in Chromium
+    and WebKit.
   - The canvas reports `data-detail-metres-per-unit`.
   - Measured 2026-11-17: Parker on 2 Dec 2026 (9.85 R☉) flies in against an 11.6° Sun, and Juno
     shows Jupiter's phase. Every model matched DISCOS's span or body within 0.1 m.

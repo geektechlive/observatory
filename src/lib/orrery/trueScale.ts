@@ -195,6 +195,13 @@ export function framingApproach(
 }
 
 /**
+ * How much of the log distance the smoothstep covers: under 1 front-loads it, so the far
+ * decades pass quickly and the last ~10 km, where the craft grows from a dot to arrival,
+ * get about half the flight (#261: with equal time per decade it "winked" in at the end).
+ */
+const FLIGHT_EASE_POWER = 0.6
+
+/**
  * The camera's distance from the craft `s` of the way through the flight (0 to 1): eased
  * (slow out, slow in) in log distance, so it covers the far kilometres fast and slows as it
  * arrives, the way a ship would.
@@ -202,6 +209,6 @@ export function framingApproach(
 export function flightDistanceKm(s: number, startKm: number, endKm: number): number {
   if (!(s > 0)) return startKm
   if (s >= 1) return endKm
-  const e = s * s * (3 - 2 * s)
+  const e = (s * s * (3 - 2 * s)) ** FLIGHT_EASE_POWER
   return Math.exp(Math.log(startKm) * (1 - e) + Math.log(endKm) * e)
 }
