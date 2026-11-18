@@ -86,3 +86,7 @@ flying in while in a spacecraft with a camera attached to it".
 ## Addendum 2026-11-17: a target bracket
 
 The owner saw the probe "wink into existence" at the end of the flight: at its true size a craft stays under a pixel until about 300 m out. The fly-in adds a target bracket and range readout, as a camera ship would show, from the first frame, fading once the model itself is plain to see; the model and the scene are unchanged. The flight is re-timed so the last 10 km take about half of it. Details: [reference/orrery.md](../reference/orrery.md).
+
+## Addendum 2026-11-17: zoom to enter
+
+The owner liked entering the fly-in by zooming past the orrery's closest zoom. A wheel or trackpad gesture that starts with the camera already at its closest zoom on the selected spacecraft, and pushes on, opens the same fly-in as Look closer. The gesture that carried the camera there never crosses, because a trackpad keeps sending its momentum for a second after the fingers lift, and the rest of a crossing gesture is swallowed so it can't cut the flight short. The hand-over is the same cut as Look closer, with the flight as the transition; there is no cross-fade, so the one-context rule (ADR 0021) is unchanged. A touch-screen pinch does not enter: it sends no wheel events. Zooming out to return is not built yet. Details: [reference/orrery.md](../reference/orrery.md).

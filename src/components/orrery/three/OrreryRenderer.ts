@@ -45,6 +45,7 @@ import type { BodyName } from '@/lib/orrery/bodies'
 import { threeQuarterView } from '@/lib/orrery/craftModelFit'
 import { attitudeDirection, craftModelFor } from '@/lib/orrery/craftModels'
 import { earthState } from '@/lib/orrery/craftState'
+import { EXAGGERATED_SUN_UNITS, LOG_SIZE_FACTOR } from '@/lib/orrery/drawnSun'
 import type { OrreryEntry } from '@/lib/orrery/dwarfView'
 import {
   CAMERA_NEAR,
@@ -219,7 +220,7 @@ const ORBIT_RESAMPLE_DAYS = 3650
  * Mercury's perihelion (0.42 units under place3d), so it never swallows the orbit.
  */
 const EXAGGERATED_RADIUS: Record<BodyName, number> = {
-  Sun: 0.22,
+  Sun: EXAGGERATED_SUN_UNITS,
   Mercury: 0.03,
   Venus: 0.045,
   Earth: 0.048,
@@ -234,6 +235,8 @@ const TRUE_RADIUS_KM = BODY_RADIUS_KM
 /** A focused body: the camera sits this many of its radii away (at least FOCUS_MIN_DISTANCE). */
 const FOCUS_RADII = 30
 const FOCUS_MIN_DISTANCE = 1.2
+/** The camera counts as at its closest zoom within this factor of the limit (#261). */
+const AT_LIMIT_SLACK = 1.02
 const DAYS_PER_YEAR = 365.25
 const MIN_FRAME_MS = 30
 /**
@@ -498,7 +501,7 @@ export class OrreryRenderer {
   private radiusOf(name: SceneKey): number {
     if (!isBody(name)) return CRAFT_RADIUS[this.mode]
     if (this.mode === 'exaggerated') return EXAGGERATED_RADIUS[name]
-    if (this.mode === 'log') return EXAGGERATED_RADIUS[name] * 0.45
+    if (this.mode === 'log') return EXAGGERATED_RADIUS[name] * LOG_SIZE_FACTOR
     return (TRUE_RADIUS_KM[name] / AU_KM) * LINEAR_K
   }
 
@@ -768,6 +771,18 @@ export class OrreryRenderer {
   viewFrom(): { x: number; y: number; z: number } {
     const d = this.camera.position.clone().sub(this.controls.target).normalize()
     return { x: d.x, y: d.y, z: d.z }
+  }
+
+  /**
+   * The followed craft, while the camera sits at its closest zoom on it (zoom-to-enter,
+   * #261); otherwise null. Not during a flight, and never a planet or satellite.
+   */
+  closestCraft(): SceneKey | null {
+    const key = this.focusBody
+    if (!key || isBody(key) || !this.following || this.flight) return null
+    if (!this.craft.naifIdOf(key)) return null
+    const distance = this.camera.position.distanceTo(this.controls.target)
+    return distance <= this.controls.minDistance * AT_LIMIT_SLACK ? key : null
   }
 
   /** A satellite's details for the inspector (#98), or null when it is not loaded. */

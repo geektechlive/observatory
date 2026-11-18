@@ -32,6 +32,7 @@ import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import { moonBodies } from '@/lib/orrery/moonState'
 import { reentryBrief, reentryElementRows } from '@/lib/orrery/reentryElements'
 import { isSatKey, reentryKey, satKey } from '@/lib/orrery/satView'
+import { swallowWheelUntilQuiet, wheelPx, ZoomGate } from '@/lib/orrery/zoomGate'
 import { reentriesWithin } from '@/lib/spaceTrackText'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
 import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
@@ -445,6 +446,31 @@ export function OrreryPage() {
     renderer.attach(el)
     return () => {
       renderer.detach()
+    }
+  }, [renderer, detailOpen])
+
+  // Zoom-to-enter (#261): a fresh zoom-in gesture at the closest zoom on the selected craft
+  // opens its fly-in. Capture, so the gate reads the camera before the controls move it.
+  useEffect(() => {
+    const el = host.current
+    if (!renderer || !el || detailOpen) return
+    const gate = new ZoomGate('in')
+    const onWheel = (e: WheelEvent) => {
+      const key = renderer.closestCraft()
+      const ready =
+        key !== null &&
+        key === selectedRef.current &&
+        modelForKey(key, (k) => renderer.satellite(k) ?? null) !== undefined
+      if (!gate.feed(wheelPx(e), ready, e.timeStamp) || key === null) return
+      openDetail(key)
+      if (useOrreryView.getState().detail !== key) return
+      e.preventDefault()
+      e.stopPropagation()
+      swallowWheelUntilQuiet(window)
+    }
+    el.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel, { capture: true })
     }
   }, [renderer, detailOpen])
 

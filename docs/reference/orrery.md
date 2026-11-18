@@ -405,6 +405,15 @@ A silhouette at a distance, a 3D model when focused.
   Heliosphere, and seeing a craft up close is the close-up's job. The test probe
   `data-orrery-px` reports it as `model` (px, or null when none is drawn). Look closer shows the
   model full size.
+- **A selected craft's whole-mission path is drawn; no other craft's is** (`craftLayer.ts`
+  `setTrajectory`). The selection lives in the address (`focus=`), so a reload keeps it; the
+  inspector's Close clears it, and a click on empty space does not (the pick acts only on a hit). Parker's loops are its 2018 to 2029 orbits shrinking at each
+  Venus flyby.
+- **The drawn Sun is wider than Parker's perihelion, and the inspector says so (#261).** In Big
+  bodies the Sun's 0.22 units reach 0.156 au under `place3d`, and 0.069 au in Log distance;
+  Parker's closest pass is 0.046 au (9.86 R☉). The owner chose a note over shrinking the Sun
+  (2026-11-17). `lib/orrery/drawnSun.ts` inverts `place3d`; `CraftFacts` shows the note when the
+  path's closest pass falls inside, with the real distance.
 - **`check-bundle` rules:** `craft-model-bytes` (850 kB each), `craft-model-total` (8.5 MB, sized for all of tier A; see satellite-models.md),
   `entry-has-no-craft-models`, `gltf-loader-gzip` (30 kB; 13.5 kB measured).
 
@@ -441,6 +450,17 @@ A button in the inspector, for a spacecraft or satellite with a model, opens the
     shows Jupiter's phase. Every model matched DISCOS's span or body within 0.1 m.
   - The caption names the sources, and any moon left out near the craft (`omittedNear`, its
     planet within 0.2 au, no samples for the date).
+  - **Zoom to enter** (`lib/orrery/zoomGate.ts`, wired in `OrreryPage`). A wheel gesture
+    (events under 300 ms apart) that starts with the camera at its closest zoom on the
+    selected, followed craft (`OrreryRenderer.closestCraft()`, within 2% of `minDistance`)
+    and pushes 400 px further opens the fly-in. Deltas are scaled as OrbitControls scales
+    them (lines x16, pages x100, a ctrl-wheel trackpad pinch x10), and slow mouse-wheel notches
+    keep their push across pauses up to 1.5 s while the camera stays at the limit. A panned
+    camera (no longer following) never enters. The listener is in the capture phase, so it
+    reads the camera before OrbitControls moves it. The gesture that reached the limit never
+    crosses (trackpad momentum), and the rest of a crossing gesture is swallowed at the window
+    (`swallowWheelUntilQuiet`), so it can't cancel the flight. A touch-screen pinch sends no
+    wheel events and does not enter. Zooming out to return is not built.
   - e2e: `orrery-fly-in.spec.ts`.
   - **A look in WebKit is needed for depth-buffer changes**, because `pnpm verify` draws only in
     headless Chromium.

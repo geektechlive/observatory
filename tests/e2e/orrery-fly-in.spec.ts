@@ -158,6 +158,51 @@ test('opening and closing the fly-in leaves nothing on the GPU', async ({ page }
   await expect(root).toHaveAttribute('data-orrery-detail-scenes', '0')
 })
 
+/** One wheel gesture: `n` events of `dy` px, 16 ms apart, then the gesture gap. */
+async function wheelGesture(page: Page, n: number, dy: number) {
+  for (let i = 0; i < n; i += 1) {
+    await page.mouse.wheel(0, dy)
+    await page.waitForTimeout(16)
+  }
+  await page.waitForTimeout(700)
+}
+
+test('zooming in past the closest zoom on a craft flies in (#261)', async ({ page }) => {
+  await serve(page)
+  await page.goto('/orrery/#focus=naif:-96')
+  const canvas = page.locator('[data-orrery-page] canvas').first()
+  await expect(canvas).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
+  await page.waitForTimeout(1_500) // the focus flight
+  const box = await canvas.boundingBox()
+  if (!box) throw new Error('no canvas')
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3)
+  // The gesture that carries the camera to its closest zoom never crosses (its tail is momentum).
+  await wheelGesture(page, 60, -100)
+  await expect(detailView(page)).toHaveCount(0)
+  // A fresh push at the limit does.
+  await wheelGesture(page, 8, -100)
+  await expect(detailView(page)).toHaveAttribute('data-detail-status', 'ready', {
+    timeout: 20_000,
+  })
+  // The rest of the crossing gesture was swallowed, so the flight still runs from far out.
+  expect(await distance(page)).toBeGreaterThan(1_000)
+  await expect(page).toHaveURL(/detail=1/)
+})
+
+test('zooming in on a planet never flies in', async ({ page }) => {
+  await serve(page)
+  await page.goto('/orrery/#focus=Mars')
+  const canvas = page.locator('[data-orrery-page] canvas').first()
+  await expect(canvas).toHaveAttribute('data-orrery-focus', 'Mars', { timeout: 20_000 })
+  await page.waitForTimeout(1_500)
+  const box = await canvas.boundingBox()
+  if (!box) throw new Error('no canvas')
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3)
+  await wheelGesture(page, 60, -100)
+  await wheelGesture(page, 20, -100)
+  await expect(detailView(page)).toHaveCount(0)
+})
+
 test('a craft without DISCOS sizes keeps the studio close-up', async ({ page }) => {
   await open(page, '-31')
   expect(await detailCanvas(page).getAttribute('data-detail-metres-per-unit')).toBeNull()

@@ -1,11 +1,17 @@
+import { useMemo } from 'react'
+
 import { Label } from '@/components/ui/Label'
 import { Readout } from '@/components/ui/Readout'
 import type { DsnLink } from '@/lib/dsn'
 import { craftModelFor } from '@/lib/orrery/craftModels'
 import { describeCraft } from '@/lib/orrery/craftState'
-import { formatLightTime } from '@/lib/orrery/units'
+import { closestPassAu, insideDrawnSun } from '@/lib/orrery/drawnSun'
+import { trajectoryPoints } from '@/lib/orrery/ephemeris'
+import { BODY_RADIUS_KM } from '@/lib/orrery/trueScale'
+import { AU_KM, formatLightTime } from '@/lib/orrery/units'
 import type { OrreryTrack } from '@/schemas/orreryBodies'
 import type { DiscosObject } from '@/schemas/spaceTrack'
+import { useOrreryView } from '@/store/orreryView'
 
 import { DiscosFacts } from './DiscosFacts'
 import { Distance } from './Distance'
@@ -51,6 +57,11 @@ export function CraftFacts({ track, earth, jd, simMs, link, physical }: CraftFac
   const closeToEarth = track.group === 'l1' || track.group === 'moon'
   // How the craft is drawn up close, and whose model it is (#115).
   const model = craftModelFor(track.naifId)
+  // The whole path's closest pass to the Sun, as the trajectory line draws it (#261).
+  const closest = useMemo(() => closestPassAu(trajectoryPoints(track)), [track])
+  const scale = useOrreryView((s) => s.scale)
+  // The fly-in draws the Sun at its true size, so the note is only for the orrery.
+  const flyingIn = useOrreryView((s) => s.detail === track.id)
 
   return (
     <>
@@ -63,6 +74,11 @@ export function CraftFacts({ track, earth, jd, simMs, link, physical }: CraftFac
           Near Earth it is drawn in the Earth frame: its true direction, with distances past
           geostationary orbit compressed, so it is not to scale. Zoomed out it sits on Earth’s
           marker; choose Earth–Moon to see it apart.
+        </p>
+      )}
+      {!flyingIn && insideDrawnSun(closest, scale) && closest !== null && (
+        <p className={styles.inspectorText ?? ''}>
+          {`Its path dips inside the Sun here because the Sun is drawn larger than life. Its closest pass is about ${((closest * AU_KM) / 1e6).toFixed(1)} million km from the Sun’s centre, about ${((closest * AU_KM) / BODY_RADIUS_KM.Sun).toFixed(1)} times the Sun’s radius. The Proportional scale uses true distances.`}
         </p>
       )}
       {d === null ? (
