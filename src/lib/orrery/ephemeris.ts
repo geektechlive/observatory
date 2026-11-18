@@ -7,6 +7,7 @@
  */
 import type { OrreryTrack, SampledSpan } from '@/schemas/orreryBodies'
 
+import { keplerArcPoints, keplerArcState, stepNorth, type Vec3Like } from './keplerArc'
 import type { Vec3 } from './scale'
 import { AU_KM } from './units'
 
@@ -76,9 +77,50 @@ function hermite(span: SampledSpan, jd: number): TrackState | null {
   }
 }
 
-function catmullRom(span: SampledSpan, jd: number): TrackState | null {
+const point = (span: SampledSpan, i: number): Vec3 => ({
+  x: at(span, 3, i, 0),
+  y: at(span, 3, i, 1),
+  z: at(span, 3, i, 2),
+})
+
+/** How far either side of a step to look for a neighbour that shows the sense of motion. */
+const NORTH_SEARCH_STEPS = 8
+
+/**
+ * Which way the body goes round the Sun at step i: the angular momentum of the nearest
+ * neighbouring step short enough to be unambiguous, or null (the caller keeps its spline).
+ * Never ecliptic north by assumption: a retrograde comet would go the long way round (#262).
+ */
+function northNear(span: SampledSpan, i: number): Vec3Like | null {
+  const n = count(span, 3)
+  for (let d = 1; d <= NORTH_SEARCH_STEPS; d += 1) {
+    for (const j of [i - d, i + d]) {
+      if (j < 0 || j + 1 >= n) continue
+      const north = stepNorth(point(span, j), point(span, j + 1))
+      if (north) return north
+    }
+  }
+  return null
+}
+
+/**
+ * Between coarse samples: the two-body arc where the step turns more than a few degrees
+ * round the Sun (#262; a spline cut through the Sun at Parker's perihelia), else
+ * Catmull-Rom through the neighbours.
+ */
+function coarseState(span: SampledSpan, jd: number): TrackState | null {
   const loc = locate(span, 3, jd)
   if (!loc) return null
+  const north = northNear(span, loc.i)
+  const arc = north
+    ? keplerArcState(point(span, loc.i), point(span, loc.i + 1), span.step, loc.s, north)
+    : null
+  if (arc)
+    return { position: { ...arc.position }, velocity: { ...arc.velocity }, resolution: 'coarse' }
+  return catmullRom(span, loc)
+}
+
+function catmullRom(span: SampledSpan, loc: { i: number; s: number }): TrackState {
   const n = count(span, 3)
   const { i, s } = loc
   const h = span.step
@@ -136,22 +178,30 @@ export function stateAt(
     const fine = hermite(track.fine, jd)
     if (fine) return fine
   }
-  if (track.coarse) return catmullRom(track.coarse, jd)
+  if (track.coarse) return coarseState(track.coarse, jd)
   return null
 }
 
-/** The whole-mission path, oldest first, for the trajectory line (spec Part 14). */
+/**
+ * The whole-mission path, oldest first, for the trajectory line (spec Part 14): every
+ * coarse sample, plus points along the two-body arc wherever a step turns far enough round
+ * the Sun that a straight line would cut the corner (#262).
+ */
 export function trajectoryPoints(track: Pick<OrreryTrack, 'coarse'>): (Vec3 & { jd: number })[] {
   const span = track.coarse
   if (!span) return []
   const out: (Vec3 & { jd: number })[] = []
-  for (let i = 0; i < count(span, 3); i += 1) {
-    out.push({
-      jd: span.start + i * span.step,
-      x: at(span, 3, i, 0),
-      y: at(span, 3, i, 1),
-      z: at(span, 3, i, 2),
-    })
+  const n = count(span, 3)
+  for (let i = 0; i < n; i += 1) {
+    const jd = span.start + i * span.step
+    const p = point(span, i)
+    out.push({ jd, ...p })
+    const north = i + 1 < n ? northNear(span, i) : null
+    if (north) {
+      for (const q of keplerArcPoints(p, point(span, i + 1), span.step, north)) {
+        out.push({ jd: jd + q.dt, x: q.position.x, y: q.position.y, z: q.position.z })
+      }
+    }
   }
   return out
 }

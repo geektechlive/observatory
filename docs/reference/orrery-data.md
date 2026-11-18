@@ -70,7 +70,19 @@ They come from JPL Horizons, sampled by the refresh job, never on the request pa
 - **The client interpolates; it never extrapolates** (`src/lib/orrery/ephemeris.ts`).
   - Hermite on the fine span reproduces Horizons' own 12 h samples to within 1–15 km, away from
     close passes (above).
-  - Catmull-Rom on the coarse span is marked coarse.
+  - On the coarse span (marked coarse), a step that turns more than 1° round the Sun follows
+    the two-body arc through both samples (Lambert, then Kepler; `keplerArc.ts`, #262). Other
+    steps use Catmull-Rom. The whole-mission line adds points along any arc that turns more
+    than 4°.
+  - Why: near perihelion Parker sweeps up to ~137° of its orbit a day. A 3-day chord came
+    within 0.4 solar radii of the Sun's centre, and Catmull-Rom put the marker 5 million km
+    off. Measured against each craft's own fine span on the 2026-11-17 payload, arcs are
+    better or equal for 13 of 15 craft:
+    - Parker: 5.1 million km becomes 24,000 km;
+    - the L1 craft, on 31–68-day steps: up to 18 million km becomes under 600,000 km;
+    - Juno and Psyche are off two-body orbits (Jupiter's pull, continuous thrust). Psyche
+      goes from 12,000 to 20,000 km, still invisible.
+    - Parker's drawn path now comes no closer than 9.8 solar radii.
   - Outside both: "no data for this date". The craft is hidden but stays in search.
 - **Earth is drawn from the same Horizons answer when it covers the date,** so the L1 craft sit
   where they should; outside it, Earth is Kepler, and the inspector says so.

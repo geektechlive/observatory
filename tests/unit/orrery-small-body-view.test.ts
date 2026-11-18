@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
+import { keplerArcState } from '@/lib/orrery/keplerArc'
 import {
   isSmallBodyKey,
   lookupTwinKey,
@@ -104,11 +105,19 @@ describe('smallBodyPath', () => {
     const path = smallBodyPath(oumuamua)
     expect(path.source).toBe('horizons')
     expect(path.closed).toBe(false)
-    expect(path.points).toEqual([
+    // Through every coarse position in order; between them, the two-body arc where a step
+    // turns (#262), so only the samples are pinned here.
+    const samples = [
       { x: 1, y: 0, z: 0 },
       { x: 2, y: 1, z: 0 },
       { x: 3, y: 2, z: 1 },
-    ])
+    ]
+    const at = samples.map((q) =>
+      path.points.findIndex((p) => p.x === q.x && p.y === q.y && p.z === q.z),
+    )
+    expect(at[0]).toBe(0)
+    expect(at[1]).toBeGreaterThan(at[0] ?? Infinity)
+    expect(at[2]).toBe(path.points.length - 1)
   })
 
   it("draws a comet's line from its elements, reaching past every sampled position", () => {
@@ -161,7 +170,10 @@ describe('smallBodyFacts', () => {
     expect(f.solution?.ref).toBe('JPL#16')
     expect(f.solutionAtDate).toBe('observed')
     expect(f.span).toBe('coarse')
-    expect(f.sunAu).toBeCloseTo(Math.hypot(1.5, 0.5, 0), 1)
+    // Half-way along the first step's two-body arc (#262).
+    const mid = keplerArcState({ x: 1, y: 0, z: 0 }, { x: 2, y: 1, z: 0 }, 100, 0.5)?.position
+    expect(mid).toBeDefined()
+    expect(f.sunAu).toBeCloseTo(Math.hypot(mid?.x ?? 0, mid?.y ?? 0, mid?.z ?? 0), 6)
   })
 
   it('never calls a comet hyperbolic or gives it a v∞, even with e just over 1', () => {

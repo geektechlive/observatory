@@ -40,3 +40,7 @@ outside the samples a body is hidden and the inspector says "no data for this da
 ## Addendum 2026-11-12
 
 [ADR 0029](0029-jpl-feeds-built-by-the-job.md) applies the same rule to `/api/planets`, `/api/sentry` and `/api/fireball` (#146), which had still called JPL from their Functions.
+
+## Addendum 2026-11-17
+
+Between coarse samples, a step that turns more than 1° round the Sun now follows the two-body arc through both samples rather than Catmull-Rom (#262): a 3-day chord at Parker's perihelion cut through the Sun. The client still never extrapolates. Measurements: [reference/orrery-data.md](../reference/orrery-data.md).
