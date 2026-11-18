@@ -49,6 +49,34 @@ describe('spacecraft switches explain themselves (#122)', () => {
   })
 })
 
+// The View presets are how you move around, so they sit near the top, not under every
+// data switch three screens down (#263).
+describe('group order (#263)', () => {
+  it('puts View straight after Learn and Find, before the data switches', () => {
+    render(
+      <ControlRail
+        open
+        onGuide={noop}
+        visibility={{ planets: true, orbits: true, labels: true }}
+        onVisibility={noop}
+        scale="exaggerated"
+        onScale={noop}
+        preset={null}
+        onPreset={noop}
+        onSelect={noop}
+        craftFilter={DEFAULT_CRAFT_FILTER}
+        onCraftFilter={noop}
+        smallBodies={<h2>Dwarf planets</h2>}
+        nearEarth={<h2>Near-Earth objects</h2>}
+        earthOrbit={<h2>Earth orbit</h2>}
+      />,
+    )
+    const titles = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(titles.slice(0, 3)).toEqual(['Learn', 'Find', 'View'])
+    expect(titles.indexOf('View')).toBeLessThan(titles.indexOf('Solar system'))
+  })
+})
+
 // The scale choice is a group of pressed buttons, like the View chips, not a radiogroup
 // that ignores the arrow keys (#192).
 describe('scale choice (#192)', () => {

@@ -34,6 +34,10 @@ the orrery writes its own voice line inside its chunk, from the planet math.
   - A 1x clock now wakes the renderer once a second with a timer.
   - `e2e/orrery-soak.spec.ts` guards it, through the canvas's `data-orrery-animating`,
     `-draws`, `-geometries` and `-programs`, and the page's `data-orrery-renders`.
+- **The controls (`ControlRail.tsx`) put the ways to move first:** Learn (the guide), Find,
+  then View (the presets and the scale), and only then the data switches. View was once
+  last, under every switch group, 2,431 px down a 720 px rail at 1440×900 and 2,332 px down
+  the phone sheet (#263). `orrery-control-rail.test.tsx` pins the order.
 - **It reads the clock through an injected `ClockReader`, never the zustand store.** When it
   imported the store (and so React), the first load split from 4 chunks into 7.
 - **Planets** come from `src/lib/orrery`: JPL Table 1 inside 1800–2050 and Table 2 (3000 BC –

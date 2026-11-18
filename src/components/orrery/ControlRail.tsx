@@ -115,6 +115,43 @@ export function ControlRail({
         <SearchBox items={items} onSelect={onSelect} />
       </section>
 
+      <section className={styles.group ?? ''} aria-labelledby="orrery-view">
+        <h2 id="orrery-view" className={styles.groupTitle ?? ''}>
+          View
+        </h2>
+        <div className={styles.chipRow ?? ''} role="group" aria-label="Focus">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={styles.chipBtn ?? ''}
+              aria-pressed={preset === p.id}
+              onClick={() => {
+                onPreset(p.id)
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className={styles.chipRow ?? ''} role="group" aria-label="Scale">
+          {SCALES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              aria-pressed={scale === s.id}
+              title={s.hint}
+              className={styles.rateBtn ?? ''}
+              onClick={() => {
+                onScale(s.id)
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* On a phone the time bar has no room for it (#242); wide screens keep it there. */}
       <section
         className={`${styles.group ?? ''} ${styles.phoneOnly ?? ''}`}
@@ -203,43 +240,6 @@ export function ControlRail({
       {nearEarth}
 
       {earthOrbit}
-
-      <section className={styles.group ?? ''} aria-labelledby="orrery-view">
-        <h2 id="orrery-view" className={styles.groupTitle ?? ''}>
-          View
-        </h2>
-        <div className={styles.chipRow ?? ''} role="group" aria-label="Focus">
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={styles.chipBtn ?? ''}
-              aria-pressed={preset === p.id}
-              onClick={() => {
-                onPreset(p.id)
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className={styles.chipRow ?? ''} role="group" aria-label="Scale">
-          {SCALES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              aria-pressed={scale === s.id}
-              title={s.hint}
-              className={styles.rateBtn ?? ''}
-              onClick={() => {
-                onScale(s.id)
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </section>
 
       <details className={styles.group ?? ''}>
         <summary className={styles.groupTitle ?? ''}>Data sources</summary>
