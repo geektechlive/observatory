@@ -30,6 +30,9 @@ export class PanTracker {
   private readonly net = new Vector3()
   private readonly last = new Vector3()
   private active = false
+  /** A two-finger gesture's first and latest midpoint, screen px (#264). */
+  private midStart: { x: number; y: number } | null = null
+  private midNow: { x: number; y: number } | null = null
 
   begin(target: Vector3): void {
     this.net.set(0, 0, 0)
@@ -39,6 +42,24 @@ export class PanTracker {
 
   end(): void {
     this.active = false
+    this.midStart = null
+    this.midNow = null
+  }
+
+  /**
+   * Two fingers are down, their midpoint here (#264). From now until the gesture ends the
+   * slide is the midpoint's movement: OrbitControls handles each finger's move on its own,
+   * zooming in between, so a still-midpoint pinch still creeps the target one way.
+   */
+  touches(mid: { x: number; y: number }): void {
+    this.midStart ??= { ...mid }
+    this.midNow = { ...mid }
+  }
+
+  /** Fewer than two fingers now: back to the target, and a re-landed pinch starts afresh. */
+  untouch(): void {
+    this.midStart = null
+    this.midNow = null
   }
 
   /** The renderer moved the target itself (the follow): not the visitor's slide. */
@@ -54,6 +75,11 @@ export class PanTracker {
   }
 
   released(unitsPerPx: number): boolean {
-    return this.active && this.net.length() > PAN_RELEASE_PX * unitsPerPx
+    if (!this.active) return false
+    if (this.midStart && this.midNow) {
+      const slid = Math.hypot(this.midNow.x - this.midStart.x, this.midNow.y - this.midStart.y)
+      return slid > PAN_RELEASE_PX
+    }
+    return this.net.length() > PAN_RELEASE_PX * unitsPerPx
   }
 }

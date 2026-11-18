@@ -417,6 +417,14 @@ export class OrreryRenderer {
     this.controls.addEventListener('change', this.onControlsChange)
     this.controls.addEventListener('start', this.onUserCamera)
     this.controls.addEventListener('end', this.onUserCameraEnd)
+    // Ahead of the controls' own handlers (capture), so a pinch's midpoint is known before
+    // the update it causes is judged (#264).
+    for (const type of ['pointerdown', 'pointermove'] as const) {
+      this.canvas.addEventListener(type, this.onTouchPointer, { capture: true })
+    }
+    for (const type of ['pointerup', 'pointercancel'] as const) {
+      this.canvas.addEventListener(type, this.onTouchLift, { capture: true })
+    }
 
     this.buildScene()
     this.applyPreset(DEFAULT_PRESET, true)
@@ -1617,6 +1625,21 @@ export class OrreryRenderer {
 
   /** The visitor's slide in the current gesture (#259). */
   private readonly pan = new PanTracker()
+  /** The fingers on the canvas, screen px, for a pinch's midpoint (#264). */
+  private readonly touchPoints = new Map<number, { x: number; y: number }>()
+
+  private readonly onTouchPointer = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') return
+    if (e.type === 'pointermove' && !this.touchPoints.has(e.pointerId)) return
+    this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const [a, b] = [...this.touchPoints.values()]
+    if (a && b) this.pan.touches({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+  }
+
+  private readonly onTouchLift = (e: PointerEvent) => {
+    // Before the controls' own pointerup, which re-starts a one-finger gesture.
+    if (this.touchPoints.delete(e.pointerId) && this.touchPoints.size < 2) this.pan.untouch()
+  }
 
   /** Nearest body or craft to a canvas point within `radius` px, or null. */
   pick(x: number, y: number, radius = 12): SceneKey | null {
@@ -1928,6 +1951,8 @@ export class OrreryRenderer {
     const { memory, programs, render } = this.renderer.info
     const d = this.canvas.dataset
     d['orreryDraws'] = String(this.draws)
+    // The craft the camera is at its closest to, for the zoom-to-enter e2e (#261).
+    d['orreryClosest'] = this.closestCraft() ?? ''
     d['orreryGeometries'] = String(memory.geometries)
     d['orreryTextures'] = String(memory.textures)
     d['orreryPrograms'] = String(programs?.length ?? 0)
@@ -2000,6 +2025,12 @@ export class OrreryRenderer {
     this.clearTick()
     this.controls.dispose()
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost)
+    for (const type of ['pointerdown', 'pointermove'] as const) {
+      this.canvas.removeEventListener(type, this.onTouchPointer, { capture: true })
+    }
+    for (const type of ['pointerup', 'pointercancel'] as const) {
+      this.canvas.removeEventListener(type, this.onTouchLift, { capture: true })
+    }
     for (const mesh of this.bodies.values()) {
       mesh.geometry.dispose()
       ;(mesh.material as MeshBasicMaterial).dispose()

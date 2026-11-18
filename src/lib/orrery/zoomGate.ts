@@ -68,6 +68,42 @@ export class ZoomGate {
   }
 }
 
+/** How far two fingers must spread past the limit to cross, px. A phone is small. */
+export const PINCH_PUSH_PX = 120
+
+/**
+ * The touch-screen pinch's version of ZoomGate. A pinch has a clear start (the second finger
+ * lands) and end (a finger lifts), so it needs no timing: only a pinch that starts with the
+ * camera at the limit can cross, and the one that carried it there never does.
+ */
+export class PinchGate {
+  private armed = false
+  private start0 = 0
+
+  /** Two fingers are down, this far apart; was the camera at the limit already? */
+  start(spreadPx: number, atLimit: boolean): void {
+    this.armed = atLimit
+    this.start0 = spreadPx
+  }
+
+  /** The fingers moved; true once, when they have spread far enough past the limit. */
+  move(spreadPx: number, atLimit: boolean): boolean {
+    if (!this.armed) return false
+    if (!atLimit) {
+      this.armed = false
+      return false
+    }
+    if (spreadPx - this.start0 < PINCH_PUSH_PX) return false
+    this.armed = false
+    return true
+  }
+
+  /** A finger lifted. */
+  end(): void {
+    this.armed = false
+  }
+}
+
 /**
  * Stop every wheel event at `target` (capture) until none has arrived for a gesture gap,
  * so a crossing gesture's momentum never reaches the view it opened. Returns a cancel.

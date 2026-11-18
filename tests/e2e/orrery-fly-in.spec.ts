@@ -203,6 +203,77 @@ test('zooming in on a planet never flies in', async ({ page }) => {
   await expect(detailView(page)).toHaveCount(0)
 })
 
+test.describe('on a touch screen (390 x 844)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+
+  /** One two-finger pinch through Chrome's touch input: spread `from` to `to` px, in steps. */
+  async function pinchOut(page: Page, from: number, to: number) {
+    const canvas = page.locator('[data-orrery-page] canvas').first()
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('no canvas')
+    // On a phone the inspector sheet covers the lower stage: pinch in the band above it.
+    const cx = box.x + box.width / 2
+    const cy = box.y + 100
+    const at = (d: number) => [
+      { x: cx - d / 2, y: cy, id: 0 },
+      { x: cx + d / 2, y: cy, id: 1 },
+    ]
+    for (const p of at(from)) {
+      const onCanvas = await page.evaluate(
+        ([x, y]) => document.elementFromPoint(x ?? 0, y ?? 0)?.tagName === 'CANVAS',
+        [p.x, p.y],
+      )
+      expect(onCanvas, `a finger at ${String(p.x)},${String(p.y)} lands on the canvas`).toBe(true)
+    }
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from) })
+    const steps = 20
+    for (let i = 1; i <= steps; i += 1) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: at(from + ((to - from) * i) / steps),
+      })
+      await page.waitForTimeout(16)
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  }
+
+  test('pinching out past the closest zoom on a craft flies in (#261)', async ({ page }) => {
+    await serve(page)
+    await page.goto('/orrery/#focus=naif:-96')
+    const canvas = page.locator('[data-orrery-page] canvas').first()
+    await expect(canvas).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
+    await page.waitForTimeout(1_500) // the focus flight
+    // The pinch that carries the camera to its closest zoom never crosses.
+    // A pinch that carries the camera to its closest zoom never crosses. Under load the
+    // focus flight may not be over, so it can take more than one to get there.
+    for (let i = 0; i < 4; i += 1) {
+      await pinchOut(page, 40, 340)
+      await expect(detailView(page)).toHaveCount(0)
+      await page.waitForTimeout(500) // the zoom eases on (damping)
+      if ((await canvas.getAttribute('data-orrery-closest')) === 'naif:-96') break
+    }
+    await expect(canvas).toHaveAttribute('data-orrery-closest', 'naif:-96')
+    // A fresh pinch at the limit does.
+    await pinchOut(page, 60, 260)
+    await expect(detailView(page)).toHaveAttribute('data-detail-status', 'ready', {
+      timeout: 20_000,
+    })
+    await expect(page).toHaveURL(/detail=1/)
+  })
+
+  test('pinching out on a planet never flies in', async ({ page }) => {
+    await serve(page)
+    await page.goto('/orrery/#focus=Mars')
+    const canvas = page.locator('[data-orrery-page] canvas').first()
+    await expect(canvas).toHaveAttribute('data-orrery-focus', 'Mars', { timeout: 20_000 })
+    await page.waitForTimeout(1_500)
+    await pinchOut(page, 40, 340)
+    await pinchOut(page, 60, 260)
+    await expect(detailView(page)).toHaveCount(0)
+  })
+})
+
 test('a craft without DISCOS sizes keeps the studio close-up', async ({ page }) => {
   await open(page, '-31')
   expect(await detailCanvas(page).getAttribute('data-detail-metres-per-unit')).toBeNull()

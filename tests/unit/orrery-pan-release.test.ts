@@ -52,6 +52,69 @@ describe('PanTracker (#259)', () => {
     expect(t.released(PX)).toBe(false)
   })
 
+  // #264: OrbitControls handles each finger's move on its own, zooming in between, so the
+  // two half-pans of a still-midpoint pinch don't cancel and the target creeps one way.
+  it('judges a two-finger pinch by its midpoint, not by the creeping target', () => {
+    const t = new PanTracker()
+    const target = new Vector3(5, 0, 0)
+    t.begin(target)
+    t.touches({ x: 200, y: 300 })
+    for (let i = 0; i < 40; i += 1) {
+      target.x += 0.6 * PX
+      t.note(target)
+      t.touches({ x: 200, y: 300 })
+    }
+    expect(t.released(PX)).toBe(false)
+  })
+
+  it('lets go when two fingers slide together', () => {
+    const t = new PanTracker()
+    const target = new Vector3(5, 0, 0)
+    t.begin(target)
+    t.touches({ x: 200, y: 300 })
+    t.touches({ x: 200 + PAN_RELEASE_PX - 1, y: 300 })
+    expect(t.released(PX)).toBe(false)
+    t.touches({ x: 200 + PAN_RELEASE_PX + 1, y: 300 })
+    expect(t.released(PX)).toBe(true)
+  })
+
+  it('goes back to the target when a finger lifts and one finger carries on', () => {
+    const t = new PanTracker()
+    const target = new Vector3(5, 0, 0)
+    t.begin(target)
+    t.touches({ x: 200, y: 300 })
+    t.untouch()
+    // The controls re-start the gesture with one finger left.
+    t.begin(target)
+    target.x += (PAN_RELEASE_PX + 1) * PX
+    t.note(target)
+    expect(t.released(PX)).toBe(true)
+  })
+
+  it('measures a re-landed pinch from where it re-landed', () => {
+    const t = new PanTracker()
+    const target = new Vector3(5, 0, 0)
+    t.begin(target)
+    t.touches({ x: 200, y: 300 })
+    t.untouch()
+    t.begin(target)
+    t.touches({ x: 260, y: 300 })
+    t.touches({ x: 262, y: 300 })
+    expect(t.released(PX)).toBe(false)
+  })
+
+  it('goes back to the target after the gesture ends', () => {
+    const t = new PanTracker()
+    const target = new Vector3(5, 0, 0)
+    t.begin(target)
+    t.touches({ x: 200, y: 300 })
+    t.end()
+    t.begin(target)
+    target.x += (PAN_RELEASE_PX + 1) * PX
+    t.note(target)
+    expect(t.released(PX)).toBe(true)
+  })
+
   it('counts nothing outside a gesture, and a new gesture starts from zero', () => {
     const t = new PanTracker()
     const target = new Vector3(5, 0, 0)

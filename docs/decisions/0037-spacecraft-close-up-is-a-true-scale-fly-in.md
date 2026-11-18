@@ -90,3 +90,7 @@ The owner saw the probe "wink into existence" at the end of the flight: at its t
 ## Addendum 2026-11-17: zoom to enter
 
 The owner liked entering the fly-in by zooming past the orrery's closest zoom. A wheel or trackpad gesture that starts with the camera already at its closest zoom on the selected spacecraft, and pushes on, opens the same fly-in as Look closer. The gesture that carried the camera there never crosses, because a trackpad keeps sending its momentum for a second after the fingers lift, and the rest of a crossing gesture is swallowed so it can't cut the flight short. The hand-over is the same cut as Look closer, with the flight as the transition; there is no cross-fade, so the one-context rule (ADR 0021) is unchanged. A touch-screen pinch does not enter: it sends no wheel events. Zooming out to return is not built yet. Details: [reference/orrery.md](../reference/orrery.md).
+
+## Addendum 2026-11-18: a touch-screen pinch enters too
+
+The 2026-11-17 addendum said a touch-screen pinch does not enter. Now it does, by the same rule: a pinch that starts with the camera already at its closest zoom on the selected spacecraft, and spreads on, opens the fly-in; the pinch that carried the camera there never does. A pinch has a clear start and end, so it needs no timing. It depends on a pinch keeping the camera on the craft, which it did not before #264. Zooming out to return is still not built. Details: [reference/orrery.md](../reference/orrery.md).

@@ -146,7 +146,12 @@ the orrery writes its own voice line inside its chunk, from the planet math.
   `followShift.ts`). It listens to the controls' `change` event, not the frame loop: with
   damping off (reduced motion) the pointer handler applies the whole pan in its own
   `update()` before any frame, and a frame-loop check (the first try) never saw it. Net, so a
-  pinch's wobbling midpoint (touch is dolly plus pan) doesn't count; only between the
+  wobble that comes back doesn't count. **A two-finger touch is judged by the fingers'
+  midpoint in screen px instead (#264):** OrbitControls handles each finger's move on its own
+  and zooms in between, so the two half-pans of a still-midpoint pinch are computed at
+  different depths and don't cancel. Measured in Chromium, a symmetric 40→340 px pinch on
+  Parker crept the target 10 px and let go of the follow. The renderer tracks touch pointers
+  on the canvas in the capture phase, ahead of the controls. Only between the
   controls' `start` and `end`, so leftover damping can't release a focus chosen just after;
   the follow's own moves are excluded. The focus stays chosen and drawn; choosing it again or
   a preset follows again. e2e: `orrery-pan-focus.spec.ts` (damped and reduced motion).
@@ -463,9 +468,17 @@ A button in the inspector, for a spacecraft or satellite with a model, opens the
     camera (no longer following) never enters. The listener is in the capture phase, so it
     reads the camera before OrbitControls moves it. The gesture that reached the limit never
     crosses (trackpad momentum), and the rest of a crossing gesture is swallowed at the window
-    (`swallowWheelUntilQuiet`), so it can't cancel the flight. A touch-screen pinch sends no
-    wheel events and does not enter. Zooming out to return is not built.
-  - e2e: `orrery-fly-in.spec.ts`.
+    (`swallowWheelUntilQuiet`), so it can't cancel the flight. Zooming out to return is not
+    built.
+  - **A touch-screen pinch enters too** (`PinchGate`). A touch screen sends no wheel events,
+    so the page tracks touch pointers itself. A pinch has a clear start and end, so it needs
+    no timing: a pinch whose second finger lands while the camera is already at its closest
+    zoom on the selected, followed craft, and that spreads 120 px further (`PINCH_PUSH_PX`),
+    opens the fly-in. The pinch that carried the camera there never does. It relies on the
+    pinch keeping the follow (#264).
+  - e2e: `orrery-fly-in.spec.ts` (the touch tests drive two fingers through CDP
+    `Input.dispatchTouchEvent`, so Chromium only; they pinch above the inspector sheet, since
+    a pinch on the sheet zooms the page).
   - **A look in WebKit is needed for depth-buffer changes**, because `pnpm verify` draws only in
     headless Chromium.
 

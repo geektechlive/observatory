@@ -32,7 +32,7 @@ import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import { moonBodies } from '@/lib/orrery/moonState'
 import { reentryBrief, reentryElementRows } from '@/lib/orrery/reentryElements'
 import { isSatKey, reentryKey, satKey } from '@/lib/orrery/satView'
-import { swallowWheelUntilQuiet, wheelPx, ZoomGate } from '@/lib/orrery/zoomGate'
+import { PinchGate, swallowWheelUntilQuiet, wheelPx, ZoomGate } from '@/lib/orrery/zoomGate'
 import { reentriesWithin } from '@/lib/spaceTrackText'
 import { voiceFor, type VoiceInput } from '@/lib/voice'
 import type { OrreryMoon, OrreryTrack } from '@/schemas/orreryBodies'
@@ -454,23 +454,60 @@ export function OrreryPage() {
   useEffect(() => {
     const el = host.current
     if (!renderer || !el || detailOpen) return
-    const gate = new ZoomGate('in')
-    const onWheel = (e: WheelEvent) => {
+    // The selected craft, when the camera is at its closest to it and it has a model.
+    const readyCraft = (): SceneKey | null => {
       const key = renderer.closestCraft()
-      const ready =
-        key !== null &&
+      return key !== null &&
         key === selectedRef.current &&
         modelForKey(key, (k) => renderer.satellite(k) ?? null) !== undefined
-      if (!gate.feed(wheelPx(e), ready, e.timeStamp) || key === null) return
+        ? key
+        : null
+    }
+    const gate = new ZoomGate('in')
+    const onWheel = (e: WheelEvent) => {
+      const key = readyCraft()
+      if (!gate.feed(wheelPx(e), key !== null, e.timeStamp) || key === null) return
       openDetail(key)
       if (useOrreryView.getState().detail !== key) return
       e.preventDefault()
       e.stopPropagation()
       swallowWheelUntilQuiet(window)
     }
+    // A touch screen's pinch: spreading two fingers is zooming in.
+    const pinch = new PinchGate()
+    const touches = new Map<number, { x: number; y: number }>()
+    const spread = () => {
+      const [a, b] = [...touches.values()]
+      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+    }
+    const onTouchDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.size === 2) pinch.start(spread(), readyCraft() !== null)
+      else pinch.end()
+    }
+    const onTouchMove = (e: PointerEvent) => {
+      if (!touches.has(e.pointerId)) return
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.size !== 2) return
+      const key = readyCraft()
+      if (pinch.move(spread(), key !== null) && key !== null) openDetail(key)
+    }
+    const onTouchUp = (e: PointerEvent) => {
+      if (!touches.delete(e.pointerId)) return
+      pinch.end()
+    }
     el.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    el.addEventListener('pointerdown', onTouchDown, { capture: true })
+    el.addEventListener('pointermove', onTouchMove, { capture: true })
+    el.addEventListener('pointerup', onTouchUp, { capture: true })
+    el.addEventListener('pointercancel', onTouchUp, { capture: true })
     return () => {
       el.removeEventListener('wheel', onWheel, { capture: true })
+      el.removeEventListener('pointerdown', onTouchDown, { capture: true })
+      el.removeEventListener('pointermove', onTouchMove, { capture: true })
+      el.removeEventListener('pointerup', onTouchUp, { capture: true })
+      el.removeEventListener('pointercancel', onTouchUp, { capture: true })
     }
   }, [renderer, detailOpen])
 

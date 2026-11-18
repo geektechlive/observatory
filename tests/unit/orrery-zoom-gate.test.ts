@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   GESTURE_GAP_MS,
   NOTCH_WINDOW_MS,
+  PINCH_PUSH_PX,
+  PinchGate,
   PUSH_PX,
   swallowWheelUntilQuiet,
   wheelPx,
@@ -77,6 +79,64 @@ describe('ZoomGate', () => {
   it('starts over if the camera leaves the limit mid-gesture', () => {
     const gate = new ZoomGate('in')
     expect(gesture(gate, 0, 60, -20, (i) => i !== 10)).toBe(0)
+  })
+})
+
+/** Spread two fingers from `from` px apart by `step` px per move, `n` moves; the crossings. */
+function pinch(
+  gate: PinchGate,
+  from: number,
+  n: number,
+  step: number,
+  atLimit: boolean | ((i: number) => boolean),
+): number {
+  const limit = (i: number) => (typeof atLimit === 'function' ? atLimit(i) : atLimit)
+  gate.start(from, limit(-1))
+  let crossed = 0
+  for (let i = 0; i < n; i += 1) {
+    if (gate.move(from + (i + 1) * step, limit(i))) crossed += 1
+  }
+  gate.end()
+  return crossed
+}
+
+// A touch screen pinch has a clear start and end (fingers down and up), so the same rule as
+// the wheel needs no timing: only a pinch that starts at the limit can cross (#261).
+describe('PinchGate', () => {
+  it('crosses once when a pinch that starts at the limit spreads far enough', () => {
+    expect(pinch(new PinchGate(), 100, 40, 10, true)).toBe(1)
+  })
+
+  it('never crosses on the pinch that reached the limit', () => {
+    const gate = new PinchGate()
+    expect(pinch(gate, 100, 40, 10, (i) => i >= 2)).toBe(0)
+    expect(pinch(gate, 100, 40, 10, true)).toBe(1)
+  })
+
+  it('needs the full spread, not a twitch', () => {
+    const step = 10
+    expect(pinch(new PinchGate(), 100, PINCH_PUSH_PX / step - 1, step, true)).toBe(0)
+  })
+
+  it('ignores pinching in (zooming out)', () => {
+    expect(pinch(new PinchGate(), 400, 30, -10, true)).toBe(0)
+  })
+
+  it('takes back spread the fingers give up', () => {
+    const gate = new PinchGate()
+    gate.start(100, true)
+    expect(gate.move(100 + PINCH_PUSH_PX - 10, true)).toBe(false)
+    expect(gate.move(100, true)).toBe(false)
+    expect(gate.move(100 + PINCH_PUSH_PX - 10, true)).toBe(false)
+  })
+
+  it('starts over if the camera leaves the limit mid-pinch', () => {
+    expect(pinch(new PinchGate(), 100, 40, 10, (i) => i !== 5)).toBe(0)
+  })
+
+  it('does nothing between pinches', () => {
+    const gate = new PinchGate()
+    expect(gate.move(500, true)).toBe(false)
   })
 })
 
