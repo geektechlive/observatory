@@ -22,7 +22,10 @@ export function AboutPopover({ onClose }: AboutPopoverProps) {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      // Used: the orrery's Esc-to-deselect (#265) must not also take this press.
+      e.preventDefault()
+      onClose()
     }
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()

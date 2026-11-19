@@ -240,8 +240,9 @@ lives in `src/components/orrery/orreryLink.ts` (no three.js), and the hook in
 ## The guide (#159)
 
 It teaches by doing: a lazy drawer of lessons, a glossary, and "what's this?" terms in the
-inspector. A Guide button (in the rail, beside Controls on a phone, and out of the way while the
-phone sheet is open, since the sheet has its own, #208) and a first-visit "New
+inspector. A Guide button (in the rail, and on the stage at every width: top left on desktop, #266,
+beside Controls on a phone, and out of the way while the phone sheet is open, since the sheet
+has its own, #208) and a first-visit "New
 here?" chip open `guide/OrreryGuide.tsx`. Decision:
 [ADR 0014](../decisions/0014-the-guide-teaches-through-links.md).
 
@@ -416,7 +417,11 @@ A silhouette at a distance, a 3D model when focused.
   model full size.
 - **A selected craft's whole-mission path is drawn; no other craft's is** (`craftLayer.ts`
   `setTrajectory`). The selection lives in the address (`focus=`), so a reload keeps it; the
-  inspector's Close clears it, and a click on empty space does not (the pick acts only on a hit). Parker's loops are its 2018 to 2029 orbits shrinking at each
+  inspector's Close clears it, and so do a click or tap on empty space and Esc (#265,
+  `canvasClick.ts`). The camera keeps following the body it was on (the renderer's
+  `focusBody` is untouched) until a slide releases it, so a running clock doesn't carry the
+  body off screen. A drag, a two-finger gesture and a right or middle click are not clicks. Esc is left to the guide, the close-up, a text field or the Find box when they use it
+  (the guide marks it used with `preventDefault`). Parker's loops are its 2018 to 2029 orbits shrinking at each
   Venus flyby.
 - **The drawn Sun is wider than Parker's perihelion, and the inspector says so (#261).** In Big
   bodies the Sun's 0.22 units reach 0.156 au under `place3d`, and 0.069 au in Log distance;

@@ -40,6 +40,7 @@ import { simTimeAt, useOrreryClock } from '@/store/orreryClock'
 import { useOrreryView } from '@/store/orreryView'
 
 import consoleStyles from '../consoles/console.module.css'
+import { CanvasClick, escDeselects } from './canvasClick'
 import { buildCatalog, L1_KEY, noDataNotice } from './catalog'
 import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
@@ -175,8 +176,6 @@ function acquire(width: number, height: number, reducedMotion: boolean) {
 /** The view store's setters are stable: the page uses them like state setters. */
 const { setSelected, setScale, setPreset, openDetail, closeDetail } = useOrreryView.getState()
 
-/** A pointer that moves further than this between down and up was a drag, not a tap. */
-const DRAG_PX = 5
 const PAGE_REFRESH_MS = 1000
 /** Re-entry predictions are judged against the wall clock, a minute at a time (#101). */
 const REENTRY_REFRESH_MS = 60_000
@@ -941,28 +940,37 @@ export function OrreryPage() {
     [],
   )
 
-  // Tap or click a body on the canvas to select it. A drag (the camera turning) is not a
-  // pick. Keyboard users have the label buttons and the search box.
+  // Tap or click a body on the canvas to select it; tap or click empty space to deselect, as
+  // the inspector's Close does (#265): the camera stays where it is. A drag (the camera
+  // turning) and a two-finger gesture are neither. Keyboard users have the label buttons, the
+  // search box and Esc. A fresh tracker each time the close-up closes: a pinch that opened
+  // it lifted its fingers off a canvas no longer on the page.
   useEffect(() => {
     const el = host.current
-    if (!renderer || !el) return
-    let down: { x: number; y: number } | null = null
+    if (!renderer || !el || detailOpen) return
+    const click = new CanvasClick()
     const onDown = (e: PointerEvent) => {
-      down = { x: e.clientX, y: e.clientY }
+      click.down(e.pointerId, e.clientX, e.clientY, e.pointerType !== 'mouse' || e.button === 0)
     }
     const onUp = (e: PointerEvent) => {
-      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > DRAG_PX) return
+      if (!click.up(e.pointerId, e.clientX, e.clientY)) return
       const box = el.getBoundingClientRect()
       const hit = renderer.pick(e.clientX - box.left, e.clientY - box.top)
       if (hit) select(hit)
+      else if (useOrreryView.getState().selected !== null) setSelected(null)
+    }
+    const onCancel = (e: PointerEvent) => {
+      click.cancel(e.pointerId)
     }
     el.addEventListener('pointerdown', onDown)
     el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onCancel)
     return () => {
       el.removeEventListener('pointerdown', onDown)
       el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onCancel)
     }
-  }, [renderer, select])
+  }, [renderer, select, detailOpen])
 
   const onPreset = (p: FocusPreset) => {
     setPreset(p)
@@ -1036,6 +1044,32 @@ export function OrreryPage() {
   const stageGuideButton = useRef<HTMLButtonElement>(null)
   const guideFocus = useMemo(() => [railGuideButton, stageGuideButton], [])
   const guide = useGuide(applyLink, guideFocus)
+
+  // Esc deselects (#265) when nothing else uses it: the guide and the close-up take it to
+  // close themselves, and in a text field or the Find box it dismisses the suggestions.
+  const guideOpen = guide.mode !== 'closed'
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const t = e.target
+      const inField =
+        t instanceof HTMLElement && t.closest('input, textarea, select, [role="combobox"]') !== null
+      const state = {
+        key: e.key,
+        defaultPrevented: e.defaultPrevented,
+        inField,
+        selected: useOrreryView.getState().selected !== null,
+        guideOpen,
+        detailOpen,
+      }
+      if (!escDeselects(state)) return
+      e.preventDefault()
+      setSelected(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [guideOpen, detailOpen])
 
   // The labels move round the stage furniture, read each drawn frame: when it changes
   // with nothing else moving (the Controls sheet or the guide chip, paused), ask for a

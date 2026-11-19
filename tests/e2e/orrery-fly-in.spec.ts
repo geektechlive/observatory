@@ -211,20 +211,33 @@ test.describe('on a touch screen (390 x 844)', () => {
     const canvas = page.locator('[data-orrery-page] canvas').first()
     const box = await canvas.boundingBox()
     if (!box) throw new Error('no canvas')
-    // On a phone the inspector sheet covers the lower stage: pinch in the band above it.
+    // On a phone the inspector sheet covers the lower stage: pinch in the band above it, on a
+    // row where both fingers start clear of labels and buttons. Chrome's touch adjustment
+    // snaps a touch onto a button a few px away, and a label moves with the bodies.
     const cx = box.x + box.width / 2
-    const cy = box.y + 100
-    const at = (d: number) => [
-      { x: cx - d / 2, y: cy, id: 0 },
-      { x: cx + d / 2, y: cy, id: 1 },
-    ]
-    for (const p of at(from)) {
-      const onCanvas = await page.evaluate(
-        ([x, y]) => document.elementFromPoint(x ?? 0, y ?? 0)?.tagName === 'CANVAS',
-        [p.x, p.y],
+    const clear = (y: number) =>
+      page.evaluate(
+        ([x0, x1, yy]) =>
+          [x0, x1].every((x) =>
+            [-15, 0, 15].every((dx) =>
+              [-15, 0, 15].every(
+                (dy) =>
+                  document.elementFromPoint((x ?? 0) + dx, (yy ?? 0) + dy)?.tagName === 'CANVAS',
+              ),
+            ),
+          ),
+        [cx - from / 2, cx + from / 2, y],
       )
-      expect(onCanvas, `a finger at ${String(p.x)},${String(p.y)} lands on the canvas`).toBe(true)
+    let cy: number | null = null
+    for (let y = box.y + 60; y <= box.y + 260 && cy === null; y += 10) {
+      if (await clear(y)) cy = y
     }
+    expect(cy, 'a row on the stage where both fingers start on the canvas').not.toBeNull()
+    const row = cy ?? 0
+    const at = (d: number) => [
+      { x: cx - d / 2, y: row, id: 0 },
+      { x: cx + d / 2, y: row, id: 1 },
+    ]
     const cdp = await page.context().newCDPSession(page)
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from) })
     const steps = 20

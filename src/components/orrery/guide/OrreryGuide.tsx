@@ -163,6 +163,8 @@ export function OrreryGuide({
       const t = e.target
       if (t instanceof HTMLElement && t.closest('input, textarea, select, [role="combobox"]'))
         return
+      // Used: the page's Esc-to-deselect (#265) must not also take this press.
+      e.preventDefault()
       onClose()
     }
     document.addEventListener('keydown', onKey)

@@ -46,7 +46,9 @@ const canvas = (page: Page) => page.locator('canvas[data-orrery-webgl]')
 const hash = (page: Page) => page.evaluate(() => window.location.hash)
 const drawer = (page: Page) => page.getByRole('complementary', { name: 'Guide', exact: true })
 const bar = (page: Page) => page.getByRole('complementary', { name: 'Lesson on show' })
-const guideButton = (page: Page) => page.getByRole('button', { name: 'Guide', exact: true })
+/** The stage's Guide button; on desktop the rail has one too (#266). */
+const guideButton = (page: Page) =>
+  page.locator('section[aria-label="Orrery"]').getByRole('button', { name: 'Guide', exact: true })
 const preset = (page: Page, name: string) => page.getByRole('button', { name, exact: true }).first()
 
 async function openGuide(page: Page) {

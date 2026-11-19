@@ -323,7 +323,10 @@
    no-data note can both show at once). */
 .notices {
   position: absolute;
-  top: var(--space-4);
+
+  /* Below the stage's top-left buttons (Guide, and Controls on a phone, #266): their plates
+     are 28 px tall (.chipBtn) at the stage's 8 px edge. */
+  top: calc(var(--space-3) + 28px + var(--space-3));
   left: var(--space-4);
   display: flex;
   flex-direction: column;
@@ -915,9 +918,13 @@
   font-weight: 600;
 }
 
-/* The Guide button on the stage is for phones, where the rail is behind Controls (#159). */
+/* The stage's Guide button: on a phone the rail is behind Controls (#159); on desktop the
+   rail's Learn > Guide scrolls away, so the stage keeps one in reach (#266). */
 .guideToggle {
-  display: none;
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 3;
 }
 
 /* A lesson on show collapses the guide to a bar; the inspector opens below it. */
@@ -928,11 +935,7 @@
 
 @media (width <= 899px) {
   .guideToggle {
-    display: inline-flex;
-    position: absolute;
-    top: var(--space-3);
     left: 108px;
-    z-index: 3;
   }
 
   /* The open sheet's "Close controls" is wider than "Controls" and would cover this button

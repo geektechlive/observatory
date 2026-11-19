@@ -36,7 +36,7 @@ export const SECTIONS: readonly Section[] = [
           'Mouse: drag to turn the view, scroll to zoom, and drag with the right button to slide it sideways.',
           'Touch: drag with one finger to turn, pinch to zoom, and drag with two fingers to slide.',
           'Keyboard: Tab moves between the labels on the stage and the controls, and Enter picks one. On the time slider the arrow keys step a day, and Shift with an arrow steps a week. Space plays and pauses the clock.',
-          'Click or tap a body, craft or label to open its inspector and fly the camera there. The camera then follows it as the clock runs, until you slide the view; choose it again to follow it again. Esc closes this guide, or the close-up of a model when one is open.',
+          'Click or tap a body, craft or label to open its inspector and fly the camera there. The camera then follows it as the clock runs, until you slide the view; choose it again to follow it again. Click or tap empty space, or press Esc, to deselect; the camera stays with it until you slide the view. Esc closes this guide first, or the close-up of a model when one is open.',
           'To fly in to a spacecraft, select it and zoom in until the camera stops getting closer. Then pause, and zoom in again: scroll, pinch on a trackpad, or pinch on a touch screen. Its Look closer button does the same.',
         ],
       },
