@@ -19,6 +19,7 @@ import {
   earthFrameRadius,
   GEO_RADII,
   l1TransitMinutes,
+  trueMinDistance,
 } from '@/lib/orrery/earthFrame'
 import { AU_KM, LD_KM } from '@/lib/orrery/units'
 
@@ -145,5 +146,24 @@ describe('camera near plane (#197)', () => {
     const gap = cameraMinDistance(0) - EARTH_FRAME_UNIT
     expect(CAMERA_NEAR).toBe(0.01)
     expect(gap).toBeGreaterThan(CAMERA_NEAR * 1.2)
+  })
+})
+
+describe('trueMinDistance: Proportional comes in to true size (#271)', () => {
+  // Proportional's Earth: 6,371 km at 10 scene units per au.
+  const earthR = (6371 / AU_KM) * 10
+
+  it('lets the camera to 2.5 true radii of the body it looks at, inside GEO', () => {
+    const min = trueMinDistance([{ distance: 0, radius: earthR }])
+    expect(min).toBeCloseTo(2.5 * earthR, 12)
+    expect((min / 10) * AU_KM).toBeLessThan(42_164)
+  })
+
+  it('takes the nearest body the target is at, and the general limit away from them all', () => {
+    const big = { distance: 0.001, radius: 0.0005 }
+    const small = { distance: 0, radius: earthR }
+    expect(trueMinDistance([big, small])).toBeCloseTo(2.5 * earthR, 12)
+    expect(trueMinDistance([{ distance: 1, radius: earthR }])).toBe(0.5)
+    expect(trueMinDistance([])).toBe(0.5)
   })
 })

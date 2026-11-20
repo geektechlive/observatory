@@ -992,6 +992,13 @@
   z-index: 5;
 }
 
+/* The fly-in (#268) happens in the orrery itself: the rail and the time bar stay, and only the
+   stage's own buttons step aside for the fly-in's Back and zoom (FlyInOverlay). */
+.stage[data-detail='fly-in'] .sheetToggle,
+.stage[data-detail='fly-in'] .guideToggle {
+  visibility: hidden;
+}
+
 .detailLoading {
   position: absolute;
   inset: 0;
@@ -1010,26 +1017,30 @@
    40% of the stage, scrolling inside, and folding gives the room back. The page measures the
    sheet, so the view's bands follow. Display none keeps the folded facts out of the tab order. */
 @media (width <= 899px) {
-  .stage[data-detail='open'] .inspector {
+  .stage:is([data-detail='open'], [data-detail='fly-in']) .inspector {
     max-height: 40%;
   }
 
-  .stage[data-detail='open'] .inspector .factsToggle {
+  .stage:is([data-detail='open'], [data-detail='fly-in']) .inspector .factsToggle {
     display: inline-flex;
   }
 
-  .stage[data-detail='open'] .inspector[data-facts='collapsed'] {
+  .stage:is([data-detail='open'], [data-detail='fly-in']) .inspector[data-facts='collapsed'] {
     max-height: none;
     overflow: hidden;
     padding-block: var(--space-2);
   }
 
   /* A long name wraps to two lines here: a smaller size keeps the row short. */
-  .stage[data-detail='open'] .inspector[data-facts='collapsed'] .inspectorTitle {
+  .stage:is([data-detail='open'], [data-detail='fly-in'])
+    .inspector[data-facts='collapsed']
+    .inspectorTitle {
     font-size: var(--text-base);
   }
 
-  .stage[data-detail='open'] .inspector[data-facts='collapsed'] .inspectorBody {
+  .stage:is([data-detail='open'], [data-detail='fly-in'])
+    .inspector[data-facts='collapsed']
+    .inspectorBody {
     display: none;
   }
 }

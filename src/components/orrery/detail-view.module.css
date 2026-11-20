@@ -40,45 +40,6 @@
   height: 100%;
 }
 
-/* The fly-in's target bracket (#261): four corner marks round the craft at the canvas's
-   centre, sized and faded by the scene each frame, with the range under it. Cyan: it is
-   telemetry. It lies over the canvas, which the camera always centres on the craft, and
-   never takes a pointer. */
-.flightTarget {
-  --target-size: 22px;
-  --corner: 6px;
-
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: var(--target-size);
-  height: var(--target-size);
-  opacity: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(var(--cyan), var(--cyan)) top left / var(--corner) 1px no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) top left / 1px var(--corner) no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) top right / var(--corner) 1px no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) top right / 1px var(--corner) no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) bottom left / var(--corner) 1px no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) bottom left / 1px var(--corner) no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) bottom right / var(--corner) 1px no-repeat,
-    linear-gradient(var(--cyan), var(--cyan)) bottom right / 1px var(--corner) no-repeat;
-}
-
-.flightRange {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font: 500 var(--text-xs) / 1 var(--font-mono);
-  letter-spacing: 0.04em;
-  color: var(--cyan);
-}
-
 .detailTitle {
   flex: 1 1 auto;
   min-width: 0;

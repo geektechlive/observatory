@@ -1,0 +1,124 @@
+/* The fly-in's controls over the orrery's stage (#268). The orrery draws the flight itself,
+   so this layer passes pointer events through to it except on its own controls and links. */
+.flyIn {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.flyIn:focus-visible {
+  outline: 2px solid var(--copper-glow);
+  outline-offset: -2px;
+}
+
+.flyBar {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  pointer-events: auto;
+}
+
+/* The camera ship's bracket, on the craft wherever the camera has it (the inspector shifts
+   the picture off centre). The renderer passes the position each frame. */
+.flyTarget {
+  --target-size: 22px;
+  --target-x: 50%;
+  --target-y: 50%;
+  --corner: 6px;
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--target-size);
+  height: var(--target-size);
+  transform: translate(var(--target-x), var(--target-y)) translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--cyan), var(--cyan)) top left / var(--corner) 1px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) top left / 1px var(--corner) no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) top right / var(--corner) 1px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) top right / 1px var(--corner) no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) bottom left / var(--corner) 1px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) bottom left / 1px var(--corner) no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) bottom right / var(--corner) 1px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) bottom right / 1px var(--corner) no-repeat;
+}
+
+.flyRange {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+
+/* Above the time bar, clear of the inspector on the right. */
+.flyCredit {
+  position: absolute;
+  left: var(--space-2);
+  right: calc(var(--inspector-right, 0px) + var(--space-4));
+  bottom: 96px;
+  max-width: 72ch;
+  border-radius: var(--radius);
+  background: var(--scrim);
+  pointer-events: auto;
+}
+
+/* Closed, it is only its link: as wide as the words, not the stage. */
+.flyCredit:not([open]) {
+  right: auto;
+  padding-block: var(--space-2);
+}
+
+.flyCredit[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.flyCreditToggle {
+  cursor: pointer;
+  color: var(--bone-dim);
+  text-decoration: underline;
+}
+
+.flyCreditToggle:hover {
+  color: var(--bone);
+}
+
+.flyCreditToggle:focus-visible {
+  outline: 2px solid var(--copper-glow);
+  outline-offset: 2px;
+}
+
+/* A stand-in model's note stays in view, above the credits' link. */
+.flyNote {
+  position: absolute;
+  left: var(--space-2);
+  bottom: calc(96px + 40px);
+  max-width: 60ch;
+  margin: 0;
+  border-radius: var(--radius);
+  background: var(--scrim);
+}
+
+/* On a phone the sheet covers the bottom: the credit goes under the bar at the top, and the
+   note under the credit's link. */
+@media (width <= 899px) {
+  .flyCredit {
+    top: calc(var(--space-3) + 40px);
+    right: var(--space-2);
+    bottom: auto;
+  }
+
+  .flyNote {
+    top: calc(var(--space-3) + 80px);
+    right: var(--space-2);
+    bottom: auto;
+  }
+}

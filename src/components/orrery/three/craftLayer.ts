@@ -117,7 +117,13 @@ export class CraftLayer {
   private modelKey: string | null = null
   private dsnIds: ReadonlySet<string> = new Set()
   private trajectoryKey: string | null = null
-  private trajectory: { past: Line; future: Line; jds: number[] } | null = null
+  private trajectory: {
+    past: Line
+    future: Line
+    jds: number[]
+    /** The path's points, au, kept so the fly-in's ease can re-place them each frame. */
+    points: readonly Vec3[]
+  } | null = null
 
   private readonly toScene: (pos: Vec3) => Vector3
 
@@ -345,6 +351,31 @@ export class CraftLayer {
     this.rebuildTrajectory()
   }
 
+  /**
+   * Move the drawn trajectory to the current scale in place: the fly-in's ease calls this
+   * each frame (#268), so it rewrites the two lines' points rather than making new ones.
+   * With nothing drawn yet, a full rebuild.
+   */
+  retraceTrajectory(): void {
+    const t = this.trajectory
+    if (!t) {
+      this.rebuildTrajectory()
+      return
+    }
+    const past = t.past.geometry.getAttribute('position') as Float32BufferAttribute
+    const future = t.future.geometry.getAttribute('position') as Float32BufferAttribute
+    t.points.forEach((p, i) => {
+      const v = this.toScene(p)
+      past.setXYZ(i, v.x, v.y, v.z)
+      future.setXYZ(i, v.x, v.y, v.z)
+    })
+    past.needsUpdate = true
+    future.needsUpdate = true
+    t.past.geometry.computeBoundingSphere()
+    t.future.geometry.computeBoundingSphere()
+    t.future.computeLineDistances()
+  }
+
   /** Re-place the trajectory through the current scale (call on a scale-mode change). */
   rebuildTrajectory(): void {
     this.disposeTrajectory()
@@ -380,7 +411,7 @@ export class CraftLayer {
     past.name = 'trajectory-past'
     future.name = 'trajectory-future'
     this.paths.add(past, future)
-    this.trajectory = { past, future, jds: points.map((p) => p.jd) }
+    this.trajectory = { past, future, jds: points.map((p) => p.jd), points }
   }
 
   /** Split the path at the sim date: solid behind it, dashed ahead. */

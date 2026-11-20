@@ -34,7 +34,10 @@ export const BUDGETS = {
   // chunk of its own it split the first load (#162). vite.config.ts now pins everything the
   // entry imports statically into two chunks, so it is its own chunk again. With it out,
   // OrreryPage measured 34.7 kB and OrreryRenderer 24.4 kB (2026-11-08); 38 kB leaves room.
-  orreryGzip: 38_000,
+  // #268 moved the spacecraft fly-in into the orrery: OrreryPage 37.7 to 38.7 kB, and
+  // OrreryRenderer 26.4 to 36.3 kB, mostly the stars and the close-up's framing maths moved
+  // in from the DetailView chunk (now 3.2 kB). 42 kB leaves room.
+  orreryGzip: 42_000,
   satBrowserGzip: 6_000,
   textureBytes: 1_500_000,
   // #105 measured the orrery's planet maps and ring strip at 486 kB together (Earth reuses

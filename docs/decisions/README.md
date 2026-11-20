@@ -45,3 +45,4 @@ that makes the decision.
 | [0035](0035-close-passes-get-ten-minute-samples.md)           | Close passes get 10-minute samples, found from the daily samples themselves               | #230           |
 | [0036](0036-views-are-paths.md)                               | Views are paths (`/orrery/`, …); a view’s own state stays in the hash                     | #232           |
 | [0037](0037-spacecraft-close-up-is-a-true-scale-fly-in.md)    | A spacecraft's close-up is a true-scale fly-in; the orrery keeps exaggerated sizes        | #260, #261     |
+| [0038](0038-the-fly-in-happens-in-the-orrery.md)              | The fly-in happens in the orrery itself: an ease to true scale, then one flight           | #268           |

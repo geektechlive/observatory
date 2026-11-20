@@ -18,6 +18,7 @@ import {
   satPointStrength,
   satScenePosition,
   temeToScene,
+  trueScaleOpenness,
 } from '@/lib/orrery/satView'
 
 const JD_J2000 = 2_451_545
@@ -225,5 +226,14 @@ describe('satHazePx (#139): the haze grain scales with the stage', () => {
       last = s
     }
     expect(satHazePx(Number.NaN)).toBe(7)
+  })
+})
+
+describe('trueScaleOpenness: satellites in Proportional (#271)', () => {
+  it('is open within the distance the satellites can show at, closed beyond', () => {
+    expect(trueScaleOpenness(10)).toBe(1)
+    expect(trueScaleOpenness(SAT_DISTANCE.hidden)).toBe(1)
+    expect(trueScaleOpenness(SAT_DISTANCE.hidden * 1.01)).toBe(0)
+    expect(trueScaleOpenness(Number.NaN)).toBe(0)
   })
 })

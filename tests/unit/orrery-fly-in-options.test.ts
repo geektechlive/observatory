@@ -1,7 +1,7 @@
 /**
  * The fly-in's settings from the page's data (#261): a craft with a model and ESA DISCOS
  * dimensions gets the true-scale view; its scene unit is half its body's largest real size;
- * it flies in from the side the visitor was looking from; its model faces its attitude.
+ * it carries the model's axis and its surroundings.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -53,7 +53,6 @@ const base = {
   tracks: [track('-96', [0.046, 0, 0])],
   moons: [],
   discos,
-  viewFrom: { x: 0, y: 1, z: 0 },
   jdNow: () => JD,
 }
 
@@ -63,17 +62,12 @@ describe('flyInOptions (#261)', () => {
     expect(o?.size).toEqual({ bodyM: 3, spanM: 3 })
   })
 
-  it('flies in from where the visitor was looking: scene up is ecliptic north', () => {
+  it('carries the model’s axis and Parker’s surroundings at the clock’s date', () => {
     const o = flyInOptions({ ...base, key: 'naif:-96' })
-    expect(o?.approach).toEqual([0, -0, 1])
-  })
-
-  it('turns Parker’s heat shield (its axis) toward the Sun', () => {
-    const o = flyInOptions({ ...base, key: 'naif:-96' })
+    expect(o?.axis).toHaveLength(3)
     const s = o?.surroundings()
-    expect(s).not.toBeNull()
-    const facing = s && o?.facing(s)
-    expect(facing?.[0]).toBeCloseTo(-1, 9)
+    expect(s?.jd).toBe(JD)
+    expect(s?.bodies.find((b) => b.name === 'Sun')?.relKm[0]).toBeLessThan(0)
   })
 
   it('gives no fly-in to a satellite, a craft without DISCOS sizes, or one without a model', () => {

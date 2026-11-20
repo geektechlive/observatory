@@ -56,3 +56,7 @@ preload map names one more lazy chunk, the shared GLB loader. One effect on the 
   check and the abort-on-close check.
 - `scripts/check-bundle.mjs`: `detailViewGzip` and the `*-detail-*` rules.
 - ADR 0020 and `docs/reference/satellite-models.md` for the models themselves.
+
+## Addendum 2026-11-20: the spacecraft fly-in moved into the orrery
+
+The fly-in (ADR 0037) now happens in the orrery itself, on its own canvas: ADR 0038. That gives `OrreryRenderer` the close-up mode this ADR kept out of it, built as this ADR's exit names: a driver outside the renderer (`flyInDriver.ts`), and a second pass for the model in a scene of its own (`nearPass.ts`). The studio close-up for satellites and for craft without DISCOS sizes keeps its own canvas, as decided here.

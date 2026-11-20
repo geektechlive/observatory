@@ -71,6 +71,17 @@ export interface DrawnParent {
   inView?: boolean
 }
 
+/** The fly-in's true scale for moons (#268). */
+export interface MoonTruth {
+  /** Scene units per au and per km at true scale. */
+  readonly unitsPerAu: number
+  readonly unitsPerKm: number
+  /** A moon's true radius, km, or undefined when unknown (it is then not drawn). */
+  readonly radiusKm: (body: MoonBody) => number | undefined
+  /** How far the ease has gone from the orrery's placement to the true one, 0 to 1. */
+  readonly share: number
+}
+
 export interface MoonMarker {
   key: string
   label: string
@@ -174,12 +185,21 @@ export class MoonLayer {
     entry.line.geometry.computeBoundingSphere()
   }
 
-  /** Place every moon for a date around its planet as drawn now. */
+  /**
+   * Place every moon for a date around its planet as drawn now. With `truth` (the fly-in,
+   * #268) every moon with data is at its true place and size around its planet's true place,
+   * whatever its planet's size on screen, and the loops are not drawn.
+   */
   place(
     jd: number,
     parentOf: (name: PlanetName) => DrawnParent | null,
     focus: string | null,
+    truth?: MoonTruth,
   ): void {
+    if (truth && truth.share > 0) {
+      this.placeTrue(jd, parentOf, truth, focus)
+      return
+    }
     for (const entry of this.entries.values()) {
       const { body, mesh, line } = entry
       const parent = parentOf(body.parent)
@@ -200,6 +220,51 @@ export class MoonLayer {
       line.visible = entry.orbitKind !== null
       line.position.copy(parent.position)
       line.scale.setScalar(r)
+    }
+  }
+
+  private placeTrue(
+    jd: number,
+    parentOf: (name: PlanetName) => DrawnParent | null,
+    truth: MoonTruth,
+    focus: string | null,
+  ): void {
+    const s = truth.share
+    for (const { body, mesh, line } of this.entries.values()) {
+      line.visible = false
+      const parent = parentOf(body.parent)
+      const state = parent ? moonRelative(body, jd) : null
+      const radiusKm = truth.radiusKm(body)
+      // At true scale every moon with data shows; on the way there, as the orrery shows them.
+      const shown =
+        s >= 1 ||
+        (parent !== null && moonsShown(body.parent, focus, parent.radiusPx, parent.inView ?? true))
+      mesh.visible = shown && parent !== null && state !== null && radiusKm !== undefined
+      if (!mesh.visible || !parent || !state || radiusKm === undefined) continue
+      // Ecliptic au to scene (x, z, -y), at the scene's true units per au.
+      const k = truth.unitsPerAu
+      const p = state.position
+      const trueAt = {
+        x: parent.position.x + p.x * k,
+        y: parent.position.y + p.z * k,
+        z: parent.position.z - p.y * k,
+      }
+      const trueRadius = radiusKm * truth.unitsPerKm
+      if (s >= 1) {
+        mesh.position.set(trueAt.x, trueAt.y, trueAt.z)
+        mesh.scale.setScalar(trueRadius)
+        continue
+      }
+      // The fly-in's ease (#268): part way from the orrery's placement to the true one.
+      const r = parent.radius * moonClearance(body.parent)
+      const from = placementFor(body.parent)(parent.position, p, r)
+      const fromRadius = parent.radius * MOON_SHARE
+      mesh.position.set(
+        from.x + (trueAt.x - from.x) * s,
+        from.y + (trueAt.y - from.y) * s,
+        from.z + (trueAt.z - from.z) * s,
+      )
+      mesh.scale.setScalar(fromRadius ** (1 - s) * trueRadius ** s)
     }
   }
 

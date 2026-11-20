@@ -94,3 +94,24 @@ The owner liked entering the fly-in by zooming past the orrery's closest zoom. A
 ## Addendum 2026-11-18: a touch-screen pinch enters too
 
 The 2026-11-17 addendum said a touch-screen pinch does not enter. Now it does, by the same rule: a pinch that starts with the camera already at its closest zoom on the selected spacecraft, and spreads on, opens the fly-in; the pinch that carried the camera there never does. A pinch has a clear start and end, so it needs no timing. It depends on a pinch keeping the camera on the craft, which it did not before #264. Zooming out to return is still not built. Details: [reference/orrery.md](../reference/orrery.md).
+
+## Addendum 2026-11-18: a single engine is possible; the "Ruled out" line overstated it
+
+The owner asked for the fly-in inside the orrery view, and whether one engine really cannot do it. An adversarial review (Fable and Codex) and a look at NASA Eyes on the Solar System (2026-11-18) found:
+
+- **"True scale in the orrery itself: nothing would be visible at the overview" is wrong as written.** Proportional mode already draws true distances and true radii, with each body held at a minimum on-screen size (`OrreryRenderer.ts` `toScene` and `radiusOf`, `bodyMinPx.ts`). Eyes on the Solar System does the same and flies from the overview to a true-size spacecraft model on one three.js canvas, with camera-relative positions and its own linear-then-log depth (its shipped `app.js`, read 2026-11-18). What has no continuous path to true scale is the default Big bodies mode (and Log distance): it places bodies on a log scale and draws the Sun about 33 times too big.
+- **"A close-up mode in `OrreryRenderer`" was ruled out on cost and regression risk, not feasibility** (ADR 0021 says the same and names its own exit). three.js multiplies view and model matrices in double precision before upload, so true km near a 3 m craft is not a precision blocker; the real costs are the log placement, the depth range and the Earth sub-frame.
+
+The decision on how the fly-in joins the orrery was open (#268). Details: [reference/orrery.md](../reference/orrery.md).
+
+## Addendum 2026-11-20: the fly-in moved into the orrery (ADR 0038)
+
+The owner chose to have the fly-in happen in the orrery itself: an ease to true scale, then one continuous flight, on the orrery's own canvas. ADR 0038 records it. What this ADR decided about the fly-in itself still holds:
+
+- true size from DISCOS;
+- the framing side;
+- the target bracket and range;
+- a 4 s flight;
+- a cut with reduced motion.
+
+The orrery's overview still keeps its exaggerated sizes until a fly-in begins. The separate close-up remains for satellites and for craft without DISCOS sizes.

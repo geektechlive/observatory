@@ -1,8 +1,10 @@
 /**
- * The fly-in (#261): with ESA DISCOS sizes for a craft, its close-up is true to life. The model
- * is scaled to its real size, and the camera flies in from about 1,000,000 km to arrival in
- * about four seconds, or cuts straight there with reduced motion. Without DISCOS sizes the
- * close-up stays the studio "Look closer". /api/orrery-bodies and /api/discos are mocked.
+ * The fly-in (#261, #268): with ESA DISCOS sizes for a craft, "Look closer" happens in the
+ * orrery itself. It eases to true scale, then flies in to the model at its real size, on the
+ * orrery's own canvas with the rail still there, and Back, Escape or a push out at the wall
+ * flies back out to the scale and view the visitor had. Reduced motion cuts. Without DISCOS
+ * sizes the close-up stays the studio "Look closer". /api/orrery-bodies and /api/discos are
+ * mocked.
  */
 import { expect, type Page, test } from '@playwright/test'
 
@@ -94,68 +96,146 @@ async function serve(page: Page) {
   )
 }
 
-const detailView = (page: Page) => page.locator('[data-detail-view]')
-const detailCanvas = (page: Page) => page.locator('canvas[data-detail-canvas]')
-/** The camera's distance from the craft, scene units. */
-const distance = async (page: Page) =>
-  Number(((await detailCanvas(page).getAttribute('data-detail-camera')) ?? ',,NaN').split(',')[2])
+const orrery = (page: Page) => page.locator('canvas[data-orrery-webgl]')
+const overlay = (page: Page) => page.locator('[data-fly-in]')
+const studio = (page: Page) => page.locator('[data-detail-view]')
+/** The fly-in's phase on the orrery's canvas: '', waiting, enter, arrived or leave. */
+const phase = async (page: Page) => (await orrery(page).getAttribute('data-orrery-fly')) ?? ''
+/** The camera's range to the craft in the fly-in, km. */
+const rangeKm = async (page: Page) =>
+  Number((await orrery(page).getAttribute('data-orrery-fly-km')) || Number.NaN)
 
 async function open(page: Page, naif: string) {
   await serve(page)
   await page.goto(`/orrery/#focus=naif:${naif}&detail=1`)
-  await expect(detailView(page)).toHaveAttribute('data-detail-status', 'ready', {
-    timeout: 20_000,
-  })
+  await expect(overlay(page)).toBeVisible({ timeout: 20_000 })
 }
 
-test('Parker flies in from far out to arrival, at its real size', async ({ page }) => {
+test('Parker flies in inside the orrery, on its one canvas, to its real size', async ({ page }) => {
   await open(page, '-96')
-  // A 3 m body and a 3 m span: the body is scaled, one unit (its robust radius) = 1.5 m.
-  await expect(detailCanvas(page)).toHaveAttribute('data-detail-metres-per-unit', '1.5000')
-  // Early in the flight the camera is still thousands of km out.
-  expect(await distance(page)).toBeGreaterThan(1_000)
-  // About four seconds later it has arrived, a few model lengths away.
-  await expect.poll(() => distance(page), { timeout: 8_000 }).toBeLessThan(20)
+  // No second canvas: the orrery draws the fly-in, and the rail stays.
+  await expect(page.locator('canvas[data-detail-canvas]')).toHaveCount(0)
+  await expect(page.locator('[data-orrery-page] [class*="rail"]').first()).toBeVisible()
+  await expect(page.locator('[data-fly-badge]')).toHaveText('TRUE SCALE')
+  // A 3 m body and a 3 m span: the body is scaled, a robust radius of 1.5 m.
+  await expect(orrery(page)).toHaveAttribute('data-orrery-fly-model-m', '1.5000', {
+    timeout: 10_000,
+  })
+  // Early on the camera is still far out.
+  await expect.poll(() => rangeKm(page), { timeout: 5_000 }).toBeGreaterThan(1_000)
+  // About five seconds later it has arrived, a few hundred metres off.
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('arrived')
+  expect(await rangeKm(page)).toBeLessThan(2)
+  await expect(orrery(page)).toHaveAttribute('data-orrery-fly-true', '1.00')
 })
 
-test('a target bracket and range mark the craft while it is too small to see (#261)', async ({
+/** The direction from the camera's target to the camera (data-orrery-camera's offset). */
+const viewDir = async (page: Page) => {
+  const [x = 0, y = 0, z = 0] = ((await orrery(page).getAttribute('data-orrery-camera')) ?? '')
+    .split(',')
+    .map(Number)
+  const n = Math.hypot(x, y, z)
+  return [x / n, y / n, z / n] as const
+}
+const angleDeg = (a: readonly number[], b: readonly number[]) =>
+  (Math.acos(
+    Math.min(1, (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0)),
+  ) *
+    180) /
+  Math.PI
+
+test('it keeps the visitor’s angle: straight in and straight back out, no swing', async ({
   page,
 }) => {
+  await serve(page)
+  await page.goto('/orrery/#focus=naif:-96')
+  await expect(orrery(page)).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
+  await page.waitForTimeout(1_500) // the focus flight
+  const before = await viewDir(page)
+  await page.getByRole('button', { name: 'Look closer' }).click()
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('arrived')
+  expect(angleDeg(before, await viewDir(page))).toBeLessThan(1)
+  await page.keyboard.press('Escape')
+  await expect.poll(() => phase(page), { timeout: 8_000 }).toBe('')
+  expect(angleDeg(before, await viewDir(page))).toBeLessThan(1)
+})
+
+test('a target bracket and range mark the craft while it is too small to see', async ({ page }) => {
   await open(page, '-96')
-  const target = page.locator('[data-detail-target]')
-  // Far out the craft is under a pixel: the bracket is at full strength with a km range.
-  await expect(target).toHaveCSS('opacity', '1')
+  const target = page.locator('[data-fly-target]')
+  await expect.poll(() => phase(page), { timeout: 5_000 }).toBe('enter')
+  // Far out the craft is under a pixel: the bracket at full strength with a km range.
+  await expect(target).toHaveCSS('opacity', '1', { timeout: 5_000 })
   await expect(target).toContainText(/km$/)
   // At arrival the model fills the view and the bracket has faded out.
-  await expect.poll(() => distance(page), { timeout: 8_000 }).toBeLessThan(20)
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('arrived')
   await expect(target).toHaveCSS('opacity', '0')
-  expect(Number(await target.getAttribute('data-detail-target-radius'))).toBeGreaterThan(40)
+  expect(Number(await target.getAttribute('data-fly-target-radius'))).toBeGreaterThan(40)
 })
 
-test('with reduced motion there is no flight: the camera starts at arrival', async ({ page }) => {
+test('with reduced motion there is no flight: the camera is at arrival at once', async ({
+  page,
+}) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await open(page, '-96')
-  await expect.poll(() => distance(page), { timeout: 2_000 }).toBeLessThan(20)
+  await expect.poll(() => phase(page), { timeout: 3_000 }).toBe('arrived')
+  expect(await rangeKm(page)).toBeLessThan(2)
 })
 
-test('opening and closing the fly-in leaves nothing on the GPU', async ({ page }) => {
+test('Escape flies back out to the scale and view the visitor had', async ({ page }) => {
+  await serve(page)
+  await page.goto('/orrery/#focus=naif:-96')
+  await expect(orrery(page)).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
+  await page.waitForTimeout(1_500) // the focus flight
+  const before = await orrery(page).getAttribute('data-orrery-sizes')
+  await page.getByRole('button', { name: 'Look closer' }).click()
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('arrived')
+  await page.keyboard.press('Escape')
+  await expect(overlay(page)).toHaveCount(0)
+  await expect.poll(() => phase(page), { timeout: 8_000 }).toBe('')
+  await expect(page.locator('[data-orrery-page] p[data-label-obstacle]').first()).toHaveText(
+    'NOT TO SCALE',
+  )
+  // Back at Big bodies, from where it was: the bodies draw as large as before.
+  await expect.poll(() => orrery(page).getAttribute('data-orrery-sizes')).toBe(before)
+  await expect(page.getByRole('button', { name: 'Look closer' })).toBeFocused()
+  await expect(page).not.toHaveURL(/detail=1/)
+})
+
+test('flying in and back three times leaves nothing more on the GPU', async ({ page }) => {
   test.setTimeout(90_000)
-  await open(page, '-96')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await serve(page)
+  await page.goto('/orrery/#focus=naif:-96')
+  await expect(orrery(page)).toHaveAttribute('data-orrery-model', 'model:-96', { timeout: 20_000 })
+  const look = page.getByRole('button', { name: 'Look closer' })
+  const counts = async () =>
+    [
+      await orrery(page).getAttribute('data-orrery-geometries'),
+      await orrery(page).getAttribute('data-orrery-textures'),
+    ].join(',')
+  // One round first: the stars and the sky's maps load on the first fly-in and then stay.
+  await look.click()
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('arrived')
+  await overlay(page).getByRole('button', { name: 'Back to orrery' }).click()
+  await expect.poll(() => phase(page), { timeout: 8_000 }).toBe('')
+  const settled = await counts()
   for (let i = 0; i < 3; i += 1) {
-    if (i > 0) {
-      await page.getByRole('button', { name: 'Look closer' }).click()
-      await expect(detailView(page)).toHaveAttribute('data-detail-status', 'ready', {
-        timeout: 20_000,
-      })
-    }
-    // The sky is on the GPU too while the view is open.
-    await expect(detailCanvas(page)).toHaveAttribute('data-detail-metres-per-unit', '1.5000')
-    await detailView(page).getByRole('button', { name: 'Back to orrery' }).click()
-    await expect(detailView(page)).toHaveCount(0)
+    await look.click()
+    await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('arrived')
+    await overlay(page).getByRole('button', { name: 'Back to orrery' }).click()
+    await expect.poll(() => phase(page), { timeout: 8_000 }).toBe('')
   }
-  const root = page.locator('[data-orrery-page]')
-  await expect(root).toHaveAttribute('data-orrery-detail-leaked', '0')
-  await expect(root).toHaveAttribute('data-orrery-detail-scenes', '0')
+  await expect.poll(counts).toBe(settled)
+})
+
+test('a preset during the fly-in ends it and closes the close-up', async ({ page }) => {
+  await open(page, '-96')
+  await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe('waiting')
+  await page.getByRole('button', { name: 'Inner', exact: true }).click()
+  await expect(overlay(page)).toHaveCount(0)
+  expect(await phase(page)).toBe('')
+  await expect(page).not.toHaveURL(/detail=1/)
 })
 
 /** One wheel gesture: `n` events of `dy` px, 16 ms apart, then the gesture gap. */
@@ -170,37 +250,50 @@ async function wheelGesture(page: Page, n: number, dy: number) {
 test('zooming in past the closest zoom on a craft flies in (#261)', async ({ page }) => {
   await serve(page)
   await page.goto('/orrery/#focus=naif:-96')
-  const canvas = page.locator('[data-orrery-page] canvas').first()
-  await expect(canvas).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
+  await expect(orrery(page)).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
   await page.waitForTimeout(1_500) // the focus flight
-  const box = await canvas.boundingBox()
+  const box = await orrery(page).boundingBox()
   if (!box) throw new Error('no canvas')
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3)
   // The gesture that carries the camera to its closest zoom never crosses (its tail is momentum).
   await wheelGesture(page, 60, -100)
-  await expect(detailView(page)).toHaveCount(0)
+  await expect(overlay(page)).toHaveCount(0)
   // A fresh push at the limit does.
   await wheelGesture(page, 8, -100)
-  await expect(detailView(page)).toHaveAttribute('data-detail-status', 'ready', {
-    timeout: 20_000,
-  })
+  await expect(overlay(page)).toBeVisible({ timeout: 20_000 })
   // The rest of the crossing gesture was swallowed, so the flight still runs from far out.
-  expect(await distance(page)).toBeGreaterThan(1_000)
+  await expect.poll(() => phase(page), { timeout: 5_000 }).toBe('enter')
   await expect(page).toHaveURL(/detail=1/)
+})
+
+test('zooming out at the fly-in’s wall flies back out', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await open(page, '-96')
+  await expect.poll(() => phase(page), { timeout: 5_000 }).toBe('arrived')
+  const box = await orrery(page).boundingBox()
+  if (!box) throw new Error('no canvas')
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.4)
+  // Out to the wall (the model about 12 px): that gesture stops there.
+  await wheelGesture(page, 120, 100)
+  expect(await phase(page)).toBe('arrived')
+  // A fresh push out there goes back.
+  await wheelGesture(page, 8, 100)
+  await expect(overlay(page)).toHaveCount(0)
+  await expect.poll(() => phase(page), { timeout: 8_000 }).toBe('')
 })
 
 test('zooming in on a planet never flies in', async ({ page }) => {
   await serve(page)
   await page.goto('/orrery/#focus=Mars')
-  const canvas = page.locator('[data-orrery-page] canvas').first()
-  await expect(canvas).toHaveAttribute('data-orrery-focus', 'Mars', { timeout: 20_000 })
+  await expect(orrery(page)).toHaveAttribute('data-orrery-focus', 'Mars', { timeout: 20_000 })
   await page.waitForTimeout(1_500)
-  const box = await canvas.boundingBox()
+  const box = await orrery(page).boundingBox()
   if (!box) throw new Error('no canvas')
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3)
   await wheelGesture(page, 60, -100)
   await wheelGesture(page, 20, -100)
-  await expect(detailView(page)).toHaveCount(0)
+  await expect(overlay(page)).toHaveCount(0)
+  expect(await phase(page)).toBe('')
 })
 
 test.describe('on a touch screen (390 x 844)', () => {
@@ -208,8 +301,7 @@ test.describe('on a touch screen (390 x 844)', () => {
 
   /** One two-finger pinch through Chrome's touch input: spread `from` to `to` px, in steps. */
   async function pinchOut(page: Page, from: number, to: number) {
-    const canvas = page.locator('[data-orrery-page] canvas').first()
-    const box = await canvas.boundingBox()
+    const box = await orrery(page).boundingBox()
     if (!box) throw new Error('no canvas')
     // On a phone the inspector sheet covers the lower stage: pinch in the band above it, on a
     // row where both fingers start clear of labels and buttons. Chrome's touch adjustment
@@ -254,43 +346,42 @@ test.describe('on a touch screen (390 x 844)', () => {
   test('pinching out past the closest zoom on a craft flies in (#261)', async ({ page }) => {
     await serve(page)
     await page.goto('/orrery/#focus=naif:-96')
-    const canvas = page.locator('[data-orrery-page] canvas').first()
-    await expect(canvas).toHaveAttribute('data-orrery-focus', 'naif:-96', { timeout: 20_000 })
+    await expect(orrery(page)).toHaveAttribute('data-orrery-focus', 'naif:-96', {
+      timeout: 20_000,
+    })
     await page.waitForTimeout(1_500) // the focus flight
-    // The pinch that carries the camera to its closest zoom never crosses.
     // A pinch that carries the camera to its closest zoom never crosses. Under load the
     // focus flight may not be over, so it can take more than one to get there.
     for (let i = 0; i < 4; i += 1) {
       await pinchOut(page, 40, 340)
-      await expect(detailView(page)).toHaveCount(0)
+      await expect(overlay(page)).toHaveCount(0)
       await page.waitForTimeout(500) // the zoom eases on (damping)
-      if ((await canvas.getAttribute('data-orrery-closest')) === 'naif:-96') break
+      if ((await orrery(page).getAttribute('data-orrery-closest')) === 'naif:-96') break
     }
-    await expect(canvas).toHaveAttribute('data-orrery-closest', 'naif:-96')
+    await expect(orrery(page)).toHaveAttribute('data-orrery-closest', 'naif:-96')
     // A fresh pinch at the limit does.
     await pinchOut(page, 60, 260)
-    await expect(detailView(page)).toHaveAttribute('data-detail-status', 'ready', {
-      timeout: 20_000,
-    })
+    await expect(overlay(page)).toBeVisible({ timeout: 20_000 })
     await expect(page).toHaveURL(/detail=1/)
   })
 
   test('pinching out on a planet never flies in', async ({ page }) => {
     await serve(page)
     await page.goto('/orrery/#focus=Mars')
-    const canvas = page.locator('[data-orrery-page] canvas').first()
-    await expect(canvas).toHaveAttribute('data-orrery-focus', 'Mars', { timeout: 20_000 })
+    await expect(orrery(page)).toHaveAttribute('data-orrery-focus', 'Mars', { timeout: 20_000 })
     await page.waitForTimeout(1_500)
     await pinchOut(page, 40, 340)
     await pinchOut(page, 60, 260)
-    await expect(detailView(page)).toHaveCount(0)
+    await expect(overlay(page)).toHaveCount(0)
   })
 })
 
 test('a craft without DISCOS sizes keeps the studio close-up', async ({ page }) => {
-  await open(page, '-31')
-  expect(await detailCanvas(page).getAttribute('data-detail-metres-per-unit')).toBeNull()
-  expect(await distance(page)).toBeLessThan(20)
-  // The studio has no flight, so no target bracket.
-  await expect(page.locator('[data-detail-target]')).toHaveCount(0)
+  await serve(page)
+  await page.goto('/orrery/#focus=naif:-31&detail=1')
+  await expect(studio(page)).toHaveAttribute('data-detail-status', 'ready', { timeout: 20_000 })
+  await expect(overlay(page)).toHaveCount(0)
+  // The studio has its own canvas; the orrery's steps off the page meanwhile.
+  await expect(page.locator('canvas[data-detail-canvas]')).toHaveCount(1)
+  await expect(orrery(page)).toHaveCount(0)
 })

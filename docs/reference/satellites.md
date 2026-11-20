@@ -110,7 +110,12 @@ and then Starlink's supplemental GP, one at a time, 2 s apart.
   - Points at full strength to 35 R⊕, pickable, worker every second. They fade out by 80, with
     the worker every 2 s. Haze from 45, full by 90, gone by 300. Haze only above 60× playback.
   - Everything scales with the Earth frame's openness, so nothing shows or downloads while the
-    frame is closed.
+    frame is closed. Proportional has no Earth frame (its distances are true already), so there
+    the openness is 1 within 300 true Earth radii and 0 beyond (`trueScaleOpenness`, #271).
+  - Proportional lets the camera in to 2.5 true radii of the body it looks at
+    (`trueMinDistance`; the frame's 2.5 radii were about 318,000 km there, far outside GEO),
+    and its near plane follows the nearest surface (`bodyNearPlane`, as in the fly-in), so
+    Earth isn't clipped that close (#271).
   - The plan's 12/40/150 were moved out: at the 30° field of view, the Earth orbit view needs
     about 31 R⊕ to hold the geostationary ring.
   - The haze blends normally, not additively: 19,000 additive points over Earth's disc made it

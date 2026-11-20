@@ -53,6 +53,28 @@ test.describe('satellites (#98)', () => {
     await expect(page.getByText('55 satellites from CelesTrak', { exact: false })).toBeVisible()
   })
 
+  test('Proportional: the Earth orbit view shows them too, and zooms in among them (#271)', async ({
+    page,
+  }) => {
+    await openOrrery(page)
+    await page.getByRole('button', { name: 'Proportional', exact: true }).click()
+    await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()
+    await expect.poll(() => attr(page, 'data-orrery-sat-mode')).toBe('points')
+    await expect.poll(async () => Number(await attr(page, 'data-orrery-sat-drawn'))).toBe(55)
+    // Wheel in: the camera comes nearer Earth than the old 318,000 km limit.
+    const box = await canvas(page).boundingBox()
+    if (!box) throw new Error('no canvas')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    for (let i = 0; i < 12; i += 1) {
+      await page.mouse.wheel(0, -250)
+      await page.waitForTimeout(80)
+    }
+    await expect
+      .poll(async () => Number(await attr(page, 'data-orrery-camera-earth-km')))
+      .toBeLessThan(42_164)
+    await expect.poll(() => attr(page, 'data-orrery-sat-mode')).toBe('points')
+  })
+
   test('pulling back turns the points to haze, and far out they are gone', async ({ page }) => {
     await openOrrery(page)
     await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()

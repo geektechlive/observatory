@@ -48,6 +48,7 @@ import { DetailLoading } from './DetailLoading'
 import { DETAIL_VIEW_ID } from './detailViewId'
 import { DwarfControls } from './DwarfControls'
 import { flyInOptions, orreryJdNow } from './flyIn'
+import { FlyInOverlay, type FlyInOverlayHandle } from './FlyInOverlay'
 import { GuideChip } from './GuideChip'
 import { Inspector } from './Inspector'
 import {
@@ -291,7 +292,7 @@ export function OrreryPage() {
   const [satState, setSatState] = useState<SatViewState | null>(null)
   // Space-Track and ESA DISCOS (#101): re-entries, the Box Score, physical facts.
   const { data: spaceTrack } = useSpaceTrack()
-  const { data: discos } = useDiscos()
+  const { data: discos, isPending: discosPending, failureCount: discosFailures } = useDiscos()
   const wallNow = useNow(REENTRY_REFRESH_MS).getTime()
   const reentries = useMemo(
     () => (spaceTrack?.tip ? reentriesWithin(spaceTrack.tip.reentries, wallNow, 7) : []),
@@ -410,21 +411,12 @@ export function OrreryPage() {
     [detail, renderer, satState],
   )
   const detailOpen = detail !== null && detailDescriptor !== undefined
-  // A spacecraft's close-up is the fly-in (#261): true size among its true surroundings. Read
-  // the camera's side while the orrery is still attached (this runs before the detach effect).
+  // A spacecraft's close-up is the fly-in (#261, #268): true size among its true surroundings,
+  // in the orrery itself.
   const flyIn = useMemo(
     () =>
-      detail
-        ? flyInOptions({
-            key: detail,
-            tracks,
-            moons,
-            discos,
-            viewFrom: renderer?.viewFrom() ?? null,
-            jdNow: orreryJdNow,
-          })
-        : undefined,
-    [detail, tracks, moons, discos, renderer],
+      detail ? flyInOptions({ key: detail, tracks, moons, discos, jdNow: orreryJdNow }) : undefined,
+    [detail, tracks, moons, discos],
   )
   // On a phone the sheet folds to its header row while the view is open and "Facts" opens it
   // (#205). It opens folded each time the view opens: reset when `detailOpen` changes.
@@ -434,19 +426,74 @@ export function OrreryPage() {
     setFactsFor(detailOpen)
     setFactsOpen(false)
   }
+  // A spacecraft with a model flies in inside the orrery itself (#268): the orrery stays on
+  // the page and eases to true scale. Until its track and DISCOS sizes are in (a cold link),
+  // nothing opens, so the studio never mounts first and swaps; but only for DISCOS's first
+  // try: once that fails the studio opens rather than wait out the retries. Anything else is
+  // the studio.
+  const flyInPending =
+    detail !== null &&
+    detail.startsWith('naif:') &&
+    flyIn === undefined &&
+    (bodies.status === 'pending' || (discosPending && discosFailures === 0))
+  const flyInOn = detailOpen && flyIn !== undefined
+  const studioOpen = detailOpen && !flyInOn && !flyInPending
   // The view's chunk loads on first open, never with the page (scripts/check-bundle.mjs).
   // If the fetch fails the view closes, so the orrery re-attaches and is never left detached.
 
-  const DetailViewComponent = useDetailViewModule(detailOpen, closeDetail)
+  const DetailViewComponent = useDetailViewModule(studioOpen, closeDetail)
   useEffect(() => {
     const el = host.current
-    if (!renderer || !el || detailOpen) return
+    if (!renderer || !el || studioOpen) return
     renderer.resize(el.clientWidth, el.clientHeight)
     renderer.attach(el)
     return () => {
       renderer.detach()
     }
-  }, [renderer, detailOpen])
+  }, [renderer, studioOpen])
+
+  // The fly-in (#268): the orrery eases to true scale and flies to the craft; closing flies
+  // back out. The options are read when it starts (a refetch of the tracks must not restart it).
+  const flyInLatest = useRef(flyIn)
+  useEffect(() => {
+    flyInLatest.current = flyIn
+  })
+  const flyOverlay = useRef<FlyInOverlayHandle>(null)
+  const labelsLayer = useRef<HTMLDivElement>(null)
+  const [flyTrue, setFlyTrue] = useState(false)
+  // The moons near the craft with no data for the date: the credit says they are left out.
+  const flyOmitted = useMemo(
+    () => (flyInOn ? (flyIn.surroundings()?.omittedNear ?? []) : []),
+    [flyInOn, flyIn],
+  )
+  useEffect(() => {
+    const options = flyInLatest.current
+    const labels = labelsLayer.current
+    if (!renderer || !flyInOn || !detail || !options) return
+    renderer.setOnFlyIn((state) => {
+      if (state === null) {
+        // It ended by itself (the craft left its data, a preset, a scale change): close.
+        setFlyTrue(false)
+        labels?.style.removeProperty('opacity')
+        if (useOrreryView.getState().detail === detail) closeDetail()
+        return
+      }
+      setFlyTrue(state.trueness > 0)
+      labels?.style.setProperty('opacity', state.decor.toFixed(3))
+      flyOverlay.current?.update(state)
+    })
+    if (!renderer.enterFlyIn(detail, options)) {
+      renderer.setOnFlyIn(null)
+      closeDetail()
+      return
+    }
+    return () => {
+      renderer.setOnFlyIn(null)
+      setFlyTrue(false)
+      labels?.style.removeProperty('opacity')
+      renderer.leaveFlyIn()
+    }
+  }, [renderer, flyInOn, detail])
 
   // Zoom-to-enter (#261): a fresh zoom-in gesture at the closest zoom on the selected craft
   // opens its fly-in. Capture, so the gate reads the camera before the controls move it.
@@ -529,6 +576,25 @@ export function OrreryPage() {
     returnFocus.current = true
     closeDetail()
   }, [])
+
+  // Zooming out at the fly-in's wall (the model about 12 px) goes back: a fresh push out, as
+  // zoom-to-enter takes a fresh push in (#261). Capture, so the gate reads the limit first.
+  useEffect(() => {
+    const el = host.current
+    if (!renderer || !el || !flyInOn) return
+    const gate = new ZoomGate('out')
+    const onWheel = (e: WheelEvent) => {
+      if (!gate.feed(wheelPx(e), renderer.flyInAtWall(), e.timeStamp)) return
+      e.preventDefault()
+      e.stopPropagation()
+      swallowWheelUntilQuiet(window)
+      backToOrrery()
+    }
+    el.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel, { capture: true })
+    }
+  }, [renderer, flyInOn, backToOrrery])
   // How many detail scenes and models are alive, on the page root, for the leak test.
   const reportDetailStats = useCallback((stats: DetailStats) => {
     const el = root.current
@@ -1170,7 +1236,7 @@ export function OrreryPage() {
       ref={root}
       className={styles.page ?? ''}
       data-orrery-page=""
-      data-detail={detailOpen ? 'open' : undefined}
+      data-detail={studioOpen ? 'open' : flyInOn ? 'fly-in' : undefined}
     >
       <div className={styles.voiceStrip ?? ''}>
         <p className={consoleStyles.voice ?? ''}>{voice}</p>
@@ -1256,7 +1322,7 @@ export function OrreryPage() {
         className={styles.stage ?? ''}
         aria-label="Orrery"
         data-guide={guide.mode}
-        data-detail={detailOpen ? 'open' : undefined}
+        data-detail={studioOpen ? 'open' : flyInOn ? 'fly-in' : undefined}
         style={{ '--guide-bar-h': `${String(barHeight)}px` } as CSSProperties}
       >
         <div
@@ -1264,7 +1330,7 @@ export function OrreryPage() {
           className={styles.canvasHost ?? ''}
           data-orrery-mode={failed || contextGone ? 'unavailable' : renderer ? 'webgl' : 'loading'}
         />
-        <div className={styles.labels ?? ''} aria-label="Bodies" role="group">
+        <div ref={labelsLayer} className={styles.labels ?? ''} aria-label="Bodies" role="group">
           <span
             ref={ringLabel}
             hidden
@@ -1463,8 +1529,16 @@ export function OrreryPage() {
             </button>
           ))}
         </div>
-        <p className={styles.badge ?? ''} data-label-obstacle="">
-          {scale === 'proportional' ? 'SIZES NOT TO SCALE' : 'NOT TO SCALE'}
+        <p
+          className={styles.badge ?? ''}
+          data-label-obstacle=""
+          data-fly-badge={flyTrue ? '' : undefined}
+        >
+          {flyTrue
+            ? 'TRUE SCALE'
+            : scale === 'proportional'
+              ? 'SIZES NOT TO SCALE'
+              : 'NOT TO SCALE'}
         </p>
         <div ref={noticesRef} className={styles.notices ?? ''}>
           {failed && (
@@ -1531,7 +1605,7 @@ export function OrreryPage() {
         >
           Guide
         </button>
-        {guide.chipVisible && guide.mode === 'closed' && (
+        {guide.chipVisible && guide.mode === 'closed' && !flyInOn && (
           <GuideChip onOpen={guide.open} onDismiss={guide.dismissChip} />
         )}
         {guide.mode !== 'closed' && (
@@ -1547,17 +1621,26 @@ export function OrreryPage() {
             />
           </Suspense>
         )}
-        {detail &&
-          detailDescriptor &&
+        {flyInOn && renderer && (
+          <FlyInOverlay
+            ref={flyOverlay}
+            descriptor={detailDescriptor}
+            title={detailTitle}
+            omitted={flyOmitted}
+            onBack={backToOrrery}
+            onNudge={(dAzimuth, dPolar, zoom) => {
+              renderer.nudgeCamera(dAzimuth, dPolar, zoom)
+            }}
+          />
+        )}
+        {studioOpen &&
           (DetailViewComponent ? (
             // eslint-disable-next-line react-hooks/static-components -- see above
             <DetailViewComponent
-              // Remounted when the fly-in becomes possible (DISCOS arriving after a cold link, #261).
-              key={`${detail}:${flyIn ? 'fly-in' : 'studio'}`}
+              key={detail}
               descriptor={detailDescriptor}
               title={detailTitle}
               reducedMotion={reducedMotion}
-              trueScale={flyIn}
               onClose={(cause) => {
                 if (cause === 'user') backToOrrery()
                 else closeDetail()

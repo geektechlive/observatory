@@ -47,7 +47,7 @@ const MOON_RADIUS_BY_NAME = new Map(MOONS.map((m) => [m.name, m.radiusKm]))
 const EARTHS_MOON = 'naif:301'
 
 /** A moon's radius, km: Earth's Moon's own, or the JPL radius on its MOONS entry. */
-function moonRadiusKm(body: MoonBody): number | undefined {
+export function moonRadiusKm(body: MoonBody): number | undefined {
   return body.key === EARTHS_MOON ? MOON_RADIUS_KM : MOON_RADIUS_BY_NAME.get(body.name)
 }
 

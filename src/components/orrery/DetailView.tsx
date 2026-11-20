@@ -1,10 +1,11 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
-import { formatRange, targetLook } from '@/lib/orrery/flightTarget'
 import type { ModelDescriptor } from '@/lib/orrery/modelDescriptor'
 
 import styles from './detail-view.module.css'
 import { DETAIL_VIEW_ID } from './detailViewId'
+import { ModelCredit } from './ModelCredit'
+import { standInNote } from './standInNote'
 import { loadModel, type ModelLoader } from './three/craftModelLoad'
 import {
   type CreateDetailScene,
@@ -12,8 +13,6 @@ import {
   type DetailSceneHandle,
   type DetailStats,
   detailStats,
-  type FlightTarget,
-  type TrueScaleOptions,
 } from './three/DetailScene'
 import { loadGltfScene } from './three/gltfLoad'
 
@@ -29,8 +28,6 @@ interface DetailViewProps {
   /** Swapped for a fake in tests (no WebGL). */
   createScene?: CreateDetailScene | undefined
   load?: ModelLoader | undefined
-  /** A spacecraft's fly-in (#261): true size among its true surroundings; absent, the studio. */
-  trueScale?: TrueScaleOptions | undefined
 }
 
 export type DetailCloseCause = 'user' | 'lost'
@@ -50,71 +47,6 @@ const ANNOUNCE: Record<Status, string> = {
 
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'
 
-/** The note a stand-in model carries, or null for a model of the very object. */
-function standInNote(descriptor: ModelDescriptor, title: string): string | null {
-  if (descriptor.kind === 'standin') {
-    return `A simplified model built for this site. The real ${title} is not exactly this shape.`
-  }
-  if (descriptor.scope === 'family') {
-    return `A stand-in shared by this kind of satellite. It is not the exact shape of ${title}.`
-  }
-  return null
-}
-
-function ExternalLink({ href, children }: { href: string; children: string }) {
-  return (
-    <a href={href} className={styles.detailLink ?? ''} target="_blank" rel="noreferrer noopener">
-      {children}
-      <span className={styles.srOnly ?? ''}> (opens in a new tab)</span>
-    </a>
-  )
-}
-
-/**
- * The credit line. A model under a licence that asks for the source, the licence and the
- * changes reads "Model: <credit> (source), <licence> (licence). <changes>"; a NASA model
- * keeps the short form.
- */
-function ModelCredit({ descriptor }: { descriptor: ModelDescriptor }) {
-  const { credit, licence, licenceUrl, changes, sourceUrl } = descriptor
-  if (!licenceUrl && !changes) {
-    return (
-      <p>
-        Model: {credit} · {licence}
-        {sourceUrl && (
-          <>
-            {' · '}
-            <ExternalLink href={sourceUrl}>Source</ExternalLink>
-          </>
-        )}
-      </p>
-    )
-  }
-  return (
-    <p>
-      Model: {credit}
-      {sourceUrl && (
-        <>
-          {' ('}
-          <ExternalLink href={sourceUrl}>source</ExternalLink>
-          {')'}
-        </>
-      )}
-      {', '}
-      {licence}
-      {licenceUrl && (
-        <>
-          {' ('}
-          <ExternalLink href={licenceUrl}>licence</ExternalLink>
-          {')'}
-        </>
-      )}
-      {'.'}
-      {changes && ` ${changes}`}
-    </p>
-  )
-}
-
 /**
  * The "Look closer" view (#203, ADR 0021): the object's 3D model on a canvas of its own,
  * filling the stage. The inspector stays beside it with the facts. Mounted only while
@@ -128,27 +60,19 @@ export function DetailView({
   onStats,
   createScene = createDetailScene,
   load = loadGltfScene,
-  trueScale: offered,
 }: DetailViewProps) {
   const host = useRef<HTMLDivElement>(null)
   const backButton = useRef<HTMLButtonElement>(null)
-  /** The fly-in's target bracket and its range readout, moved each frame without a render. */
-  const target = useRef<HTMLDivElement>(null)
-  const targetRange = useRef<HTMLSpanElement>(null)
   const scene = useRef<DetailSceneHandle | null>(null)
-  // The fly-in or the studio is chosen once, at open: the scene and its caption must agree (#261).
-  const [trueScale] = useState(() => offered)
-  const latest = useRef({ onClose, onStats, reducedMotion, descriptor, trueScale })
+  const latest = useRef({ onClose, onStats, reducedMotion, descriptor })
   const [attempt, setAttempt] = useState(0)
-  // The moons near the craft that have no data for the date, read once when the view opens.
-  const [omitted] = useState(() => trueScale?.surroundings()?.omittedNear ?? [])
   const [outcome, setOutcome] = useState<{ attempt: number; ok: boolean } | null>(null)
   // The file or stand-in, not the descriptor object: a new object for the same model
   // (the page rebuilds it when satellites load) must not reload it.
   const descriptorKey = descriptor.kind === 'file' ? descriptor.file : descriptor.standIn
 
   useEffect(() => {
-    latest.current = { onClose, onStats, reducedMotion, descriptor, trueScale }
+    latest.current = { onClose, onStats, reducedMotion, descriptor }
   })
 
   // The scene: made once on open, disposed on close. It owns its canvas, so React never
@@ -156,33 +80,12 @@ export function DetailView({
   useEffect(() => {
     const el = host.current
     if (!el) return
-    // The fly-in's bracket (rendered with the host, so it exists by now), cleared on cleanup.
-    const bracket = target.current
-    const bracketRange = targetRange.current
     let made: DetailSceneHandle
     try {
       made = createScene(el, {
         reducedMotion: latest.current.reducedMotion,
         onContextLost: () => {
           latest.current.onClose('lost')
-        },
-        trueScale: latest.current.trueScale,
-        onTarget: (t: FlightTarget) => {
-          const el = target.current
-          const label = targetRange.current
-          if (!el || !label) return
-          const look = targetLook(t.radiusPx)
-          // Every frame calls this; write only what changed (the settled view redraws on
-          // the clock too).
-          const size = `${look.sizePx.toFixed(1)}px`
-          const opacity = look.opacity.toFixed(3)
-          const range = look.opacity > 0 ? formatRange(t.rangeKm) : ''
-          if (el.style.getPropertyValue('--target-size') !== size) {
-            el.style.setProperty('--target-size', size)
-          }
-          if (el.style.opacity !== opacity) el.style.opacity = opacity
-          el.dataset['detailTargetRadius'] = t.radiusPx.toFixed(2)
-          if (label.textContent !== range) label.textContent = range
         },
       })
     } catch (error) {
@@ -195,9 +98,6 @@ export function DetailView({
     return () => {
       scene.current = null
       made.dispose()
-      // A new scene starts with the bracket hidden, not showing the last one's range.
-      bracket?.style.removeProperty('opacity')
-      if (bracketRange) bracketRange.textContent = ''
       latest.current.onStats?.(detailStats())
     }
   }, [createScene])
@@ -337,22 +237,7 @@ export function DetailView({
         aria-label={`Model of ${title}. Arrow keys turn it, plus and minus zoom.`}
         aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown + -"
         onKeyDown={onModelKey}
-      >
-        {/* The fly-in's target bracket (#261): the craft is under a pixel until about a km
-            out, so a camera ship's bracket and range mark it from the first frame, then fade
-            as the model itself grows. It sits over the canvas the scene adds here, at its
-            centre, where the camera always looks. Decorative: the range is not announced. */}
-        {trueScale && (
-          <div
-            ref={target}
-            className={styles.flightTarget ?? ''}
-            data-detail-target=""
-            aria-hidden="true"
-          >
-            <span ref={targetRange} className={styles.flightRange ?? ''} />
-          </div>
-        )}
-      </div>
+      />
       <p className={styles.srOnly ?? ''} role="status" data-detail-announce="">
         {ANNOUNCE[status]}
       </p>
@@ -379,15 +264,6 @@ export function DetailView({
       )}
       <div className={styles.detailCredit ?? ''} data-detail-credit="">
         {note && <p>{note}</p>}
-        {trueScale && (
-          <p data-detail-true-scale="">
-            True size and distance, seen from beside the craft. Its place is from JPL Horizons, the
-            planets&rsquo; from JPL&rsquo;s orbital elements, its size from ESA DISCOS, and the
-            stars from the Yale Bright Star Catalogue.
-            {omitted.length > 0 &&
-              ` No data for ${omitted.join(', ')} on this date, so ${omitted.length === 1 ? 'it is' : 'they are'} left out.`}
-          </p>
-        )}
         <ModelCredit descriptor={descriptor} />
       </div>
     </div>

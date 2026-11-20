@@ -100,6 +100,16 @@ export function satDisplay(re: number, rate: number, openness: number): SatDispl
   }
 }
 
+/**
+ * The openness the satellites get in the Proportional mode (#271), from the camera's
+ * distance from Earth in true Earth radii. That mode has no Earth frame (its distances are
+ * already true), so the satellites show, and their groups load, once the camera is near
+ * enough for them to show at all.
+ */
+export function trueScaleOpenness(re: number): number {
+  return re <= SAT_DISTANCE.hidden ? 1 : 0
+}
+
 /** Row-major 3x3 matrix. */
 export type Mat3 = readonly [number, number, number, number, number, number, number, number, number]
 

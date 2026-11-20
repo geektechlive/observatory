@@ -13,6 +13,7 @@ import {
   Line,
   LineBasicMaterial,
   LineDashedMaterial,
+  type Material,
   Mesh,
   MeshBasicMaterial,
   type Object3D,
@@ -20,6 +21,7 @@ import {
   PointLight,
   Scene,
   SphereGeometry,
+  Spherical,
   Sprite,
   TextureLoader,
   Vector3,
@@ -55,12 +57,19 @@ import {
   earthFrameBlend,
   earthFrameRadius,
   L1_DISTANCE_KM,
+  trueMinDistance,
 } from '@/lib/orrery/earthFrame'
 import { modelForKey, sceneModel } from '@/lib/orrery/modelDescriptor'
 import type { MoonBody } from '@/lib/orrery/moonState'
 import type { SatSource } from '@/lib/orrery/satController'
-import { labelBehindEarth, ORBIT_PRESET_RADII, reentryKey } from '@/lib/orrery/satView'
+import {
+  labelBehindEarth,
+  ORBIT_PRESET_RADII,
+  reentryKey,
+  trueScaleOpenness,
+} from '@/lib/orrery/satView'
 import { lookupTwinKey } from '@/lib/orrery/smallBodyView'
+import { moonRadiusKm } from '@/lib/orrery/surroundings'
 import { sunDrawnReach, SUVI_FRAME } from '@/lib/orrery/suvi'
 import { BODY_RADIUS_KM } from '@/lib/orrery/trueScale'
 import { BODY_HEX, HUD_HEX } from '@/lib/palette'
@@ -75,6 +84,13 @@ import { BodySkins } from './bodySkins'
 import { CRAFT_ICON_PX, craftIconScale, CraftLayer } from './craftLayer'
 import { CraftModelLayer } from './craftModelLayer'
 import { EarthNeighbourhood } from './earthNeighbourhood'
+import {
+  FlyInDriver,
+  type FlyInHost,
+  type FlyInOptions,
+  type FlyInPhase,
+  type FlyInState,
+} from './flyInDriver'
 import { followShift, PanTracker } from './followShift'
 import {
   earthPresetView,
@@ -89,6 +105,7 @@ import {
 import { loadGltfScene } from './gltfLoad'
 import { type LookupData, LookupLayer, lookupMarkerRadius } from './lookupLayer'
 import { MoonLayer } from './moonLayer'
+import { bodyNearPlane, FILL_INTENSITY, NearPass } from './nearPass'
 import { cappedPixelRatio, watchPixelRatio } from './pixelRatio'
 import {
   clampRadius,
@@ -101,9 +118,11 @@ import {
 import { isSatKey, type SatInfo, satKey, SatLayer, type SatViewState } from './satLayer'
 import { satFacing, satModelPx, satRingPx, SceneModelCache, sunOnScreen } from './satModelFit'
 import { type SmallBodyGroups, SmallBodyLayer } from './smallBodyLayer'
+import { buildStars, disposeStars, setStarsOpacity } from './starField'
 import { loadCorsImage, SunImage, type SunImageState } from './sunImage'
 
 export type { CraftFilter } from '../craftFilter'
+export type { FlyInOptions, FlyInPhase, FlyInState } from './flyInDriver'
 export type { FocusPreset } from './framing'
 export type { LookupData } from './lookupLayer'
 export type { SatInfo, SatMode, SatViewState } from './satLayer'
@@ -252,6 +271,21 @@ const AMBIENT_INTENSITY = Math.PI * 0.12
 const SKIN_VIEW_NDC = 1.15
 /** While the clock plays at 1x nothing moves visibly; redraw this often at most. */
 const SLOW_CLOCK_REDRAW_MS = 1000
+/**
+ * In the fly-in (#268), close in: the least a body draws, px, a point of light like a faint
+ * star rather than a marker. The floors ease to it as the decoration fades.
+ */
+const TRUE_FLOOR_PX = 1.5
+/** The orrery pass's near plane in the fly-in comes no nearer than this, scene units (about 15 m). */
+const FLY_NEAR_MIN = 1e-9
+/** Decoration below this share is hidden outright, so nothing invisible is drawn or picked. */
+const DECOR_HIDDEN = 0.02
+/** The farthest the orrery camera may zoom out, scene units. */
+const MAX_CAMERA_DISTANCE = 120_000
+/** The fly-in's stars sit on a sphere this far round the camera, scene units (inside far). */
+const STAR_RADIUS = 1e5
+/** Keyboard turns keep the camera this far off the poles, where the turn would flip. */
+const NUDGE_POLE_MARGIN = 0.05
 
 /** The simulation clock as the renderer sees it: read each frame, never subscribed to. */
 export interface ClockReader {
@@ -388,6 +422,30 @@ export class OrreryRenderer {
     start: number
     ms: number
   } | null = null
+  /** The spacecraft fly-in while it runs (#268): flyInDriver.ts. */
+  private fly: FlyInDriver | null = null
+  /** The fly-in's second pass: the model in its own small scene (nearPass.ts). */
+  private readonly nearPass = new NearPass()
+  private onFlyIn: ((state: FlyInState | null) => void) | null = null
+  /** The scale things were last placed at: a change rebuilds the lines (#268). */
+  private placedMode: ScaleMode = 'exaggerated'
+  private placedBlend = 0
+  /** Bumped at each full line rebuild: the comet and lookup layers' cache key (#268). */
+  private lineEpoch = 0
+  /**
+   * The lines the fly-in's ease does not re-place each frame (comets', a looked-up object's,
+   * the heliopause ring): hidden while it eases, rebuilt at either end (#268).
+   */
+  private readonly easeHidden = new Group()
+  private readonly ambient = new AmbientLight(new Color(1, 1, 1), AMBIENT_INTENSITY)
+  /**
+   * Everything that is orrery furniture rather than a body: lines, other markers, the
+   * satellites. The fly-in fades it on the way in (#268); otherwise it is always visible
+   * (each layer keeps its own switches inside it).
+   */
+  private readonly decorGroup = new Group()
+  /** The real stars, shown at true scale in the fly-in (#268), round the camera. */
+  private readonly stars = buildStars(STAR_RADIUS)
 
   constructor(options: OrreryRendererOptions) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true })
@@ -412,11 +470,12 @@ export class OrreryRenderer {
     this.controls.enableDamping = !this.reducedMotion
     this.controls.dampingFactor = 0.08
     this.controls.minDistance = cameraMinDistance(Number.POSITIVE_INFINITY)
-    this.controls.maxDistance = 120_000
+    this.controls.maxDistance = MAX_CAMERA_DISTANCE
     this.controls.addEventListener('change', this.markDirty)
     this.controls.addEventListener('change', this.onControlsChange)
     this.controls.addEventListener('start', this.onUserCamera)
     this.controls.addEventListener('end', this.onUserCameraEnd)
+    this.flyHost = this.makeFlyHost()
     // Ahead of the controls' own handlers (capture), so a pinch's midpoint is known before
     // the update it causes is judged (#264).
     for (const type of ['pointerdown', 'pointermove'] as const) {
@@ -433,33 +492,33 @@ export class OrreryRenderer {
   }
 
   private buildScene(): void {
-    this.scene.add(
+    this.decorGroup.add(
       this.orbitGroup,
-      this.bodyGroup,
       this.craft.paths,
       this.craft.stalks,
       this.craft.markers,
-      this.models.group,
       this.satModels.group,
       this.near.group,
       this.sats.group,
       this.lookup.marker,
       this.small.markers,
     )
+    this.scene.add(this.bodyGroup, this.models.group, this.decorGroup, this.stars)
+    setStarsOpacity(this.stars, 0)
     // Its orbit line is an orbit: the Orbits switch hides it with the planets' (#145), and
     // the comets' and interstellar objects' lines with them (#99).
-    this.orbitGroup.add(this.heliopause, this.lookup.path, this.lookup.nearPath, this.small.paths)
+    this.easeHidden.add(this.heliopause, this.lookup.path, this.lookup.nearPath, this.small.paths)
+    this.orbitGroup.add(this.easeHidden)
     // The Planets switch hides the moons with their planets; their loops are orbits, so
     // they sit with the planets' orbit lines under the Orbits switch too.
     this.bodyGroup.add(this.moons.group)
     this.orbitGroup.add(this.moons.orbits)
-    this.scene.add(
-      new AmbientLight(new Color(1, 1, 1), AMBIENT_INTENSITY),
-      new PointLight(new Color(1, 1, 1), SUNLIGHT_INTENSITY, 0, 0),
-    )
+    this.scene.add(this.ambient, new PointLight(new Color(1, 1, 1), SUNLIGHT_INTENSITY, 0, 0))
     for (const name of ['Sun', ...PLANETS] as BodyName[]) {
       const mesh = new Mesh(
-        new SphereGeometry(1, 24, 16),
+        // 64 x 32: in the fly-in a planet can fill the view (Jupiter from Juno), and a
+        // coarser sphere shows its facets at the limb (#268).
+        new SphereGeometry(1, 64, 32),
         new MeshBasicMaterial({ color: new Color(BODY_HEX[name] ?? HUD_HEX) }),
       )
       mesh.name = name
@@ -496,26 +555,53 @@ export class OrreryRenderer {
     cb?.(this.sunState)
   }
 
-  /** Scene position of a heliocentric ecliptic position under the current mode. */
-  private toScene(pos: { x: number; y: number; z: number }): Vector3 {
-    if (this.mode === 'proportional') {
-      return new Vector3(pos.x * LINEAR_K, pos.z * LINEAR_K, -pos.y * LINEAR_K)
-    }
-    const p = place3d(pos)
-    return new Vector3(p.x, p.y, p.z)
+  /**
+   * The scale things are placed at: the visitor's mode, or true scale (the proportional
+   * mode's placement) once the fly-in has eased toward it (#268).
+   */
+  private placeMode(): ScaleMode {
+    return this.fly && this.fly.trueness >= 1 ? 'proportional' : this.mode
   }
 
-  /** A body's radius in scene units before the minimum on-screen size is applied. */
+  /** How far the fly-in has eased the visitor's scale to true scale: 0 to 1 (#268). */
+  private blend(): number {
+    return this.fly?.trueness ?? 0
+  }
+
+  /**
+   * Scene position of a heliocentric ecliptic position under the current mode; in the fly-in's
+   * ease, part way from the visitor's mode to true scale (#268).
+   */
+  private toScene(pos: { x: number; y: number; z: number }): Vector3 {
+    const linear = new Vector3(pos.x * LINEAR_K, pos.z * LINEAR_K, -pos.y * LINEAR_K)
+    const e = this.blend()
+    if (this.mode === 'proportional' || e >= 1) return linear
+    const p = place3d(pos)
+    const placed = new Vector3(p.x, p.y, p.z)
+    return e > 0 ? placed.lerp(linear, e) : placed
+  }
+
+  /**
+   * A body's radius in scene units before the minimum on-screen size is applied; in the
+   * fly-in's ease, part way to its true size, geometrically (#268).
+   */
   private radiusOf(name: SceneKey): number {
-    if (!isBody(name)) return CRAFT_RADIUS[this.mode]
-    if (this.mode === 'exaggerated') return EXAGGERATED_RADIUS[name]
-    if (this.mode === 'log') return EXAGGERATED_RADIUS[name] * LOG_SIZE_FACTOR
-    return (TRUE_RADIUS_KM[name] / AU_KM) * LINEAR_K
+    const from = modeRadius(this.mode, name)
+    const e = this.blend()
+    if (e <= 0) return from
+    const to = modeRadius('proportional', name)
+    return e >= 1 ? to : from ** (1 - e) * to ** e
   }
 
   private minPx(name: SceneKey): number {
     if (!isBody(name)) return CRAFT_ICON_PX / 2
-    return bodyMinPx(name, this.mode)
+    const e = this.blend()
+    const floor = bodyMinPx(name, this.mode)
+    if (e <= 0) return floor
+    // The ease moves the floor to true scale's, and close in a body is its true size or a
+    // point of light (#268).
+    const eased = floor + (bodyMinPx(name, 'proportional') - floor) * e
+    return TRUE_FLOOR_PX + (eased - TRUE_FLOOR_PX) * (this.fly?.decor ?? 1)
   }
 
   /** Scene units that cover one px at a distance from the camera. */
@@ -661,11 +747,15 @@ export class OrreryRenderer {
    */
   private earthOpenness(): number {
     const earth = this.bodies.get('Earth')
-    if (!earth || this.mode === 'proportional' || !this.near.coversEarth(this.lastJd)) return 0
-    return earthFrameBlend(
+    if (!earth || this.placeMode() === 'proportional' || !this.near.coversEarth(this.lastJd)) {
+      return 0
+    }
+    // The fly-in's ease closes the frame as it goes to true scale (#268).
+    const open = earthFrameBlend(
       earth.position.distanceTo(this.camera.position) / EARTH_FRAME_UNIT,
       earth.position.distanceTo(this.controls.target) / EARTH_FRAME_UNIT,
     )
+    return open * (1 - this.blend())
   }
 
   /**
@@ -726,7 +816,13 @@ export class OrreryRenderer {
       earth: earth.position,
       radius,
       earthPx: radius / this.unitsPerPx(earth.position.distanceTo(this.camera.position)),
-      openness: this.mode === 'proportional' ? 0 : t,
+      // Proportional has no Earth frame: its distances are true already (#271).
+      openness:
+        this.placeMode() === 'proportional'
+          ? trueScaleOpenness(
+              earth.position.distanceTo(this.camera.position) / modeRadius('proportional', 'Earth'),
+            )
+          : t,
       camera: this.camera.position,
       pixelRatio: this.renderer.getPixelRatio(),
       aspect: this.width / Math.max(1, this.height),
@@ -773,24 +869,292 @@ export class OrreryRenderer {
   }
 
   /**
-   * Which way the camera looks at its target from, a unit vector in scene axes: the fly-in
-   * (#261) comes in on this side, so the close-up continues the view the visitor had.
-   */
-  viewFrom(): { x: number; y: number; z: number } {
-    const d = this.camera.position.clone().sub(this.controls.target).normalize()
-    return { x: d.x, y: d.y, z: d.z }
-  }
-
-  /**
    * The followed craft, while the camera sits at its closest zoom on it (zoom-to-enter,
    * #261); otherwise null. Not during a flight, and never a planet or satellite.
    */
   closestCraft(): SceneKey | null {
     const key = this.focusBody
-    if (!key || isBody(key) || !this.following || this.flight) return null
+    if (!key || isBody(key) || !this.following || this.flight || this.fly) return null
     if (!this.craft.naifIdOf(key)) return null
     const distance = this.camera.position.distanceTo(this.controls.target)
     return distance <= this.controls.minDistance * AT_LIMIT_SLACK ? key : null
+  }
+
+  /**
+   * Fly in to a spacecraft in this view (#268): ease to true scale, then fly to its model at
+   * its real size (flyInDriver.ts). False when the key is not a craft drawn now.
+   */
+  enterFlyIn(key: SceneKey, options: FlyInOptions): boolean {
+    if (this.fly?.key === key && this.fly.phase !== 'leave') return true
+    // Replacing a fly-in: back to the visitor's own view first, so the new one saves that.
+    if (this.fly) this.endFly(true, false)
+    const naif = isBody(key) ? null : this.craft.naifIdOf(key)
+    const at = naif ? this.drawnPosition(key) : null
+    if (!naif || !at) return false
+    // Aim at the craft, keeping the camera's side and distance: a focus flight still running,
+    // or a slide that let go of the follow, would otherwise leave the view off it.
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    this.controls.target.copy(at)
+    this.camera.position.copy(at).add(offset)
+    this.camera.lookAt(at)
+    // Follow the craft and show its model, as focusOn does, without moving the camera.
+    this.focusBody = key
+    this.following = true
+    this.preset = null
+    this.focusFramed = false
+    this.flight = null
+    this.canvas.dataset['orreryFocus'] = key
+    this.models.show(key, naif)
+    this.fly = new FlyInDriver(this.flyHost, key, options, performance.now())
+    this.controls.enablePan = false
+    this.markDirty()
+    return true
+  }
+
+  /** Fly back out and ease back to the visitor's scale (#268); at once if it had not begun. */
+  leaveFlyIn(): void {
+    const fly = this.fly
+    if (!fly) return
+    if (!fly.startLeave(performance.now(), this.lastJd)) this.endFly(true)
+    this.markDirty()
+  }
+
+  /**
+   * Turn the camera about its target by these angles (radians), or move it to `zoom` times its
+   * distance, within the limits: the fly-in's arrow keys and zoom buttons (#268), as a drag
+   * or a scroll would.
+   */
+  nudgeCamera(dAzimuth: number, dPolar: number, zoom = 1): void {
+    this.onUserCamera()
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const s = new Spherical().setFromVector3(offset)
+    s.theta += dAzimuth
+    s.phi = Math.min(Math.PI - NUDGE_POLE_MARGIN, Math.max(NUDGE_POLE_MARGIN, s.phi + dPolar))
+    s.radius = Math.min(
+      this.controls.maxDistance,
+      Math.max(this.controls.minDistance, s.radius * zoom),
+    )
+    this.camera.position.setFromSpherical(s).add(this.controls.target)
+    this.camera.lookAt(this.controls.target)
+    this.controls.update()
+    this.markDirty()
+  }
+
+  flyInPhase(): FlyInPhase | null {
+    return this.fly?.phase ?? null
+  }
+
+  /** At the fly-in's zoom-out wall: a fresh push out leaves (#268). */
+  flyInAtWall(): boolean {
+    return this.fly?.atWall(AT_LIMIT_SLACK) ?? false
+  }
+
+  /** The fly-in's state for the page, each drawn frame; null when it ends. */
+  setOnFlyIn(cb: ((state: FlyInState | null) => void) | null): void {
+    this.onFlyIn = cb
+  }
+
+  /** What the fly-in reads from the scene. */
+  private readonly flyHost: FlyInHost
+
+  private makeFlyHost(): FlyInHost {
+    return {
+      camera: this.camera,
+      controls: this.controls,
+      reducedMotion: this.reducedMotion,
+      unitsPerAu: LINEAR_K,
+      fovDeg: FOV,
+      aspect: () => this.width / Math.max(1, this.height),
+      heightPx: () => this.height,
+      freeShare: () => {
+        const w = Math.max(1, this.width)
+        const h = Math.max(1, this.height)
+        const { right, bottom, top } = this.inset
+        const blocked = Math.max(bottom, this.reserveBottomPx) + top
+        return { x: Math.max(0.2, (w - right) / w), y: Math.max(0.2, (h - blocked) / h) }
+      },
+      drawn: (key) => this.drawnPosition(key),
+      helio: (key) => this.craft.helioOf(key),
+      bodies: () =>
+        (['Sun', ...PLANETS] as BodyName[]).flatMap((name) => {
+          const mesh = this.bodies.get(name)
+          return mesh ? [{ helio: this.bodyHelio(name, this.lastJd), drawn: mesh.position }] : []
+        }),
+      shape: () => this.models.shape(),
+      facing: (key) => this.craftFacing(key),
+    }
+  }
+
+  /** Advance the fly-in for this frame: its phase, scale, light, and the model's pass. */
+  private stepFly(now: number): void {
+    const fly = this.fly
+    if (!fly) return
+    const result = fly.step(now, this.models.settled(), this.lastJd)
+    if (result === 'lost') {
+      this.endFly(false)
+      return
+    }
+    if (result === 'done') {
+      this.endFly(true)
+      return
+    }
+    // At true scale the model draws in its own pass (nearPass.ts). Through the ease it stays in
+    // the orrery's, at icon size, so a body in front of it still hides it.
+    const near = fly.phase !== 'waiting' && fly.trueness >= 1
+    if (near && this.models.group.parent !== this.nearPass.scene) {
+      this.nearPass.hold(this.models.group)
+    } else if (!near && this.models.group.parent !== this.scene) {
+      this.nearPass.hold(null)
+      this.scene.add(this.models.group)
+    }
+    // The orrery's ambient eases to the fly-in's faint night-side fill, and the stars come out.
+    this.ambient.intensity = AMBIENT_INTENSITY + (FILL_INTENSITY - AMBIENT_INTENSITY) * fly.trueness
+    setStarsOpacity(this.stars, fly.trueness)
+  }
+
+  /**
+   * End the fly-in at once; `restore` puts the camera back where the visitor had it. The page
+   * hears of it (null) unless a new fly-in is replacing this one.
+   */
+  private endFly(restore: boolean, notify = true): void {
+    const fly = this.fly
+    if (!fly) return
+    this.fly = null
+    this.scene.add(this.models.group)
+    this.nearPass.hold(null)
+    this.controls.enablePan = true
+    this.controls.maxDistance = MAX_CAMERA_DISTANCE
+    this.ambient.intensity = AMBIENT_INTENSITY
+    setStarsOpacity(this.stars, 0)
+    this.applyDecor(1)
+    // Back to the visitor's scale first, so the camera goes back about the craft as drawn.
+    this.updateBodies(true)
+    if (restore) fly.restoreCamera()
+    this.syncMinDistance()
+    this.controls.update()
+    this.markDirty()
+    if (notify) this.onFlyIn?.(null)
+  }
+
+  /** The Sun's or a planet's heliocentric position at `jd`, au: as placeBodies places it. */
+  private bodyHelio(name: BodyName, jd: number): { x: number; y: number; z: number } {
+    if (name === 'Sun') return { x: 0, y: 0, z: 0 }
+    if (name === 'Earth' && this.earthTrack) return earthState(this.earthTrack, jd).position
+    return heliocentric(name, jd)
+  }
+
+  /** The decoration's opacity now, and each faded material's own (#268). */
+  private decorShown = 1
+  private readonly decorBase = new Map<Material, { opacity: number; transparent: boolean }>()
+
+  /**
+   * Fade the orrery's furniture (lines, other markers) by `decor`; hide it outright near 0, so
+   * nothing invisible is drawn. 1 puts every material back as it was.
+   */
+  private applyDecor(decor: number): void {
+    if (decor === this.decorShown) return
+    this.decorShown = decor
+    this.decorGroup.visible = decor > DECOR_HIDDEN
+    if (decor >= 1) {
+      for (const [m, base] of this.decorBase) {
+        m.opacity = base.opacity
+        m.transparent = base.transparent
+      }
+      this.decorBase.clear()
+      return
+    }
+    this.decorGroup.traverse((o) => {
+      if (!(o instanceof Line || o instanceof Sprite)) return
+      const materials = Array.isArray(o.material) ? o.material : [o.material]
+      for (const m of materials as Material[]) {
+        let base = this.decorBase.get(m)
+        if (!base) {
+          base = { opacity: m.opacity, transparent: m.transparent }
+          this.decorBase.set(m, base)
+        }
+        m.transparent = true
+        m.opacity = base.opacity * decor
+      }
+    })
+  }
+
+  /**
+   * Draw the frame. In the fly-in, two passes (nearPass.ts): the orrery with its near plane
+   * set from the nearest body's surface, then, over a cleared depth buffer, the model.
+   */
+  private drawScene(): void {
+    const fly = this.fly
+    const flying = fly !== null && fly.phase !== 'waiting'
+    // Proportional comes in to true size (#271): its near plane follows the nearest
+    // surface too, or Earth would clip long before the satellites show.
+    if (!flying && this.placeMode() !== 'proportional') {
+      this.renderer.render(this.scene, this.camera)
+      return
+    }
+    const cam = this.camera.position
+    const surfaces: number[] = []
+    for (const mesh of this.bodies.values())
+      surfaces.push(mesh.position.distanceTo(cam) - mesh.scale.x)
+    for (const m of this.moons.visible())
+      surfaces.push(m.mesh.position.distanceTo(cam) - m.mesh.scale.x)
+    // Outside the fly-in a camera turned about an off-centre target can end up inside a
+    // body: that body is then not in view, and its negative surface would take the near
+    // plane to FLY_NEAR_MIN and the depth precision of everything else with it (#271).
+    if (!flying) {
+      for (let i = surfaces.length - 1; i >= 0; i -= 1)
+        if (!((surfaces[i] ?? 0) > 0)) surfaces.splice(i, 1)
+    }
+    this.camera.near = bodyNearPlane(surfaces, FLY_NEAR_MIN, CAMERA_NEAR)
+    this.camera.updateProjectionMatrix()
+    try {
+      this.renderer.render(this.scene, this.camera)
+      if (fly && flying) this.drawNear(fly)
+    } finally {
+      this.camera.near = CAMERA_NEAR
+      this.camera.updateProjectionMatrix()
+    }
+  }
+
+  /** The fly-in's second pass: the model over a cleared depth buffer (nearPass.ts). */
+  private drawNear(fly: FlyInDriver): void {
+    const at = this.drawnPosition(fly.key)
+    const sun = this.bodies.get('Sun')
+    const inNear = this.models.group.parent === this.nearPass.scene
+    if (at && sun && inNear && this.models.shownKey() === fly.key && fly.unit > 0) {
+      this.nearPass.sync({
+        main: this.camera,
+        centre: at,
+        unit: fly.unit,
+        fullShare: fly.fullShare,
+        toSun: sun.position.clone().sub(at).normalize(),
+      })
+      this.renderer.autoClear = false
+      try {
+        this.renderer.clearDepth()
+        this.renderer.render(this.nearPass.scene, this.nearPass.camera)
+      } finally {
+        this.renderer.autoClear = true
+      }
+    }
+  }
+
+  /** Tell the page where the fly-in is this frame. */
+  private emitFly(): void {
+    const fly = this.fly
+    if (!fly || !this.onFlyIn) return
+    this.onFlyIn(
+      fly.state(
+        (p) => {
+          this.scratch.copy(p).project(this.camera)
+          if (this.scratch.z > 1) return null
+          return {
+            x: ((this.scratch.x + 1) / 2) * this.width,
+            y: ((1 - this.scratch.y) / 2) * this.height,
+          }
+        },
+        (d) => this.unitsPerPx(d),
+      ),
+    )
   }
 
   /** A satellite's details for the inspector (#98), or null when it is not loaded. */
@@ -818,6 +1182,19 @@ export class OrreryRenderer {
     const at = this.craft.position(key)
     const facing = this.craftFacing(key)
     if (!at || !facing) return
+    const fly = this.fly
+    if (fly && fly.key === key && fly.phase !== 'waiting') {
+      // The fly-in (#268): drawn at `fly.unit` in robust radius, its true size or the icon
+      // floor easing out. In the near pass it is centred at robust radius 1, the pass's unit.
+      const upp = this.unitsPerPx(at.distanceTo(this.camera.position))
+      this.modelPx = fly.unit / upp
+      if (this.models.group.parent === this.nearPass.scene) {
+        this.models.place(ORIGIN, 1, facing, 1)
+      } else {
+        this.models.place(at, upp, facing, this.modelPx)
+      }
+      return
+    }
     // Icon-sized at any zoom (#260), like the Voyagers' icons; never the Sun's twin.
     this.modelPx = CRAFT_MODEL_PX
     this.models.place(
@@ -943,11 +1320,28 @@ export class OrreryRenderer {
         }
       },
       this.focusBody,
+      // In the fly-in, moons go to their true places and sizes (#268).
+      this.fly && this.blend() > 0
+        ? {
+            unitsPerAu: LINEAR_K,
+            unitsPerKm: LINEAR_K / AU_KM,
+            radiusKm: moonRadiusKm,
+            share: this.blend(),
+          }
+        : undefined,
     )
+    const fly = this.fly && this.fly.trueness > 0 ? this.fly : null
     for (const m of this.moons.visible()) {
       const depth = m.mesh.position.distanceTo(this.camera.position)
       m.mesh.scale.setScalar(
-        clampRadius(m.mesh.scale.x, this.unitsPerPx(depth), MOON_MIN_PX, PX_CEILING.moon),
+        fly
+          ? clampRadius(
+              m.mesh.scale.x,
+              this.unitsPerPx(depth),
+              TRUE_FLOOR_PX + (MOON_MIN_PX - TRUE_FLOOR_PX) * fly.decor,
+              fly.trueness < 1 ? PX_CEILING.moon : undefined,
+            )
+          : clampRadius(m.mesh.scale.x, this.unitsPerPx(depth), MOON_MIN_PX, PX_CEILING.moon),
       )
     }
   }
@@ -966,11 +1360,23 @@ export class OrreryRenderer {
       }
       const line = this.orbits.get(planet)
       if (!line) continue
+      // Rewritten in place when the size matches: the fly-in's ease resamples every frame (#268).
+      const attr = line.geometry.getAttribute('position') as Float32BufferAttribute | undefined
+      if (attr && attr.array.length === points.length) {
+        attr.copyArray(points)
+        attr.needsUpdate = true
+        line.geometry.computeBoundingSphere()
+        continue
+      }
       line.geometry.dispose()
       const geometry = new BufferGeometry()
       geometry.setAttribute('position', new Float32BufferAttribute(points, 3))
       line.geometry = geometry
     }
+    this.orbitJd = jd
+    // Hidden while the fly-in eases (easeHidden): rebuilt at either end, not every frame.
+    const e = this.blend()
+    if (e > 0 && e < 1) return
     // The heliopause marker (#93): a ring in the ecliptic where Voyager 1 crossed. Dashed,
     // because it is approximate: the real boundary is neither a sphere nor fixed.
     const r = this.sceneRadius(HELIOPAUSE_V1_AU)
@@ -1023,8 +1429,11 @@ export class OrreryRenderer {
     this.skins.orient(jd)
     this.craft.place(jd)
     // The comets first: a looked-up object whose twin they draw hides its own copy (#99).
-    this.small.place(jd, (p) => this.toScene(p), this.mode)
-    this.lookup.place(jd, (p) => this.toScene(p), this.mode, this.lookupTwin(jd) !== null)
+    // Those layers rebuild their lines when this key changes: the scale, and each rebuild the
+    // fly-in's ease asks for (#268: back at the visitor's mode, they were left at true scale).
+    const key = `${this.placeMode()}#${String(this.lineEpoch)}`
+    this.small.place(jd, (p) => this.toScene(p), key)
+    this.lookup.place(jd, (p) => this.toScene(p), key, this.lookupTwin(jd) !== null)
   }
 
   /**
@@ -1293,6 +1702,8 @@ export class OrreryRenderer {
 
   setScaleMode(mode: ScaleMode): void {
     if (mode === this.mode) return
+    // From the visitor's own view, not the fly-in's: what follows moves from there (#268).
+    this.endFly(true)
     // Keep the same framing: refit the current preset in the new mode.
     this.mode = mode
     this.canvas.dataset['orreryScale'] = mode
@@ -1321,6 +1732,9 @@ export class OrreryRenderer {
    * (#93: Voyager 2, 90 au south of the ecliptic, fell below a ring-only frame).
    */
   applyPreset(preset: FocusPreset, instant = this.reducedMotion): void {
+    // Back at the visitor's own view first, so the preset's flight starts there: from the
+    // fly-in's spot a few metres off the craft it swung up to 160 degrees (owner, 2026-11-20).
+    this.endFly(true)
     if (preset === 'earth' || preset === 'orbit') {
       this.applyEarthPreset(preset, instant)
       return
@@ -1418,6 +1832,11 @@ export class OrreryRenderer {
 
   /** Fly to a body or craft and keep following it as it moves. */
   focusOn(name: SceneKey, instant = this.reducedMotion): void {
+    // The fly-in's own craft stays as it is; anything else ends the fly-in (#268).
+    if (this.fly) {
+      if (this.fly.key === name) return
+      this.endFly(true)
+    }
     // A satellite (#98): the camera stays where the points are pickable (a tap chose it
     // there); otherwise (search) the Earth orbit view. Its marker shows which one.
     if (isSatKey(name)) {
@@ -1590,8 +2009,24 @@ export class OrreryRenderer {
     this.markDirty()
   }
 
+  /** syncMinDistance's per-frame list in Proportional, reused (#271). */
+  private readonly trueNear: { distance: number; radius: number }[] = []
+
   /** Near Earth the camera may come in close; elsewhere it keeps the general limit (#98). */
   private syncMinDistance(): void {
+    // Proportional draws bodies at true size: the camera may come in to theirs (#271).
+    if (this.placeMode() === 'proportional') {
+      const target = this.controls.target
+      const near = this.trueNear
+      near.length = 0
+      for (const [name, mesh] of this.bodies)
+        near.push({
+          distance: mesh.position.distanceTo(target),
+          radius: modeRadius('proportional', name),
+        })
+      this.controls.minDistance = trueMinDistance(near)
+      return
+    }
     const earth = this.bodies.get('Earth')
     this.controls.minDistance = cameraMinDistance(
       earth ? earth.position.distanceTo(this.controls.target) : Number.POSITIVE_INFINITY,
@@ -1600,6 +2035,8 @@ export class OrreryRenderer {
 
   /** The user turned or zoomed: stop any flight, and stop refitting the preset. */
   private readonly onUserCamera = () => {
+    // A drag or zoom in the fly-in's flight stops it where it is; in the way back, finishes it.
+    if (this.fly && this.fly.interrupt() === 'done') this.endFly(true)
     this.flight = null
     this.presetPristine = false
     this.focusFramed = false
@@ -1618,7 +2055,8 @@ export class OrreryRenderer {
    */
   private readonly onControlsChange = () => {
     this.pan.note(this.controls.target)
-    if (!this.focusBody || !this.following) return
+    // The fly-in holds its craft: there is no slide to let go with (pan is off) (#268).
+    if (!this.focusBody || !this.following || this.fly) return
     const depth = this.camera.position.distanceTo(this.controls.target)
     if (this.pan.released(this.unitsPerPx(depth))) this.following = false
   }
@@ -1856,7 +2294,26 @@ export class OrreryRenderer {
   private reserveBottomPx = 0
 
   private updateBodies(force = false): void {
-    const jd = jdFromDate(new Date(this.clock.simTime()))
+    // The fly-in holds the epoch while its camera moves (#268), so a fast clock can't move
+    // the bodies under its planned path.
+    const jd = this.fly?.frozenJd ?? jdFromDate(new Date(this.clock.simTime()))
+    const mode = this.placeMode()
+    const e = this.blend()
+    if (mode !== this.placedMode || e !== this.placedBlend) {
+      // The fly-in moved the scale (#268): the planets' orbits and the craft's path follow it,
+      // rewritten in place through the ease; the other lines are hidden through the ease and
+      // rebuilt at either end.
+      const rebuild = mode !== this.placedMode || e === 0 || e >= 1
+      this.placedMode = mode
+      this.placedBlend = e
+      this.orbitJd = Number.NaN
+      if (rebuild) {
+        this.craft.rebuildTrajectory()
+        this.lineEpoch += 1
+      } else this.craft.retraceTrajectory()
+      this.easeHidden.visible = e === 0 || e >= 1
+      force = true
+    }
     if (!force && jd === this.lastJd) return
     this.lastJd = jd
     if (!(Math.abs(jd - this.orbitJd) < ORBIT_RESAMPLE_DAYS)) this.sampleOrbits(jd)
@@ -1872,7 +2329,7 @@ export class OrreryRenderer {
    * as the Earth frame opens or closes with the camera's distance (#92).
    */
   private followFocus(): void {
-    if (!this.focusBody || !this.following || this.flight) return
+    if (!this.focusBody || !this.following || this.flight || this.fly?.scripted()) return
     const target = this.drawnPosition(this.focusBody)
     // Not drawn (hidden, or past its samples): hold the camera, not pull it to the Sun (#186).
     const shift = followShift(target, this.controls.target)
@@ -1914,14 +2371,33 @@ export class OrreryRenderer {
       this.controls.target.lerpVectors(f.fromTarget, f.toTarget, k)
       if (t >= 1) this.flight = null
     }
-    this.syncMinDistance()
+    this.stepFly(now)
+    // The fly-in sets its own camera limits (flyInDriver.ts).
+    if (!this.fly) this.syncMinDistance()
     const damping = this.controls.update()
-    if (this.dirty || moving || flying || damping) {
-      if (now - this.lastDraw >= MIN_FRAME_MS || this.dirty || flying) {
+    // The fly-in's timeline (or its wait for the model) moves things every frame.
+    const flyMoving = this.fly !== null && this.fly.phase !== 'arrived'
+    if (this.dirty || moving || flying || damping || flyMoving) {
+      if (now - this.lastDraw >= MIN_FRAME_MS || this.dirty || flying || flyMoving) {
         this.updateBodies()
+        const fly = this.fly
+        if (fly) {
+          if (!fly.placeCamera()) {
+            // The craft has no place now (past its data): the fly-in ends where it is.
+            this.endFly(false)
+          } else {
+            if (fly.scripted()) this.pan.moved(this.controls.target)
+            // Arrived, the follow moves the camera with the craft: before the fade and the
+            // floors are judged from it (a fast clock moves it far in one frame).
+            else this.followFocus()
+            this.stars.position.copy(this.camera.position)
+            fly.measure((d) => this.unitsPerPx(d), CRAFT_MODEL_PX)
+            this.applyDecor(fly.decor)
+          }
+        }
         this.applyMinPixelSize()
         this.followFocus()
-        this.renderer.render(this.scene, this.camera)
+        this.drawScene()
         this.lastDraw = now
         this.dirty = false
         this.draws += 1
@@ -1933,12 +2409,22 @@ export class OrreryRenderer {
           .map((p) => p.name)
           .join(',')
         this.reportFramed(projected)
-        if (this.onFrame) this.onFrame(this.visibility.labels ? projected : [])
+        // In the fly-in the labels go with the rest of the furniture (#268); the craft's own
+        // is the target bracket. Hidden labels are not on the page to tab to or tap.
+        const flyKey = this.fly?.key
+        const labels =
+          this.visibility.labels && this.decorShown > DECOR_HIDDEN
+            ? flyKey
+              ? projected.filter((p) => p.name !== flyKey)
+              : projected
+            : []
+        if (this.onFrame) this.onFrame(labels)
+        this.emitFly()
       }
     }
     // Loop only while something moves on screen. When it settles, stop; a 1x clock
     // then wakes the renderer once a second, and nothing else runs.
-    const animating = moving || flying || damping || this.dirty
+    const animating = moving || flying || damping || this.dirty || flyMoving
     this.canvas.dataset['orreryAnimating'] = String(animating)
     if (animating) this.schedule()
     else if (clock.playing) this.scheduleTick()
@@ -1953,6 +2439,17 @@ export class OrreryRenderer {
     d['orreryDraws'] = String(this.draws)
     // The craft the camera is at its closest to, for the zoom-to-enter e2e (#261).
     d['orreryClosest'] = this.closestCraft() ?? ''
+    // The fly-in (#268): its phase, how far it has eased to true scale, and the decoration.
+    d['orreryFly'] = this.fly?.phase ?? ''
+    d['orreryFlyTrue'] = this.fly ? this.fly.trueness.toFixed(2) : ''
+    d['orreryFlyDecor'] = this.decorShown.toFixed(2)
+    // The camera's range to its target, km, and the model's robust radius at true size, m.
+    const fly = this.fly
+    d['orreryFlyKm'] = fly
+      ? ((this.camera.position.distanceTo(this.controls.target) / LINEAR_K) * AU_KM).toFixed(3)
+      : ''
+    d['orreryFlyModelM'] =
+      fly && fly.robustUnits > 0 ? ((fly.robustUnits / LINEAR_K) * AU_KM * 1000).toFixed(4) : ''
     d['orreryGeometries'] = String(memory.geometries)
     d['orreryTextures'] = String(memory.textures)
     d['orreryPrograms'] = String(programs?.length ?? 0)
@@ -2001,6 +2498,19 @@ export class OrreryRenderer {
     const sats = this.sats.snapshot()
     d['orrerySatMode'] = this.sats.mode()
     d['orrerySatDistance'] = this.sats.distance().toFixed(1)
+    // The camera's true distance from Earth's centre, km, in Proportional (#271).
+    const earthMesh = this.bodies.get('Earth')
+    d['orreryCameraEarthKm'] =
+      earthMesh && this.placeMode() === 'proportional'
+        ? ((earthMesh.position.distanceTo(this.camera.position) / LINEAR_K) * AU_KM).toFixed(0)
+        : ''
+    // The camera's offset from its target, then the target, scene units: the offset on its
+    // own keeps its precision when the camera is metres from a craft au from the Sun.
+    const ct = this.controls.target
+    const off = this.camera.position.clone().sub(ct)
+    d['orreryCamera'] = [off.x, off.y, off.z, ct.x, ct.y, ct.z]
+      .map((v) => v.toPrecision(6))
+      .join(',')
     d['orrerySatTotal'] = String(sats.total)
     d['orrerySatDrawn'] = String(sats.drawn)
     d['orrerySatHidden'] = String(sats.outOfWindow)
@@ -2045,6 +2555,8 @@ export class OrreryRenderer {
     this.small.dispose()
     this.sats.dispose()
     this.models.dispose()
+    this.nearPass.dispose()
+    disposeStars(this.stars)
     this.satModels.dispose()
     this.moons.dispose()
     this.sunImage.stop()
@@ -2057,6 +2569,15 @@ export class OrreryRenderer {
 }
 
 const BODY_NAMES = new Set<string>(['Sun', ...PLANETS])
+const ORIGIN = new Vector3()
+
+/** A body's (or a craft marker's) radius in scene units in a mode, before any px floor. */
+function modeRadius(mode: ScaleMode, name: SceneKey): number {
+  if (!isBody(name)) return CRAFT_RADIUS[mode]
+  if (mode === 'exaggerated') return EXAGGERATED_RADIUS[name]
+  if (mode === 'log') return EXAGGERATED_RADIUS[name] * LOG_SIZE_FACTOR
+  return (TRUE_RADIUS_KM[name] / AU_KM) * LINEAR_K
+}
 
 /** A planet or the Sun (drawn from the elements), as opposed to a craft key. */
 function isBody(name: SceneKey): name is BodyName {

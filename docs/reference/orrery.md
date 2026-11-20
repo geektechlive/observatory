@@ -433,59 +433,106 @@ A silhouette at a distance, a 3D model when focused.
 
 ## The detail view, "Look closer" (#203)
 
-A button in the inspector, for a spacecraft or satellite with a model, opens the model close up
-(ADR 0021).
+A button in the inspector, for a spacecraft or satellite with a model, opens the model close up:
+a spacecraft with DISCOS sizes flies in within the orrery itself (ADR 0038); a satellite, or a
+craft without them, opens the studio with a canvas of its own (ADR 0021).
 
-- **For a spacecraft with ESA DISCOS sizes it is the fly-in (#261, ADR 0037).**
-  `flyIn.ts` builds `TrueScaleOptions` from the page's tracks, moons, DISCOS and clock.
-  `DetailScene` then switches to the fly-in:
-  - a logarithmic depth buffer and an opaque black background;
-  - `TrueSky` in place of the studio lights: the Sun, the planets and the moons at true km from
-    the craft, one point light at the Sun, a faint ambient fill, and 287 Yale Bright Star
-    Catalogue stars on a sphere that follows the camera;
-  - the model scaled by `modelMetresPerUnit`: to DISCOS's span where that is at least 1.5 times
-    the body, else body to body;
-  - the model turned to its attitude;
-  - a 4 s flight (`flight.ts`) from 1,000,000 km. The flight comes in opposite the
-    biggest-looking body, 12° off (`framingApproach`), and is moved off any body in the way
-    (`flightStart`).
-  - Reduced motion cuts to arrival, and a drag takes over the flight.
-  - **A target bracket and range** (`flightTarget.ts`, cyan as telemetry) mark the craft from
-    the first frame. The owner saw the probe "wink into existence": at true size it stays
-    under a pixel, dark, until about 300 m out. The bracket grows round the model and fades
-    between 12 and 40 px of model radius, so it returns when you zoom back out. The scene
-    reports the radius and range through `onTarget`.
-  - The flight's log-distance ease is `smoothstep^0.6`, so the last 10 km get about half the 4 s.
-    Measured on the preview: the bracket is on from 272,000 km, the model shows inside it at
-    about 350 m, and it grows from 1 px to filling the view over about 1.5 s, in Chromium
-    and WebKit.
-  - The canvas reports `data-detail-metres-per-unit`.
-  - Measured 2026-11-17: Parker on 2 Dec 2026 (9.85 R☉) flies in against an 11.6° Sun, and Juno
-    shows Jupiter's phase. Every model matched DISCOS's span or body within 0.1 m.
-  - The caption names the sources, and any moon left out near the craft (`omittedNear`, its
-    planet within 0.2 au, no samples for the date).
-  - **Zoom to enter** (`lib/orrery/zoomGate.ts`, wired in `OrreryPage`). A wheel gesture
-    (events under 300 ms apart) that starts with the camera at its closest zoom on the
-    selected, followed craft (`OrreryRenderer.closestCraft()`, within 2% of `minDistance`)
-    and pushes 400 px further opens the fly-in. Deltas are scaled as OrbitControls scales
-    them (lines x16, pages x100, a ctrl-wheel trackpad pinch x10), and slow mouse-wheel notches
-    keep their push across pauses up to 1.5 s while the camera stays at the limit. A panned
-    camera (no longer following) never enters. The listener is in the capture phase, so it
-    reads the camera before OrbitControls moves it. The gesture that reached the limit never
-    crosses (trackpad momentum), and the rest of a crossing gesture is swallowed at the window
-    (`swallowWheelUntilQuiet`), so it can't cancel the flight. Zooming out to return is not
-    built.
-  - **A touch-screen pinch enters too** (`PinchGate`). A touch screen sends no wheel events,
-    so the page tracks touch pointers itself. A pinch has a clear start and end, so it needs
-    no timing: a pinch whose second finger lands while the camera is already at its closest
-    zoom on the selected, followed craft, and that spreads 120 px further (`PINCH_PUSH_PX`),
-    opens the fly-in. The pinch that carried the camera there never does. It relies on the
-    pinch keeping the follow (#264).
-  - e2e: `orrery-fly-in.spec.ts` (the touch tests drive two fingers through CDP
-    `Input.dispatchTouchEvent`, so Chromium only; they pinch above the inspector sheet, since
-    a pinch on the sheet zooms the page).
-  - **A look in WebKit is needed for depth-buffer changes**, because `pnpm verify` draws only in
-    headless Chromium.
+- **For a spacecraft with ESA DISCOS sizes it is the fly-in, in the orrery itself (#261, #268,
+  ADR 0037, ADR 0038).** `flyIn.ts` builds `FlyInOptions` (DISCOS size, the model's axis, the
+  surroundings at the clock's date) from the page's tracks, moons, DISCOS and clock. The page
+  calls `renderer.enterFlyIn(key, options)` instead of mounting `DetailView`, and the orrery
+  stays on the page with the rail, time bar and inspector. Closing calls `leaveFlyIn()`.
+  - **Ease, then flight** (`lib/orrery/flyInPath.ts`, pure): 0.7 s easing every body, orbit and
+    the craft's path from the visitor's scale to true scale. The renderer's `blend()` lerps
+    positions, interpolates radii geometrically, moves the px floors, closes the Earth frame
+    and takes moons to their true places. Then a 4 s flight to the model at its real size,
+    eased in log distance (`flightDistanceKm`, `smoothstep^0.6`).
+    - The ease pulls the camera back so the body nearest the craft keeps about its separation
+      on screen (`scaleRatio`).
+    - The flight comes straight in along the visitor's line of sight, and the leave goes
+      straight back out (`radialClear` on that line; owner, 2026-11-20). Measured on Juno:
+      0° of turn either way, where the framing turn had swung 108°.
+    - Only when a body sits on that line does it turn to the framing side: opposite the
+      biggest-looking body, 12° off (`framingApproach`), moved off any body in the way
+      (`flightStart` at `FLIGHT_START_KM`). That turn is tested exactly against each body
+      at its own distance (`turnClear`); failing that, it happens in the ease.
+    - A preset, a new selection or a scale change in the fly-in ends it at the visitor's
+      view first (`endFly(true)`), so the move starts there: from the fly-in's spot, the
+      Inner preset swung 162°; from the visitor's view, 60°, the preset's own move.
+    - `data-orrery-camera` on the canvas: the camera's offset from its target, then the
+      target, for checks that the camera holds still.
+  - **Driver** (`three/flyInDriver.ts`): phases waiting → enter → arrived → leave.
+    - It waits up to 6 s for the model, then flies without one.
+    - The bodies are held at the epoch it began while the camera moves.
+    - A drag in the flight stops it where it is.
+    - Arrival frames the model by its outline in the part of the stage the inspector and time
+      bar leave free.
+    - The zoom-out wall is where the model's farthest vertex is 12 px. A fresh push out there
+      (`ZoomGate('out')`) leaves, as do Back and Escape.
+    - Leaving flies back out, then eases back to the visitor's scale, side and distance.
+    - Reduced motion cuts to each end.
+    - A preset, a scale change or another focus ends it at once.
+  - **Two passes** (`three/nearPass.ts`), in the fly-in only. The orrery draws everything but
+    the model with its near plane half way to the nearest body's surface. Then, over a cleared
+    depth buffer, it draws the model in a small scene of its own, in units of the model's
+    robust radius, with the camera matched in 64-bit numbers and the Sun's light and the faint
+    fill.
+    - No log depth: it is a renderer-wide constructor option, and it rounds 1 + w to 1 below
+      about 1e-7 scene units.
+    - The model is sized by `modelMetresPerUnit`, to DISCOS's span where that is at least 1.5
+      times the body, else body to body. It is drawn at max(true size, the 9 px icon fading out
+      with the ease).
+  - **Decoration** (`decorAt`): lines, other markers, the satellites and the labels fade between
+    30 and 3 million km from the craft and are hidden below 2%. That is a design choice, and it
+    also keeps the lines' float32 rounding (about a km near Parker, thousands near Voyager) out
+    of the close-up. Close in, a body's floor is 1.5 px, a point of light. The 287 Yale Bright
+    Star Catalogue stars (`three/starField.ts`) come out with the ease, and the badge reads
+    TRUE SCALE.
+  - **Overlay** (`FlyInOverlay.tsx`):
+    - Back to orrery, zoom buttons, arrow keys and +/− (`renderer.nudgeCamera`);
+    - the target bracket and range (`flightTarget.ts`, cyan as telemetry), placed on the
+      craft's projected position, fading between 12 and 40 px of model radius;
+    - the credit: the sources, any moon left out near the craft, and the model's licence.
+  - **Cold links.** A cold `detail=` link to a craft waits for the tracks and DISCOS before
+    choosing the fly-in or the studio, so the studio never mounts first.
+  - **Probes** on the orrery canvas: `data-orrery-fly` (phase), `data-orrery-fly-true`,
+    `data-orrery-fly-decor`, `data-orrery-fly-km`, `data-orrery-fly-model-m`.
+  - **Measured 2026-11-20** (Chromium, real GPU, the API from production):
+    - Parker arrives opposite the Sun with the Sun beside it (the first build's framing
+      turn; since 2026-11-20 it comes in on the visitor's side, heat shield lit).
+    - Juno and DSCOVR (from the open Earth frame) arrive at their models, and Back returns
+      each to the view it left.
+    - The flight held 60 fps (p95 16.7 ms) at 390 x 844 with a 4x CPU slowdown, the same as
+      dragging the orrery.
+  - **Zoom to enter** (`lib/orrery/zoomGate.ts`, wired in `OrreryPage`).
+    - A wheel gesture (events under 300 ms apart) that starts with the camera at its closest
+      zoom on the selected, followed craft (`OrreryRenderer.closestCraft()`, within 2% of
+      `minDistance`) and pushes 400 px further opens the fly-in.
+    - Deltas are scaled as OrbitControls scales them (lines x16, pages x100, a ctrl-wheel
+      trackpad pinch x10). Slow mouse-wheel notches keep their push across pauses up to 1.5 s
+      while the camera stays at the limit.
+    - A panned camera (no longer following) never enters.
+    - The listener is in the capture phase, so it reads the camera before OrbitControls moves
+      it.
+    - The gesture that reached the limit never crosses (trackpad momentum), and the rest of a
+      crossing gesture is swallowed at the window (`swallowWheelUntilQuiet`).
+  - **A touch-screen pinch enters too** (`PinchGate`). A touch screen sends no wheel events, so
+    the page tracks touch pointers itself. A pinch has a clear start and end, so it needs no
+    timing: a pinch whose second finger lands while the camera is already at its closest zoom
+    on the selected, followed craft, and that spreads 120 px further (`PINCH_PUSH_PX`), opens
+    the fly-in. The pinch that carried the camera there never does. It relies on the pinch
+    keeping the follow (#264). A pinch in to leave is not built: Back and Escape do it.
+  - e2e: `orrery-fly-in.spec.ts`.
+    - It covers one canvas and the rail, the true size, arrival, the bracket, reduced motion,
+      Escape back to the same view, the GPU count over cycles, a preset ending it, wheel and
+      pinch entry, and the wall exit.
+    - The touch tests drive two fingers through CDP `Input.dispatchTouchEvent`, so Chromium
+      only. They pinch above the inspector sheet, since a pinch on the sheet zooms the page.
+  - **A look in WebKit is needed for depth or pass changes**, because `pnpm verify` draws only
+    in headless Chromium.
+
+- **The studio, for satellites and for craft without DISCOS sizes.** It has its own canvas and
+  renderer (ADR 0021).
 
 - **Its own canvas and renderer.** `DetailView.tsx` (a lazy chunk, `DetailView-*.js`) mounts only
   while `detail` is set in `store/orreryView.ts`. `three/DetailScene.ts` makes the canvas, a

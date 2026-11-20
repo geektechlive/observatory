@@ -127,6 +127,8 @@ export function earthFrameDistance(trueOffset: number, open: number, t: number):
 /**
  * The camera's near plane, scene units. A smaller one costs depth precision across the
  * 200,000-unit far plane, so the minimum distance near Earth is raised instead (#197).
+ * The fly-in and the Proportional mode, where bodies are true size, lower it frame by frame
+ * from the nearest surface instead (`bodyNearPlane`, #268, #271).
  */
 export const CAMERA_NEAR = 0.01
 /** The camera never comes nearer its target than this, scene units, away from Earth. */
@@ -148,6 +150,22 @@ export function cameraMinDistance(targetToEarth: number): number {
   return targetToEarth <= EARTH_FRAME_OPEN_TARGET.closed * EARTH_FRAME_UNIT
     ? CAMERA_MIN_EARTH_RADII * EARTH_FRAME_UNIT
     : CAMERA_MIN_DISTANCE
+}
+
+/**
+ * The Proportional mode's minimum distance (#271): bodies are true size there, so the
+ * frame's 2.5 radii (0.021 units, about 318,000 km at 10 units per au) kept the camera
+ * far outside geostationary orbit. Near a body (within `EARTH_FRAME_OPEN_TARGET.closed` of
+ * its radii) the camera may come to 2.5 of its true radii; elsewhere the general limit.
+ * Each entry is the target's distance from a body and that body's true radius, scene units.
+ */
+export function trueMinDistance(bodies: readonly { distance: number; radius: number }[]): number {
+  let min = CAMERA_MIN_DISTANCE
+  for (const b of bodies) {
+    if (b.distance <= EARTH_FRAME_OPEN_TARGET.closed * b.radius)
+      min = Math.min(min, CAMERA_MIN_EARTH_RADII * b.radius)
+  }
+  return min
 }
 
 /** Minutes the solar wind takes from L1 to Earth at a speed, km/s; null without one. */

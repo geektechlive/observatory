@@ -8,7 +8,13 @@ import { Group, type Object3D, Quaternion, Vector3 } from 'three'
 
 import { type ModelDescriptor, spacecraftDescriptor } from '@/lib/orrery/modelDescriptor'
 
-import { disposeTree, fitModel, type ModelLoader, prepareMaterials } from './craftModelLoad'
+import {
+  disposeTree,
+  fitModel,
+  type ModelLoader,
+  positionsOf,
+  prepareMaterials,
+} from './craftModelLoad'
 import { buildStandIn } from './craftStandIns'
 
 export type { ModelLoader }
@@ -20,6 +26,10 @@ interface Shown {
   /** Positions the model and turns it; holds the centred model. */
   holder: Group
   radius: number
+  /** Every vertex, centred, in robust radii (x, y, z flat): the fly-in frames by it (#268). */
+  points: Float32Array
+  /** The farthest vertex from the centre, in robust radii. */
+  fullShare: number
 }
 
 export class CraftModelLayer {
@@ -107,8 +117,38 @@ export class CraftModelLayer {
     holder.name = `model:${naifId}`
     holder.add(fit.centred)
     this.group.add(holder)
-    this.shown = { key, naifId, model, holder, radius: fit.radius }
+    const raw = positionsOf(fit.centred)
+    const points = new Float32Array(raw.length)
+    let far = 0
+    for (let i = 0; i < raw.length; i += 3) {
+      const x = (raw[i] ?? 0) / fit.radius
+      const y = (raw[i + 1] ?? 0) / fit.radius
+      const z = (raw[i + 2] ?? 0) / fit.radius
+      points[i] = x
+      points[i + 1] = y
+      points[i + 2] = z
+      far = Math.max(far, Math.hypot(x, y, z))
+    }
+    this.shown = {
+      key,
+      naifId,
+      model,
+      holder,
+      radius: fit.radius,
+      points,
+      fullShare: Math.max(far, 1),
+    }
     this.onChange()
+  }
+
+  /** The shown model's shape for the fly-in (#268): its vertices and farthest reach, in robust radii. */
+  shape(): { points: Float32Array; fullShare: number } | null {
+    return this.shown ? { points: this.shown.points, fullShare: this.shown.fullShare } : null
+  }
+
+  /** Whether the model has arrived, or failed (the fly-in waits for one or the other). */
+  settled(): boolean {
+    return this.shown !== null || this.failed !== null
   }
 
   private clear(): void {
