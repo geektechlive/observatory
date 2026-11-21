@@ -5,7 +5,7 @@
  * nothing is.
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ControlRail } from '@/components/orrery/ControlRail'
 import { SatControls } from '@/components/orrery/SatControls'
@@ -18,7 +18,11 @@ import {
 } from '@/components/orrery/satToggles'
 import type { SatGroupState, SatSnapshot } from '@/lib/orrery/satController'
 
+import { openAllFolds } from './fixtures/openFolds'
+
 afterEach(cleanup)
+// The rail folds its layer groups (#273): these tests read what a group holds.
+beforeEach(openAllFolds)
 
 const loaded = (count: number, ageSeconds = 7200): SatGroupState => ({
   status: 'loaded',
@@ -129,7 +133,7 @@ describe('the Earth orbit preset and group in the rail (#98)', () => {
     expect((button as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(button)
     expect(onPreset).toHaveBeenCalledWith('orbit')
-    expect(screen.getByRole('heading', { name: 'Earth orbit' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /^Earth orbit/ })).toBeTruthy()
   })
 })
 
@@ -149,14 +153,15 @@ describe('<SatControls> (#98)', () => {
     const starlink = screen.getByRole('switch', { name: 'Starlink' })
     expect(starlink.getAttribute('aria-checked')).toBe('false')
     const hint = document.getElementById(starlink.getAttribute('aria-describedby') ?? '')
-    expect(hint?.textContent).toMatch(/SpaceX/)
+    // One line in the folding rail (#273); the guide and the browser carry the rest.
+    expect(hint?.textContent).toMatch(/0\.5 MB/)
     fireEvent.click(starlink)
     expect(onToggles).toHaveBeenCalledWith({ ...DEFAULT_SAT_TOGGLES, starlink: true })
     for (const t of SAT_TOGGLES) {
       const sw = screen.getByRole('switch', { name: t.label })
       expect(sw.getAttribute('aria-describedby')).toBeTruthy()
     }
-    expect(screen.getByRole('status').textContent).toBe('Loading…')
+    expect(screen.getAllByRole('status').map((s) => s.textContent)).toContain('Loading…')
   })
 
   it('adds Space-Track’s Box Score and this week’s re-entries, credited (#101)', () => {

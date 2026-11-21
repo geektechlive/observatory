@@ -5,7 +5,7 @@
  * Earth–Moon/L1 preset.
  */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ControlRail } from '@/components/orrery/ControlRail'
 import { DEFAULT_CRAFT_FILTER } from '@/components/orrery/craftFilter'
@@ -13,7 +13,11 @@ import { NeoControls } from '@/components/orrery/NeoControls'
 import { DEFAULT_NEO_FILTER } from '@/lib/orrery/asteroids'
 import type { ScoutObject } from '@/schemas/orreryNeo'
 
+import { openAllFolds } from './fixtures/openFolds'
+
 afterEach(cleanup)
+// The rail folds its layer groups (#273): these tests read what a group holds.
+beforeEach(openAllFolds)
 
 const noop = () => undefined
 
@@ -76,16 +80,16 @@ describe('NeoControls (#92)', () => {
     ).toBe('true')
     fireEvent.click(within(group).getByRole('button', { name: /within a day/i }))
     expect(onFilter).toHaveBeenCalledWith({ ...DEFAULT_NEO_FILTER, window: 'day' })
-    expect(screen.getByText(/±30 days/)).toBeTruthy()
+    expect(screen.getByText(/30 days either side of today/)).toBeTruthy()
   })
 
   it('explains hazardous and risk-listed in plain words', () => {
     const { onFilter } = renderNeo()
     const pha = screen.getByRole('switch', { name: /hazardous only/i })
-    expect(hintOf(pha)).toMatch(/140 m/)
-    expect(hintOf(pha)).toMatch(/not a prediction/i)
+    // One line each in the folding rail (#273); the guide's "The controls" has the rest.
+    expect(hintOf(pha)).toMatch(/not a forecast/i)
     const risk = screen.getByRole('switch', { name: /risk list only/i })
-    expect(hintOf(risk)).toMatch(/ESA/)
+    expect(hintOf(risk)).toMatch(/100 years/)
     fireEvent.click(risk)
     expect(onFilter).toHaveBeenCalledWith({ ...DEFAULT_NEO_FILTER, riskListedOnly: true })
   })
@@ -105,7 +109,7 @@ describe('NeoControls (#92)', () => {
     expect(screen.getByText(/no position/i)).toBeTruthy()
   })
 
-  it('has a Space weather switch for the Sun–Earth line and L1, explained', () => {
+  it('has a switch for the Sun–Earth line and L1, explained, in Near Earth (#273)', () => {
     const { onSunLine } = renderNeo()
     const sw = screen.getByRole('switch', { name: /Sun–Earth line/i })
     expect(hintOf(sw)).toMatch(/L1/)

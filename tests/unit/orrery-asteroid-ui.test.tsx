@@ -4,14 +4,18 @@
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Vector3 } from 'three'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SmallBodyControls } from '@/components/orrery/SmallBodyControls'
 import { SmallBodyLayer } from '@/components/orrery/three/smallBodyLayer'
 import { asteroidStatus, isAsteroidKey } from '@/lib/orrery/smallBodyView'
 import type { OrrerySmallBody } from '@/schemas/orrerySmallBodies'
 
+import { openAllFolds } from './fixtures/openFolds'
+
 afterEach(cleanup)
+// The rail folds its layer groups (#273): these tests read what a group holds.
+beforeEach(openAllFolds)
 
 const OFF = { comets: false, interstellar: false, asteroids: false, dwarfs: false }
 
@@ -34,7 +38,12 @@ describe('SmallBodyControls: Bright asteroids', () => {
         asteroidStatus="3 bright asteroids this week, from JPL Horizons"
       />,
     )
-    expect(screen.getByRole('status').textContent).toMatch(/3 bright asteroids/)
+    expect(
+      screen
+        .getAllByRole('status')
+        .map((s) => s.textContent)
+        .join(' '),
+    ).toMatch(/3 bright asteroids/)
   })
 })
 

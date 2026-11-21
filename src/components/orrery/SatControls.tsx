@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
 
 import { boxscoreLine } from '@/lib/satcatWords'
 
+import { FoldGroup } from './FoldGroup'
 import styles from './orrery.module.css'
+import { countReadout } from './railFolds'
 import type { SatBrowserProps } from './SatBrowser'
 import { SAT_TOGGLES, type SatToggles } from './satToggles'
 import { Switch } from './Switch'
@@ -27,8 +29,9 @@ interface SatControlsProps {
 }
 
 /**
- * The Earth orbit group of the controls (#98; spec Part 19): a switch per kind of
- * satellite, each explained in place since phones have no hover (#122). Below them,
+ * The Earth orbit group of the controls (#98; spec Part 19; folds since #273): a switch
+ * per kind of satellite, each with a one-line hint since phones have no hover (#122); the
+ * satellite browser and the guide carry the longer ones. Below them,
  * Space-Track's count of everything in orbit and this week's re-entries (#101).
  */
 export function SatControls({
@@ -39,6 +42,7 @@ export function SatControls({
   reentriesThisWeek = 0,
   browse,
 }: SatControlsProps) {
+  const on = SAT_TOGGLES.filter((t) => toggles[t.id]).map((t) => t.label)
   const [browsing, setBrowsing] = useState(false)
   const panelId = useId()
   const panel = useRef<HTMLDivElement>(null)
@@ -47,15 +51,18 @@ export function SatControls({
     if (browsing) panel.current?.scrollIntoView({ block: 'start' })
   }, [browsing])
   return (
-    <section className={styles.group ?? ''} aria-labelledby="orrery-sats">
-      <h2 id="orrery-sats" className={styles.groupTitle ?? ''}>
-        Earth orbit
-      </h2>
+    <FoldGroup
+      id="orbit"
+      title="Earth orbit"
+      readout={countReadout(on.length, SAT_TOGGLES.length)}
+      off={on.length === 0}
+      onKeys={on}
+    >
       {SAT_TOGGLES.map((t) => (
         <Switch
           key={t.id}
           label={t.label}
-          hint={t.hint}
+          hint={t.short}
           on={toggles[t.id]}
           onChange={(on) => {
             onToggles({ ...toggles, [t.id]: on })
@@ -99,6 +106,6 @@ export function SatControls({
           </div>
         </>
       )}
-    </section>
+    </FoldGroup>
   )
 }

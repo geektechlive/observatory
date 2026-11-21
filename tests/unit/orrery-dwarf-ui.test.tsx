@@ -10,8 +10,9 @@ import { cleanup, fireEvent, render, renderHook, screen } from '@testing-library
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { smallBodyCatalog } from '@/components/orrery/catalog'
-import { DwarfControls } from '@/components/orrery/DwarfControls'
 import { Inspector } from '@/components/orrery/Inspector'
+import { resetFoldMemory } from '@/components/orrery/railFolds'
+import { SmallBodyControls } from '@/components/orrery/SmallBodyControls'
 import type { OrreryRenderer } from '@/components/orrery/three/OrreryRenderer'
 import { DWARF_MIN_PX, PX_CEILING } from '@/components/orrery/three/pxClamp'
 import { useOrreryLink } from '@/components/orrery/useOrreryLink'
@@ -46,6 +47,10 @@ const entries = dwarfEntries(data)
 const pluto = entries[0]
 
 afterEach(cleanup)
+beforeEach(() => {
+  localStorage.clear()
+  resetFoldMemory()
+})
 
 describe('the Find box', () => {
   it('lists each dwarf planet under its own group, available where its span covers the date', () => {
@@ -125,21 +130,30 @@ describe('a link by name: focus=pluto (#99 item 8)', () => {
   })
 })
 
-describe('DwarfControls', () => {
+describe('the Dwarf planets switch, in Small bodies (#273)', () => {
+  const OFF = { comets: false, interstellar: false, asteroids: false, dwarfs: false }
+
   it('is one switch, off at first, with the status beneath it', () => {
-    const onChange = vi.fn()
+    const onGroups = vi.fn()
     render(
-      <DwarfControls
-        on={false}
-        onChange={onChange}
-        status="No dwarf-planet data yet: the next data refresh adds it."
+      <SmallBodyControls
+        groups={OFF}
+        onGroups={onGroups}
+        status=""
+        dwarfStatus="No dwarf-planet data yet: the next data refresh adds it."
       />,
     )
+    fireEvent.click(screen.getByRole('button', { name: /Small bodies/ }))
     const sw = screen.getByRole('switch', { name: /Dwarf planets/ })
     expect(sw.getAttribute('aria-checked')).toBe('false')
     fireEvent.click(sw)
-    expect(onChange).toHaveBeenCalledWith(true)
-    expect(screen.getByRole('status').textContent).toMatch(/No dwarf-planet data yet/)
+    expect(onGroups).toHaveBeenCalledWith({ ...OFF, dwarfs: true })
+    expect(
+      screen
+        .getAllByRole('status')
+        .map((s) => s.textContent)
+        .join(' '),
+    ).toMatch(/No dwarf-planet data yet/)
   })
 })
 

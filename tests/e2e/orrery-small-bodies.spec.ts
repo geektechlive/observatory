@@ -9,6 +9,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { lookupTrajectory } from './lookupPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { ATLAS_ID, COMET_ID, serveCometsTonight, serveSmallBodies } from './smallBodiesPayload'
 import { offlineSun } from './swpc'
 
@@ -38,6 +39,7 @@ test.describe('Bright asteroids (#99 item 4)', () => {
     const comets = await open(page)
     await page.waitForTimeout(1000)
     expect(tonight).toEqual([])
+    await openRailGroup(page, 'Small bodies')
     const sw = page.getByRole('switch', { name: 'Bright asteroids' })
     await expect(sw).toHaveAttribute('aria-checked', 'false')
     await sw.click()
@@ -58,6 +60,7 @@ test.describe('Comets & interstellar (#99)', () => {
     expect(asked).toEqual([])
     await expect.poll(() => attr(page, 'data-orrery-small-bodies')).toBe('0')
 
+    await openRailGroup(page, 'Small bodies')
     await page.getByRole('switch', { name: 'Comets' }).click()
     await expect.poll(() => asked.length).toBeGreaterThan(0)
     await expect.poll(() => attr(page, 'data-orrery-small-body-keys')).toBe(COMET_ID)
@@ -88,6 +91,7 @@ test.describe('Comets & interstellar (#99)', () => {
 
   test('choosing 3I/ATLAS in the Find box opens its inspector', async ({ page }) => {
     await open(page)
+    await openRailGroup(page, 'Small bodies')
     await page.getByRole('switch', { name: 'Interstellar objects' }).click()
     await page.getByRole('combobox', { name: /find/i }).fill('3I')
     await page.getByRole('option', { name: /^3I\/ATLAS/ }).click()
@@ -132,6 +136,7 @@ test.describe('Comets & interstellar (#99)', () => {
     await expect
       .poll(() => attr(page, 'data-orrery-lookup'), { timeout: 15_000 })
       .toBe('lookup:1004083')
+    await openRailGroup(page, 'Small bodies')
     await page.getByRole('switch', { name: 'Interstellar objects' }).click()
     await expect.poll(() => attr(page, 'data-orrery-small-body-keys')).toBe(ATLAS_ID)
     // Its twin in the comet data is drawn now, so the lookup's copy hides.

@@ -3,8 +3,10 @@ import type { ReactNode, Ref } from 'react'
 import { SOURCES } from '@/lib/orrery/sources'
 
 import type { CatalogItem } from './catalog'
+import { FoldGroup } from './FoldGroup'
 import { GoToDate } from './GoToDate'
 import styles from './orrery.module.css'
+import { countReadout } from './railFolds'
 import { SearchBox } from './SearchBox'
 import { Switch } from './Switch'
 import type { CraftFilter, FocusPreset, ScaleMode, Visibility } from './three/OrreryRenderer'
@@ -49,17 +51,18 @@ interface ControlRailProps {
   craftStatus?: string | undefined
   /** Craft in DSN contact now. */
   dsnCount?: number | undefined
-  /** The near-Earth groups (#92): close approaches, Scout, the Sun–Earth line. */
+  /** The Near Earth group (#92, #273): close approaches, Scout, the Sun–Earth line. */
   nearEarth?: ReactNode
   /** The Earth orbit group (#98): the satellite switches. */
   earthOrbit?: ReactNode
-  /** The "Dwarf planets" and "Comets & interstellar" groups (#99). */
+  /** The Small bodies group (#99, #273): dwarf planets, comets, asteroids, interstellar. */
   smallBodies?: ReactNode
 }
 
 /**
  * The orrery's controls (#91), grouped as in spec Part 19 and showing only the groups
- * that have something in them. Left rail from 900px, a bottom sheet below.
+ * that have something in them. Left rail from 900px, a bottom sheet below. Learn, Find
+ * and View stay open; the layer groups fold (#273).
  */
 export function ControlRail({
   open,
@@ -82,6 +85,19 @@ export function ControlRail({
   earthOrbit,
   smallBodies,
 }: ControlRailProps) {
+  const solarOn = [
+    ...(visibility.planets ? ['Planets'] : []),
+    ...(visibility.orbits ? ['Orbits'] : []),
+    ...(visibility.labels ? ['Labels'] : []),
+  ]
+  // The DSN switch narrows the others rather than adding a layer, so it isn't counted.
+  const craftOn = craftFilter
+    ? [
+        ...(craftFilter['deep-space'] ? ['Deep space'] : []),
+        ...(craftFilter.mission ? ['Missions'] : []),
+        ...(craftFilter.l1 ? ['L1 & L2 observatories'] : []),
+      ]
+    : []
   return (
     <div
       id="orrery-controls"
@@ -163,10 +179,13 @@ export function ControlRail({
         <GoToDate className={styles.dateField} />
       </section>
 
-      <section className={styles.group ?? ''} aria-labelledby="orrery-solar">
-        <h2 id="orrery-solar" className={styles.groupTitle ?? ''}>
-          Solar system
-        </h2>
+      <FoldGroup
+        id="solar"
+        title="Solar system"
+        readout={countReadout(solarOn.length, 3)}
+        off={solarOn.length === 0}
+        onKeys={solarOn}
+      >
         <Switch
           label="Planets"
           on={visibility.planets}
@@ -188,16 +207,19 @@ export function ControlRail({
             onVisibility({ ...visibility, labels })
           }}
         />
-      </section>
+      </FoldGroup>
 
       {craftFilter && onCraftFilter && (
-        <section className={styles.group ?? ''} aria-labelledby="orrery-craft">
-          <h2 id="orrery-craft" className={styles.groupTitle ?? ''}>
-            Spacecraft
-          </h2>
+        <FoldGroup
+          id="craft"
+          title="Spacecraft"
+          readout={countReadout(craftOn.length, 3)}
+          off={craftOn.length === 0}
+          onKeys={craftOn}
+        >
           <Switch
             label="Deep space"
-            hint="Voyager 1, Voyager 2 and New Horizons, beyond the planets"
+            hint="Voyager 1 and 2 and New Horizons, beyond the planets"
             on={craftFilter['deep-space']}
             onChange={(on) => {
               onCraftFilter({ ...craftFilter, 'deep-space': on })
@@ -205,7 +227,7 @@ export function ControlRail({
           />
           <Switch
             label="Missions"
-            hint="Parker, Juno, Europa Clipper, Psyche, Lucy, Solar Orbiter and BepiColombo, on their way or at work"
+            hint="Parker, Juno, Europa Clipper and four more"
             on={craftFilter.mission}
             onChange={(mission) => {
               onCraftFilter({ ...craftFilter, mission })
@@ -213,7 +235,7 @@ export function ControlRail({
           />
           <Switch
             label="L1 & L2 observatories"
-            hint="JWST, SOHO, DSCOVR, ACE and Wind, parked about 1.5 million km from Earth"
+            hint="JWST, SOHO, DSCOVR, ACE and Wind"
             on={craftFilter.l1}
             onChange={(l1) => {
               onCraftFilter({ ...craftFilter, l1 })
@@ -221,7 +243,7 @@ export function ControlRail({
           />
           <Switch
             label={`Only those talking to Earth now (${String(dsnCount ?? 0)})`}
-            hint="In radio contact with NASA's Deep Space Network: the big dishes at Goldstone, Madrid and Canberra"
+            hint="Hides craft out of contact with NASA's Deep Space Network"
             on={craftFilter.dsnOnly}
             onChange={(dsnOnly) => {
               onCraftFilter({ ...craftFilter, dsnOnly })
@@ -232,7 +254,7 @@ export function ControlRail({
               {craftStatus}
             </p>
           )}
-        </section>
+        </FoldGroup>
       )}
 
       {smallBodies}

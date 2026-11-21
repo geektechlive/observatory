@@ -1,4 +1,6 @@
+import { FoldGroup } from './FoldGroup'
 import styles from './orrery.module.css'
+import { countReadout } from './railFolds'
 import { Switch } from './Switch'
 import type { SmallBodyGroups } from './three/OrreryRenderer'
 
@@ -8,38 +10,66 @@ interface SmallBodyControlsProps {
   status: string
   /** The "Bright asteroids" switch's status line (#99 item 4). */
   asteroidStatus?: string
+  /** The "Dwarf planets" switch's status line (#99 item 8). */
+  dwarfStatus?: string
 }
 
+const LABELS = {
+  dwarfs: 'Dwarf planets',
+  comets: 'Comets',
+  asteroids: 'Bright asteroids',
+  interstellar: 'Interstellar objects',
+} as const satisfies Record<keyof SmallBodyGroups, string>
+
+const ORDER = ['dwarfs', 'comets', 'asteroids', 'interstellar'] as const
+
 /**
- * The "Comets, asteroids & interstellar" group (#99). All start off: the data loads only
- * when one is switched on. Each term is explained in place, since phones have no hover (#122).
+ * The "Small bodies" group (#99; merged from the dwarf planets and the comets, asteroids
+ * and interstellar groups in #273). All start off: each one's data loads only when it is
+ * switched on or a link asks. Each switch has a one-line hint, since phones have no hover
+ * (#122); the guide holds the longer story.
  */
 export function SmallBodyControls({
   groups,
   onGroups,
   status,
   asteroidStatus = '',
+  dwarfStatus = '',
 }: SmallBodyControlsProps) {
+  const on = ORDER.filter((k) => groups[k]).map((k) => LABELS[k])
+  const toggle = (key: keyof SmallBodyGroups) => (value: boolean) => {
+    onGroups({ ...groups, [key]: value })
+  }
   return (
-    <section className={styles.group ?? ''} aria-labelledby="orrery-small-bodies">
-      <h2 id="orrery-small-bodies" className={styles.groupTitle ?? ''}>
-        Comets, asteroids & interstellar
-      </h2>
+    <FoldGroup
+      id="small"
+      title="Small bodies"
+      readout={countReadout(on.length, ORDER.length)}
+      off={on.length === 0}
+      onKeys={on}
+    >
       <Switch
-        label="Comets"
-        hint="The comets JPL forecasts brightest tonight. Each is placed for ±30 days of today; its orbit line is drawn from its orbital elements"
+        label={LABELS.dwarfs}
+        hint="Pluto, Ceres, Eris, Makemake and Haumea"
+        on={groups.dwarfs}
+        onChange={toggle('dwarfs')}
+      />
+      {dwarfStatus && (
+        <p className={styles.craftStatus ?? ''} role="status">
+          {dwarfStatus}
+        </p>
+      )}
+      <Switch
+        label={LABELS.comets}
+        hint="The comets JPL forecasts brightest tonight"
         on={groups.comets}
-        onChange={(comets) => {
-          onGroups({ ...groups, comets })
-        }}
+        onChange={toggle('comets')}
       />
       <Switch
-        label="Bright asteroids"
-        hint="The asteroids JPL’s H and G estimate to be brightest at the last refresh (about magnitude 11.5 or brighter); Ceres is drawn only by the Dwarf planets switch, though the Sky view lists it. Each is placed from daily JPL samples for about a week around the refresh and is hidden outside it; its orbit line is drawn from its orbital elements"
+        label={LABELS.asteroids}
+        hint="The brightest asteroids, per JPL"
         on={groups.asteroids}
-        onChange={(asteroids) => {
-          onGroups({ ...groups, asteroids })
-        }}
+        onChange={toggle('asteroids')}
       />
       {asteroidStatus && (
         <p className={styles.craftStatus ?? ''} role="status">
@@ -47,18 +77,16 @@ export function SmallBodyControls({
         </p>
       )}
       <Switch
-        label="Interstellar objects"
-        hint="ʻOumuamua, Borisov and 3I/ATLAS: visitors from other stars, on paths the Sun cannot hold"
+        label={LABELS.interstellar}
+        hint="ʻOumuamua, Borisov and 3I/ATLAS, from other stars"
         on={groups.interstellar}
-        onChange={(interstellar) => {
-          onGroups({ ...groups, interstellar })
-        }}
+        onChange={toggle('interstellar')}
       />
       {status && (
         <p className={styles.craftStatus ?? ''} role="status">
           {status}
         </p>
       )}
-    </section>
+    </FoldGroup>
   )
 }

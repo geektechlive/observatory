@@ -18,7 +18,10 @@ export type SatToggleId =
 export interface SatToggle {
   id: SatToggleId
   label: string
+  /** The full description, in the satellite browser. */
   hint: string
+  /** One line for the folding rail (#273); the guide and the browser carry the rest. */
+  short: string
   groups: readonly SatGroupId[]
   /**
    * The download when switched on, kB gzip, as /api/orrery-sats served it on 2026-11-07
@@ -32,6 +35,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'stations',
     label: 'Space stations',
     hint: 'The ISS, China’s Tiangong, and the craft docked to them',
+    short: 'The ISS, Tiangong and the craft docked to them',
     groups: ['stations'],
     downloadKb: 1,
   },
@@ -39,6 +43,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'starlink',
     label: 'Starlink',
     hint: 'SpaceX’s internet satellites, over 11,000 in low orbit, placed from SpaceX’s own orbit data where CelesTrak has it. A bigger download (about 0.5 MB)',
+    short: 'SpaceX’s 11,000+ satellites; about 0.5 MB',
     groups: ['starlink'],
     // SupGP elements (#209): 477 kB at gzip -6 from the 2026-11-12 dry run, against 550 kB
     // for the GP body production served the same hour.
@@ -48,6 +53,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'gps',
     label: 'GPS',
     hint: 'The US navigation satellites, about 20,000 km up',
+    short: 'US navigation satellites, about 20,000 km up',
     groups: ['gps-ops'],
     downloadKb: 2,
   },
@@ -55,6 +61,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'weather',
     label: 'Weather',
     hint: 'Weather satellites in low orbit and in the geostationary ring',
+    short: 'In low orbit and the geostationary ring',
     groups: ['weather'],
     downloadKb: 4.5,
   },
@@ -62,6 +69,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'science',
     label: 'Science',
     hint: 'Space telescopes and Earth-science missions, Hubble among them',
+    short: 'Telescopes and Earth science, Hubble among them',
     groups: ['science'],
     downloadKb: 3,
   },
@@ -69,6 +77,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'other',
     label: 'Other active',
     hint: 'Every other working satellite CelesTrak tracks: communications, imaging, defence and more',
+    short: 'Communications, imaging, defence and more',
     groups: ['other'],
     downloadKb: 291,
   },
@@ -76,6 +85,7 @@ export const SAT_TOGGLES: readonly SatToggle[] = [
     id: 'debris',
     label: 'Debris',
     hint: 'Pieces of three break-ups: China’s 2007 missile test on Fengyun-1C and the 2009 collision of Iridium 33 and Cosmos 2251',
+    short: 'From three break-ups in orbit',
     groups: ['fengyun-1c-debris', 'iridium-33-debris', 'cosmos-2251-debris'],
     downloadKb: 139,
   },

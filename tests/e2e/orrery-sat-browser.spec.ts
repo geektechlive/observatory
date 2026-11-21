@@ -8,6 +8,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { serveSats } from './satPayload'
 import { serveSpaceTrack } from './spaceTrackPayload'
 import { offlineSun } from './swpc'
@@ -33,7 +34,11 @@ const browseBy = (page: Page) => page.getByRole('combobox', { name: 'Browse by' 
 // The browser's rows; a ringed re-entry object also has a button of its own on the stage (#154).
 const listed = (page: Page, name: RegExp) =>
   page.getByRole('listitem').getByRole('button', { name })
-const openBrowser = (page: Page) => page.getByRole('button', { name: 'Browse satellites' }).click()
+// The Earth orbit group starts folded (#273); the browser's button is inside it.
+const openBrowser = async (page: Page) => {
+  await openRailGroup(page, 'Earth orbit')
+  await page.getByRole('button', { name: 'Browse satellites' }).click()
+}
 
 test.describe('satellite browser (#158)', () => {
   test.use({ viewport: { width: 1440, height: 900 } })

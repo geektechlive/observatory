@@ -30,7 +30,7 @@ function renderRail() {
 // exist on a phone, so each spacecraft switch carries a visible, linked hint.
 describe('spacecraft switches explain themselves (#122)', () => {
   it.each([
-    [/deep space/i, /Voyager 1, Voyager 2 and New Horizons/],
+    [/deep space/i, /Voyager 1 and 2 and New Horizons/],
     [/missions/i, /Parker, Juno, Europa Clipper/],
     [/L1 & L2/i, /JWST/],
     [/talking to Earth now/i, /Deep Space Network/],
@@ -73,7 +73,10 @@ describe('group order (#263)', () => {
     )
     const titles = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
     expect(titles.slice(0, 3)).toEqual(['Learn', 'Find', 'View'])
-    expect(titles.indexOf('View')).toBeLessThan(titles.indexOf('Solar system'))
+    // A folding group's heading also carries its readout (#273).
+    const solar = titles.findIndex((t) => t.startsWith('Solar system'))
+    expect(solar).toBeGreaterThan(-1)
+    expect(titles.indexOf('View')).toBeLessThan(solar)
   })
 })
 

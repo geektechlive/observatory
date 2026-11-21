@@ -38,6 +38,24 @@ the orrery writes its own voice line inside its chunk, from the planet math.
   then View (the presets and the scale), and only then the data switches. View was once
   last, under every switch group, 2,431 px down a 720 px rail at 1440×900 and 2,332 px down
   the phone sheet (#263). `orrery-control-rail.test.tsx` pins the order.
+- **The layer groups fold (#273, ADR 0039).** `FoldGroup.tsx` is the heading button with a
+  readout of what is on; Solar system and Spacecraft start open; Small bodies (dwarf planets,
+  comets, bright asteroids, interstellar), Near Earth (close approaches, Scout, the Sun–Earth
+  line) and Earth orbit start folded.
+  - A visitor's folds live in localStorage (`railFolds.ts`, key `observatory.orrery.rail.v1`,
+    every access wrapped, with an in-memory copy). A group that opens by itself isn't stored.
+  - Contents stay mounted while folded, so the satellite browser and Scout's list keep their
+    state. A switch in a folded group can't be clicked, so one that turns on while folded was
+    turned on from outside (Find, a link, Show me, a preset): the group opens, marks the row
+    (`data-just-on`, via `JustOnContext`) and announces it in a `role="status"` line for 8 s.
+    It scrolls into view only when the rail is visible (`checkVisibility`), since on a phone
+    the sheet has closed.
+  - Each hint is one line; the detail lives in the guide's "The controls" section
+    (`orrery-guide-sections.test.ts` pins it there) and the satellite browser's full hints
+    (`SatToggle.hint` vs `.short`).
+  - Tests open a folded group first: `tests/e2e/railFolds.ts` (`openRailGroup`) and
+    `tests/unit/fixtures/openFolds.ts`. Steps that rely on an outside switch-on don't, so
+    they prove the reveal.
 - **It reads the clock through an injected `ClockReader`, never the zustand store.** When it
   imported the store (and so React), the first load split from 4 chunks into 7.
 - **Planets** come from `src/lib/orrery`: JPL Table 1 inside 1800–2050 and Table 2 (3000 BC –

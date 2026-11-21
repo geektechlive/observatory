@@ -8,6 +8,7 @@ describe('the guide reference sections (#159)', () => {
   it('covers every topic in the brief, in order', () => {
     expect(SECTIONS.map((s) => s.id)).toEqual([
       'getting-around',
+      'controls',
       'time',
       'finding',
       'inspector',
@@ -15,6 +16,26 @@ describe('the guide reference sections (#159)', () => {
       'scale',
       'data',
     ])
+  })
+
+  // The folding rail cut each switch hint to one line (#273); what was cut lives here.
+  it('keeps the detail the rail’s hints no longer carry', () => {
+    const controls = SECTIONS.find((s) => s.id === 'controls')
+    const text = controls ? sectionText(controls) : ''
+    for (const fact of [
+      'Goldstone, Madrid and Canberra',
+      'Psyche, Lucy, Solar Orbiter and BepiColombo',
+      '1.5 million km',
+      'bigger than about 140 m',
+      'within 100 years',
+      '19 lunar distances',
+      'Tiangong',
+      'about 0.5 MB',
+      'Fengyun-1C',
+      'Cosmos 2251',
+    ]) {
+      expect(text, fact).toContain(fact)
+    }
   })
 
   it('writes no em or en dashes', () => {

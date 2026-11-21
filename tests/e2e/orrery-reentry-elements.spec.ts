@@ -8,6 +8,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { REENTRY_NAME, serveStarlinkReentry } from './reentryElementsPayload'
 import { serveSats } from './satPayload'
 import { offlineSun } from './swpc'
@@ -61,6 +62,7 @@ test.describe('re-entry objects outside the switched-on groups (#154)', () => {
     })
     await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()
     await expect.poll(() => attr(page, 'data-orrery-sat-mode')).toBe('points')
+    await openRailGroup(page, 'Earth orbit')
     await expect(page.getByRole('switch', { name: 'Starlink' })).toHaveAttribute(
       'aria-checked',
       'false',

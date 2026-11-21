@@ -168,7 +168,7 @@ export function buildCatalog(
     })
   }
   if (!near) return items
-  items.push({ key: L1_KEY, label: 'L1', kind: 'marker', group: 'Space weather', available: true })
+  items.push({ key: L1_KEY, label: 'L1', kind: 'marker', group: 'Near Earth', available: true })
   for (const a of near.approaches) {
     const base = {
       key: a.id,

@@ -9,6 +9,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { serveCraft } from './craftPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { serveSats } from './satPayload'
 import { serveSpaceTrack } from './spaceTrackPayload'
 import { offlineSun } from './swpc'
@@ -77,6 +78,7 @@ test.describe('marker sizes against the Sun (#195, #196)', () => {
     test(`${preset}, zoomed in: no marker outgrows the Sun`, async ({ page }) => {
       await openOrrery(page)
       await page.getByRole('button', { name: preset, exact: true }).click()
+      await openRailGroup(page, 'Earth orbit')
       await page.getByRole('switch', { name: 'Starlink' }).click()
       await page.getByRole('combobox', { name: /find/i }).fill('ISS')
       await page.getByRole('option', { name: /^ISS/ }).first().click()

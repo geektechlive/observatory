@@ -8,6 +8,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { serveSats } from './satPayload'
 import { serveSpaceTrack } from './spaceTrackPayload'
 import { offlineSun } from './swpc'
@@ -50,6 +51,7 @@ test.describe('satellites (#98)', () => {
     expect(requested).not.toContain('starlink')
     await expect.poll(async () => Number(await attr(page, 'data-orrery-sat-drawn'))).toBe(55)
     expect(Number(await attr(page, 'data-sat-propagate-ms'))).toBeGreaterThanOrEqual(0)
+    await openRailGroup(page, 'Earth orbit')
     await expect(page.getByText('55 satellites from CelesTrak', { exact: false })).toBeVisible()
   })
 
@@ -99,6 +101,7 @@ test.describe('satellites (#98)', () => {
     const requested = await openOrrery(page)
     await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()
     await expect.poll(async () => Number(await attr(page, 'data-orrery-sat-drawn'))).toBe(55)
+    await openRailGroup(page, 'Earth orbit')
     const starlink = page.getByRole('switch', { name: 'Starlink' })
     await expect(starlink).toHaveAttribute('aria-describedby', /.+/)
     await starlink.click()
@@ -129,6 +132,7 @@ test.describe('satellites (#98)', () => {
     })
     await page.getByRole('button', { name: 'Earth orbit', exact: true }).click()
     await expect.poll(async () => Number(await attr(page, 'data-orrery-sat-drawn'))).toBe(55)
+    await openRailGroup(page, 'Earth orbit')
     await page.getByRole('switch', { name: 'Starlink' }).click()
     await page.getByRole('switch', { name: 'Debris' }).click()
     await expect
@@ -188,6 +192,7 @@ test.describe('satellites (#98)', () => {
   }) => {
     await serveSpaceTrack(page)
     await openOrrery(page)
+    await openRailGroup(page, 'Earth orbit')
     await expect(page.getByText('Space-Track tracks 35,526 objects in orbit')).toBeVisible()
     await expect(
       page.getByText(/1 object is predicted to re-enter in the next 7 days/),

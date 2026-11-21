@@ -46,7 +46,6 @@ import { ControlRail } from './ControlRail'
 import { type CraftFilter, DEFAULT_CRAFT_FILTER } from './craftFilter'
 import { DetailLoading } from './DetailLoading'
 import { DETAIL_VIEW_ID } from './detailViewId'
-import { DwarfControls } from './DwarfControls'
 import { flyInOptions, orreryJdNow } from './flyIn'
 import { FlyInOverlay, type FlyInOverlayHandle } from './FlyInOverlay'
 import { GuideChip } from './GuideChip'
@@ -1268,21 +1267,13 @@ export function OrreryPage() {
         craftStatus={craftStatus}
         dsnCount={craftTracks.filter((t) => dsnIds.has(t.naifId)).length}
         smallBodies={
-          <>
-            <DwarfControls
-              on={small.groups.dwarfs}
-              onChange={(dwarfs) => {
-                small.setGroups({ ...small.groups, dwarfs })
-              }}
-              status={small.dwarfStatus}
-            />
-            <SmallBodyControls
-              groups={small.groups}
-              onGroups={small.setGroups}
-              status={small.status}
-              asteroidStatus={small.asteroidStatus}
-            />
-          </>
+          <SmallBodyControls
+            groups={small.groups}
+            onGroups={small.setGroups}
+            status={small.status}
+            asteroidStatus={small.asteroidStatus}
+            dwarfStatus={small.dwarfStatus}
+          />
         }
         nearEarth={
           <NeoControls

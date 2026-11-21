@@ -15,12 +15,16 @@ import type { SatFieldInfo } from '@/lib/orbit/bulk/satHandler'
 import { ORBIT_GEO, ORBIT_LEO, ORBIT_MEO } from '@/lib/orbit/orbitClass'
 import { SAT_GROUPS, type SatGroupId } from '@/lib/orbit/satCatalog'
 
+import { openAllFolds } from './fixtures/openFolds'
+
 const fetchSatcatShard = vi.fn()
 vi.mock('@/lib/api/spaceTrack', () => ({
   fetchSatcatShard: (shard: number) => fetchSatcatShard(shard) as Promise<unknown>,
 }))
 
 afterEach(cleanup)
+// The rail folds its layer groups (#273): these tests read what a group holds.
+beforeEach(openAllFolds)
 beforeEach(() => {
   // jsdom has no layout: opening the browser scrolls it into view.
   Element.prototype.scrollIntoView = vi.fn()

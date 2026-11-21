@@ -47,6 +47,27 @@ export const SECTIONS: readonly Section[] = [
     ],
   },
   {
+    // The rail folds its layer groups (#273); the facts below are the switch hints the rail
+    // carried in full before then (ControlRail.tsx, NeoControls.tsx, satToggles.ts).
+    id: 'controls',
+    title: 'The controls',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'Learn, Find and View are always open. Each group of switches below them folds: press its name to open or close it, and the name says what is on even when it is folded. The rail remembers which groups you left open. When something else switches a layer on, such as a search, a link or a lesson’s Show me, its group opens and says what it switched on.',
+      },
+      {
+        kind: 'list',
+        items: [
+          'Spacecraft. Deep space is Voyager 1, Voyager 2 and New Horizons, beyond the planets. Missions is Parker, Juno, Europa Clipper, Psyche, Lucy, Solar Orbiter and BepiColombo, on their way or at work. L1 & L2 observatories is JWST, SOHO, DSCOVR, ACE and Wind, parked about 1.5 million km from Earth. Only those talking to Earth now keeps the craft in radio contact with NASA’s Deep Space Network: the big dishes at Goldstone, Madrid and Canberra.',
+          'Small bodies. Dwarf planets, comets, bright asteroids and the interstellar objects, all off at first so nothing extra loads (see “Finding things”).',
+          'Near Earth. The asteroids passing within 0.05 au of Earth (19 lunar distances); the data covers 30 days either side of today, and the closest approach is counted from the date shown. Hazardous only keeps JPL’s “potentially hazardous” list: bigger than about 140 m, on an orbit that comes within 0.05 au of Earth’s. It is a label, not a prediction of a hit. On ESA’s risk list only keeps the objects whose orbit, as known today, leaves a tiny modelled chance of a hit within 100 years; most drop off as observations come in. The last switch draws the line from the Sun to Earth, with L1 on it: the point 1.5 million km sunward where DSCOVR and ACE sample the solar wind before it reaches us.',
+          'Earth orbit. Space stations are the ISS, China’s Tiangong and the craft docked to them. Starlink is SpaceX’s internet satellites, over 11,000 in low orbit, placed from SpaceX’s own orbit data where CelesTrak has it; it is the biggest download, about 0.5 MB. GPS is the US navigation satellites, about 20,000 km up. Weather covers low orbit and the geostationary ring. Science is space telescopes and Earth-science missions, Hubble among them. Other active is every other working satellite CelesTrak tracks. Debris is the pieces of three break-ups: China’s 2007 missile test on Fengyun-1C and the 2009 collision of Iridium 33 and Cosmos 2251.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'time',
     title: 'Time',
     blocks: [
@@ -78,7 +99,7 @@ export const SECTIONS: readonly Section[] = [
       },
       {
         kind: 'p',
-        text: 'The Comets, asteroids & interstellar controls have three switches, all off at first so nothing extra loads. Comets draws the comets JPL’s magnitude forecast puts brightest tonight. Bright asteroids draws the asteroids that JPL’s H and G put brightest at the last refresh, about magnitude 11.5 or brighter; Ceres is drawn only by the Dwarf planets switch, although the Sky view lists it. Interstellar objects draws ʻOumuamua, Borisov and 3I/ATLAS, visitors from other stars. Once a switch has loaded them, they are in the Find box too.',
+        text: 'The Small bodies controls have four switches, all off at first so nothing extra loads: Dwarf planets (below), Comets, Bright asteroids and Interstellar objects. Comets draws the comets JPL’s magnitude forecast puts brightest tonight. Bright asteroids draws the asteroids that JPL’s H and G put brightest at the last refresh, about magnitude 11.5 or brighter; Ceres is drawn only by the Dwarf planets switch, although the Sky view lists it. Interstellar objects draws ʻOumuamua, Borisov and 3I/ATLAS, visitors from other stars. Once a switch has loaded them, they are in the Find box too.',
       },
       {
         kind: 'p',

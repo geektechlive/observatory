@@ -52,6 +52,105 @@
   text-transform: uppercase;
 }
 
+/* A layer group that folds (#273, direction A): the heading is the button. */
+.fold {
+  padding: 0;
+  gap: 0;
+}
+
+.foldBtn {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding: 0 var(--space-4);
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.foldBtn:focus-visible {
+  outline: 2px solid var(--copper-glow);
+  outline-offset: -2px;
+}
+
+.foldChevron {
+  inline-size: 7px;
+  block-size: 7px;
+  flex: none;
+  border-right: 1.5px solid var(--copper);
+  border-bottom: 1.5px solid var(--copper);
+  rotate: -45deg;
+  transition: rotate 160ms var(--ease-out-expo);
+}
+
+.foldBtn[aria-expanded='true'] .foldChevron {
+  rotate: 45deg;
+  translate: 0 -2px;
+}
+
+.foldTitle {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.foldBtn:hover .foldTitle {
+  color: var(--brass);
+}
+
+/* What is on, upright and in sentence case beside the slanted engraved title. */
+.foldReadout {
+  flex: none;
+  font: 500 var(--text-xs) / 1 var(--font-mono);
+  font-style: normal;
+  letter-spacing: var(--track-label);
+  text-transform: none;
+  color: var(--bone-dim);
+}
+
+.foldReadout[data-off] {
+  color: var(--bone-faint);
+}
+
+.foldBody {
+  display: grid;
+  gap: var(--space-3);
+  padding: 10px var(--space-4) var(--space-4);
+  border-top: 1px solid var(--plate-seam);
+}
+
+.foldBody[hidden] {
+  display: none;
+}
+
+/* The row a group opened for when something outside the rail switched it on. */
+.switchField[data-just-on] {
+  margin-inline: calc(-1 * var(--space-4));
+  padding: 4px var(--space-4) 4px calc(var(--space-4) - 3px);
+  border-left: 3px solid var(--copper-glow);
+  background: color-mix(in oklch, var(--copper) 12%, transparent);
+}
+
+.revealNote {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  font: 500 var(--text-xs) / 1.4 var(--font-mono);
+  letter-spacing: var(--track-label);
+  color: var(--copper-glow);
+}
+
+.revealNote:empty {
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foldChevron {
+    transition: none;
+  }
+}
+
 .switchField {
   display: grid;
   gap: var(--space-1);

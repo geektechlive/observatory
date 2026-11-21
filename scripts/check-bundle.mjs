@@ -58,8 +58,9 @@ export const BUDGETS = {
   gltfLoaderGzip: 30_000,
   // The orrery's guide drawer (#159): lessons, reference copy and the glossary, fetched
   // on the first open. Measured 8.7 kB gzip, plus a small glossary chunk it shares with
-  // the inspector's term buttons.
-  orreryGuideGzip: 12_000,
+  // the inspector's term buttons. 12.6 kB once the folding rail's detail moved into its
+  // "The controls" section (#273).
+  orreryGuideGzip: 14_000,
   // The "Look closer" view (#203): its own canvas, scene and chrome, fetched on the first
   // open. It shares three.js and GLTFLoader with the orrery, so the chunk is small. The
   // fly-in (#261) adds its sky, flight and 287 bright stars: 4.4 kB to about 10.6 kB.

@@ -10,6 +10,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { CERES_ID, PLUTO_ID, serveDwarfs } from './dwarfsPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { serveCometsTonight, serveSmallBodies } from './smallBodiesPayload'
 import { offlineSun } from './swpc'
 
@@ -39,6 +40,7 @@ test.describe('Dwarf planets (#99 item 8)', () => {
     await page.waitForTimeout(1000)
     expect(asked).toEqual([])
     expect(comets).toEqual([])
+    await openRailGroup(page, 'Small bodies')
     const sw = page.getByRole('switch', { name: 'Dwarf planets' })
     await expect(sw).toHaveAttribute('aria-checked', 'false')
     await sw.click()
@@ -67,6 +69,7 @@ test.describe('Dwarf planets (#99 item 8)', () => {
     page,
   }) => {
     await open(page, '#orrery?t=-002999-01-02')
+    await openRailGroup(page, 'Small bodies')
     await page.getByRole('switch', { name: 'Dwarf planets' }).click()
     await expect.poll(() => attr(page, 'data-orrery-small-body-keys')).toBe(PLUTO_ID)
     // Both orbit lines: Ceres's stays where its marker is hidden.
@@ -103,6 +106,7 @@ test.describe('Dwarf planets (#99 item 8)', () => {
       route.fulfill({ status: 503, json: { error: 'Dwarf planets not yet in KV' } }),
     )
     await page.goto('/#orrery')
+    await openRailGroup(page, 'Small bodies')
     await page.getByRole('switch', { name: 'Dwarf planets' }).click()
     await expect(
       page.getByRole('status').filter({ hasText: 'No dwarf-planet data yet' }),

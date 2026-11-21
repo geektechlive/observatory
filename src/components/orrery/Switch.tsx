@@ -1,6 +1,7 @@
-import { useId } from 'react'
+import { useContext, useId } from 'react'
 
 import styles from './orrery.module.css'
+import { JustOnContext } from './railFolds'
 
 /** One of the orrery's on/off switches, with an optional visible explanation. */
 export function Switch({
@@ -16,8 +17,10 @@ export function Switch({
   onChange: (on: boolean) => void
 }) {
   const hintId = useId()
+  // A folding group marks the row it opened for (#273).
+  const justOn = useContext(JustOnContext).includes(label)
   return (
-    <div className={styles.switchField ?? ''}>
+    <div className={styles.switchField ?? ''} data-just-on={justOn || undefined}>
       <div className={styles.switchRow ?? ''}>
         <span>{label}</span>
         <button

@@ -1,0 +1,242 @@
+[
+  {
+    "file": "baseline",
+    "state": "default",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 2676,
+    "width": 260
+  },
+  {
+    "file": "baseline",
+    "state": "default",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 2604,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "closed",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 848,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "earthonly",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1296,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "default",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1182,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "earth",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1630,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "reveal",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1676,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "closed-merged",
+    "size": "desk",
+    "clientHeight": 660,
+    "scrollHeight": 660,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "earthonly-merged",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1108,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "default-merged",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 994,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "earth-merged",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1441,
+    "width": 260
+  },
+  {
+    "file": "a-folding",
+    "state": "closed",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 924,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "earthonly",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1470,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "default",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1343,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "earth",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1889,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "reveal",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1935,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "closed-merged",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 754,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "earthonly-merged",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1300,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "default-merged",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1173,
+    "width": 324
+  },
+  {
+    "file": "a-folding",
+    "state": "earth-merged",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1718,
+    "width": 324
+  },
+  {
+    "file": "b-switchboard",
+    "state": "default",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1746,
+    "width": 260
+  },
+  {
+    "file": "b-switchboard",
+    "state": "earth",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 2050,
+    "width": 260
+  },
+  {
+    "file": "b-switchboard",
+    "state": "default",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 2085,
+    "width": 324
+  },
+  {
+    "file": "b-switchboard",
+    "state": "earth",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 2343,
+    "width": 324
+  },
+  {
+    "file": "c-tabbed",
+    "state": "default",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 741,
+    "width": 260
+  },
+  {
+    "file": "c-tabbed",
+    "state": "earth",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1096,
+    "width": 260
+  },
+  {
+    "file": "c-tabbed",
+    "state": "reveal",
+    "size": "desk",
+    "clientHeight": 720,
+    "scrollHeight": 1128,
+    "width": 260
+  },
+  {
+    "file": "c-tabbed",
+    "state": "default",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 858,
+    "width": 324
+  },
+  {
+    "file": "c-tabbed",
+    "state": "earth",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1212,
+    "width": 324
+  },
+  {
+    "file": "c-tabbed",
+    "state": "reveal",
+    "size": "phone",
+    "clientHeight": 382,
+    "scrollHeight": 1244,
+    "width": 324
+  }
+]

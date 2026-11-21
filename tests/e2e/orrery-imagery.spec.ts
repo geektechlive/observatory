@@ -28,7 +28,7 @@ async function openOrrery(page: Page) {
 async function inspect(page: Page, name: string) {
   await page.getByRole('combobox', { name: /find/i }).fill(name.slice(0, 3).toLowerCase())
   await page.getByRole('option', { name, exact: true }).click()
-  await expect(page.getByRole('heading', { name })).toBeVisible()
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
 }
 
 test.describe('Orrery imagery (#105)', () => {

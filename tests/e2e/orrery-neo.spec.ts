@@ -9,6 +9,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { lookupTrajectory } from './lookupPayload'
 import { serveMoons } from './moonPayload'
 import { serveNeo } from './neoPayload'
+import { openRailGroup } from './railFolds'
 import { offlineSun } from './swpc'
 
 test.beforeEach(async ({ page }) => {
@@ -56,11 +57,13 @@ test.describe('Earth’s neighbourhood (#92)', () => {
     await page.getByRole('button', { name: 'Earth–Moon', exact: true }).click()
     // Within 30 days, the default (#136): all four.
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('4')
+    await openRailGroup(page, 'Near Earth')
     const window = page.getByRole('group', { name: /closest approach/i })
     await window.getByRole('button', { name: /within a day/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
     await window.getByRole('button', { name: /within a week/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('3')
+    await openRailGroup(page, 'Near Earth')
     await page.getByRole('switch', { name: /risk list only/i }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
     await page.getByRole('switch', { name: /risk list only/i }).click()
@@ -133,6 +136,7 @@ test.describe('Earth’s neighbourhood (#92)', () => {
     )
     await expect(canvas(page)).toHaveAttribute('data-orrery-focus', 'lookup:54000001')
     // Once the approaches' filter leaves it out and nothing chooses it, the lookup draws it.
+    await openRailGroup(page, 'Near Earth')
     await page.getByRole('switch', { name: /risk list only/i }).click()
     await page.getByRole('complementary').getByRole('button', { name: 'Close' }).click()
     await expect.poll(() => attr(page, 'data-orrery-asteroids')).toBe('1')
